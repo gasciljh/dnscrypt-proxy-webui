@@ -499,4 +499,4 @@ The Code of Conduct is licensed under [CC BY 4.0](https://creativecommons.org/li
 - Releases: https://github.com/gasciljh/dnscrypt-proxy-webui/releases
 - Issues: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - Discussions: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
-- Security reports: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new# test
+- Security reports: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
