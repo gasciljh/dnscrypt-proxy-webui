@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     DNSCrypt Smart Filter — WebUI
+     Version: v1.0.0
+     Author: gasciljh
+     Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+     ============================================================
+     Bilingual WebUI (English/Arabic) with:
+       • Login (POST-only, CSRF-protected)
+       • Service toggle/restart
+       • Blocklist profile selection
+       • Custom rules editor (Allowlist + Denylist)
+       • Runtime info
+       • Diagnostic file viewer
+       • Live status via SSE
+       • PWA support (installable, offline-capable)
+     ============================================================ -->
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#0d1117">
+    <link rel="manifest" href="/manifest.json">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <title>DNSCrypt Proxy v1.0.0</title>
+    <style>
+        :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:20px; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }
+        .container { background:var(--bg-card); backdrop-filter:blur(16px); padding:24px 8px; border-radius:var(--radius); border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.7); width:100%; max-width:900px; position:relative; overflow:hidden; display:none; }
+        .login-overlay { position:fixed; inset:0; background:var(--bg); z-index:10000; display:flex; align-items:center; justify-content:center; }
+        .login-box { background:var(--bg-card); padding:40px; border-radius:var(--radius); border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.8); width:90%; max-width:400px; text-align:center; }
+        .login-box input { width:100%; padding:14px; margin-bottom:16px; background:rgba(0,0,0,0.2); border:1px solid var(--border); color:white; border-radius:12px; font-size:15px; outline:none; transition:0.3s; font-family:inherit; }
+        .login-box input:focus { border-color:var(--primary); box-shadow:0 0 10px rgba(88,166,255,0.2); }
+        .login-box button { width:100%; background:linear-gradient(135deg,var(--primary),#1f6feb); color:white; border:none; padding:14px; border-radius:12px; font-weight:bold; font-size:16px; cursor:pointer; transition:0.3s; font-family:inherit; }
+        .login-box button:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 20px rgba(31,111,235,0.4); }
+        .login-box button:disabled { opacity:0.6; cursor:not-allowed; }
+        .logo-container { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:8px; animation:logoPulse 2s ease-in-out; }
+        .logo-icon { font-size:48px; display:inline-block; animation:float 3s ease-in-out infinite; filter:drop-shadow(0 0 20px rgba(88,166,255,0.3)); transition:transform 0.3s ease; }
+        .logo-icon:hover { transform:scale(1.1) rotate(-5deg); }
+        @keyframes float { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+        @keyframes logoPulse { 0%{opacity:0;transform:scale(0.8);} 60%{opacity:1;transform:scale(1.05);} 100%{opacity:1;transform:scale(1);} }
+        .top-btn { position:fixed; top:16px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text-muted); padding:8px 14px; border-radius:10px; font-size:12px; cursor:pointer; transition:0.2s; font-family:inherit; z-index:10001; }
+        .top-btn:hover { background:rgba(255,255,255,0.12); color:var(--text); }
+        .lang-toggle { left:16px; }
+        .logout-btn { right:16px; display:none; color:var(--danger); background:rgba(248,81,73,0.1); border-color:rgba(248,81,73,0.3); }
+        .logout-btn:hover { background:rgba(248,81,73,0.2); color:var(--danger); }
+        [dir="ltr"] .lang-toggle { left:auto; right:16px; }
+        [dir="ltr"] .logout-btn { right:auto; left:16px; }
+        .auth-badge { position:fixed; top:16px; left:50%; transform:translateX(-50%); background:rgba(63,185,80,0.15); border:1px solid rgba(63,185,80,0.3); color:var(--success); padding:6px 14px; border-radius:20px; font-size:11px; font-family:inherit; z-index:10001; display:none; align-items:center; gap:6px; }
+        .auth-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--success); box-shadow:0 0 6px var(--success); animation:pulse-green 2s ease-in-out infinite; }
+        @keyframes pulse-green { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+        .update-banner { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,rgba(88,166,255,0.95),rgba(31,111,235,0.95)); color:white; padding:12px 20px; border-radius:14px; box-shadow:0 10px 30px rgba(88,166,255,0.4); z-index:10002; display:none; align-items:center; gap:12px; font-size:13px; font-weight:600; max-width:90%; animation:slideDown 0.4s ease-out; }
+        @keyframes slideDown { from{opacity:0;transform:translate(-50%,-20px);} to{opacity:1;transform:translate(-50%,0);} }
+        .update-banner button { background:rgba(255,255,255,0.2); color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; white-space:nowrap; }
+        .update-banner button:hover { background:rgba(255,255,255,0.35); }
+        .update-banner .close-x { background:transparent; padding:4px 8px; font-size:14px; color:rgba(255,255,255,0.7); }
+        .update-banner .close-x:hover { background:rgba(255,255,255,0.15); color:white; }
+        .header { text-align:center; }
+        h1 { font-weight:900; font-size:28px; background:linear-gradient(135deg,var(--primary),#1f6feb); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .subtitle { color:var(--text-muted); font-size:13px; margin-bottom:24px; }
+        .badge { background:rgba(88,166,255,0.15); color:var(--primary); font-size:9px; padding:2px 10px; border-radius:20px; display:inline-block; }
+        .badge-dashboard { background:rgba(63,185,80,0.2); color:var(--success); font-size:11px; padding:4px 14px; border-radius:20px; display:inline-block; text-decoration:none; cursor:pointer; transition:0.2s; margin-right:8px; border:1px solid rgba(63,185,80,0.2); }
+        .badge-dashboard:hover { background:rgba(63,185,80,0.3); border-color:var(--success); }
+        .badge-dashboard.loading { opacity:0.6; cursor:wait; }
+        .status-area { display:flex; align-items:center; justify-content:center; gap:14px; padding:16px; background:rgba(255,255,255,0.02); border-radius:14px; border:1px solid var(--border); margin-bottom:20px; min-height:60px; transition:border-color 0.3s ease; }
+        .status-dot { width:12px; height:12px; border-radius:50%; transition:0.5s; }
+        .dot-on { background:var(--success); box-shadow:0 0 20px var(--success); }
+        .dot-off { background:var(--danger); }
+        .status-text { font-weight:600; font-size:14px; }
+        .btn-group { display:flex; gap:8px; width:100%; }
+        .btn-toggle { background:linear-gradient(136deg,#238636,#2ea043); color:white; border:none; padding:16px; border-radius:14px; font-weight:700; font-size:16px; cursor:pointer; flex:1; transition:all 0.3s ease; font-family:inherit; }
+        @keyframes pulse-red { 0%{box-shadow:0 0 0 0 rgba(248,81,73,0.4);} 70%{box-shadow:0 0 0 10px rgba(248,81,73,0);} 100%{box-shadow:0 0 0 0 rgba(248,81,73,0);} }
+        .btn-toggle.off-state { background:linear-gradient(135deg,#da3633,#f85149); animation:pulse-red 2s infinite; }
+        .btn-toggle:disabled { opacity:0.5; cursor:not-allowed; animation:none; }
+        .btn-restart { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:16px; border-radius:14px; font-weight:700; font-size:16px; cursor:pointer; flex:0.4; transition:all 0.3s ease; font-family:inherit; }
+        .btn-restart:disabled { opacity:0.5; cursor:not-allowed; }
+        .loader-container { display:none; justify-content:center; margin:10px 0; }
+        .loader { width:20px; height:20px; border:3px solid rgba(255,255,255,0.1); border-top:3px solid var(--primary); border-radius:50%; animation:spin 0.7s linear infinite; }
+        @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+        .card-editor { margin-top:24px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:right; }
+        [dir="ltr"] .card-editor { text-align:left; }
+        .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap; }
+        .editor-header h3 { font-size:16px; color:var(--primary); margin:0; }
+        .profile-selector { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; }
+        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; }
+        .profile-selector select option { background:var(--bg); color:var(--text); }
+        .btn-apply { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; }
+        .btn-apply:disabled { opacity:0.5; cursor:not-allowed; }
+        .btn-edit { background:linear-gradient(135deg,#8957e5,#6e40c9); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; }
+        .btn-edit:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(137,87,229,0.4); }
+        .btn-cancel-edit { background:rgba(139,148,158,0.15); border:1px solid rgba(139,148,158,0.3); color:var(--text-muted); padding:10px 16px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer; width:100%; margin-top:6px; font-family:inherit; transition:0.2s; display:none; }
+        .btn-cancel-edit:hover { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
+        .rule-box textarea.editing { border-color:var(--warning) !important; background:rgba(210,153,34,0.05) !important; box-shadow:0 0 10px rgba(210,153,34,0.15); }
+        .rule-box textarea.rollback { border-color:var(--danger) !important; background:rgba(248,81,73,0.05) !important; }
+        .rule-box textarea:read-only { cursor:pointer; opacity:0.85; }
+        .rule-box textarea:read-only:hover { border-color:rgba(88,166,255,0.3); }
+        .edit-badge { display:none; background:rgba(210,153,34,0.15); color:var(--warning); font-size:10px; padding:2px 10px; border-radius:10px; border:1px solid rgba(210,153,34,0.3); margin-right:8px; animation:pulse-edit 1.5s ease-in-out infinite; }
+        .edit-badge.visible { display:inline-block; }
+        @keyframes pulse-edit { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+        .draft-badge { display:none; color:var(--success); font-size:10px; padding:2px 8px; border-radius:8px; margin-right:6px; transition:opacity 0.3s; }
+        .draft-badge.visible { display:inline-block; }
+        .current-profile { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:rgba(0,0,0,0.3); border-radius:12px; border:1px solid var(--border); margin-bottom:16px; font-size:14px; }
+        .current-profile span:last-child { font-weight:600; }
+        .last-update { font-size:12px; color:var(--text-muted); text-align:center; margin:8px 0; }
+        .editor-actions { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+        .btn { padding:10px 14px; border-radius:12px; border:none; cursor:pointer; font-weight:700; font-size:13px; flex:1; color:white; transition:0.2s; text-align:center; min-width:75px; font-family:inherit; }
+        .btn:disabled { opacity:0.3; cursor:not-allowed; }
+        .btn-sync { background:#445566; }
+        .btn-force-refresh { background:linear-gradient(135deg,#6e40c9,#8957e5); }
+        .btn-force-refresh:hover { opacity:0.9; }
+        .btn-logs { background:#6c757d; }
+        .btn-clear-logs { background:#8b949e; }
+        .btn-clear-logs:hover { background:#6c757d; }
+        .rules-group { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+        .rule-box { flex:1; min-width:200px; display:flex; flex-direction:column; gap:8px; }
+        .rule-label { font-size:13px; color:var(--text-muted); text-align:right; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; }
+        [dir="ltr"] .rule-label { text-align:left; }
+        .rule-box textarea { width:100%; height:120px; background:rgba(0,0,0,0.3); border:1px solid var(--border); color:var(--text); border-radius:12px; padding:12px; font-family:'JetBrains Mono',monospace; font-size:12px; resize:vertical; outline:none; transition:0.3s; }
+        .rule-box textarea:focus { border-color:var(--primary); }
+        .rule-box textarea:read-only:focus { border-color:var(--warning); box-shadow:none; }
+        .rule-status { font-size:11px; color:var(--text-muted); text-align:center; transition:opacity 0.3s ease; min-height:16px; }
+        .rule-status.saved { color:var(--success); }
+        .rule-status.error { color:var(--danger); }
+        .rule-status.pending { color:var(--warning); }
+        .rule-status.info { color:var(--primary); }
+        .progress-container { display:none; margin:12px 0; background:rgba(0,0,0,0.6); border-radius:14px; overflow:hidden; height:28px; position:relative; border:1px solid var(--border); box-shadow:inset 0 2px 5px rgba(0,0,0,0.5); opacity:1; transition:opacity 0.5s ease; }
+        .progress-bar { width:0%; height:100%; background-color:var(--primary); background-image:linear-gradient(45deg,rgba(255,255,255,0.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.15) 75%,transparent 75%,transparent); background-size:1rem 1rem; animation:progress-stripes 1s linear infinite; transition:width 0.4s ease,background-color 0.4s ease; border-radius:12px; }
+        .progress-bar.success { background-color:var(--success); }
+        .progress-text { position:absolute; width:100%; top:0; left:0; text-align:center; font-size:13px; font-weight:700; color:white; line-height:28px; text-shadow:0 1px 3px rgba(0,0,0,0.9); }
+        @keyframes progress-stripes { from{background-position:1rem 0;} to{background-position:0 0;} }
+        .msg-float { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:10005; padding:18px 36px; border-radius:16px; display:none; font-size:15px; font-weight:600; backdrop-filter:blur(16px); text-align:center; max-width:90%; min-width:200px; box-shadow:0 20px 60px rgba(0,0,0,0.6); transition:opacity 0.4s ease,visibility 0.4s ease; pointer-events:none; }
+        .msg-float.success { background:rgba(63,185,80,0.25); border:2px solid var(--success); color:var(--success); }
+        .msg-float.error { background:rgba(248,81,73,0.25); border:2px solid var(--danger); color:var(--danger); }
+        .msg-float.info { background:rgba(88,166,255,0.25); border:2px solid var(--primary); color:var(--primary); }
+        .msg-float.warning { background:rgba(210,153,34,0.25); border:2px solid var(--warning); color:var(--warning); }
+        .log-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2000; justify-content:center; align-items:center; }
+        .log-modal-content { background:var(--bg-card); border-radius:var(--radius); padding:20px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; border:1px solid var(--border); color:var(--text); }
+        .log-modal-content pre { font-family:'JetBrains Mono',monospace; font-size:12px; white-space:pre-wrap; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px; max-height:400px; overflow-y:auto; scroll-behavior:smooth; }
+        .log-modal-content .close-btn { background:var(--danger); border:none; color:white; padding:8px 16px; border-radius:8px; cursor:pointer; float:left; font-family:inherit; }
+        [dir="ltr"] .log-modal-content .close-btn { float:right; }
+        .old-modules-card { margin-top:16px; background:rgba(248,81,73,0.08); border:1px solid var(--danger); border-radius:var(--radius); padding:16px; display:none; }
+        .old-modules-card .title { color:var(--danger); font-weight:700; font-size:15px; margin-bottom:10px; }
+        .old-module-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:rgba(0,0,0,0.2); border-radius:10px; margin-bottom:8px; flex-wrap:wrap; gap:8px; }
+        .old-module-item .info { font-size:13px; flex:1; min-width:120px; }
+        .old-module-item .info .path { color:var(--text-muted); font-size:11px; }
+        .old-module-item .info .version { color:var(--primary); font-weight:600; }
+        .old-module-item .info .status { font-size:11px; padding:2px 8px; border-radius:10px; }
+        .old-module-item .info .status.disabled { background:rgba(139,148,158,0.2); color:var(--text-muted); }
+        .old-module-item .info .status.active { background:rgba(63,185,80,0.2); color:var(--success); }
+        .btn-delete-old { background:var(--danger); color:white; border:none; padding:6px 16px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; transition:0.2s; font-family:inherit; }
+        .btn-delete-old:hover { opacity:0.8; }
+        .btn-delete-old:disabled { opacity:0.4; cursor:not-allowed; }
+
+        /* ============================================================
+         * Footer — RTL/LTR safe
+         * ============================================================ */
+        .footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 14px;
+        }
+        .footer-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+        .footer-meta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            flex-wrap: wrap;
+        }
+        .footer-sep {
+            opacity: 0.4;
+            padding: 0 2px;
+        }
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .stats-area { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; color:var(--text-muted); flex-wrap:wrap; gap:8px; }
+        .stats-area span { background:rgba(255,255,255,0.03); padding:4px 12px; border-radius:8px; border:1px solid var(--border); }
+        .runtime-info { margin-top:16px; background:rgba(88,166,255,0.05); border:1px solid rgba(88,166,255,0.2); border-radius:var(--radius); padding:16px; display:none; }
+        .runtime-info .card-body { padding: 0 12px 14px 12px; }
+        .runtime-info .ri-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px; }
+        .runtime-info .ri-item:last-child { border-bottom:none; }
+        .runtime-info .ri-label { color:var(--text-muted); flex-shrink:0; font-weight:600; }
+        .runtime-info .ri-value { font-family:'JetBrains Mono',monospace; color:var(--text); font-size:11px; word-break:break-all; text-align:left; direction:ltr; max-width:65%; line-height:1.5; }
+        .runtime-info .ri-value a { color: var(--primary); text-decoration: none; }
+        .runtime-info .ri-value a:hover { text-decoration: underline; }
+        .runtime-info .btn-ri-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+        .runtime-info .btn-ri-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
+        .runtime-info .btn-ri-refresh:disabled { opacity:0.5; cursor:not-allowed; }
+        .ri-actions { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; }
+        .btn-ri-action { flex:1; background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:10px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; transition:0.2s; min-width:120px; }
+        .btn-ri-action:hover { background:rgba(88,166,255,0.25); transform:translateY(-1px); }
+        .btn-ri-action.secondary { background:rgba(139,148,158,0.15); border-color:rgba(139,148,158,0.3); color:var(--text-muted); }
+        .btn-ri-action.secondary:hover { background:rgba(139,148,158,0.25); color:var(--text); }
+        #riRawJson { display:none; margin-top:12px; background:rgba(0,0,0,0.4); padding:12px; border-radius:8px; font-size:11px; font-family:monospace; color:var(--text); overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; max-height:400px; max-width:calc(100vw - 80px); width:100%; direction:ltr; text-align:left; line-height:1.6; border:1px solid var(--border); white-space:pre; box-sizing:border-box; }
+        .diag-files { margin-top:16px; background:rgba(139,148,158,0.05); border:1px solid rgba(139,148,158,0.2); border-radius:var(--radius); padding:16px; display:none; }
+        .diag-files .card-body { padding: 0 12px 14px 12px; }
+        .diag-files .btn-df-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+        .diag-files .btn-df-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
+        .diag-files .btn-df-refresh:disabled { opacity:0.5; cursor:not-allowed; }
+        .df-section { margin-top:14px; }
+        .df-section:first-child { margin-top:0; }
+        .df-section-header { font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); letter-spacing:0.3px; }
+        .df-file { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:rgba(0,0,0,0.2); border-radius:8px; margin-bottom:6px; gap:8px; flex-wrap:wrap; border:1px solid rgba(255,255,255,0.03); }
+        .df-file:hover { background:rgba(0,0,0,0.3); border-color:rgba(88,166,255,0.15); }
+        .df-file-info { flex:1; min-width:150px; }
+        .df-file-name { color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; word-break:break-all; direction:ltr; text-align:left; display:block; line-height:1.4; }
+        .df-file-meta { color:var(--text-muted); font-size:10px; margin-top:3px; display:block; direction:ltr; text-align:left; }
+        .df-file-actions { display:flex; gap:6px; flex-shrink:0; }
+        .df-btn { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:5px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; white-space:nowrap; }
+        .df-btn:hover { background:rgba(88,166,255,0.25); }
+        .df-btn.ghost { background:rgba(139,148,158,0.15); border-color:rgba(139,148,158,0.3); color:var(--text-muted); }
+        .df-btn.ghost:hover { background:rgba(139,148,158,0.25); color:var(--text); }
+        .df-btn.danger { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
+        .df-btn.danger:hover { background:rgba(248,81,73,0.25); }
+        .df-empty { text-align:center; padding:16px; color:var(--text-muted); font-size:12px; }
+        .df-reveal-btn { width:100%; background:linear-gradient(135deg,rgba(248,81,73,0.15),rgba(248,81,73,0.1)); border:1px solid rgba(248,81,73,0.4); color:var(--danger); padding:10px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; }
+        .df-reveal-btn:hover { background:rgba(248,81,73,0.25); }
+        .file-viewer-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:4000; justify-content:center; align-items:center; padding:15px; }
+        .file-viewer-content { background:var(--bg-card); border-radius:var(--radius); padding:20px; max-width:900px; width:100%; max-height:92vh; overflow:hidden; border:1px solid var(--border); display:flex; flex-direction:column; gap:12px; box-shadow:0 30px 80px rgba(0,0,0,0.9); }
+        .file-viewer-header { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:10px; }
+        .file-viewer-title { font-size:13px; color:var(--primary); font-family:'JetBrains Mono',monospace; direction:ltr; text-align:left; word-break:break-all; flex:1; min-width:150px; }
+        .file-viewer-actions { display:flex; gap:6px; flex-shrink:0; }
+        .file-viewer-warning { background:rgba(248,81,73,0.12); border:1px solid rgba(248,81,73,0.4); color:var(--danger); padding:8px 12px; border-radius:8px; font-size:11px; font-weight:600; }
+        .file-viewer-body { background:rgba(0,0,0,0.5); padding:14px; border-radius:8px; font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text); overflow:auto; flex:1; white-space:pre; direction:ltr; text-align:left; line-height:1.55; border:1px solid var(--border); }
+        .custom-modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:5000; justify-content:center; align-items:center; }
+        .custom-modal-box { background:var(--bg-card); border-radius:var(--radius); padding:28px 24px; max-width:400px; width:90%; border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.8); text-align:center; animation:modalIn 0.25s ease-out; }
+        @keyframes modalIn { from{opacity:0;transform:scale(0.92) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
+        .custom-modal-box h3 { color:var(--text); margin-bottom:12px; font-size:18px; }
+        .custom-modal-box p { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
+        .custom-modal-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+        .custom-modal-actions button { padding:10px 28px; border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; font-family:inherit; }
+        .custom-modal-actions .modal-confirm { background:var(--danger); color:white; }
+        .custom-modal-actions .modal-confirm:hover { opacity:0.85; }
+        .custom-modal-actions .modal-cancel { background:rgba(255,255,255,0.1); color:var(--text); }
+        .custom-modal-actions .modal-cancel:hover { background:rgba(255,255,255,0.2); }
+        .custom-modal-actions .modal-primary { background:var(--primary); color:white; }
+        .custom-modal-actions .modal-primary:hover { opacity:0.85; }
+        .card-body-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-out, visibility 0.3s, opacity 0.3s; overflow: hidden; visibility: hidden; opacity: 0; }
+        .card.open .card-body-wrapper { grid-template-rows: 1fr; visibility: visible; opacity: 1; }
+        .card-body-wrapper > .card-body { min-height: 0; }
+        .card-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 14px 12px; border-bottom: 1px solid var(--border); margin-bottom: 0 !important; flex-wrap: nowrap; gap: 8px; }
+        .card-header .arrow { transition: transform 0.3s ease; font-size: 12px; color: var(--primary); }
+        .card.open .card-header .arrow { transform: rotate(180deg); }
+        .runtime-info, .diag-files { padding: 0 !important; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+    </style>
+</head>
+<body>
+
+<div id="customModal" class="custom-modal-overlay">
+    <div class="custom-modal-box">
+        <h3 id="modalTitle">Confirm</h3>
+        <p id="modalMessage">Are you sure?</p>
+        <div class="custom-modal-actions">
+            <button class="modal-cancel" id="modalCancelBtn">Cancel</button>
+            <button class="modal-confirm" id="modalConfirmBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div id="msg" class="msg-float"></div>
+
+<div id="swUpdateBanner" class="update-banner">
+    <span>🔄 <span id="swUpdateText">Update available — reload</span></span>
+    <button type="button" id="swUpdateReloadBtn">Reload</button>
+    <button type="button" class="close-x" id="swUpdateCloseBtn" title="Hide">✕</button>
+</div>
+
+<div id="authBadge" class="auth-badge" title="Session active">🔐 Connected</div>
+
+<button class="top-btn lang-toggle" id="langToggle">🇸🇦 العربية</button>
+<button class="top-btn logout-btn" id="logoutBtn">🚪 Logout</button>
+
+<div id="loginScreen" class="login-overlay">
+    <div class="login-box">
+        <div class="logo-icon" style="font-size: 50px; margin-bottom: 15px;">🛡️</div>
+        <h2 id="loginTitle" style="color: var(--text); margin-bottom: 24px;">Login</h2>
+        <input type="text" id="usernameInput" placeholder="Username" autocomplete="username">
+        <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+        <button id="loginBtn">Login</button>
+    </div>
+</div>
+
+<div class="container" id="appContent">
+    <div id="mainUI">
+        <div class="header">
+            <div class="logo-container"><span class="logo-icon" id="logoIcon">🛡️</span></div>
+            <h1 id="title">DNSCrypt Proxy</h1>
+            <p class="subtitle">
+                <span id="subtitle">Smart Filter</span>
+                <span class="badge" id="versionBadge">v1.0.0</span>
+                <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
+                    📊 <span id="dashboardLinkText">Dashboard</span>
+                </a>
+            </p>
+        </div>
+
+        <div class="status-area" id="statusArea">
+            <span id="statusDot" class="status-dot"></span>
+            <span id="statusText" class="status-text">Checking...</span>
+        </div>
+
+        <div class="btn-group">
+            <button id="toggleBtn" class="btn-toggle off-state">▶️ Start Service</button>
+            <button id="restartBtn" class="btn-restart" title="Restart service">🔄</button>
+        </div>
+        <div id="loaderContainer" class="loader-container"><div class="loader"></div></div>
+
+        <div id="progressContainer" class="progress-container">
+            <div id="progressBar" class="progress-bar" style="width:0%"></div>
+            <div id="progressText" class="progress-text">0%</div>
+        </div>
+
+        <div class="stats-area" id="statsArea">
+            <span id="blockedToday">🚫 Today: 0</span>
+            <span id="ramUsage">💾 RAM: N/A</span>
+        </div>
+
+        <div class="card-editor" id="editorCard">
+            <div class="editor-header">
+                <h3 id="editorTitle">📝 Select Blocklist</h3>
+                <span class="source-count" id="sourceCountText" style="font-size:12px">Choose protection level</span>
+            </div>
+            <div class="current-profile">
+                <span id="currentLabel">Current Profile:</span>
+                <span id="currentProfileName">HaGeZi PRO</span>
+            </div>
+            <div class="last-update" id="lastUpdateText">🕒 Last update: unknown</div>
+            <div class="profile-selector">
+                <select id="profileSelect">
+                    <option value="light">☀️ Light</option>
+                    <option value="normal">🧹 Normal</option>
+                    <option value="pro" selected>🛡️ PRO</option>
+                    <option value="proplus">⚡ PRO++</option>
+                    <option value="ultimate">🔥 Ultimate</option>
+                </select>
+                <button class="btn-apply" id="applyBtn"><span id="applyText">Apply</span></button>
+            </div>
+            <div id="updateStatus" style="font-size:13px; color:var(--text-muted); text-align:center; margin-top:8px; min-height:20px;"></div>
+        </div>
+
+        <div class="card-editor" id="customRulesCard">
+            <div class="editor-header"><h3 id="customRulesTitle">⚙️ Custom Rules</h3></div>
+            <div class="rules-group">
+                <div class="rule-box">
+                    <span class="rule-label" id="allowlistLabel">
+                        <span>🟢 Allowlist (Bypass)</span>
+                        <span>
+                            <span class="edit-badge" id="allowEditBadge">🔓 Edit Mode</span>
+                            <span class="draft-badge" id="allowDraftBadge">💾 Draft</span>
+                        </span>
+                    </span>
+                    <textarea id="allowlistInput" readonly placeholder="googleadservices.com&#10;s.youtube.com"></textarea>
+                    <div class="rule-status" id="allowStatus"></div>
+                    <button class="btn-edit" id="saveAllowBtn">
+                        <span id="saveAllowText">✏️ Edit Allowlist</span>
+                    </button>
+                    <button class="btn-cancel-edit" id="cancelAllowBtn">✕ Cancel Edit</button>
+                </div>
+                <div class="rule-box">
+                    <span class="rule-label" id="denylistLabel">
+                        <span>🔴 Denylist (Block)</span>
+                        <span>
+                            <span class="edit-badge" id="denyEditBadge">🔓 Edit Mode</span>
+                            <span class="draft-badge" id="denyDraftBadge">💾 Draft</span>
+                        </span>
+                    </span>
+                    <textarea id="denylistInput" readonly placeholder="facebook.com&#10;tiktok.com"></textarea>
+                    <div class="rule-status" id="denyStatus"></div>
+                    <button class="btn-edit" id="saveDenyBtn">
+                        <span id="saveDenyText">✏️ Edit Denylist</span>
+                    </button>
+                    <button class="btn-cancel-edit" id="cancelDenyBtn">✕ Cancel Edit</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="runtime-info card" id="runtimeInfoCard" style="display:none;">
+            <div class="card-header" id="runtimeInfoHeader">
+                <h2 id="runtimeInfoTitle" style="font-size:15px; color:var(--primary); margin:0; display:flex; align-items:center; gap:6px; white-space:nowrap;">🔧 System Info</h2>
+                <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                    <button class="btn-ri-refresh" id="riRefreshBtn" type="button">↻ <span id="riRefreshText">Refresh</span></button>
+                    <span class="arrow">▼</span>
+                </div>
+            </div>
+            <div class="card-body-wrapper">
+                <div class="card-body">
+                    <div id="runtimeInfoContent"><div class="ri-item"><span class="ri-label">Loading...</span></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="diag-files card" id="diagFilesCard" style="display:none;">
+            <div class="card-header" id="diagFilesHeader">
+                <h2 id="diagFilesTitle" style="font-size:15px; color:var(--primary); margin:0; display:flex; align-items:center; gap:6px; white-space:nowrap;">📁 Diagnostic Files</h2>
+                <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+                    <button class="btn-df-refresh" id="dfRefreshBtn" type="button">↻ <span id="dfRefreshText">Refresh</span></button>
+                    <span class="arrow">▼</span>
+                </div>
+            </div>
+            <div class="card-body-wrapper">
+                <div class="card-body">
+                    <div id="diagFilesContent"><div class="df-empty">⏳ ...</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card-editor" style="padding: 15px;">
+            <div class="editor-actions" style="margin-top:0;">
+                <button class="btn btn-sync" id="syncBtn"><span id="syncText">↻ Refresh All</span></button>
+                <button class="btn btn-force-refresh" id="forceRefreshBtn" title="Bypass cache and reload fully"><span id="forceRefreshText">🔄 Force Refresh</span></button>
+                <button class="btn btn-logs" id="logsBtn"><span id="logsText">📜 Logs</span></button>
+                <button class="btn btn-clear-logs" id="clearLogsBtn"><span id="clearLogsText">🗑️ Clear</span></button>
+            </div>
+        </div>
+
+        <div class="old-modules-card" id="oldModulesCard">
+            <div class="title" id="oldModulesTitle">⚠️ Old modules found</div>
+            <div id="oldModulesList"></div>
+        </div>
+
+        <!-- ============================================================
+             Footer — RTL/LTR safe layout
+             ============================================================ -->
+        <div class="footer">
+            <span class="footer-brand">📋 HaGeZi Profiles</span>
+            <span class="footer-meta">
+                <span id="footerVersion">v1.0.0 Smart Edit Mode</span>
+                <span class="footer-sep">·</span>
+                <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
+            </span>
+        </div>
+    </div>
+</div>
+
+<div id="logModal" class="log-modal">
+    <div class="log-modal-content">
+        <button class="close-btn" id="closeLogsBtn">✕ <span id="closeLogsText">Close</span></button>
+        <h3 style="margin-top:0;" id="logsModalTitle">📜 Event Log (Last 300 lines)</h3>
+        <pre id="logContent">Loading...</pre>
+    </div>
+</div>
+
+<div id="fileViewerModal" class="file-viewer-overlay">
+    <div class="file-viewer-content">
+        <div class="file-viewer-header">
+            <span class="file-viewer-title" id="fvTitle">—</span>
+            <div class="file-viewer-actions">
+                <button class="df-btn" id="fvDownloadBtn">⬇️ <span id="fvDownloadText">Download</span></button>
+                <button class="df-btn danger" id="fvClearBtn">🗑️ <span id="fvClearText">Clear</span></button>
+                <button class="df-btn ghost" id="fvCloseBtn">✕ <span id="fvCloseText">Close</span></button>
+            </div>
+        </div>
+        <div class="file-viewer-warning" id="fvWarning" style="display:none;">⚠️ Sensitive file — may contain credentials</div>
+        <div class="file-viewer-body" id="fvContent">...</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ============================================================
+    // [1] Initial settings
+    // ============================================================
+    var VERSION = 'v1.0.0';
+
+    // Dynamic ports (updated from runtime_info)
+    var PORTS = {
+        webui:     '9090',
+        dashboard: '9091'
+    };
+
+    var translations = {
+        en: {
+            title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.0.0',
+            dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
+            loginTitle: 'Login', username: 'Username', password: 'Password',
+            loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
+            tooManyAttempts: '🚫 Too many attempts. Try again in 15 minutes.', loggingIn: '⏳ Verifying...',
+            sessionExpiredTitle: 'Session Expired',
+            sessionExpiredMsg: 'Your session expired due to inactivity or connection loss. Please login again.',
+            sessionRelogin: '🔄 Re-login',
+            networkError: '📡 Connection failed. Retrying...', networkDown: '⚠️ Server unreachable',
+            customRulesTitle: '⚙️ Custom Rules', allowlistLabel: '🟢 Allowlist (Bypass)',
+            denylistLabel: '🔴 Denylist (Block)',
+            saveAllowText: '💾 Save Allowlist', saveDenyText: '💾 Save Denylist',
+            editAllowText: '✏️ Edit Allowlist', editDenyText: '✏️ Edit Denylist',
+            cancelEdit: '✕ Cancel Edit', editBadge: '🔓 Edit Mode', draftBadge: '💾 Draft',
+            noAllowChanges: '⚠️ No changes in allowlist', noDenyChanges: '⚠️ No changes in denylist',
+            allowSavedMsg: '✅ Allowlist saved', denySavedMsg: '✅ Denylist saved',
+            allowSaveFailed: '❌ Allowlist save failed, rolled back',
+            denySaveFailed: '❌ Denylist save failed, rolled back',
+            cancelConfirm: '⚠️ You have unsaved changes. Discard them?',
+            unsavedWarning: '⚠️ You have unsaved changes in the rules!',
+            draftRestored: '💾 Draft restored',
+            retryText: '🔄 Retry',
+            conflictDetected: '⚠️ Modified in another session. Reloading...',
+            statusChecking: 'Checking...', statusOn: '🟢 Service Running', statusOff: '🔴 Service Stopped',
+            blockedTodayLabel: '🚫 Today:', ramUsageLabel: '💾 RAM:',
+            toggleOn: '▶️ Start Service', toggleOff: '⏹️ Stop Service',
+            toggleSuccess: '✅ Status changed', toggleError: '❌ Failed to change status',
+            restartBtn: '🔄 Restart', restartSuccess: '✅ Service restarted', restartError: '❌ Failed to restart',
+            editorTitle: '📝 Select Blocklist', sourceCount: 'Choose protection level',
+            entriesLabel: 'Protection entries', currentLabel: 'Current Profile:', lastUpdateLabel: '🕒 Last update: ',
+            apply: 'Apply', alreadyActive: '⚠️ This profile is already active', applyConfirm: 'Are you sure you want to apply rules and "',
+            serverError: '❌ Connection failed.',
+            safetyTimeout: '⚠️ Server timeout.', corruptFileError: '❌ Corrupted file.',
+            updateStatus: '⏳ Downloading blocklist...', updateStatusDone: '✅ Blocklist updated',
+            progressStart: 'Starting download...', sync: '↻ Refresh All', forceRefresh: '🔄 Force Refresh',
+            syncStart: '🔄 Refreshing all data...', syncSuccess: '✅ Refresh completed',
+            forceRefreshStart: '🔄 Force refresh...',
+            logs: '📜 Logs', closeLogs: 'Close', logsModalTitle: '📜 Event Log (Last 300 lines)',
+            loadingLogs: 'Loading...', noLogs: 'No logs available.', logsLoadError: '❌ Failed to load logs.',
+            clearLogs: '🗑️ Clear Logs', clearLogsSuccess: '✅ Logs cleared', clearLogsError: '❌ Failed to clear logs',
+            clearLogsConfirm: 'Are you sure you want to clear the logs?',
+            oldModulesTitle: '⚠️ Old modules found', checkingOldModules: 'Checking...', oldModuleInfo: 'Version: ',
+            statusDisabled: 'Disabled', statusActive: 'Active', deleteBtn: '🗑️ Delete',
+            deleteConfirm: '⚠️ Are you sure you want to delete the old module?\nPath: ',
+            deleteSuccess: '✅ Old module deleted', deleteError: '❌ Failed to delete module',
+            confirmTitle: 'Confirm', confirmCancel: 'Cancel', confirmOk: 'Confirm',
+            restartConfirm: 'Are you sure you want to restart the service?',
+            runtimeInfoTitle: '🔧 System Info', riRefresh: 'Refresh',
+            runtimeInfoLoading: '⏳ Loading...', runtimeInfoError: '❌ Failed to load system info',
+            riVersion: 'Version', riCommit: 'Commit', riBuildTime: 'Build Time',
+            riProjectURL: 'Project URL',
+            riRunDir: 'Runtime Dir', riStatusFile: 'Status File',
+            riPidFile: 'PID File', riProgressFile: 'Progress File', riLogFile: 'Log File',
+            riWebuiPort: 'WebUI Port', riDashboardPort: 'Dashboard Port',
+            riCopyAll: '📋 Copy All', riCopySuccess: '✅ Copied', riCopyError: '❌ Copy failed',
+            riRawJson: '🔍 Raw JSON', riHideJson: '🔍 Hide JSON',
+            diagFilesTitle: '📁 Diagnostic Files', dfRefresh: 'Refresh',
+            dfActiveFiles: 'Active Files', dfArchiveFiles: 'Archived Files',
+            dfEmergencyFiles: 'Emergency Files', dfSensitiveFiles: 'Sensitive Files',
+            dfRevealCredentials: '🔐 Reveal Credentials', dfHide: '🔒 Hide',
+            dfView: 'View', dfDownload: 'Download',
+            dfNoFiles: 'No files', dfLoadError: '❌ Failed to load files',
+            dfConfirmSensitive: '⚠️ This will reveal sensitive data (username & password).\nIt may appear in screenshots.\n\nAre you sure?',
+            dfLoading: '⏳ Loading...', dfFailedToLoad: '❌ Failed to load file',
+            dfEmpty: '(empty)', dfTruncatedPrefix: '... [truncated to 500 KB] ...\n\n',
+            dfDownloading: '⬇️ Downloading...', dfSensitiveWarning: '⚠️ Sensitive file — may contain credentials',
+            fvClear: 'Clear',
+            fvClearConfirm: '⚠️ Are you sure you want to clear this file?\nThis cannot be undone.',
+            fvClearSuccess: '✅ File cleared successfully',
+            fvClearError: '❌ Failed to clear file',
+            projectLink: 'Project',
+            swUpdateAvailable: '🔄 Update available — reload',
+            swUpdateReload: 'Reload'
+        },
+        ar: {
+            title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.0.0',
+            dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
+            loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
+            loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
+            tooManyAttempts: '🚫 محاولات كثيرة. حاول بعد 15 دقيقة.', loggingIn: '⏳ جاري التحقق...',
+            sessionExpiredTitle: 'انتهت الجلسة',
+            sessionExpiredMsg: 'انتهت جلستك بسبب عدم النشاط أو انقطاع الاتصال. يرجى إعادة تسجيل الدخول.',
+            sessionRelogin: '🔄 إعادة تسجيل الدخول',
+            networkError: '📡 فشل الاتصال بالخادم. جاري إعادة المحاولة...', networkDown: '⚠️ تعذر الاتصال بالخادم',
+            customRulesTitle: '⚙️ القواعد المخصصة', allowlistLabel: '🟢 القائمة البيضاء (تخطي الحظر)',
+            denylistLabel: '🔴 القائمة السوداء (حظر إضافي)',
+            saveAllowText: '💾 حفظ القائمة البيضاء', saveDenyText: '💾 حفظ القائمة السوداء',
+            editAllowText: '✏️ تعديل القائمة البيضاء', editDenyText: '✏️ تعديل القائمة السوداء',
+            cancelEdit: '✕ إلغاء التعديل', editBadge: '🔓 وضع التعديل', draftBadge: '💾 مسودة',
+            noAllowChanges: '⚠️ لا توجد تغييرات في القائمة البيضاء', noDenyChanges: '⚠️ لا توجد تغييرات في القائمة السوداء',
+            allowSavedMsg: '✅ تم حفظ القائمة البيضاء', denySavedMsg: '✅ تم حفظ القائمة السوداء',
+            allowSaveFailed: '❌ فشل حفظ القائمة البيضاء، تم التراجع',
+            denySaveFailed: '❌ فشل حفظ القائمة السوداء، تم التراجع',
+            cancelConfirm: '⚠️ لديك تعديلات غير محفوظة. هل تريد تجاهلها؟',
+            unsavedWarning: '⚠️ لديك تعديلات غير محفوظة في القوائم!',
+            draftRestored: '💾 تم استرجاع المسودة المحفوظة',
+            retryText: '🔄 إعادة المحاولة',
+            conflictDetected: '⚠️ تم التعديل من جلسة أخرى. جاري إعادة التحميل...',
+            statusChecking: 'جاري التحقق...', statusOn: '🟢 النظام نشط', statusOff: '🔴 النظام متوقف',
+            blockedTodayLabel: '🚫 اليوم:', ramUsageLabel: '💾 الذاكرة:',
+            toggleOn: '▶️ تشغيل الخدمة', toggleOff: '⏹️ إيقاف الخدمة',
+            toggleSuccess: '✅ تم تغيير الحالة بنجاح', toggleError: '❌ فشل تغيير الحالة',
+            restartBtn: '🔄 إعادة تشغيل', restartSuccess: '✅ تم إعادة تشغيل الخدمة بنجاح', restartError: '❌ فشل إعادة التشغيل',
+            editorTitle: '📝 اختيار القائمة', sourceCount: 'اختر مستوى الحماية',
+            entriesLabel: 'مدخلة حماية', currentLabel: 'القائمة الحالية:', lastUpdateLabel: '🕒 آخر تحديث: ',
+            apply: 'تطبيق', alreadyActive: '⚠️ هذه القائمة مفعلة بالفعل', applyConfirm: 'هل أنت متأكد من تطبيق القواعد وقائمة ',
+            serverError: '❌ فشل الاتصال.',
+            safetyTimeout: '⚠️ طال انتظار الخادم.', corruptFileError: '❌ الملف المحمل تالف.',
+            updateStatus: '⏳ جاري تحميل القائمة...', updateStatusDone: '✅ تم تحديث القائمة',
+            progressStart: 'بدء التحميل...', sync: '↻ تحديث شامل', forceRefresh: '🔄 تحديث قسري',
+            syncStart: '🔄 جاري التحديث الشامل...', syncSuccess: '✅ تم التحديث الشامل',
+            forceRefreshStart: '🔄 جاري التحديث القسري...',
+            logs: '📜 سجلات', closeLogs: 'إغلاق', logsModalTitle: '📜 سجل الأحداث (آخر 300 سطر)',
+            loadingLogs: 'جاري التحميل...', noLogs: 'لا توجد سجلات متاحة.', logsLoadError: '❌ فشل في تحميل السجلات.',
+            clearLogs: '🗑️ تنظيف السجلات', clearLogsSuccess: '✅ تم تنظيف السجلات', clearLogsError: '❌ فشل تنظيف السجلات',
+            clearLogsConfirm: 'هل أنت متأكد من تنظيف السجلات؟',
+            oldModulesTitle: '⚠️ موديولات قديمة موجودة', checkingOldModules: 'جاري الفحص...', oldModuleInfo: 'الإصدار: ',
+            statusDisabled: 'معطل', statusActive: 'نشط', deleteBtn: '🗑️ حذف',
+            deleteConfirm: '⚠️ هل أنت متأكد من حذف الموديول القديم؟\nالمسار: ',
+            deleteSuccess: '✅ تم حذف الموديول القديم', deleteError: '❌ فشل حذف الموديول',
+            confirmTitle: 'تأكيد', confirmCancel: 'إلغاء', confirmOk: 'تأكيد',
+            restartConfirm: 'هل أنت متأكد من إعادة تشغيل الخدمة؟',
+            runtimeInfoTitle: '🔧 معلومات النظام', riRefresh: 'تحديث',
+            runtimeInfoLoading: '⏳ جاري التحميل...', runtimeInfoError: '❌ فشل تحميل معلومات النظام',
+            riVersion: 'الإصدار', riCommit: 'الـ commit', riBuildTime: 'زمن البناء',
+            riProjectURL: 'رابط المشروع',
+            riRunDir: 'مجلد التشغيل', riStatusFile: 'ملف الحالة',
+            riPidFile: 'ملف PID', riProgressFile: 'ملف التقدم', riLogFile: 'ملف السجل',
+            riWebuiPort: 'منفذ WebUI', riDashboardPort: 'منفذ Dashboard',
+            riCopyAll: '📋 نسخ الكل', riCopySuccess: '✅ تم النسخ', riCopyError: '❌ فشل النسخ',
+            riRawJson: '🔍 JSON خام', riHideJson: '🔍 إخفاء JSON',
+            diagFilesTitle: '📁 ملفات التشخيص', dfRefresh: 'تحديث',
+            dfActiveFiles: 'ملفات نشطة', dfArchiveFiles: 'ملفات مضغوطة',
+            dfEmergencyFiles: 'ملفات طارئة', dfSensitiveFiles: 'ملفات حساسة',
+            dfRevealCredentials: '🔐 إظهار معلومات الدخول', dfHide: '🔒 إخفاء',
+            dfView: 'عرض', dfDownload: 'تحميل',
+            dfNoFiles: 'لا توجد ملفات', dfLoadError: '❌ فشل تحميل الملفات',
+            dfConfirmSensitive: '⚠️ سيتم عرض بيانات حساسة (اسم المستخدم وكلمة المرور).\nقد تظهر في لقطات الشاشة.\n\nهل أنت متأكد؟',
+            dfLoading: '⏳ جاري التحميل...', dfFailedToLoad: '❌ فشل تحميل الملف',
+            dfEmpty: '(فارغ)', dfTruncatedPrefix: '... [تم اقتصاص النص إلى 500 KB] ...\n\n',
+            dfDownloading: '⬇️ جاري التحميل...', dfSensitiveWarning: '⚠️ ملف حساس — قد يحتوي بيانات دخول',
+            fvClear: 'مسح',
+            fvClearConfirm: '⚠️ هل أنت متأكد من مسح محتوى هذا الملف؟\nلا يمكن التراجع عن هذه العملية.',
+            fvClearSuccess: '✅ تم مسح الملف بنجاح',
+            fvClearError: '❌ فشل مسح الملف',
+            projectLink: 'المشروع',
+            swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
+            swUpdateReload: 'إعادة التحميل'
+        }
+    };
+
+    var currentLang = 'en';
+    try { currentLang = localStorage.getItem('dnscrypt-lang') || 'en'; } catch(e) {}
+
+    var isToggling = false, isProcessing = false, statusPollInterval = null;
+    var currentProfileKey = 'pro', currentProfileIsEmpty = true;
+    var pendingConfirmCallback = null, sse = null, statsInterval = null, safetyTimer = null;
+    var currentBlockedCount = '0', currentRamUsage = 'N/A';
+    var appInitialized = false, isLoginAttempt = false, sessionExpiredShown = false;
+    var runtimeInfoLoaded = false, runtimeInfoData = null, rawJsonVisible = false;
+    var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
+    var rulesState = { savingAllow: false, savingDeny: false, serverAllowHash: '', serverDenyHash: '' };
+
+    var currentStatus = '';
+
+    var verifyBackoff = 3000;
+    var verifyMaxBackoff = 60000;
+    var verifyFailures = 0;
+
+    var sseBackoff = 5000;
+    var sseMaxBackoff = 60000;
+
+    var sseStatusDebounceTimer = null;
+    var SSE_STATUS_DEBOUNCE_MS = 500;
+
+    var EditState = { VIEW: 'view', EDIT: 'edit', ROLLBACK: 'rollback' };
+    var editStates = { allow: EditState.VIEW, deny: EditState.VIEW };
+    var draftTimers = { allow: null, deny: null };
+    var originalValues = { allow: '', deny: '' };
+
+    var swUpdateAvailable = false;
+    var swUpdateCheckInterval = null;
+
+    var $ = function(id) { return document.getElementById(id); };
+    function t(k) { return translations[currentLang][k] || k; }
+
+    // ============================================================
+    // [1b] Dashboard URL builder (respects custom ports)
+    // ============================================================
+    function getDashboardUrl() {
+        var hostname = window.location.hostname || '127.0.0.1';
+
+        if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
+            hostname = '[' + hostname + ']';
+        }
+
+        var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+
+        return protocol + '//' + hostname + ':' + PORTS.dashboard + '/';
+    }
+
+    function updateDashboardLink() {
+        var link = $('dashboardLink');
+        if (!link) return;
+
+        var url = getDashboardUrl();
+        link.href = url;
+        link.setAttribute('data-port', PORTS.dashboard);
+        link.classList.remove('loading');
+    }
+
+    // ============================================================
+    // [2] escapeHtml
+    // ============================================================
+    function escapeHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/\u2028/g, '&#8232;')
+            .replace(/\u2029/g, '&#8233;');
+    }
+
+    // ============================================================
+    // [3] Token helpers — cookie-only
+    // ============================================================
+    function getStoredToken() { return null; }
+    function storeToken(tk) { void tk; }
+    function clearStoredToken() { }
+
+    // ============================================================
+    // [4] Draft helpers
+    // ============================================================
+    function getDraftKey(listType) { return 'dnscrypt-' + listType + '-draft'; }
+    function saveDraft(listType, value) {
+        try {
+            localStorage.setItem(getDraftKey(listType), JSON.stringify({
+                value: value,
+                timestamp: Date.now()
+            }));
+        } catch(e) {}
+    }
+    function getDraft(listType) {
+        try {
+            var raw = localStorage.getItem(getDraftKey(listType));
+            if (!raw) return null;
+            var parsed = JSON.parse(raw);
+            var ageMin = (Date.now() - parsed.timestamp) / 60000;
+            if (ageMin > 60) { localStorage.removeItem(getDraftKey(listType)); return null; }
+            return parsed;
+        } catch(e) { return null; }
+    }
+    function clearDraft(listType) {
+        try { localStorage.removeItem(getDraftKey(listType)); } catch(e) {}
+    }
+    function hasDraft(listType) {
+        var draft = getDraft(listType);
+        if (!draft) return false;
+        var orig = originalValues[listType] || '';
+        return draft.value !== orig;
+    }
+
+    // ============================================================
+    // [5] countChanges
+    // ============================================================
+    function countChanges(listType) {
+        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+        var original = originalValues[listType] || '';
+        var current = ta.value || '';
+        if (original === current) return 0;
+        var origLines = original.split('\n').filter(function(l) { return l.trim() !== ''; });
+        var currLines = current.split('\n').filter(function(l) { return l.trim() !== ''; });
+        var origSet = {}, currSet = {};
+        origLines.forEach(function(l) { origSet[l.trim()] = (origSet[l.trim()] || 0) + 1; });
+        currLines.forEach(function(l) { currSet[l.trim()] = (currSet[l.trim()] || 0) + 1; });
+        var added = 0, removed = 0;
+        for (var k in currSet) { if (!origSet[k]) added += currSet[k]; else if (currSet[k] > origSet[k]) added += currSet[k] - origSet[k]; }
+        for (var k2 in origSet) { if (!currSet[k2]) removed += origSet[k2]; else if (origSet[k2] > currSet[k2]) removed += origSet[k2] - currSet[k2]; }
+        return added + removed;
+    }
+
+    // ============================================================
+    // [6] Draft auto-save
+    // ============================================================
+    function startDraftAutoSave(listType) {
+        if (draftTimers[listType]) clearInterval(draftTimers[listType]);
+        draftTimers[listType] = setInterval(function() {
+            if (editStates[listType] !== EditState.EDIT && editStates[listType] !== EditState.ROLLBACK) return;
+            var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+            var changes = countChanges(listType);
+            if (changes > 0) {
+                saveDraft(listType, ta.value);
+                updateChangeCounter(listType);
+            }
+        }, 3000);
+    }
+    function stopDraftAutoSave(listType) {
+        if (draftTimers[listType]) { clearInterval(draftTimers[listType]); draftTimers[listType] = null; }
+    }
+
+    function updateChangeCounter(listType) {
+        var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
+        if (!badge) return;
+        var changes = countChanges(listType);
+        if (changes > 0) {
+            badge.textContent = '💾 ' + changes + ' ' + (currentLang === 'ar' ? 'تغيير' : 'changes');
+            badge.classList.add('visible');
+        } else {
+            badge.classList.remove('visible');
+        }
+    }
+
+    // ============================================================
+    // [7] FSM transition
+    // ============================================================
+    function transitionTo(listType, newState) {
+        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+        var btn = listType === 'allow' ? $('saveAllowBtn') : $('saveDenyBtn');
+        var cancelBtn = listType === 'allow' ? $('cancelAllowBtn') : $('cancelDenyBtn');
+        var badge = $(listType === 'allow' ? 'allowEditBadge' : 'denyEditBadge');
+        var textSpan = $(listType === 'allow' ? 'saveAllowText' : 'saveDenyText');
+
+        editStates[listType] = newState;
+
+        switch(newState) {
+            case EditState.VIEW:
+                ta.readOnly = true;
+                ta.classList.remove('editing', 'rollback');
+                btn.className = 'btn-edit';
+                btn.disabled = false;
+                textSpan.textContent = listType === 'allow' ? t('editAllowText') : t('editDenyText');
+                cancelBtn.style.display = 'none';
+                if (badge) badge.classList.remove('visible');
+                stopDraftAutoSave(listType);
+                break;
+
+            case EditState.EDIT:
+                ta.readOnly = false;
+                ta.classList.add('editing');
+                ta.classList.remove('rollback');
+                btn.className = 'btn-apply';
+                btn.disabled = false;
+                textSpan.textContent = listType === 'allow' ? t('saveAllowText') : t('saveDenyText');
+                cancelBtn.style.display = 'block';
+                if (badge) badge.classList.add('visible');
+                startDraftAutoSave(listType);
+                break;
+
+            case EditState.ROLLBACK:
+                ta.readOnly = false;
+                ta.classList.remove('editing');
+                ta.classList.add('rollback');
+                btn.className = 'btn-apply';
+                btn.disabled = false;
+                textSpan.textContent = t('retryText');
+                cancelBtn.style.display = 'block';
+                if (badge) badge.classList.add('visible');
+                break;
+        }
+    }
+
+    // ============================================================
+    // [8] Edit mode
+    // ============================================================
+    function handleEditBtnClick(listType) {
+        if (editStates[listType] === EditState.VIEW) {
+            enterEditMode(listType);
+        } else if (editStates[listType] === EditState.EDIT || editStates[listType] === EditState.ROLLBACK) {
+            saveWithOptimistic(listType);
+        }
+    }
+
+    function enterEditMode(listType) {
+        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+        originalValues[listType] = ta.value;
+
+        var draft = getDraft(listType);
+        if (draft && draft.value !== ta.value) {
+            showConfirmModal(t('draftRestored') + '\n\n' +
+                (currentLang === 'ar'
+                    ? 'هل تريد استرجاع المسودة المحفوظة من آخر جلسة؟'
+                    : 'Do you want to restore the draft from your last session?'),
+                function(restore) {
+                    if (restore) {
+                        ta.value = draft.value;
+                        showMsg(t('draftRestored'), 'info', 2500);
+                    } else {
+                        clearDraft(listType);
+                    }
+                    transitionTo(listType, EditState.EDIT);
+                    ta.focus();
+                    updateChangeCounter(listType);
+                },
+                { title: '💾 ' + (currentLang === 'ar' ? 'مسودة محفوظة' : 'Saved Draft') }
+            );
+        } else {
+            transitionTo(listType, EditState.EDIT);
+            ta.focus();
+            updateChangeCounter(listType);
+        }
+    }
+
+    function cancelEdit(listType) {
+        var changes = countChanges(listType);
+        if (changes > 0) {
+            showConfirmModal(t('cancelConfirm'), function(confirmed) {
+                if (!confirmed) return;
+                doCancelEdit(listType);
+            }, { title: '⚠️ ' + (currentLang === 'ar' ? 'تأكيد الإلغاء' : 'Confirm Cancel') });
+        } else {
+            doCancelEdit(listType);
+        }
+    }
+    function doCancelEdit(listType) {
+        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+        var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
+        ta.value = originalValues[listType];
+        clearDraft(listType);
+        transitionTo(listType, EditState.VIEW);
+        setRuleStatus(statusId, '', '');
+    }
+
+    // ============================================================
+    // [9] SHA-256
+    // ============================================================
+    function sha256(text) {
+        if (!window.crypto || !window.crypto.subtle) {
+            return Promise.reject(new Error('SHA-256 not available'));
+        }
+        try {
+            var buf = new TextEncoder().encode(text);
+            return crypto.subtle.digest('SHA-256', buf).then(function(hash) {
+                return Array.from(new Uint8Array(hash))
+                    .map(function(b) { return b.toString(16).padStart(2, '0'); })
+                    .join('');
+            });
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    }
+
+    function setRuleStatus(id, text, type) {
+        var el = $(id); if (!el) return;
+        el.textContent = text;
+        el.className = 'rule-status' + (type ? ' ' + type : '');
+    }
+
+    // ============================================================
+    // [10] Save with optimistic UI
+    // ============================================================
+    function saveWithOptimistic(listType) {
+        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+        var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
+        var content = ta.value;
+        var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+        var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
+        var originalValue = originalValues[listType];
+
+        if (countChanges(listType) === 0) {
+            showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+            return;
+        }
+
+        rulesState[savingFlag] = true;
+        transitionTo(listType, EditState.VIEW);
+        setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
+
+        sha256(content).then(function(newHash) {
+            var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
+            var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
+                         encodeURIComponent(content) +
+                         '&expected_hash=' + hash;
+
+            xhrPost(url, params, function(err, data) {
+                rulesState[savingFlag] = false;
+
+                if (err || !data || data.status !== 'ok') {
+                    ta.value = originalValue;
+                    transitionTo(listType, EditState.ROLLBACK);
+                    setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
+                    showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
+                    saveDraft(listType, content);
+                    return;
+                }
+
+                if (listType === 'allow') {
+                    rulesState.serverAllowHash = data.hash || newHash;
+                } else {
+                    rulesState.serverDenyHash = data.hash || newHash;
+                }
+                clearDraft(listType);
+                originalValues[listType] = content;
+                var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
+                if (badge) badge.classList.remove('visible');
+                setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
+                showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
+                setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
+                setTimeout(loadProfile, 500);
+            });
+        }).catch(function() {
+            rulesState[savingFlag] = false;
+            ta.value = originalValue;
+            transitionTo(listType, EditState.ROLLBACK);
+            var errMsg = '❌ SHA-256 unavailable in browser — use modern Chrome/Edge/Firefox';
+            setRuleStatus(statusId, errMsg, 'error');
+            showMsg(errMsg, 'error', 5000);
+        });
+    }
+
+    function hasUnsavedChanges() {
+        return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
+               ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
+    }
+
+    // ============================================================
+    // [11] Keyboard shortcuts
+    // ============================================================
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+                saveWithOptimistic('allow');
+            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+                saveWithOptimistic('deny');
+            }
+        }
+        if (e.key === 'Escape') {
+            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+                cancelEdit('allow');
+            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+                cancelEdit('deny');
+            }
+        }
+    });
+
+    // ============================================================
+    // [12] Modal
+    // ============================================================
+    function showConfirmModal(message, callback, options) {
+        options = options || {};
+        $('modalMessage').textContent = message;
+        $('modalTitle').textContent = options.title || t('confirmTitle');
+        $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
+        $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+        var box = $('customModal').querySelector('.custom-modal-actions');
+        var existing = box.querySelector('.modal-primary');
+        if (existing) existing.remove();
+        if (options.primaryText && options.primaryCallback) {
+            var btn = document.createElement('button');
+            btn.className = 'modal-primary';
+            btn.textContent = options.primaryText;
+            btn.addEventListener('click', function() {
+                closeConfirmModal();
+                options.primaryCallback();
+            });
+            box.insertBefore(btn, box.firstChild);
+        }
+        $('customModal').style.display = 'flex';
+        pendingConfirmCallback = callback;
+    }
+    function closeConfirmModal() {
+        $('customModal').style.display = 'none';
+        pendingConfirmCallback = null;
+    }
+
+    // ============================================================
+    // [13] Auth helpers
+    // ============================================================
+    function showAuthBadge() {
+        var b = $('authBadge');
+        if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
+    }
+    function hideAuthBadge() {
+        var b = $('authBadge');
+        if (b) b.style.display = 'none';
+    }
+    function setNetworkDownUI(isDown) {
+        var area = $('statusArea'), txt = $('statusText');
+        if (!area || !txt) return;
+        if (isDown) {
+            area.style.borderColor = 'rgba(210,153,34,0.4)';
+            txt.textContent = t('networkDown');
+        } else {
+            area.style.borderColor = '';
+        }
+    }
+    function updateStatsDisplay() {
+        $('blockedToday').textContent = t('blockedTodayLabel') + ' ' + currentBlockedCount;
+        $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
+    }
+
+    // ============================================================
+    // [13.b] SW Update handlers
+    // ============================================================
+    function showSWUpdateBanner() {
+        if (swUpdateAvailable) return;
+        swUpdateAvailable = true;
+        var banner = $('swUpdateBanner');
+        var txt = $('swUpdateText');
+        if (txt) txt.textContent = t('swUpdateAvailable');
+        if (banner) banner.style.display = 'flex';
+    }
+
+    function hideSWUpdateBanner() {
+        var banner = $('swUpdateBanner');
+        if (banner) banner.style.display = 'none';
+    }
+
+    function setupSWUpdateHandler() {
+        if (!('serviceWorker' in navigator)) return;
+
+        navigator.serviceWorker.addEventListener('message', function(event) {
+            if (!event.data) return;
+
+            if (event.data.type === 'UPDATE_AVAILABLE') {
+                if (event.data.waiting) {
+                    showSWUpdateBanner();
+                }
+            }
+        });
+
+        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+        swUpdateCheckInterval = setInterval(function() {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            }
+        }, 3600000);
+
+        setTimeout(function() {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            }
+        }, 5000);
+    }
+
+    function bindSWUpdateButtons() {
+        var reloadBtn = $('swUpdateReloadBtn');
+        var closeBtn = $('swUpdateCloseBtn');
+
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', function() {
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+                }
+                setTimeout(function() { location.reload(); }, 300);
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', hideSWUpdateBanner);
+        }
+    }
+
+    // ============================================================
+    // [14] Runtime Info — updates PORTS dynamically
+    // ============================================================
+    function loadRuntimeInfo() {
+        var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
+        if (!content) return;
+        if (card) card.style.display = 'block';
+        if (refreshBtn) refreshBtn.disabled = true;
+        content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
+
+        xhrGet('/api?action=runtime_info', function(err, data) {
+            if (refreshBtn) refreshBtn.disabled = false;
+            if (err || !data) {
+                content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
+                return;
+            }
+            runtimeInfoData = data;
+            runtimeInfoLoaded = true;
+
+            if (data.webui_port) {
+                PORTS.webui = String(data.webui_port);
+            }
+            if (data.dashboard_port) {
+                PORTS.dashboard = String(data.dashboard_port);
+                updateDashboardLink();
+            }
+
+            if (data.version && data.version !== 'dev') {
+                VERSION = data.version;
+                var badge = $('versionBadge');
+                if (badge) badge.textContent = VERSION;
+                var footer = $('footerVersion');
+                if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
+            }
+
+            if (data.project_url && data.project_url !== '') {
+                var link = $('footerProjectLink');
+                var linkText = $('footerProjectText');
+                if (link) {
+                    link.href = data.project_url;
+                    link.style.display = 'inline-flex';
+                }
+                if (linkText) linkText.textContent = t('projectLink');
+            }
+
+            var html = '';
+            var items = [
+                { label: t('riVersion'), value: data.version || 'unknown' },
+                { label: t('riCommit'), value: data.commit || 'unknown' },
+                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
+                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
+                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
+                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
+                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
+                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
+                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
+                { label: t('riLogFile'), value: data.log_file || 'unknown' }
+            ];
+            for (var i = 0; i < items.length; i++) {
+                var valHtml;
+                if (items[i].isLink && items[i].value !== 'unknown') {
+                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+                } else {
+                    valHtml = escapeHtml(items[i].value);
+                }
+                html += '<div class="ri-item"><span class="ri-label">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+            }
+            html += '<div class="ri-actions">'
+                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
+                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
+                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
+                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+            content.innerHTML = html;
+
+            var copyBtn = $('riCopyBtn');
+            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
+            var rawBtn = $('riRawJsonBtn');
+            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+        });
+    }
+
+    function copyRuntimeInfo() {
+        if (!runtimeInfoData) return;
+        var text = JSON.stringify(runtimeInfoData, null, 2);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                showMsg(t('riCopySuccess'), 'success', 1500);
+            }).catch(function() { _fallbackCopy(text); });
+        } else {
+            _fallbackCopy(text);
+        }
+    }
+    function _fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showMsg(t('riCopySuccess'), 'success', 1500);
+        } catch(e) {
+            showMsg(t('riCopyError'), 'error', 2000);
+        }
+        document.body.removeChild(ta);
+    }
+    function toggleRawJson() {
+        var el = $('riRawJson'), btn = $('riRawJsonBtn');
+        if (!el) return;
+        rawJsonVisible = !rawJsonVisible;
+        el.style.display = rawJsonVisible ? 'block' : 'none';
+        if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+    }
+
+    // ============================================================
+    // [15] Log files
+    // ============================================================
+    function formatBytes(bytes) {
+        if (!bytes || bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    function formatMtime(mtime) {
+        var d = new Date(mtime * 1000);
+        var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+        var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+    }
+    function fileIcon(name) {
+        if (name.indexOf('query') !== -1) return '📊';
+        if (name.indexOf('blocked-ips') !== -1) return '🚫';
+        if (name.indexOf('blocked') !== -1) return '🔴';
+        if (name.indexOf('allowed') !== -1) return '🟢';
+        if (name.indexOf('proxy.log') !== -1) return '⚙️';
+        if (name.indexOf('install') !== -1) return '📦';
+        if (name.indexOf('credential') !== -1) return '🔐';
+        if (name.endsWith('.gz')) return '🗜️';
+        if (name.indexOf('.emergency.') !== -1) return '⚠️';
+        return '📄';
+    }
+    function loadLogFiles() {
+        var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
+        if (!card || !content) return;
+        card.style.display = 'block';
+        if (btn) btn.disabled = true;
+        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+        xhrGet('/api?action=list_logs', function(err, data) {
+            if (btn) btn.disabled = false;
+            if (err || !data || !data.files) {
+                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+                return;
+            }
+            logFilesData = data;
+            renderLogFiles();
+        });
+    }
+    function renderLogFiles() {
+        var content = $('diagFilesContent');
+        if (!content || !logFilesData || !logFilesData.files) return;
+        var active = [], archive = [], emergency = [], sensitive = [];
+        for (var i = 0; i < logFilesData.files.length; i++) {
+            var f = logFilesData.files[i];
+            switch (f.type) {
+                case 'active': active.push(f); break;
+                case 'archive': archive.push(f); break;
+                case 'emergency': emergency.push(f); break;
+                case 'sensitive': sensitive.push(f); break;
+            }
+        }
+        var html = '';
+        html += renderSection('🟢', t('dfActiveFiles'), active);
+        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+        if (sensitive.length > 0) {
+            html += '<div class="df-section">';
+            html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+            if (!sensitiveRevealed) {
+                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+            } else {
+                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+            }
+            html += '</div>';
+        }
+        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+
+        content.querySelectorAll('[data-action]').forEach(function(el) {
+            var action = el.getAttribute('data-action');
+            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+            else if (action === 'view-log') {
+                el.addEventListener('click', function() {
+                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+            else if (action === 'download-log') {
+                el.addEventListener('click', function() {
+                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+        });
+    }
+    function renderSection(icon, label, files) {
+        if (!files || files.length === 0) return '';
+        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+        html += '</div>';
+        return html;
+    }
+    function renderFileRow(file, isSensitive) {
+        var sens = isSensitive ? '1' : '0';
+        return '<div class="df-file">'
+             + '<div class="df-file-info">'
+             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+             + '</div>'
+             + '<div class="df-file-actions">'
+             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+             + '</div></div>';
+    }
+    function revealSensitive() {
+        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+        }, { title: '⚠️ ' + t('confirmTitle') });
+    }
+    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+
+    function viewLogFile(name, isSensitive) {
+        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
+        title.textContent = name;
+        body.textContent = t('dfLoading');
+        warning.style.display = isSensitive ? 'block' : 'none';
+        warning.textContent = t('dfSensitiveWarning');
+        modal.style.display = 'flex';
+        currentViewerFile = { name: name, sensitive: isSensitive };
+        xhrGet(url, function(err, data) {
+            if (err || !data || data.status !== 'ok') {
+                body.textContent = t('dfFailedToLoad');
+                return;
+            }
+            var content = data.content || '';
+            if (data.truncated) content = t('dfTruncatedPrefix') + content;
+            body.textContent = content || t('dfEmpty');
+            body.scrollTop = body.scrollHeight;
+        });
+    }
+    function downloadLogFile(name, isSensitive) {
+        var url = '/api/download_log?file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        showMsg(t('dfDownloading'), 'info', 1500);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.withCredentials = true;
+        xhr.responseType = 'blob';
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var blob = new Blob([xhr.response]);
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+            }
+        };
+        xhr.send();
+    }
+    function downloadCurrentFile() {
+        if (!currentViewerFile) return;
+        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+    }
+    function clearCurrentFile() {
+        if (!currentViewerFile) return;
+        var name = currentViewerFile.name;
+        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+            if (!confirmed) return;
+            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+                if (err || !data || data.status !== 'ok') {
+                    showMsg(t('fvClearError'), 'error', 3000);
+                    return;
+                }
+                showMsg(t('fvClearSuccess'), 'success', 2500);
+                closeFileViewer();
+                setTimeout(function() { loadLogFiles(); }, 500);
+            });
+        });
+    }
+    function closeFileViewer() {
+        $('fileViewerModal').style.display = 'none';
+        currentViewerFile = null;
+    }
+
+    // ============================================================
+    // [16] updateUIStrings
+    // ============================================================
+    function updateUIStrings() {
+        $('title').textContent = t('title');
+        $('subtitle').textContent = t('subtitle');
+        $('editorTitle').textContent = t('editorTitle');
+        var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
+        if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
+        else $('sourceCountText').textContent = t('sourceCount');
+        $('currentLabel').textContent = t('currentLabel');
+        $('applyText').textContent = t('apply');
+        $('syncText').textContent = t('sync');
+        $('forceRefreshText').textContent = t('forceRefresh');
+        $('logsText').textContent = t('logs');
+        $('clearLogsText').textContent = t('clearLogs');
+        $('closeLogsText').textContent = t('closeLogs');
+        $('logsModalTitle').textContent = t('logsModalTitle');
+        $('oldModulesTitle').textContent = t('oldModulesTitle');
+        $('dashboardLinkText').textContent = t('dashboardLinkText');
+        $('customRulesTitle').textContent = t('customRulesTitle');
+
+        var allowBadge = $('allowEditBadge');
+        if (allowBadge) allowBadge.textContent = t('editBadge');
+        var denyBadge = $('denyEditBadge');
+        if (denyBadge) denyBadge.textContent = t('editBadge');
+
+        var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
+        var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
+        $('saveAllowText').textContent = allowBtnText;
+        $('saveDenyText').textContent = denyBtnText;
+        $('cancelAllowBtn').textContent = t('cancelEdit');
+        $('cancelDenyBtn').textContent = t('cancelEdit');
+
+        var allowLabel = $('allowlistLabel');
+        if (allowLabel) {
+            var firstSpan = allowLabel.querySelector('span:first-child');
+            if (firstSpan) firstSpan.textContent = t('allowlistLabel');
+        }
+        var denyLabel = $('denylistLabel');
+        if (denyLabel) {
+            var firstSpan2 = denyLabel.querySelector('span:first-child');
+            if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
+        }
+
+        var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
+        var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+        var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
+        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+        var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+        var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
+
+        $('loginTitle').textContent = t('loginTitle');
+        $('usernameInput').placeholder = t('username');
+        $('passwordInput').placeholder = t('password');
+        $('loginBtn').textContent = t('loginBtn');
+        $('logoutBtn').textContent = t('logoutBtn');
+
+        var btn = $('toggleBtn');
+        if (currentStatus === 'ON') {
+            btn.textContent = t('toggleOff');
+            btn.className = 'btn-toggle';
+        } else if (currentStatus === 'OFF') {
+            btn.textContent = t('toggleOn');
+            btn.className = 'btn-toggle off-state';
+        }
+
+        $('restartBtn').title = t('restartBtn');
+        $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+        updateStatsDisplay();
+        var ab = $('authBadge');
+        if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
+        if (logFilesData) renderLogFiles();
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'ar' ? 'en' : 'ar';
+        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        updateUIStrings();
+        if (appInitialized) {
+            loadProfile();
+            checkOldModules();
+            if (runtimeInfoLoaded) loadRuntimeInfo();
+        }
+    }
+
+    function showMsg(text, type, duration) {
+        duration = duration || 2000;
+        var m = $('msg');
+        m.textContent = text;
+        m.className = 'msg-float ' + (type || 'info');
+        m.style.display = 'block';
+        m.style.opacity = '1';
+        m.style.visibility = 'visible';
+        clearTimeout(m._timeout);
+        m._timeout = setTimeout(function() {
+            m.style.opacity = '0';
+            m.style.visibility = 'hidden';
+            setTimeout(function() { m.style.display = 'none'; }, 400);
+        }, duration);
+    }
+
+    // ============================================================
+    // [17] Login / Logout
+    // ============================================================
+    function performLogin() {
+        var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
+        if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
+        isLoginAttempt = true;
+        var btn = $('loginBtn');
+        btn.disabled = true;
+        btn.textContent = t('loggingIn');
+        fetch('/api/auth/login', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        }).then(function(r) {
+            return r.json().then(function(d) { return { status: r.status, data: d }; });
+        }).then(function(resp) {
+            btn.disabled = false;
+            btn.textContent = t('loginBtn');
+            if (resp.status === 200 && resp.data.status === 'ok') {
+                $('passwordInput').value = '';
+                sessionExpiredShown = false;
+                if (resp.data.profile) renderProfileData(resp.data.profile);
+                if (resp.data.token) storeToken(resp.data.token);
+                closeConfirmModal();
+                showAuthBadge();
+                showMainScreen();
+                if (!appInitialized) {
+                    showMsg(t('welcomeMsg'), 'info', 4000);
+                    appInitialized = true;
+                }
+                initSSE();
+                startPolling();
+                loadCustomRules();
+                loadRuntimeInfo();
+                loadLogFiles();
+                verifyFailures = 0;
+                verifyBackoff = 3000;
+            } else if (resp.status === 429) {
+                showMsg(t('tooManyAttempts'), 'error', 5000);
+                isLoginAttempt = false;
+            } else {
+                showMsg(t('loginError'), 'error');
+                isLoginAttempt = false;
+            }
+        }).catch(function() {
+            btn.disabled = false;
+            btn.textContent = t('loginBtn');
+            showMsg(t('networkError'), 'error');
+            isLoginAttempt = false;
+        });
+    }
+
+    function logout() {
+        if (hasUnsavedChanges()) {
+            showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
+                function(confirmed) {
+                    if (!confirmed) return;
+                    doLogout();
+                },
+                { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
+            );
+            return;
+        }
+        doLogout();
+    }
+
+    function doLogout() {
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+            .catch(function() {})
+            .then(function() {
+                clearStoredToken();
+                clearDraft('allow');
+                clearDraft('deny');
+                if (sse) { sse.close(); sse = null; }
+                if (statusPollInterval) clearInterval(statusPollInterval);
+                if (statsInterval) clearInterval(statsInterval);
+                if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+                if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+                location.reload();
+            });
+    }
+
+    // ============================================================
+    // [18] verifyAuth with backoff
+    // ============================================================
+    function verifyAuth() {
+        xhrGet('/api?action=status', function(err, data) {
+            if (err) {
+                if (err.code === 401) {
+                    clearStoredToken();
+                    showLoginScreen();
+                    hideAuthBadge();
+                    if (isLoginAttempt) {
+                        showMsg(t('loginError'), 'error');
+                        isLoginAttempt = false;
+                    }
+                    verifyFailures = 0;
+                    verifyBackoff = 3000;
+                } else {
+                    verifyFailures++;
+                    setNetworkDownUI(true);
+                    if (verifyFailures === 1) {
+                        showMsg(t('networkError'), 'warning', 3000);
+                    }
+                    setTimeout(verifyAuth, verifyBackoff);
+                    verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
+                }
+                return;
+            }
+            verifyFailures = 0;
+            verifyBackoff = 3000;
+            sessionExpiredShown = false;
+            setNetworkDownUI(false);
+            showMainScreen();
+            showAuthBadge();
+            if (!appInitialized) {
+                showMsg(t('welcomeMsg'), 'info', 4000);
+                initSSE();
+                startPolling();
+                loadCustomRules();
+                loadRuntimeInfo();
+                loadLogFiles();
+                appInitialized = true;
+            }
+        });
+    }
+
+    function showLoginScreen() {
+        $('loginScreen').style.display = 'flex';
+        $('appContent').style.display = 'none';
+        $('logoutBtn').style.display = 'none';
+        hideAuthBadge();
+    }
+    function showMainScreen() {
+        $('loginScreen').style.display = 'none';
+        $('appContent').style.display = 'block';
+        $('logoutBtn').style.display = 'block';
+        showAuthBadge();
+        closeConfirmModal();
+        sessionExpiredShown = false;
+    }
+    function handleSessionExpired() {
+        if (sessionExpiredShown) return;
+        sessionExpiredShown = true;
+        var wasInitialized = appInitialized;
+        appInitialized = false;
+        clearStoredToken();
+        if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
+        if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
+        if (sse) { sse.close(); sse = null; }
+        if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+        showLoginScreen();
+        if (!wasInitialized) return;
+        showConfirmModal(t('sessionExpiredMsg'), function(ok) {
+            if (ok) $('usernameInput').focus();
+        }, {
+            title: t('sessionExpiredTitle'),
+            primaryText: t('sessionRelogin'),
+            primaryCallback: function() {
+                $('usernameInput').value = '';
+                $('passwordInput').value = '';
+                $('usernameInput').focus();
+            }
+        });
+    }
+
+    // ============================================================
+    // [19] xhrRequest
+    // ============================================================
+    function getTimeoutForUrl(method, url) {
+        if (method === 'POST' && url.indexOf('update_profile') !== -1) {
+            return 310000;
+        }
+        if (url.indexOf('toggle_service') !== -1 ||
+            url.indexOf('restart_service') !== -1) {
+            return 60000;
+        }
+        return 15000;
+    }
+
+    function xhrRequest(method, url, data, cb, retries, delay) {
+        retries = (retries === undefined) ? 3 : retries;
+        delay = delay || 1000;
+        var attempt = 0;
+        function sendRequest() {
+            attempt++;
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            xhr.withCredentials = true;
+            if (method === 'POST') xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            var tk = getStoredToken();
+            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+            xhr.timeout = getTimeoutForUrl(method, url);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { cb(null, JSON.parse(xhr.responseText)); }
+                    catch(e) { cb(e, null); }
+                } else if (xhr.status === 401) {
+                    var e401 = new Error('HTTP 401'); e401.code = 401;
+                    cb(e401, null);
+                    handleSessionExpired();
+                } else if (xhr.status === 405) {
+                    var e405 = new Error('HTTP 405');
+                    e405.code = 405;
+                    cb(e405, null);
+                    showMsg('⚠️ endpoint requires POST', 'warning', 3000);
+                } else if (xhr.status === 409) {
+                    var e409 = new Error('HTTP 409'); e409.code = 409;
+                    cb(e409, null);
+                    showMsg(t('conflictDetected'), 'warning', 3000);
+                    loadCustomRules();
+                } else if (xhr.status === 413) {
+                    var e413 = new Error('HTTP 413'); e413.code = 413;
+                    cb(e413, null);
+                    showMsg('❌ File too large (> 5 MB)', 'error', 4000);
+                } else {
+                    var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
+                    cb(eN, null);
+                }
+            };
+            xhr.onerror = function() {
+                if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                else cb(new Error('Network Error'), null);
+            };
+            xhr.ontimeout = function() {
+                if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                else cb(new Error('Timeout'), null);
+            };
+            xhr.send(data || null);
+        }
+        sendRequest();
+    }
+    function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
+    function xhrPost(url, data, cb) { xhrRequest('POST', url, data, cb); }
+
+    // ============================================================
+    // [20] SSE with backoff
+    // ============================================================
+    function initSSE() {
+        if (sse) { sse.close(); sse = null; }
+        try {
+            sse = new EventSource('/events?t=' + Date.now(), { withCredentials: true });
+            sse.addEventListener('open', function() {
+                sseBackoff = 5000;
+            });
+            sse.addEventListener('progress', function(e) {
+                var parts = e.data.split('|');
+                var percent = parseInt(parts[0]) || 0, msg = parts[1] || '';
+                var progBar = $('progressBar'), progContainer = $('progressContainer');
+                progBar.style.width = Math.min(percent, 100) + '%';
+                $('progressText').textContent = msg || percent + '%';
+                if (percent >= 100) {
+                    progBar.classList.add('success');
+                    showMsg(t('updateStatusDone'), 'success');
+                    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    setTimeout(function() {
+                        progContainer.style.opacity = '0';
+                        setTimeout(function() {
+                            progContainer.style.display = 'none';
+                            progContainer.style.opacity = '1';
+                            progBar.classList.remove('success');
+                            progBar.style.width = '0%';
+                            $('progressText').textContent = '0%';
+                            isProcessing = false;
+                            $('applyBtn').disabled = false;
+                            $('saveAllowBtn').disabled = false;
+                            $('saveDenyBtn').disabled = false;
+                            $('toggleBtn').disabled = false;
+                            $('restartBtn').disabled = false;
+                            loadProfile();
+                            refreshAll(true);
+                        }, 500);
+                    }, 1500);
+                } else if (percent > 0 && percent < 100) {
+                    progContainer.style.display = 'block';
+                    progContainer.style.opacity = '1';
+                    progBar.classList.remove('success');
+                    isProcessing = true;
+                    $('applyBtn').disabled = true;
+                    $('saveAllowBtn').disabled = true;
+                    $('saveDenyBtn').disabled = true;
+                    $('toggleBtn').disabled = true;
+                    $('restartBtn').disabled = true;
+                }
+            });
+
+            sse.addEventListener('status', function(e) {
+                var incoming = e.data;
+                if (sseStatusDebounceTimer) {
+                    clearTimeout(sseStatusDebounceTimer);
+                }
+                sseStatusDebounceTimer = setTimeout(function() {
+                    sseStatusDebounceTimer = null;
+                    updateStatusUI(incoming);
+                }, SSE_STATUS_DEBOUNCE_MS);
+            });
+
+            sse.addEventListener('stats', function(e) {
+                try {
+                    var data = JSON.parse(e.data);
+                    if (data.blocked_today !== undefined) { currentBlockedCount = data.blocked_today; updateStatsDisplay(); }
+                    if (data.ram !== undefined) { currentRamUsage = data.ram; updateStatsDisplay(); }
+                } catch(ex) {}
+            });
+            sse.addEventListener('resources', function(e) {
+                try {
+                    var data = JSON.parse(e.data);
+                    if (data.ram !== undefined) { currentRamUsage = data.ram; updateStatsDisplay(); }
+                } catch(ex) {}
+            });
+            sse.onerror = function() {
+                if (sse) { sse.close(); sse = null; }
+                if (!sessionExpiredShown) {
+                    setTimeout(initSSE, sseBackoff);
+                    sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
+                }
+            };
+            if (!window.sseHeartbeat) {
+                window.sseHeartbeat = setInterval(function() {
+                    if (sse && sse.readyState === 2 && !sessionExpiredShown) initSSE();
+                }, 30000);
+            }
+        } catch(e) {
+            setTimeout(initSSE, sseBackoff);
+            sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
+        }
+    }
+
+    function updateStatusUI(status) {
+        var dot = $('statusDot'), txt = $('statusText'), btn = $('toggleBtn');
+
+        if (status === 'ON' || status === 'OFF') {
+            currentStatus = status;
+        }
+
+        if (status === 'ON') {
+            dot.className = 'status-dot dot-on';
+            txt.textContent = t('statusOn');
+            btn.textContent = t('toggleOff');
+            btn.className = 'btn-toggle';
+        } else {
+            dot.className = 'status-dot dot-off';
+            txt.textContent = t('statusOff');
+            btn.textContent = t('toggleOn');
+            btn.className = 'btn-toggle off-state';
+        }
+        if (!isProcessing) {
+            btn.disabled = false;
+            $('restartBtn').disabled = false;
+        }
+    }
+
+    function fetchStatus(callback) {
+        if (isToggling) { if (callback) callback(); return; }
+        xhrGet('/api?action=status', function(err, data) {
+            if (err) { if (callback) callback(); return; }
+            updateStatusUI(data.status);
+            if (callback) callback();
+        });
+    }
+
+    // ============================================================
+    // [21] handleToggle
+    // ============================================================
+    function handleToggle() {
+        if (isProcessing || isToggling) return;
+        isToggling = true;
+        var btn = $('toggleBtn');
+        btn.disabled = true;
+        $('restartBtn').disabled = true;
+        $('loaderContainer').style.display = 'flex';
+
+        xhrPost('/api/toggle_service', '', function(err, data) {
+            isToggling = false;
+            $('loaderContainer').style.display = 'none';
+            if (!isProcessing) { btn.disabled = false; $('restartBtn').disabled = false; }
+            if (err) { showMsg(t('toggleError'), 'error'); return; }
+            showMsg(t('toggleSuccess'), 'success');
+            if (data && data.status) updateStatusUI(data.status);
+            else setTimeout(fetchStatus, 500);
+        });
+    }
+
+    // ============================================================
+    // [22] handleRestart
+    // ============================================================
+    function handleRestart() {
+        if (isProcessing || isToggling) return;
+        showConfirmModal(t('restartConfirm'), function(confirmed) {
+            if (!confirmed) return;
+            isToggling = true;
+            var btn = $('toggleBtn');
+            btn.disabled = true;
+            $('restartBtn').disabled = true;
+            $('loaderContainer').style.display = 'flex';
+
+            xhrPost('/api/restart_service', '', function(err, data) {
+                isToggling = false;
+                $('loaderContainer').style.display = 'none';
+                if (!isProcessing) { btn.disabled = false; $('restartBtn').disabled = false; }
+                if (err) { showMsg(t('restartError'), 'error'); return; }
+                showMsg(t('restartSuccess'), 'success');
+                if (data && data.status) updateStatusUI(data.status);
+                else setTimeout(fetchStatus, 500);
+            });
+        });
+    }
+
+    function forceRefresh() {
+        if (isProcessing) return;
+        showMsg(t('forceRefreshStart'), 'info', 1500);
+        try {
+            if ('caches' in window) caches.keys().then(function(names) {
+                return Promise.all(names.map(function(n) { return caches.delete(n); }));
+            });
+        } catch(e) {}
+        setTimeout(function() {
+            window.location.replace(window.location.pathname + '?_fr=' + Date.now());
+        }, 800);
+    }
+
+    function refreshAll(isSilent) {
+        if (isProcessing) return;
+        var startTime = Date.now();
+        if (!isSilent) showMsg(t('syncStart'), 'info');
+        var completed = 0, total = 4;
+        function checkComplete() {
+            completed++;
+            if (completed === total) {
+                var elapsed = Date.now() - startTime;
+                if (!isSilent) showMsg(t('syncSuccess'), 'success', Math.max(elapsed + 1000, 4000));
+            }
+        }
+        fetchStatus(function() { checkComplete(); });
+        setTimeout(function() { loadProfile(function() { checkComplete(); }); }, 300);
+        setTimeout(function() { loadRuntimeInfo(); checkComplete(); }, 500);
+        setTimeout(function() { loadLogFiles(); checkComplete(); }, 700);
+    }
+
+    // ============================================================
+    // [23] Profile management
+    // ============================================================
+    function renderProfileData(data) {
+        if (!data || !data.key) return;
+        currentProfileKey = data.key;
+        currentProfileIsEmpty = data.is_empty;
+        $('profileSelect').value = data.key;
+        $('currentProfileName').textContent = data.name;
+        var count = data.entries || 0;
+        $('sourceCountText').textContent = t('entriesLabel') + ' ' + count.toLocaleString('en-US');
+        if (data.last_update) $('lastUpdateText').textContent = t('lastUpdateLabel') + data.last_update;
+        if (currentProfileIsEmpty) {
+            $('currentProfileName').style.color = 'var(--danger)';
+            $('sourceCountText').style.color = 'var(--danger)';
+        } else {
+            $('currentProfileName').style.color = 'var(--primary)';
+            $('sourceCountText').style.color = 'var(--success)';
+        }
+        $('editorCard').style.display = 'block';
+    }
+    function loadProfile(callback) {
+        if (isProcessing) { if (callback) callback(); return; }
+        xhrGet('/api?action=get_profile', function(err, data) {
+            if (err || !data.key) { if (callback) callback(); return; }
+            renderProfileData(data);
+            if (callback) callback();
+        });
+    }
+    function loadCustomRules() {
+        xhrGet('/api?action=get_custom_rules', function(err, data) {
+            if (err || !data) return;
+            var allow = data.allowlist || '', deny = data.denylist || '';
+            if (editStates.allow === EditState.VIEW) {
+                $('allowlistInput').value = allow;
+                originalValues.allow = allow;
+            }
+            if (editStates.deny === EditState.VIEW) {
+                $('denylistInput').value = deny;
+                originalValues.deny = deny;
+            }
+            Promise.all([sha256(allow), sha256(deny)]).then(function(hashes) {
+                rulesState.serverAllowHash = hashes[0];
+                rulesState.serverDenyHash = hashes[1];
+            }).catch(function() {});
+        });
+    }
+
+    function applyProfile() {
+        if (isProcessing) return;
+        var select = $('profileSelect'), profile = select.value;
+        if (profile === currentProfileKey && !currentProfileIsEmpty) {
+            showMsg(t('alreadyActive'), 'warning');
+            return;
+        }
+        var name = select.options[select.selectedIndex].text;
+        showConfirmModal(t('applyConfirm') + '"' + name + '"?', function(confirmed) {
+            if (!confirmed) return;
+            isProcessing = true;
+            $('applyBtn').disabled = true;
+            $('saveAllowBtn').disabled = true;
+            $('saveDenyBtn').disabled = true;
+            $('toggleBtn').disabled = true;
+            $('restartBtn').disabled = true;
+            var progContainer = $('progressContainer'), progBar = $('progressBar');
+            progContainer.style.display = 'block';
+            progContainer.style.opacity = '1';
+            progBar.style.width = '5%';
+            progBar.classList.remove('success');
+            $('progressText').textContent = t('progressStart');
+            showMsg(t('updateStatus'), 'info', 2500);
+
+            if (safetyTimer) clearTimeout(safetyTimer);
+            safetyTimer = setTimeout(function() {
+                if (isProcessing) {
+                    isProcessing = false;
+                    $('applyBtn').disabled = false;
+                    $('saveAllowBtn').disabled = false;
+                    $('saveDenyBtn').disabled = false;
+                    $('toggleBtn').disabled = false;
+                    $('restartBtn').disabled = false;
+                    progContainer.style.display = 'none';
+                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    showMsg(t('safetyTimeout'), 'warning', 5000);
+                }
+                safetyTimer = null;
+            }, 120000);
+
+            if (window.progressPoller) clearInterval(window.progressPoller);
+            window.progressPoller = setInterval(function() {
+                if (!isProcessing) { clearInterval(window.progressPoller); return; }
+                xhrGet('/api?action=get_progress', function(err, data) {
+                    if (err || !data || !data.progress) return;
+                    var parts = data.progress.split('|');
+                    var percent = parseInt(parts[0]) || 0;
+                    var progressMsg = parts[1] || '';
+                    if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
+                        clearInterval(window.progressPoller);
+                        if (safetyTimer) clearTimeout(safetyTimer);
+                        isProcessing = false;
+                        progContainer.style.display = 'none';
+                        $('applyBtn').disabled = false;
+                        $('saveAllowBtn').disabled = false;
+                        $('saveDenyBtn').disabled = false;
+                        $('toggleBtn').disabled = false;
+                        $('restartBtn').disabled = false;
+                        showMsg(t('corruptFileError'), 'error', 4000);
+                        return;
+                    }
+                    if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
+                        clearInterval(window.progressPoller);
+                        if (safetyTimer) clearTimeout(safetyTimer);
+                        if (isProcessing) {
+                            progBar.style.width = '100%';
+                            progBar.classList.add('success');
+                            showMsg(t('updateStatusDone'), 'success');
+                            setTimeout(function() {
+                                progContainer.style.opacity = '0';
+                                setTimeout(function() {
+                                    progContainer.style.display = 'none';
+                                    progContainer.style.opacity = '1';
+                                    progBar.classList.remove('success');
+                                    progBar.style.width = '0%';
+                                    isProcessing = false;
+                                    $('applyBtn').disabled = false;
+                                    $('saveAllowBtn').disabled = false;
+                                    $('saveDenyBtn').disabled = false;
+                                    $('toggleBtn').disabled = false;
+                                    $('restartBtn').disabled = false;
+                                    loadProfile();
+                                    refreshAll(true);
+                                }, 500);
+                            }, 1500);
+                        }
+                    }
+                });
+            }, 1000);
+
+            xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
+                if (err) {
+                    if (safetyTimer) clearTimeout(safetyTimer);
+                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    isProcessing = false;
+                    $('applyBtn').disabled = false;
+                    $('saveAllowBtn').disabled = false;
+                    $('saveDenyBtn').disabled = false;
+                    $('toggleBtn').disabled = false;
+                    $('restartBtn').disabled = false;
+                    progContainer.style.display = 'none';
+                    showMsg(t('serverError'), 'error', 4000);
+                }
+            });
+        });
+    }
+
+    // ============================================================
+    // [24] Logs
+    // ============================================================
+    function showLogs() {
+        if (isProcessing) return;
+        var modal = $('logModal'), content = $('logContent');
+        modal.style.display = 'flex';
+        content.textContent = t('loadingLogs');
+        xhrGet('/api?action=logs', function(err, data) {
+            if (err) content.textContent = t('logsLoadError');
+            else {
+                content.textContent = data.logs || t('noLogs');
+                content.scrollTop = content.scrollHeight;
+            }
+        });
+    }
+    function closeLogs() { $('logModal').style.display = 'none'; }
+    function clearLogs() {
+        if (isProcessing) return;
+        showConfirmModal(t('clearLogsConfirm'), function(confirmed) {
+            if (!confirmed) return;
+            xhrPost('/api/clear_logs', '', function(err, data) {
+                if (err || !data || data.status !== 'ok') {
+                    showMsg(t('clearLogsError'), 'error');
+                    return;
+                }
+                showMsg(t('clearLogsSuccess'), 'success');
+                if ($('logModal').style.display === 'flex') $('logContent').textContent = '';
+            });
+        });
+    }
+
+    // ============================================================
+    // [25] Old modules
+    // ============================================================
+    function checkOldModules() {
+        var card = $('oldModulesCard'), list = $('oldModulesList');
+        card.style.display = 'none';
+        list.innerHTML = '<div style="text-align:center;padding:10px;color:var(--text-muted);">' + t('checkingOldModules') + '</div>';
+        xhrGet('/api?action=check_old_modules', function(err, data) {
+            if (err || !data || data.count === undefined || data.count === 0 || !data.modules || data.modules.length === 0) {
+                card.style.display = 'none';
+                return;
+            }
+            card.style.display = 'block';
+            list.innerHTML = '';
+            for (var i = 0; i < data.modules.length; i++) {
+                var mod = data.modules[i];
+                var itemDiv = document.createElement('div');
+                itemDiv.className = 'old-module-item';
+                var infoDiv = document.createElement('div');
+                infoDiv.className = 'info';
+                var nameStrong = document.createElement('strong');
+                nameStrong.textContent = mod.name;
+                var versionSpan = document.createElement('span');
+                versionSpan.className = 'version';
+                versionSpan.textContent = mod.version ? ' (' + t('oldModuleInfo') + mod.version + ')' : '';
+                var nameWrapper = document.createElement('div');
+                nameWrapper.appendChild(nameStrong);
+                nameWrapper.appendChild(versionSpan);
+                var pathDiv = document.createElement('div');
+                pathDiv.className = 'path';
+                pathDiv.textContent = mod.path;
+                var statusSpan = document.createElement('span');
+                statusSpan.className = 'status ' + (mod.disabled ? 'disabled' : 'active');
+                statusSpan.textContent = mod.disabled ? t('statusDisabled') : t('statusActive');
+                infoDiv.appendChild(nameWrapper);
+                infoDiv.appendChild(pathDiv);
+                infoDiv.appendChild(statusSpan);
+                var delBtn = document.createElement('button');
+                delBtn.className = 'btn-delete-old';
+                delBtn.textContent = t('deleteBtn');
+                delBtn.dataset.path = mod.path;
+                delBtn.addEventListener('click', function() { deleteOldModule(this); });
+                itemDiv.appendChild(infoDiv);
+                itemDiv.appendChild(delBtn);
+                list.appendChild(itemDiv);
+            }
+        });
+    }
+    function deleteOldModule(btn) {
+        var path = btn.getAttribute('data-path');
+        if (!path) return;
+        showConfirmModal(t('deleteConfirm') + path, function(confirmed) {
+            if (!confirmed) return;
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            xhrPost('/api/remove_module', 'path=' + encodeURIComponent(path), function(err, data) {
+                btn.disabled = false;
+                if (err || !data || data.status !== 'ok') {
+                    btn.textContent = t('deleteBtn');
+                    showMsg(t('deleteError'), 'error');
+                    return;
+                }
+                showMsg(t('deleteSuccess'), 'success');
+                setTimeout(function() { checkOldModules(); refreshAll(true); }, 500);
+            });
+        });
+    }
+
+    // ============================================================
+    // [26] Stats / Resources
+    // ============================================================
+    function fetchStatsAndResources() {
+        xhrGet('/api?action=stats', function(err, data) {
+            if (!err && data && data.blocked_today !== undefined) {
+                currentBlockedCount = data.blocked_today;
+                updateStatsDisplay();
+            }
+        });
+        xhrGet('/api?action=resources', function(err, data) {
+            if (!err && data && data.ram) {
+                currentRamUsage = data.ram;
+                updateStatsDisplay();
+            }
+        });
+    }
+    function startPolling() {
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        statusPollInterval = setInterval(fetchStatus, 10000);
+        fetchStatus();
+        loadProfile();
+        setTimeout(checkOldModules, 1500);
+        if (statsInterval) clearInterval(statsInterval);
+        statsInterval = setInterval(fetchStatsAndResources, 30000);
+        fetchStatsAndResources();
+    }
+
+    // ============================================================
+    // [27] beforeunload
+    // ============================================================
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges()) {
+            e.preventDefault();
+            e.returnValue = t('unsavedWarning');
+            return t('unsavedWarning');
+        }
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        if (statsInterval) clearInterval(statsInterval);
+        if (sse) { sse.close(); sse = null; }
+        if (safetyTimer) clearTimeout(safetyTimer);
+        if (window.sseHeartbeat) clearInterval(window.sseHeartbeat);
+        if (window.progressPoller) clearInterval(window.progressPoller);
+        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+    });
+
+    // ============================================================
+    // [28] bindEvents
+    // ============================================================
+    function bindEvents() {
+        $('langToggle').addEventListener('click', toggleLanguage);
+        $('logoutBtn').addEventListener('click', logout);
+
+        $('loginBtn').addEventListener('click', performLogin);
+        $('passwordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') performLogin();
+        });
+
+        $('toggleBtn').addEventListener('click', handleToggle);
+        $('restartBtn').addEventListener('click', handleRestart);
+
+        $('applyBtn').addEventListener('click', applyProfile);
+
+        $('saveAllowBtn').addEventListener('click', function() { handleEditBtnClick('allow'); });
+        $('saveDenyBtn').addEventListener('click', function() { handleEditBtnClick('deny'); });
+        $('cancelAllowBtn').addEventListener('click', function() { cancelEdit('allow'); });
+        $('cancelDenyBtn').addEventListener('click', function() { cancelEdit('deny'); });
+
+        $('allowlistInput').addEventListener('input', function() { updateChangeCounter('allow'); });
+        $('denylistInput').addEventListener('input', function() { updateChangeCounter('deny'); });
+
+        $('allowlistInput').addEventListener('click', function() {
+            if (editStates.allow === EditState.VIEW) enterEditMode('allow');
+        });
+        $('denylistInput').addEventListener('click', function() {
+            if (editStates.deny === EditState.VIEW) enterEditMode('deny');
+        });
+
+        $('syncBtn').addEventListener('click', function() { refreshAll(false); });
+        $('forceRefreshBtn').addEventListener('click', forceRefresh);
+        $('logsBtn').addEventListener('click', showLogs);
+        $('clearLogsBtn').addEventListener('click', clearLogs);
+        $('closeLogsBtn').addEventListener('click', closeLogs);
+
+        $('riRefreshBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            loadRuntimeInfo();
+        });
+        $('dfRefreshBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            loadLogFiles();
+        });
+
+        $('fvDownloadBtn').addEventListener('click', downloadCurrentFile);
+        $('fvClearBtn').addEventListener('click', clearCurrentFile);
+        $('fvCloseBtn').addEventListener('click', closeFileViewer);
+
+        var runtimeCard = $('runtimeInfoCard');
+        var runtimeHeader = $('runtimeInfoHeader');
+        runtimeHeader.addEventListener('click', function() { runtimeCard.classList.toggle('open'); });
+
+        var diagCard = $('diagFilesCard');
+        var diagHeader = $('diagFilesHeader');
+        diagHeader.addEventListener('click', function() { diagCard.classList.toggle('open'); });
+
+        $('modalConfirmBtn').addEventListener('click', function() {
+            if (pendingConfirmCallback) { pendingConfirmCallback(true); closeConfirmModal(); }
+        });
+        $('modalCancelBtn').addEventListener('click', function() {
+            if (pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+        });
+        $('customModal').addEventListener('click', function(e) {
+            if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+        });
+    }
+
+    // ============================================================
+    // [29] Boot
+    // ============================================================
+    function boot() {
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+
+        updateDashboardLink();
+
+        updateUIStrings();
+        bindEvents();
+        bindSWUpdateButtons();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                if (reg.waiting) {
+                    showSWUpdateBanner();
+                }
+
+                reg.addEventListener('updatefound', function() {
+                    var newWorker = reg.installing;
+                    if (!newWorker) return;
+                    newWorker.addEventListener('statechange', function() {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            showSWUpdateBanner();
+                        }
+                    });
+                });
+
+                setupSWUpdateHandler();
+            }).catch(function(err) {
+                // Silent — registration is non-critical
+            });
+        }
+
+        verifyAuth();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+
+})();
+</script>
+</body>
+</html>

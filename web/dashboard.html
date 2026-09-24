@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     DNSCrypt Smart Filter — Dashboard
+     Version: v1.0.0
+     Author: gasciljh
+     Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+     ============================================================
+     Bilingual Dashboard (English/Arabic) with:
+       • Live metrics from /api/metrics (JSON)
+       • Resolver health
+       • Cache statistics
+       • Top domains
+       • Recent queries
+       • Source refresh status
+       • Runtime info (with dynamic ports)
+       • Diagnostic file viewer
+     ============================================================ -->
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#0d1117">
+
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
+    <title>DNSCrypt Dashboard v1.0.0</title>
+    <style>
+        :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:12px; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html { scroll-padding-top:140px; scroll-behavior:smooth; }
+        body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; padding:20px; min-height:100vh; }
+        .container { max-width:1400px; margin:0 auto; }
+        header { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:20px; padding:24px 20px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:24px; }
+        header h1 { font-size:24px; color:var(--primary); text-align:center; width:100%; }
+        .header-meta { display:flex; flex-direction:row; flex-wrap:wrap; justify-content:space-evenly; align-items:center; width:100%; font-size:13px; color:var(--text-muted); gap:10px; }
+        .meta-item { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-decoration:none; color:inherit; background:transparent; border:none; font-family:inherit; flex:1; cursor:pointer; min-width:80px; padding:6px 4px; border-radius:10px; transition:background 0.2s ease; }
+        .meta-item:hover { background:rgba(255,255,255,0.04); }
+        .meta-item .icon { font-size:22px; line-height:1; }
+        .meta-item .text { font-size:12px; text-align:center; line-height:1.5; }
+        .lang-toggle { background:rgba(255,255,255,0.06); border:1px solid var(--border); padding:8px 16px; border-radius:12px; transition:0.2s; }
+        .lang-toggle:hover { background:rgba(255,255,255,0.12); color:var(--text); }
+        .refresh-btn { background:rgba(88,166,255,0.1); border:1px solid rgba(88,166,255,0.3); padding:8px 16px; border-radius:12px; transition:0.2s; color:var(--primary); }
+        .refresh-btn:hover { background:rgba(88,166,255,0.2); }
+        .refresh-btn.spinning .icon { animation:spin 1s linear infinite; display:inline-block; }
+        @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+        .sse-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:4px; transition:background 0.3s ease,box-shadow 0.3s ease; }
+        .sse-dot.connected { background:var(--success); box-shadow:0 0 8px var(--success); animation:pulse-green 2s ease-in-out infinite; }
+        .sse-dot.disconnected { background:var(--warning); box-shadow:0 0 8px var(--warning); }
+        @keyframes pulse-green { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+        .section-nav { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; position:sticky; top:0; z-index:100; background:rgba(13,17,23,0.85); padding:12px 10px; backdrop-filter:blur(12px); border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); border:1px solid var(--border); justify-content:center; }
+        .section-nav a { background:rgba(255,255,255,0.06); color:var(--text-muted); padding:6px 14px; border-radius:20px; text-decoration:none; font-size:13px; border:1px solid var(--border); transition:0.2s; }
+        .section-nav a:hover { background:rgba(255,255,255,0.12); color:var(--text); }
+        .dashboard-grid { display:block; }
+        .card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:20px; }
+        @media (min-width:768px) { .dashboard-grid { display:flex; gap:20px; } .dashboard-grid .card { flex:1; margin-bottom:20px; } }
+        .card-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); margin-bottom:14px; padding-bottom:10px; flex-wrap:wrap; gap:8px; }
+        .card-header h2 { color:var(--primary); font-size:17px; margin:0; }
+        .filter-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; }
+        .filter-toggle input { cursor:pointer; }
+        .stat { display:flex; justify-content:space-between; padding:6px 0; font-size:14px; border-bottom:1px solid rgba(255,255,255,0.04); }
+        .stat:last-child { border-bottom:none; }
+        .stat-label { color:var(--text-muted); }
+        .stat-value { font-weight:600; }
+        .table-wrap { overflow-x:auto; margin-top:8px; }
+        table { width:100%; border-collapse:collapse; font-size:13px; }
+        th { text-align:left; padding:8px 10px; background:rgba(255,255,255,0.04); color:var(--text-muted); font-weight:600; white-space:nowrap; }
+        td { padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.04); }
+        tr:hover td { background:rgba(255,255,255,0.02); }
+        .empty-row td { text-align:center; padding:24px 10px; color:var(--text-muted); font-style:italic; font-size:12px; }
+        .status-badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+        .status-badge.healthy { background:rgba(63,185,80,0.15); color:var(--success); border:1px solid rgba(63,185,80,0.3); }
+        .status-badge.stale { background:rgba(210,153,34,0.15); color:var(--warning); border:1px solid rgba(210,153,34,0.3); }
+        .status-badge.idle { background:rgba(139,148,158,0.15); color:var(--text-muted); border:1px solid rgba(139,148,158,0.3); }
+        .status-badge.ok { background:rgba(63,185,80,0.15); color:var(--success); }
+        .text-success { color:var(--success); font-weight:bold; }
+        .text-danger { color:var(--danger); font-weight:bold; }
+        .loading { text-align:center; padding:60px 20px; color:var(--primary); font-weight:bold; animation:pulse 1.5s infinite; }
+        .error { text-align:center; padding:60px 20px; color:var(--danger); font-weight:bold; line-height:1.6; }
+        .error a { color:var(--primary); text-decoration:none; font-weight:bold; margin-top:15px; display:inline-block; background:rgba(88,166,255,0.1); padding:8px 16px; border-radius:8px; border:1px solid rgba(88,166,255,0.3); }
+        .error a:hover { background:rgba(88,166,255,0.2); }
+        @keyframes pulse { 0%{opacity:0.6;} 50%{opacity:1;} 100%{opacity:0.6;} }
+        .no-data-banner { background:rgba(210,153,34,0.12); border:1px solid rgba(210,153,34,0.4); color:var(--warning); padding:14px 18px; border-radius:12px; margin-bottom:20px; display:none; align-items:center; gap:14px; font-size:13px; line-height:1.6; }
+        .no-data-banner.visible { display:flex; }
+        .no-data-banner .nd-icon { font-size:24px; flex-shrink:0; }
+        .no-data-banner .nd-text { flex:1; }
+        .no-data-banner .nd-text strong { color:var(--text); display:block; margin-bottom:4px; }
+        .no-data-banner .nd-action { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:8px 16px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; text-decoration:none; white-space:nowrap; transition:0.2s; }
+        .no-data-banner .nd-action:hover { background:rgba(88,166,255,0.25); }
+        .diagnostics { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; font-size:12px; color:var(--text-muted); justify-content:center; }
+        .diagnostics .diag-item { background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:8px; border:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+        .runtime-info-card { background:var(--bg-card); border:1px solid rgba(88,166,255,0.2); border-radius:var(--radius); padding:18px; margin-bottom:20px; display:none; }
+        .runtime-info-card .ri-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:14px; }
+        .runtime-info-card .ri-header h2 { color:var(--primary); font-size:17px; margin:0; display:flex; align-items:center; gap:8px; }
+        .runtime-info-card .btn-ri-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 14px; border-radius:8px; font-size:14px; cursor:pointer; font-family:inherit; transition:0.2s; display:flex; align-items:center; gap:6px; }
+        .runtime-info-card .btn-ri-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
+        .runtime-info-card .btn-ri-refresh:disabled { opacity:0.5; cursor:not-allowed; }
+        .runtime-info-card .btn-ri-refresh.spinning { animation:spin 1s linear infinite; }
+        .ri-content { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px; }
+        .ri-item { background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; transition:all 0.2s ease; display:flex; flex-direction:column; gap:6px; }
+        .ri-item:hover { border-color:rgba(88,166,255,0.4); background:rgba(88,166,255,0.05); transform:translateY(-1px); box-shadow:0 4px 12px rgba(88,166,255,0.1); }
+        .ri-item .ri-label { font-size:11px; color:var(--text-muted); font-weight:600; display:flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:0.5px; }
+        .ri-item .ri-icon { font-size:14px; line-height:1; }
+        .ri-item .ri-value { font-family:'JetBrains Mono','Courier New',monospace; font-size:11px; color:var(--text); word-break:break-all; direction:ltr; text-align:left; line-height:1.5; padding:4px 8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.03); }
+        .ri-item .ri-value a { color:var(--primary); text-decoration:none; }
+        .ri-item .ri-value a:hover { text-decoration:underline; }
+        .ri-loading { text-align:center; color:var(--text-muted); padding:30px; font-size:13px; grid-column:1 / -1; }
+        .ri-error { text-align:center; color:var(--danger); padding:30px; font-size:13px; grid-column:1 / -1; background:rgba(248,81,73,0.05); border:1px solid rgba(248,81,73,0.2); border-radius:10px; }
+        .diag-files { background:var(--bg-card); border:1px solid rgba(139,148,158,0.2); border-radius:var(--radius); padding:18px; margin-bottom:20px; }
+        .diag-files .df-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--border); padding-bottom:12px; }
+        .diag-files h2 { color:var(--primary); font-size:17px; margin:0; display:flex; align-items:center; gap:8px; }
+        .diag-files .btn-df-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; }
+        .diag-files .btn-df-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
+        .diag-files .btn-df-refresh:disabled { opacity:0.5; cursor:not-allowed; }
+        .df-section { margin-top:14px; }
+        .df-section:first-child { margin-top:0; }
+        .df-section-header { font-size:12px; color:var(--text-muted); font-weight:700; margin-bottom:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); letter-spacing:0.3px; }
+        .df-file { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:rgba(0,0,0,0.2); border-radius:8px; margin-bottom:6px; gap:8px; flex-wrap:wrap; border:1px solid rgba(255,255,255,0.03); }
+        .df-file:hover { background:rgba(0,0,0,0.3); border-color:rgba(88,166,255,0.15); }
+        .df-file-info { flex:1; min-width:150px; }
+        .df-file-name { color:var(--text); font-family:'JetBrains Mono',monospace; font-size:11px; word-break:break-all; direction:ltr; text-align:left; display:block; line-height:1.4; }
+        .df-file-meta { color:var(--text-muted); font-size:10px; margin-top:3px; display:block; direction:ltr; text-align:left; }
+        .df-file-actions { display:flex; gap:6px; flex-shrink:0; }
+        .df-btn { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:5px 10px; border-radius:6px; font-size:11px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; white-space:nowrap; }
+        .df-btn:hover { background:rgba(88,166,255,0.25); }
+        .df-btn.ghost { background:rgba(139,148,158,0.15); border-color:rgba(139,148,158,0.3); color:var(--text-muted); }
+        .df-btn.ghost:hover { background:rgba(139,148,158,0.25); color:var(--text); }
+        .df-btn.danger { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
+        .df-btn.danger:hover { background:rgba(248,81,73,0.25); }
+        .df-empty { text-align:center; padding:16px; color:var(--text-muted); font-size:12px; }
+        .df-reveal-btn { width:100%; background:linear-gradient(135deg,rgba(248,81,73,0.15),rgba(248,81,73,0.1)); border:1px solid rgba(248,81,73,0.4); color:var(--danger); padding:10px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; }
+        .df-reveal-btn:hover { background:rgba(248,81,73,0.25); }
+        .file-viewer-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:4000; justify-content:center; align-items:center; padding:15px; }
+        .file-viewer-content { background:var(--bg-card); border-radius:var(--radius); padding:20px; max-width:900px; width:100%; max-height:92vh; overflow:hidden; border:1px solid var(--border); display:flex; flex-direction:column; gap:12px; box-shadow:0 30px 80px rgba(0,0,0,0.9); }
+        .file-viewer-header { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:10px; }
+        .file-viewer-title { font-size:13px; color:var(--primary); font-family:'JetBrains Mono',monospace; direction:ltr; text-align:left; word-break:break-all; flex:1; min-width:150px; }
+        .file-viewer-actions { display:flex; gap:6px; flex-shrink:0; }
+        .file-viewer-warning { background:rgba(248,81,73,0.12); border:1px solid rgba(248,81,73,0.4); color:var(--danger); padding:8px 12px; border-radius:8px; font-size:11px; font-weight:600; }
+        .file-viewer-body { background:rgba(0,0,0,0.5); padding:14px; border-radius:8px; font-size:11px; font-family:'JetBrains Mono',monospace; color:var(--text); overflow:auto; flex:1; white-space:pre; direction:ltr; text-align:left; line-height:1.55; border:1px solid var(--border); }
+        .custom-modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:5000; justify-content:center; align-items:center; }
+        .custom-modal-box { background:var(--bg-card); border-radius:var(--radius); padding:28px 24px; max-width:420px; width:90%; border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.8); text-align:center; animation:modalIn 0.25s ease-out; }
+        @keyframes modalIn { from{opacity:0;transform:scale(0.92) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
+        .custom-modal-box h3 { color:var(--text); margin-bottom:12px; font-size:18px; }
+        .custom-modal-box p { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
+        .custom-modal-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+        .custom-modal-actions button { padding:10px 28px; border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; font-family:inherit; }
+        .custom-modal-actions .modal-confirm { background:var(--danger); color:white; }
+        .custom-modal-actions .modal-confirm:hover { opacity:0.85; }
+        .custom-modal-actions .modal-cancel { background:rgba(255,255,255,0.1); color:var(--text); }
+        .custom-modal-actions .modal-cancel:hover { background:rgba(255,255,255,0.2); }
+        .footer { margin-top:30px; text-align:center; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:14px; }
+        .footer a { color:var(--primary); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        [dir="ltr"] { direction:ltr; }
+        [dir="rtl"] { direction:rtl; }
+        [dir="rtl"] th { text-align:right; }
+
+        .card-body-wrapper { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.3s ease-out, visibility 0.3s, opacity 0.3s; overflow:hidden; visibility:hidden; opacity:0; }
+        .card.open .card-body-wrapper { grid-template-rows:1fr; visibility:visible; opacity:1; }
+        .card-body-wrapper > .card-body { min-height:0; }
+        .runtime-info-card .card-body, .diag-files .card-body { padding:0 18px 18px 18px; }
+        .runtime-info-card .ri-header, .diag-files .df-header { cursor:pointer; }
+        .runtime-info-card.open .ri-header, .diag-files.open .df-header { border-bottom:1px solid var(--border); margin-bottom:14px; }
+        .arrow { transition:transform 0.3s ease; font-size:12px; color:var(--primary); }
+        .card.open .arrow { transform:rotate(180deg); }
+        button:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="pageTitle">📊 Monitoring Dashboard</h1>
+            <div class="header-meta">
+                <div class="meta-item">
+                    <span class="icon" style="position:relative;">
+                        🕒
+                        <span id="sseDot" class="sse-dot disconnected" style="position:absolute; top:2px; right:-6px;"></span>
+                    </span>
+                    <span class="text" id="lastUpdated">Last Updated:<br>--</span>
+                </div>
+                <button class="meta-item refresh-btn" id="refreshBtn" title="Refresh now" type="button">
+                    <span class="icon" id="refreshIcon">🔄</span>
+                    <span class="text" id="refreshText">Refresh</span>
+                </button>
+                <button class="meta-item lang-toggle" id="langToggle" type="button">
+                    <span class="icon" id="langIcon">🇸🇦</span>
+                    <span class="text" id="langText">العربية</span>
+                </button>
+                <a href="/api/metrics" target="_blank" rel="noopener noreferrer" class="meta-item">
+                    <span class="icon">📄</span>
+                    <span class="text" id="rawText">Raw Data</span>
+                </a>
+            </div>
+        </header>
+
+        <nav class="section-nav" id="sectionNav">
+            <a href="#runtime-info">Runtime Info</a>
+            <a href="#diag-files">Diagnostic Files</a>
+            <a href="#overview">Overview</a>
+            <a href="#cache">Cache</a>
+            <a href="#query-types">Types</a>
+            <a href="#resolvers">Resolvers</a>
+            <a href="#top-domains">Domains</a>
+            <a href="#sources">Sources</a>
+            <a href="#recent">Queries</a>
+        </nav>
+
+        <div class="diagnostics" id="diagnosticsBar">
+            <div class="diag-item"><span id="diagSse" style="color:var(--warning);">● SSE: Disconnected</span></div>
+            <div class="diag-item"><span id="diagRefresh">Last refresh: --</span></div>
+            <div class="diag-item"><span id="diagFailures">Failures: 0</span></div>
+        </div>
+
+        <div class="no-data-banner" id="noDataBanner" role="status" aria-live="polite">
+            <span class="nd-icon" aria-hidden="true">⚠️</span>
+            <div class="nd-text">
+                <strong id="ndTitle">No data yet</strong>
+                <span id="ndMessage">The DNS engine may be stopped, or it has not produced any metrics yet.</span>
+            </div>
+            <a href="#" class="nd-action" id="ndAction" data-port="9090">🖥️ Open WebUI</a>
+        </div>
+
+        <div id="runtimeInfoCard" class="runtime-info-card card" style="display:none;">
+            <div class="ri-header" id="riHeader">
+                <h2 id="riTitle">🔧 System Info</h2>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-ri-refresh" id="riRefreshBtn" type="button"><span>↻</span> <span id="riRefreshText">Refresh</span></button>
+                    <span class="arrow">▼</span>
+                </div>
+            </div>
+            <div class="card-body-wrapper">
+                <div class="card-body">
+                    <div id="runtimeInfoContent" class="ri-content"><div class="ri-loading">⏳ Loading...</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="diag-files card" id="diagFilesCard" style="display:none;">
+            <div class="df-header" id="dfHeader">
+                <h2 id="diagFilesTitle">📁 Diagnostic Files</h2>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-df-refresh" id="dfRefreshBtn" type="button">↻ <span id="dfRefreshText">Refresh</span></button>
+                    <span class="arrow">▼</span>
+                </div>
+            </div>
+            <div class="card-body-wrapper">
+                <div class="card-body">
+                    <div id="diagFilesContent"><div class="df-empty">⏳ ...</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboardContent">
+            <div class="loading">⏳ Fetching live data...</div>
+        </div>
+
+        <div class="footer">
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.0.0 Zero-Footprint</span>
+            · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
+        </div>
+    </div>
+
+    <div id="fileViewerModal" class="file-viewer-overlay">
+        <div class="file-viewer-content">
+            <div class="file-viewer-header">
+                <span class="file-viewer-title" id="fvTitle">—</span>
+                <div class="file-viewer-actions">
+                    <button class="df-btn" id="fvDownloadBtn" type="button">⬇️ <span id="fvDownloadText">Download</span></button>
+                    <button class="df-btn danger" id="fvClearBtn" type="button">🗑️ <span id="fvClearText">Clear</span></button>
+                    <button class="df-btn ghost" id="fvCloseBtn" type="button">✕ <span id="fvCloseText">Close</span></button>
+                </div>
+            </div>
+            <div class="file-viewer-warning" id="fvWarning" style="display:none;">⚠️ Sensitive file</div>
+            <div class="file-viewer-body" id="fvContent">...</div>
+        </div>
+    </div>
+
+    <div id="customModal" class="custom-modal-overlay">
+        <div class="custom-modal-box">
+            <h3 id="modalTitle">Confirm</h3>
+            <p id="modalMessage">Are you sure?</p>
+            <div class="custom-modal-actions">
+                <button class="modal-cancel" id="modalCancelBtn" type="button">Cancel</button>
+                <button class="modal-confirm" id="modalConfirmBtn" type="button">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        // ============================================================
+        // [1] Settings
+        // ============================================================
+        var VERSION = 'v1.0.0';
+
+        // Dynamic ports (updated from runtime_info)
+        var PORTS = {
+            webui:     '9090',
+            dashboard: '9091'
+        };
+
+        var translations = {
+            en: {
+                pageTitle: '📊 Monitoring Dashboard',
+                lastUpdatedLabel: 'Last Updated:', rawData: 'Raw Data',
+                refresh: 'Refresh', refreshing: 'Loading...',
+                loading: '⏳ Fetching live data...',
+                error: '❌ Cannot fetch data. Make sure DNSCrypt-Proxy is running.',
+                unauthorized: '❌ Unauthorized.<br>Session expired or cookie invalid.',
+                backToHome: '🏠 Back to Control Panel',
+                overview:'Overview', totalQueries:'Total Queries', blockedQueries:'Blocked Queries',
+                qps:'Queries/s', uptime:'Uptime', avgResponse:'Avg Response',
+                cache:'Cache Performance', cacheEnabled:'Enabled', enabled:'Enabled', disabled:'Disabled',
+                cacheHitRatio:'Cache Hit Ratio', cacheHits:'Cache Hits', cacheMisses:'Cache Misses',
+                cacheConfiguredSize:'Configured Size', cacheEntries:'Entries / Capacity', cacheTTL:'TTL Ranges',
+                queryTypes:'Query Types', type:'Type', count:'Count',
+                resolverHealth:'Resolver Health', resolverName:'Resolver', status:'Status',
+                successRate:'Success Rate', total:'Total', failures:'Failures', avgResponseMs:'Response (ms)', lastSeen:'Last Seen',
+                showIdle:'Show Idle Resolvers',
+                topDomains:'Top Domains', domain:'Domain',
+                sourceRefresh:'Source Refresh', sourceName:'Source', lastRefresh:'Last Refresh', nextRefresh:'Next Refresh', sourceStatus:'Status', age:'Age',
+                recentQueries:'Recent Queries', time:'Time', client:'Client', server:'Server', response:'Response', responseTime:'Time (ms)',
+                healthy:'Healthy', stale:'Stale', idle:'Idle', ok:'Ok',
+                navRuntimeInfo:'Runtime Info', navDiagFiles:'Diagnostic Files', navOverview:'Overview', navCache:'Cache', navQueryTypes:'Types', navResolvers:'Resolvers', navTopDomains:'Domains', navSources:'Sources', navRecent:'Queries',
+                diagSseConnected:'● SSE: Connected', diagSseDisconnected:'● SSE: Disconnected',
+                diagLastRefresh:'Last refresh: ', diagFailures:'Failures: ', never:'Not yet',
+                riTitle:'🔧 System Info', riRefresh:'Refresh',
+                riLoading:'⏳ Loading...', riError:'❌ Failed to load system info',
+                riVersion:'Version', riCommit:'Commit', riBuildTime:'Build Time',
+                riProjectURL:'Project URL',
+                riRunDir:'Runtime Dir', riStatusFile:'Status File',
+                riPidFile:'PID File', riProgressFile:'Progress File', riLogFile:'Log File',
+                riBindAddr:'Bind Address',
+                riWebuiPort:'WebUI Port', riDashboardPort:'Dashboard Port',
+                diagFilesTitle:'📁 Diagnostic Files', dfRefresh:'Refresh',
+                dfActiveFiles:'Active Files', dfArchiveFiles:'Archived Files',
+                dfEmergencyFiles:'Emergency Files', dfSensitiveFiles:'Sensitive Files',
+                dfRevealCredentials:'🔐 Reveal Credentials', dfHide:'🔒 Hide',
+                dfView:'View', dfDownload:'Download',
+                dfNoFiles:'No files', dfLoadError:'❌ Failed to load files',
+                dfConfirmSensitive:'⚠️ This will reveal sensitive data (username & password).\nIt may appear in screenshots.\n\nAre you sure?',
+                dfLoading:'⏳ Loading...', dfFailedToLoad:'❌ Failed to load file',
+                dfEmpty:'(empty)', dfTruncatedPrefix:'... [truncated to 500 KB] ...\n\n',
+                dfDownloading:'⬇️ Downloading...', dfSensitiveWarning:'⚠️ Sensitive file — may contain credentials',
+                confirmTitle:'Confirm', confirmCancel:'Cancel', confirmOk:'Confirm',
+                closeLogs:'Close',
+                fvClear: 'Clear',
+                fvClearConfirm: '⚠️ Are you sure you want to clear this file?\nThis cannot be undone.',
+                fvClearSuccess: '✅ File cleared successfully',
+                fvClearError: '❌ Failed to clear file',
+                projectLink: 'Project',
+                noData: 'No data',
+                noDataTitle: 'No data yet',
+                noDataMessage: 'The DNS engine may be stopped, or it has not produced any metrics yet.',
+                noDataAction: '🖥️ Open WebUI',
+                unknownStatus: 'Unknown'
+            },
+            ar: {
+                pageTitle: '📊 لـــوحـــة الـــمـــراقـــبـــة',
+                lastUpdatedLabel: 'آخر تحديث:', rawData: 'بيانات خام',
+                refresh: 'تحديث', refreshing: 'جاري...',
+                loading: '⏳ جاري تحميل البيانات الحية...',
+                error: '❌ لا يمكن جلب البيانات. تأكد من تشغيل DNSCrypt-Proxy.',
+                unauthorized: '❌ غير مصرح لك بالدخول.<br>الجلسة منتهية أو الكوكي غير صالح.',
+                backToHome: '🏠 العودة للوحة التحكم',
+                overview:'نظرة عامة', totalQueries:'إجمالي الاستعلامات', blockedQueries:'الاستعلامات المحظورة',
+                qps:'استعلامات/ثانية', uptime:'مدة التشغيل', avgResponse:'متوسط زمن الاستجابة',
+                cache:'أداء الكاش', cacheEnabled:'مفعل', enabled:'مفعل', disabled:'معطل',
+                cacheHitRatio:'نسبة نجاح الكاش', cacheHits:'نجاحات الكاش', cacheMisses:'فشل الكاش',
+                cacheConfiguredSize:'الحجم المحدد', cacheEntries:'المدخلات / السعة', cacheTTL:'نطاق TTL',
+                queryTypes:'أنواع الاستعلامات', type:'النوع', count:'العدد',
+                resolverHealth:'صحة الخوادم', resolverName:'الخادم', status:'الحالة',
+                successRate:'نسبة النجاح', total:'الإجمالي', failures:'الفشل', avgResponseMs:'الاستجابة (مللي)', lastSeen:'آخر ظهور',
+                showIdle:'إظهار الخوادم الخاملة',
+                topDomains:'النطاقات الأكثر استعلاماً', domain:'النطاق',
+                sourceRefresh:'تحديث المصادر', sourceName:'المصدر', lastRefresh:'آخر تحديث', nextRefresh:'التحديث القادم', sourceStatus:'الحالة', age:'العمر',
+                recentQueries:'الاستعلامات الأخيرة', time:'الوقت', client:'العميل', server:'الخادم', response:'الرد', responseTime:'الزمن (ms)',
+                healthy:'سليم', stale:'قديم', idle:'خامل', ok:'ناجح',
+                navRuntimeInfo:'معلومات النظام', navDiagFiles:'ملفات التشخيص', navOverview:'نظرة عامة', navCache:'الكاش', navQueryTypes:'الأنواع', navResolvers:'الخوادم', navTopDomains:'النطاقات', navSources:'المصادر', navRecent:'الاستعلامات',
+                diagSseConnected:'● SSE: متصل', diagSseDisconnected:'● SSE: غير متصل',
+                diagLastRefresh:'آخر تحديث: ', diagFailures:'فشل الاتصال: ', never:'لم يتم بعد',
+                riTitle:'🔧 معلومات النظام', riRefresh:'تحديث',
+                riLoading:'⏳ جاري التحميل...', riError:'❌ فشل تحميل معلومات النظام',
+                riVersion:'الإصدار', riCommit:'Commit', riBuildTime:'زمن البناء',
+                riProjectURL:'رابط المشروع',
+                riRunDir:'مجلد التشغيل', riStatusFile:'ملف الحالة',
+                riPidFile:'ملف PID', riProgressFile:'ملف التقدم', riLogFile:'ملف السجل',
+                riBindAddr:'عنوان الاستماع',
+                riWebuiPort:'منفذ WebUI', riDashboardPort:'منفذ Dashboard',
+                diagFilesTitle:'📁 ملفات التشخيص', dfRefresh:'تحديث',
+                dfActiveFiles:'ملفات نشطة', dfArchiveFiles:'ملفات مضغوطة',
+                dfEmergencyFiles:'ملفات طارئة', dfSensitiveFiles:'ملفات حساسة',
+                dfRevealCredentials:'🔐 إظهار معلومات الدخول', dfHide:'🔒 إخفاء',
+                dfView:'عرض', dfDownload:'تحميل',
+                dfNoFiles:'لا توجد ملفات', dfLoadError:'❌ فشل تحميل الملفات',
+                dfConfirmSensitive:'⚠️ سيتم عرض بيانات حساسة (اسم المستخدم وكلمة المرور).\nقد تظهر في لقطات الشاشة.\n\nهل أنت متأكد؟',
+                dfLoading:'⏳ جاري التحميل...', dfFailedToLoad:'❌ فشل تحميل الملف',
+                dfEmpty:'(فارغ)', dfTruncatedPrefix:'... [تم اقتصاص النص إلى 500 KB] ...\n\n',
+                dfDownloading:'⬇️ جاري التحميل...', dfSensitiveWarning:'⚠️ ملف حساس — قد يحتوي بيانات دخول',
+                confirmTitle:'تأكيد', confirmCancel:'إلغاء', confirmOk:'تأكيد',
+                closeLogs:'إغلاق',
+                fvClear: 'مسح',
+                fvClearConfirm: '⚠️ هل أنت متأكد من مسح محتوى هذا الملف؟\nلا يمكن التراجع عن هذه العملية.',
+                fvClearSuccess: '✅ تم مسح الملف بنجاح',
+                fvClearError: '❌ فشل مسح الملف',
+                projectLink: 'المشروع',
+                noData: 'لا توجد بيانات',
+                noDataTitle: 'لا توجد بيانات بعد',
+                noDataMessage: 'محرك DNS قد لا يكون مشغّلًا، أو أنه لم يُنتج أي إحصائيات بعد.',
+                noDataAction: '🖥️ فتح WebUI',
+                unknownStatus: 'غير معروف'
+            }
+        };
+
+        var currentLang = 'en';
+        try { currentLang = localStorage.getItem('dnscrypt-lang') || 'en'; } catch(e) {}
+
+        var dataCache = null, sse = null;
+        var showIdleResolvers = false;
+        try { showIdleResolvers = localStorage.getItem('dnscrypt-show-idle') === 'true'; } catch(e) {}
+        var refreshInterval = null, sessionExpired = false;
+        var sseConnected = false, lastRefreshTime = null, failureCount = 0, isRefreshing = false;
+        var runtimeInfoLoading = false;
+        var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
+        var pendingConfirmCallback = null;
+
+        var sseBackoff = 5000, sseMaxBackoff = 60000;
+
+        var sseStatusDebounceTimer = null;
+        var SSE_STATUS_DEBOUNCE_MS = 500;
+
+        var showingNoDataBanner = false;
+
+        var $ = function(id) { return document.getElementById(id); };
+        function t(key) { return translations[currentLang][key] || key; }
+
+        // ============================================================
+        // [1b] Dashboard URL builder (respects custom ports)
+        // ============================================================
+        function getWebUIUrl() {
+            var hostname = window.location.hostname || '127.0.0.1';
+
+            if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
+                hostname = '[' + hostname + ']';
+            }
+
+            var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+
+            return protocol + '//' + hostname + ':' + PORTS.webui + '/';
+        }
+
+        function updateBackToHomeLinks() {
+            var ndAction = $('ndAction');
+            if (ndAction) {
+                ndAction.href = getWebUIUrl();
+                ndAction.setAttribute('data-port', PORTS.webui);
+            }
+        }
+
+        // ============================================================
+        // [2] Token helper — cookie-only
+        // ============================================================
+        function getStoredToken() { return null; }
+        function storeToken(tk) { void tk; }
+        function clearStoredToken() { }
+
+        // ============================================================
+        // [3] escapeHtml
+        // ============================================================
+        function escapeHtml(s) {
+            if (s === null || s === undefined) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/\u2028/g, '&#8232;')
+                .replace(/\u2029/g, '&#8233;');
+        }
+
+        // ============================================================
+        // [4] Formatters
+        // ============================================================
+        function formatNumber(num) {
+            if (num === null || num === undefined || num === '') return '0';
+            var n = Number(num);
+            if (isNaN(n)) return '0';
+            return n.toLocaleString('en-US');
+        }
+        function formatLocalTime(ts) {
+            if (!ts) return '--';
+            var d = new Date(ts), hours = d.getHours();
+            var mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
+            var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
+            return hours + ':' + mins + ':' + secs + ' ' + ampm;
+        }
+        function formatDateTime(ts, showDate) {
+            if (!ts) return '-';
+            var d = new Date(ts);
+            if (isNaN(d.getTime())) return '-';
+            var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+            var hours = d.getHours(), mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
+            var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
+            var timeStr = hours + ':' + mins + ':' + secs + ' ' + ampm;
+            if (showDate) return '<span dir="ltr" style="display:inline-block; text-align:center;">' + yyyy + '/' + mm + '/' + dd + '<br>' + timeStr + '</span>';
+            return '<span dir="ltr" style="display:inline-block;">' + timeStr + '</span>';
+        }
+        function formatUptime(seconds) {
+            if (!seconds || seconds <= 0) return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">0s</span>';
+            var d = Math.floor(seconds/86400), h = Math.floor((seconds%86400)/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
+            var p = []; if (d>0) p.push(d+'d'); if (h>0) p.push(h+'h'); if (m>0) p.push(m+'m'); if (s>0 || p.length===0) p.push(s+'s');
+            return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + p.join(' ') + '</span>';
+        }
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return '-';
+            var h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
+            return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + h + 'h ' + m + 'm ' + s + 's</span>';
+        }
+        function getStatusLabel(status) {
+            if (!status) return t('unknownStatus');
+            var map = { 'healthy':t('healthy'), 'stale':t('stale'), 'idle':t('idle'), 'ok':t('ok') };
+            return map[String(status).toLowerCase()] || status;
+        }
+        function formatBytes(bytes) {
+            if (!bytes || bytes < 1024) return bytes + ' B';
+            if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+            return (bytes/(1024*1024)).toFixed(1) + ' MB';
+        }
+        function formatMtime(mtime) {
+            var d = new Date(mtime * 1000);
+            var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+            var hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
+            return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+        }
+        function fileIcon(name) {
+            if (name.indexOf('query') !== -1) return '📊';
+            if (name.indexOf('blocked-ips') !== -1) return '🚫';
+            if (name.indexOf('blocked') !== -1) return '🔴';
+            if (name.indexOf('allowed') !== -1) return '🟢';
+            if (name.indexOf('proxy.log') !== -1) return '⚙️';
+            if (name.indexOf('install') !== -1) return '📦';
+            if (name.indexOf('credential') !== -1) return '🔐';
+            if (name.endsWith('.gz')) return '🗜️';
+            if (name.indexOf('.emergency.') !== -1) return '⚠️';
+            return '📄';
+        }
+
+        // ============================================================
+        // [5] Modal
+        // ============================================================
+        function showConfirmModal(message, callback, options) {
+            options = options || {};
+            $('modalMessage').textContent = message;
+            $('modalTitle').textContent = options.title || t('confirmTitle');
+            $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
+            $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+            $('customModal').style.display = 'flex';
+            pendingConfirmCallback = callback;
+        }
+        function closeConfirmModal() {
+            $('customModal').style.display = 'none';
+            pendingConfirmCallback = null;
+        }
+
+        // ============================================================
+        // [6] XHR — cookie-only
+        // ============================================================
+        function xhrGet(url, cb) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.withCredentials = true;
+            var tk = getStoredToken();
+            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+            xhr.timeout = 15000;
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { cb(null, JSON.parse(xhr.responseText)); }
+                    catch(e) { cb(e, null); }
+                } else if (xhr.status === 401) {
+                    var e401 = new Error('HTTP 401'); e401.code = 401;
+                    cb(e401, null);
+                } else {
+                    var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
+                    cb(eN, null);
+                }
+            };
+            xhr.onerror = function() { cb(new Error('Network Error'), null); };
+            xhr.ontimeout = function() { cb(new Error('Timeout'), null); };
+            xhr.send();
+        }
+        function xhrPost(url, data, cb) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            var tk = getStoredToken();
+            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+            xhr.timeout = 15000;
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { cb(null, JSON.parse(xhr.responseText)); }
+                    catch(e) { cb(e, null); }
+                } else if (xhr.status === 401) {
+                    var e401 = new Error('HTTP 401'); e401.code = 401;
+                    cb(e401, null);
+                } else {
+                    var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
+                    cb(eN, null);
+                }
+            };
+            xhr.onerror = function() { cb(new Error('Network Error'), null); };
+            xhr.ontimeout = function() { cb(new Error('Timeout'), null); };
+            xhr.send(data || null);
+        }
+
+        // ============================================================
+        // [7] No-data banner
+        // ============================================================
+        function showNoDataBanner() {
+            var banner = $('noDataBanner');
+            if (!banner) return;
+            var titleEl = $('ndTitle');
+            var msgEl = $('ndMessage');
+            var actionEl = $('ndAction');
+            if (titleEl) titleEl.textContent = t('noDataTitle');
+            if (msgEl) msgEl.textContent = t('noDataMessage');
+            if (actionEl) {
+                actionEl.textContent = t('noDataAction');
+                actionEl.href = getWebUIUrl();
+            }
+            banner.classList.add('visible');
+            showingNoDataBanner = true;
+        }
+
+        function hideNoDataBanner() {
+            var banner = $('noDataBanner');
+            if (!banner) return;
+            banner.classList.remove('visible');
+            showingNoDataBanner = false;
+        }
+
+        function isDashboardEmpty(data) {
+            if (!data) return true;
+            var total = Number(data.total_queries) || 0;
+            var cacheHits = (data.cache_stats && Number(data.cache_stats.cache_hits)) || 0;
+            var cacheMisses = (data.cache_stats && Number(data.cache_stats.cache_misses)) || 0;
+            var resolverCount = (data.resolver_health && data.resolver_health.length) || 0;
+            var recentCount = (data.recent_queries && data.recent_queries.length) || 0;
+            return (total === 0 && cacheHits === 0 && cacheMisses === 0 && resolverCount === 0 && recentCount === 0);
+        }
+
+        // ============================================================
+        // [8] Runtime Info — updates PORTS dynamically
+        // ============================================================
+        function loadRuntimeInfo() {
+            var card = $('runtimeInfoCard');
+            var content = $('runtimeInfoContent');
+            var refreshBtn = $('riRefreshBtn');
+            if (!card || !content) return;
+            if (runtimeInfoLoading) return;
+            runtimeInfoLoading = true;
+            card.style.display = 'block';
+            if (refreshBtn) { refreshBtn.disabled = true; }
+            if (!content.querySelector('.ri-item')) content.innerHTML = '<div class="ri-loading">' + t('riLoading') + '</div>';
+            var url = '/api/runtime_info?_=' + Date.now();
+            xhrGet(url, function(err, data) {
+                runtimeInfoLoading = false;
+                if (refreshBtn) refreshBtn.disabled = false;
+                if (err || !data) {
+                    content.innerHTML = '<div class="ri-error">' + t('riError') + '</div>';
+                    return;
+                }
+
+                // Extract actual ports
+                if (data.webui_port) {
+                    PORTS.webui = String(data.webui_port);
+                    updateBackToHomeLinks();
+                }
+                if (data.dashboard_port) {
+                    PORTS.dashboard = String(data.dashboard_port);
+                }
+
+                if (data.version && data.version !== 'dev') {
+                    VERSION = data.version;
+                    var footer = $('footerText');
+                    if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
+                }
+
+                if (data.project_url && data.project_url !== '') {
+                    var link = $('footerProjectLink');
+                    var linkText = $('footerProjectText');
+                    if (link) {
+                        link.href = data.project_url;
+                        link.style.display = 'inline';
+                    }
+                    if (linkText) linkText.textContent = t('projectLink');
+                }
+
+                var items = [
+                    { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
+                    { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
+                    { icon:'⏱️', label:t('riBuildTime'), value:data.build_time_human||data.build_time||'unknown' },
+                    { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
+                    { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
+                    { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
+                    { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
+                    { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
+                    { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
+                    { icon:'📊', label:t('riProgressFile'), value:data.progress_file||'unknown' },
+                    { icon:'📝', label:t('riLogFile'), value:data.log_file||'unknown' },
+                    { icon:'🔌', label:t('riBindAddr'), value:data.bind_addr||'127.0.0.1' }
+                ];
+                var html = '';
+                for (var i = 0; i < items.length; i++) {
+                    var valHtml;
+                    if (items[i].isLink && items[i].value !== 'unknown') {
+                        valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+                    } else {
+                        valHtml = escapeHtml(items[i].value);
+                    }
+                    html += '<div class="ri-item"><span class="ri-label"><span class="ri-icon">' + items[i].icon + '</span>' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+                }
+                content.innerHTML = html;
+            });
+        }
+
+        // ============================================================
+        // [9] Log files
+        // ============================================================
+        function loadLogFiles() {
+            var card = $('diagFilesCard');
+            var content = $('diagFilesContent');
+            var btn = $('dfRefreshBtn');
+            if (!card || !content) return;
+            card.style.display = 'block';
+            if (btn) btn.disabled = true;
+            if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+            xhrGet('/api?action=list_logs&_=' + Date.now(), function(err, data) {
+                if (btn) btn.disabled = false;
+                if (err || !data || !data.files) {
+                    content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+                    return;
+                }
+                logFilesData = data;
+                renderLogFiles();
+            });
+        }
+        function renderLogFiles() {
+            var content = $('diagFilesContent');
+            if (!content || !logFilesData || !logFilesData.files) return;
+            var active = [], archive = [], emergency = [], sensitive = [];
+            for (var i = 0; i < logFilesData.files.length; i++) {
+                var f = logFilesData.files[i];
+                switch (f.type) {
+                    case 'active': active.push(f); break;
+                    case 'archive': archive.push(f); break;
+                    case 'emergency': emergency.push(f); break;
+                    case 'sensitive': sensitive.push(f); break;
+                }
+            }
+            var html = '';
+            html += renderSection('🟢', t('dfActiveFiles'), active);
+            html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+            html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+            if (sensitive.length > 0) {
+                html += '<div class="df-section"><div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+                if (!sensitiveRevealed) {
+                    html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+                } else {
+                    for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+                    html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+                }
+                html += '</div>';
+            }
+            content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+
+            content.querySelectorAll('[data-action]').forEach(function(el) {
+                var action = el.getAttribute('data-action');
+                if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+                else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+                else if (action === 'view-log') {
+                    el.addEventListener('click', function() {
+                        viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                    });
+                }
+                else if (action === 'download-log') {
+                    el.addEventListener('click', function() {
+                        downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                    });
+                }
+            });
+        }
+        function renderSection(icon, label, files) {
+            if (!files || files.length === 0) return '';
+            var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+            for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+            html += '</div>';
+            return html;
+        }
+        function renderFileRow(file, isSensitive) {
+            var sens = isSensitive ? '1' : '0';
+            return '<div class="df-file">'
+                 + '<div class="df-file-info">'
+                 + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+                 + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+                 + '</div>'
+                 + '<div class="df-file-actions">'
+                 + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+                 + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+                 + '</div></div>';
+        }
+        function revealSensitive() {
+            showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+                if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+            }, { title: '⚠️ ' + t('confirmTitle') });
+        }
+        function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+
+        function viewLogFile(name, isSensitive) {
+            var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+            if (isSensitive) url += '&confirm=1';
+            var modal = $('fileViewerModal');
+            var title = $('fvTitle');
+            var body = $('fvContent');
+            var warning = $('fvWarning');
+            title.textContent = name;
+            body.textContent = t('dfLoading');
+            warning.style.display = isSensitive ? 'block' : 'none';
+            warning.textContent = t('dfSensitiveWarning');
+            modal.style.display = 'flex';
+            currentViewerFile = { name: name, sensitive: isSensitive };
+            xhrGet(url + '&_=' + Date.now(), function(err, data) {
+                if (err || !data || data.status !== 'ok') {
+                    body.textContent = t('dfFailedToLoad');
+                    return;
+                }
+                var content = data.content || '';
+                if (data.truncated) content = t('dfTruncatedPrefix') + content;
+                body.textContent = content || t('dfEmpty');
+                body.scrollTop = body.scrollHeight;
+            });
+        }
+        function downloadLogFile(name, isSensitive) {
+            var url = '/api/download_log?file=' + encodeURIComponent(name);
+            if (isSensitive) url += '&confirm=1';
+            showMsg(t('dfDownloading'), 'info', 1500);
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.withCredentials = true;
+            xhr.responseType = 'blob';
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var blob = new Blob([xhr.response]);
+                    var a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+                }
+            };
+            xhr.send();
+        }
+        function downloadCurrentFile() {
+            if (!currentViewerFile) return;
+            downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+        }
+        function clearCurrentFile() {
+            if (!currentViewerFile) return;
+            var name = currentViewerFile.name;
+            showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+                if (!confirmed) return;
+                xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+                    if (err || !data || data.status !== 'ok') {
+                        showMsg((data && data.message) || t('fvClearError'), 'error', 3000);
+                        return;
+                    }
+                    showMsg(t('fvClearSuccess'), 'success', 2500);
+                    closeFileViewer();
+                    setTimeout(function() { loadLogFiles(); }, 500);
+                });
+            });
+        }
+        function closeFileViewer() {
+            $('fileViewerModal').style.display = 'none';
+            currentViewerFile = null;
+        }
+
+        // ============================================================
+        // [10] Toast
+        // ============================================================
+        function showMsg(text, type, duration) {
+            duration = duration || 2500;
+            var existing = document.getElementById('__toast');
+            if (existing) existing.remove();
+            var t2 = document.createElement('div');
+            t2.id = '__toast';
+            var bg = type === 'error' ? 'rgba(248,81,73,0.9)' : 'rgba(63,185,80,0.9)';
+            t2.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;padding:14px 24px;border-radius:12px;background:' + bg + ';color:white;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;max-width:85%;white-space:pre-wrap;';
+            t2.textContent = text;
+            document.body.appendChild(t2);
+            setTimeout(function() {
+                t2.style.transition = 'opacity 0.4s';
+                t2.style.opacity = '0';
+                setTimeout(function() { t2.remove(); }, 400);
+            }, duration);
+        }
+
+        // ============================================================
+        // [11] Diagnostics
+        // ============================================================
+        function updateDiagnostics() {
+            var sseEl = $('diagSse');
+            if (sseConnected) {
+                sseEl.textContent = t('diagSseConnected');
+                sseEl.style.color = 'var(--success)';
+                $('sseDot').className = 'sse-dot connected';
+            } else {
+                sseEl.textContent = t('diagSseDisconnected');
+                sseEl.style.color = 'var(--warning)';
+                $('sseDot').className = 'sse-dot disconnected';
+            }
+            var refreshEl = $('diagRefresh');
+            if (lastRefreshTime) refreshEl.textContent = t('diagLastRefresh') + formatLocalTime(lastRefreshTime);
+            else refreshEl.textContent = t('diagLastRefresh') + t('never');
+            $('diagFailures').textContent = t('diagFailures') + failureCount;
+        }
+
+        // ============================================================
+        // [12] UI strings
+        // ============================================================
+        function updateNavLinks() {
+            var nav = $('sectionNav');
+            var links = [
+                { id:'runtime-info', key:'navRuntimeInfo' },
+                { id:'diag-files', key:'navDiagFiles' },
+                { id:'overview', key:'navOverview' },
+                { id:'cache', key:'navCache' },
+                { id:'query-types', key:'navQueryTypes' },
+                { id:'resolvers', key:'navResolvers' },
+                { id:'top-domains', key:'navTopDomains' },
+                { id:'sources', key:'navSources' },
+                { id:'recent', key:'navRecent' }
+            ];
+            nav.innerHTML = links.map(function(l) { return '<a href="#' + l.id + '">' + t(l.key) + '</a>'; }).join('');
+        }
+        function updateUIStrings() {
+            $('pageTitle').textContent = t('pageTitle');
+            $('langIcon').textContent = currentLang === 'ar' ? '🇬🇧' : '🇸🇦';
+            $('langText').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+            $('rawText').textContent = t('rawData');
+            $('refreshText').textContent = isRefreshing ? t('refreshing') : t('refresh');
+            var riTitle = $('riTitle'); if (riTitle) riTitle.textContent = t('riTitle');
+            var riRefreshText = $('riRefreshText'); if (riRefreshText) riRefreshText.textContent = t('riRefresh');
+            var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+            var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+            var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+            var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+            var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+            var modalTitle = $('modalTitle'); if (modalTitle) modalTitle.textContent = t('confirmTitle');
+            var modalCancel = $('modalCancelBtn'); if (modalCancel) modalCancel.textContent = t('confirmCancel');
+            var modalConfirm = $('modalConfirmBtn'); if (modalConfirm) modalConfirm.textContent = t('confirmOk');
+            var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+            if (showingNoDataBanner) showNoDataBanner();
+
+            updateNavLinks();
+        }
+        function toggleLanguage() {
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
+            try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            updateUIStrings();
+            updateDiagnostics();
+            if (dataCache) renderDashboard(dataCache);
+            if (logFilesData) renderLogFiles();
+        }
+        function toggleIdleResolvers() {
+            showIdleResolvers = !showIdleResolvers;
+            try { localStorage.setItem('dnscrypt-show-idle', showIdleResolvers); } catch(e) {}
+            if (dataCache) renderDashboard(dataCache);
+        }
+
+        // ============================================================
+        // [13] Empty-state helper
+        // ============================================================
+        function renderEmptyRow(colspan, message) {
+            return '<tr class="empty-row"><td colspan="' + colspan + '">' + escapeHtml(message || t('noData')) + '</td></tr>';
+        }
+
+        // ============================================================
+        // [14] Render Dashboard
+        // ============================================================
+        function renderDashboard(data) {
+            dataCache = data;
+
+            if (isDashboardEmpty(data)) {
+                showNoDataBanner();
+            } else {
+                hideNoDataBanner();
+            }
+
+            var container = $('dashboardContent');
+            var lastUpdated = $('lastUpdated');
+            var scrollPositions = {};
+            container.querySelectorAll('.card').forEach(function(card) {
+                var wrap = card.querySelector('.table-wrap');
+                if (wrap) scrollPositions[card.id] = wrap.scrollLeft;
+            });
+            if (data.generated_at) lastUpdated.innerHTML = t('lastUpdatedLabel') + '<br>' + formatDateTime(data.generated_at, true);
+            var cache = data.cache_stats || {};
+            var html = '<div class="dashboard-grid">';
+
+            html += '<div class="card" id="overview"><div class="card-header"><h2>' + t('overview') + '</h2></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('totalQueries') + '</span><span class="stat-value">' + formatNumber(data.total_queries) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('blockedQueries') + '</span><span class="stat-value">' + formatNumber(data.blocked_queries) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('qps') + '</span><span class="stat-value">' + ((data.queries_per_second && data.queries_per_second.toFixed(2)) || '0.00') + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('uptime') + '</span><span class="stat-value">' + formatUptime(data.uptime_seconds) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('avgResponse') + '</span><span class="stat-value">' + ((data.avg_response_time && data.avg_response_time.toFixed(2)) || '0.00') + ' ms</span></div></div>';
+
+            html += '<div class="card" id="cache"><div class="card-header"><h2>' + t('cache') + '</h2></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheEnabled') + '</span><span class="stat-value">' + (cache.enabled ? t('enabled') : t('disabled')) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheHitRatio') + '</span><span class="stat-value">' + (((cache.cache_hit_ratio||0)*100).toFixed(1)) + '%</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheHits') + '</span><span class="stat-value">' + formatNumber(cache.cache_hits) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheMisses') + '</span><span class="stat-value">' + formatNumber(cache.cache_misses) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheConfiguredSize') + '</span><span class="stat-value">' + formatNumber(cache.configured_size) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheEntries') + '</span><span class="stat-value">' + formatNumber(cache.entries) + ' / ' + formatNumber(cache.capacity) + '</span></div>'
+                 + '<div class="stat"><span class="stat-label">' + t('cacheTTL') + '</span><span class="stat-value">' + (cache.min_ttl||0) + 's – ' + (cache.max_ttl||0) + 's</span></div></div></div>';
+
+            var queryTypesRows = (data.query_types||[]).map(function(q) {
+                return '<tr><td>' + escapeHtml(q.type) + '</td><td>' + formatNumber(q.count) + '</td></tr>';
+            }).join('');
+            html += '<div class="card" id="query-types"><div class="card-header"><h2>' + t('queryTypes') + '</h2></div>'
+                 + '<div class="table-wrap"><table><thead><tr><th>' + t('type') + '</th><th>' + t('count') + '</th></tr></thead><tbody>'
+                 + (queryTypesRows || renderEmptyRow(2, t('noData')))
+                 + '</tbody></table></div></div>';
+
+            var resolvers = data.resolver_health || [];
+            if (!showIdleResolvers) resolvers = resolvers.filter(function(r) { return (r.status||'').toLowerCase() !== 'idle'; });
+            var checkedAttr = showIdleResolvers ? 'checked' : '';
+            var resolverRows = resolvers.map(function(r) {
+                return '<tr><td>' + escapeHtml(r.name) + '</td>'
+                     + '<td><span class="status-badge ' + escapeHtml((r.status||'').toLowerCase()) + '">' + escapeHtml(getStatusLabel(r.status)) + '</span></td>'
+                     + '<td>' + (((r.success_rate||0)*100).toFixed(1)) + '%</td>'
+                     + '<td>' + formatNumber(r.total_queries) + '</td>'
+                     + '<td>' + formatNumber(r.failed_queries) + '</td>'
+                     + '<td>' + ((r.avg_response_ms && r.avg_response_ms.toFixed(0)) || '-') + '</td>'
+                     + '<td>' + (r.last_action ? formatDateTime(r.last_action, true) : '-') + '</td></tr>';
+            }).join('');
+            html += '<div class="card" id="resolvers"><div class="card-header"><h2>' + t('resolverHealth') + '</h2>'
+                 + '<label class="filter-toggle"><input type="checkbox" id="idleToggle" ' + checkedAttr + '> ' + t('showIdle') + '</label></div>'
+                 + '<div class="table-wrap"><table><thead><tr><th>' + t('resolverName') + '</th><th>' + t('status') + '</th><th>' + t('successRate') + '</th><th>' + t('total') + '</th><th>' + t('failures') + '</th><th>' + t('avgResponseMs') + '</th><th>' + t('lastSeen') + '</th></tr></thead><tbody>'
+                 + (resolverRows || renderEmptyRow(7, t('noData')))
+                 + '</tbody></table></div></div>';
+
+            var maxDomainCount = (data.top_domains && data.top_domains.length > 0) ? data.top_domains[0].count : 1;
+            var isRTL = document.documentElement.dir === 'rtl';
+            var gradDir = isRTL ? 'to left' : 'to right';
+            var topDomainsRows = (data.top_domains||[]).map(function(d) {
+                var percent = (d.count/maxDomainCount)*100;
+                var hue = Math.floor((1-(percent/100))*120);
+                var bgColor = 'linear-gradient(' + gradDir + ', hsla(' + hue + ', 85%, 50%, 0.25), transparent)';
+                return '<tr><td style="position:relative; z-index:1; border-radius:4px;">'
+                     + '<div style="position:absolute; top:0; inset-inline-start:0; height:100%; width:' + percent + '%; background:' + bgColor + '; z-index:-1; border-radius:4px; transition: width 0.5s ease;"></div>'
+                     + escapeHtml(d.domain) + '</td><td>' + formatNumber(d.count) + '</td></tr>';
+            }).join('');
+            html += '<div class="card" id="top-domains"><div class="card-header"><h2>' + t('topDomains') + '</h2></div>'
+                 + '<div class="table-wrap"><table><thead><tr><th>' + t('domain') + '</th><th>' + t('count') + '</th></tr></thead><tbody>'
+                 + (topDomainsRows || renderEmptyRow(2, t('noData')))
+                 + '</tbody></table></div></div>';
+
+            var sourceRows = (data.sources||[]).map(function(s) {
+                return '<tr><td>' + escapeHtml(s.name) + '</td>'
+                     + '<td>' + (s.last_refresh ? formatDateTime(s.last_refresh, true) : '-') + '</td>'
+                     + '<td>' + (s.next_refresh ? formatDateTime(s.next_refresh, true) : '-') + '</td>'
+                     + '<td><span class="status-badge ' + escapeHtml((s.status||'idle').toLowerCase()) + '">' + escapeHtml(getStatusLabel(s.status)) + '</span></td>'
+                     + '<td>' + formatDuration(s.age_seconds) + '</td></tr>';
+            }).join('');
+            html += '<div class="card" id="sources"><div class="card-header"><h2>' + t('sourceRefresh') + '</h2></div>'
+                 + '<div class="table-wrap"><table><thead><tr><th>' + t('sourceName') + '</th><th>' + t('lastRefresh') + '</th><th>' + t('nextRefresh') + '</th><th>' + t('sourceStatus') + '</th><th>' + t('age') + '</th></tr></thead><tbody>'
+                 + (sourceRows || renderEmptyRow(5, t('noData')))
+                 + '</tbody></table></div></div>';
+
+            var recentRows = (data.recent_queries||[]).slice(0,30).map(function(q) {
+                var resClass = q.response_code === 'REJECT' ? 'text-danger' : ((q.response_code === 'PASS' || q.response_code === 'OK') ? 'text-success' : '');
+                return '<tr><td>' + formatDateTime(q.timestamp, false) + '</td>'
+                     + '<td>' + escapeHtml(q.domain) + '</td>'
+                     + '<td>' + escapeHtml(q.type) + '</td>'
+                     + '<td>' + escapeHtml(q.client_ip||'-') + '</td>'
+                     + '<td>' + escapeHtml(q.server||'-') + '</td>'
+                     + '<td class="' + resClass + '">' + escapeHtml(q.response_code||'-') + '</td>'
+                     + '<td>' + (q.response_time||0) + ' ms</td></tr>';
+            }).join('');
+            html += '<div class="card" id="recent"><div class="card-header"><h2>' + t('recentQueries') + '</h2></div>'
+                 + '<div class="table-wrap"><table><thead><tr><th>' + t('time') + '</th><th>' + t('domain') + '</th><th>' + t('type') + '</th><th>' + t('client') + '</th><th>' + t('server') + '</th><th>' + t('response') + '</th><th>' + t('responseTime') + '</th></tr></thead><tbody>'
+                 + (recentRows || renderEmptyRow(7, t('noData')))
+                 + '</tbody></table></div></div>';
+
+            container.innerHTML = html;
+
+            var idleToggle = $('idleToggle');
+            if (idleToggle) idleToggle.addEventListener('change', toggleIdleResolvers);
+
+            requestAnimationFrame(function() {
+                container.querySelectorAll('.card').forEach(function(card) {
+                    var wrap = card.querySelector('.table-wrap');
+                    if (wrap && scrollPositions[card.id] !== undefined) wrap.scrollLeft = scrollPositions[card.id];
+                });
+            });
+        }
+
+        // ============================================================
+        // [15] Fetch Dashboard — uses getWebUIUrl()
+        // ============================================================
+        function stopPolling() {
+            sessionExpired = true;
+            if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+            if (sse) { sse.close(); sse = null; }
+            if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+            if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+            sseConnected = false;
+            updateDiagnostics();
+        }
+
+        function fetchDashboardData(silent) {
+            if (sessionExpired) return;
+            if (isRefreshing && silent) return;
+            var container = $('dashboardContent');
+            if (!dataCache && !silent) container.innerHTML = '<div class="loading">' + t('loading') + '</div>';
+            if (!silent) {
+                isRefreshing = true;
+                var refreshBtn = $('refreshBtn');
+                if (refreshBtn) refreshBtn.classList.add('spinning');
+                $('refreshText').textContent = t('refreshing');
+            }
+            var url = '/api/metrics?t=' + Date.now();
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.withCredentials = true;
+            xhr.timeout = 15000;
+            xhr.onload = function() {
+                if (xhr.status === 401) {
+                    stopPolling();
+                    var homeUrl = getWebUIUrl();
+                    container.innerHTML = '<div class="error">' + t('unauthorized') + '<br><a href="' + homeUrl + '">' + t('backToHome') + '</a></div>';
+                    return;
+                }
+                if (xhr.status !== 200) {
+                    onFetchError(xhr.status, silent);
+                    return;
+                }
+                try {
+                    var data = JSON.parse(xhr.responseText);
+
+                    renderDashboard(data);
+
+                    lastRefreshTime = new Date();
+                    failureCount = 0;
+                    updateDiagnostics();
+                    if (!silent) {
+                        isRefreshing = false;
+                        var refreshBtn = $('refreshBtn');
+                        if (refreshBtn) refreshBtn.classList.remove('spinning');
+                        $('refreshText').textContent = t('refresh');
+                    }
+                } catch(e) {
+                    onFetchError(0, silent);
+                }
+            };
+            xhr.onerror = function() { onFetchError(0, silent); };
+            xhr.ontimeout = function() { onFetchError(0, silent); };
+            xhr.send();
+        }
+        function onFetchError(status, silent) {
+            if (!silent) {
+                isRefreshing = false;
+                var refreshBtn = $('refreshBtn');
+                if (refreshBtn) refreshBtn.classList.remove('spinning');
+                $('refreshText').textContent = t('refresh');
+            }
+            failureCount++;
+            updateDiagnostics();
+            if (dataCache && silent) return;
+            $('dashboardContent').innerHTML = '<div class="error">' + t('error') + '</div>';
+        }
+
+        function manualRefresh() {
+            if (isRefreshing) return;
+            fetchDashboardData(false);
+            loadRuntimeInfo();
+            loadLogFiles();
+        }
+
+        // ============================================================
+        // [16] SSE with backoff
+        // ============================================================
+        function initSSE() {
+            if (sessionExpired) return;
+            if (sse) { sse.close(); sse = null; }
+            try {
+                sse = new EventSource('/events?t=' + Date.now());
+                sse.onopen = function() {
+                    sseConnected = true;
+                    sseBackoff = 5000;
+                    updateDiagnostics();
+                };
+                var lastStatus = null;
+                sse.addEventListener('status', function(e) {
+                    var incoming = e.data;
+                    if (sseStatusDebounceTimer) {
+                        clearTimeout(sseStatusDebounceTimer);
+                    }
+                    sseStatusDebounceTimer = setTimeout(function() {
+                        sseStatusDebounceTimer = null;
+                        if (lastStatus !== null && lastStatus !== incoming) {
+                            fetchDashboardData(true);
+                        }
+                        lastStatus = incoming;
+                    }, SSE_STATUS_DEBOUNCE_MS);
+                });
+                sse.onerror = function() {
+                    sseConnected = false;
+                    updateDiagnostics();
+                    if (sse) { sse.close(); sse = null; }
+                    if (!sessionExpired) {
+                        setTimeout(initSSE, sseBackoff);
+                        sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
+                    }
+                };
+                if (!window.sseHeartbeat) {
+                    window.sseHeartbeat = setInterval(function() {
+                        if (sse && sse.readyState === 2 && !sessionExpired) initSSE();
+                    }, 30000);
+                }
+            } catch(e) {
+                sseConnected = false;
+                updateDiagnostics();
+                if (!sessionExpired) {
+                    setTimeout(initSSE, sseBackoff);
+                    sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
+                }
+            }
+        }
+
+        // ============================================================
+        // [17] Bind events
+        // ============================================================
+        function bindEvents() {
+            $('refreshBtn').addEventListener('click', manualRefresh);
+            $('langToggle').addEventListener('click', toggleLanguage);
+
+            $('riRefreshBtn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                loadRuntimeInfo();
+            });
+            $('dfRefreshBtn').addEventListener('click', function(e) {
+                e.stopPropagation();
+                loadLogFiles();
+            });
+
+            $('fvDownloadBtn').addEventListener('click', downloadCurrentFile);
+            $('fvClearBtn').addEventListener('click', clearCurrentFile);
+            $('fvCloseBtn').addEventListener('click', closeFileViewer);
+
+            $('modalConfirmBtn').addEventListener('click', function() {
+                if (pendingConfirmCallback) { pendingConfirmCallback(true); closeConfirmModal(); }
+            });
+            $('modalCancelBtn').addEventListener('click', function() {
+                if (pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+            });
+            $('customModal').addEventListener('click', function(e) {
+                if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+            });
+
+            var runtimeCard = $('runtimeInfoCard');
+            $('riHeader').addEventListener('click', function() {
+                runtimeCard.classList.toggle('open');
+            });
+            var diagCard = $('diagFilesCard');
+            $('dfHeader').addEventListener('click', function() {
+                diagCard.classList.toggle('open');
+            });
+        }
+
+        // ============================================================
+        // [18] beforeunload
+        // ============================================================
+        window.addEventListener('beforeunload', function() { stopPolling(); });
+
+        // ============================================================
+        // [19] Boot
+        // ============================================================
+        function boot() {
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+
+            // Update links immediately (fallback before runtime_info)
+            updateBackToHomeLinks();
+
+            updateUIStrings();
+            updateDiagnostics();
+            bindEvents();
+            loadRuntimeInfo();  // ← will update PORTS
+            loadLogFiles();
+            fetchDashboardData(false);
+            refreshInterval = setInterval(function() { fetchDashboardData(true); }, 30000);
+            initSSE();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', boot);
+        } else {
+            boot();
+        }
+
+    })();
+    </script>
+</body>
+</html>

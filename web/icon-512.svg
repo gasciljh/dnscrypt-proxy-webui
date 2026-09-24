@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================================
+     DNSCrypt Smart Filter — PWA Icon (512×512, maskable)
+     Version: v1.0.0
+     Author: gasciljh
+     Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+     ============================================================
+     Large SVG icon for modern browsers (PWA, splash screen,
+     maskable icon). Rendered at 512×512 in web/manifest.json
+     → icons[3] and used as the source for all generated PNGs
+     (192, 512, apple-touch, favicon-32, favicon-16) via
+     scripts/generate-icons.sh.
+
+     Design:
+       • Blue gradient background (matches theme_color)
+       • Shield with subtle border
+       • "DNS" bold label
+       • Green status dot with glow (running indicator)
+
+     Maskable-safe area:
+       • Content is centred within a 40% safe circle
+       • Outer 10% padding is background only (no critical art)
+     ============================================================ -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="DNSCrypt Smart Filter">
+    <title>DNSCrypt Smart Filter</title>
+    <desc>Shield-shaped icon with DNS label and green status indicator</desc>
+
+    <defs>
+        <linearGradient id="bgGrad512" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#3a7bd5"/>
+            <stop offset="100%" stop-color="#1e5bb8"/>
+        </linearGradient>
+        <linearGradient id="shieldGrad512" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#4a7fc7"/>
+            <stop offset="100%" stop-color="#3a6fb0"/>
+        </linearGradient>
+        <radialGradient id="dotGrad512" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#5ee06b"/>
+            <stop offset="100%" stop-color="#2eb841"/>
+        </radialGradient>
+        <filter id="dotGlow512" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background (full-bleed for maskable) -->
+    <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad512)"/>
+
+    <!-- Shield shape -->
+    <path d="M 256 52
+             L 416 116
+             L 416 256
+             Q 416 374 256 448
+             Q 96 374 96 256
+             L 96 116 Z"
+          fill="url(#shieldGrad512)"
+          stroke="#2d5a94"
+          stroke-width="5"
+          stroke-linejoin="round"/>
+
+    <!-- Inner highlight edge -->
+    <path d="M 256 68
+             L 400 126
+             L 400 256
+             Q 400 362 256 428
+             Q 112 362 112 256
+             L 112 126 Z"
+          fill="none"
+          stroke="#5a8fd4"
+          stroke-width="2"
+          opacity="0.6"/>
+
+    <!-- "DNS" text -->
+    <text x="256" y="312"
+          font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+          font-size="160"
+          font-weight="900"
+          fill="#0d1117"
+          text-anchor="middle"
+          letter-spacing="3">DNS</text>
+
+    <!-- Green status dot with glow -->
+    <circle cx="256" cy="376" r="24" fill="url(#dotGrad512)" filter="url(#dotGlow512)"/>
+    <circle cx="256" cy="376" r="34" fill="none" stroke="#5ee06b" stroke-width="3" opacity="0.55"/>
+    <circle cx="256" cy="376" r="44" fill="none" stroke="#5ee06b" stroke-width="2" opacity="0.25"/>
+</svg>

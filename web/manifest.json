@@ -1,0 +1,111 @@
+{
+  "id": "dnscrypt-proxy-webui",
+  "name": "DNSCrypt Proxy",
+  "short_name": "DNS Proxy",
+  "description": "Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354 with per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), bilingual EN/AR interface, separate monitoring Dashboard with JSON metrics, SSE live updates, and offline-capable PWA. Zero telemetry.",
+  "version": "1.0.0",
+
+  "author": "gasciljh",
+  "developer": {
+    "name": "gasciljh",
+    "url": "https://github.com/gasciljh"
+  },
+  "homepage_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+
+  "lang": "en",
+  "dir": "ltr",
+
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+
+  "categories": ["utilities", "security", "productivity"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+
+  "background_color": "#0d1117",
+  "theme_color": "#58a6ff",
+
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+
+  "shortcuts": [
+    {
+      "name": "Control Panel",
+      "short_name": "WebUI",
+      "description": "Open the main control panel",
+      "url": "http://127.0.0.1:9090/?source=shortcut_webui",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "/icon-192.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Monitoring Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open the monitoring dashboard",
+      "url": "http://127.0.0.1:9091/?source=shortcut_dashboard",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        },
+        {
+          "src": "/icon-192.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+
+  "x-note-shortcuts": "Shortcut URLs use the DEFAULT ports: 9090 for WebUI, 9091 for Dashboard. If you change PORT or DASHBOARD_PORT in webui.conf, these shortcuts will continue using the default ports. This is a fundamental limitation of the static PWA manifest format (it cannot read runtime configuration).",
+  "x-note-port-limitation": "For dynamic port handling, the WebUI/Dashboard HTML/JS read the actual ports from /api?action=runtime_info (fields: webui_port, dashboard_port) and construct URLs dynamically. However, PWA shortcuts (this section) are evaluated by the browser BEFORE any JS runs, so they cannot benefit from runtime_info. See v1.0.0 PORT-2 fix in index.html and dashboard.html for the dynamic link implementation.",
+  "x-note-ports": "Default ports: WebUI=9090, Dashboard=9091. Monitoring UI (internal): 8080. DNS Engine: 5354. All ports are configurable in webui.conf except 8080 (reserved for dnscrypt-proxy's monitoring_ui).",
+  "x-note-screenshots": "The 'screenshots' array was intentionally removed in v1.0.0. Per PWA spec, screenshots should be actual app screenshots (not icons). Add real screenshots in a future release to enable Chrome's richer install UI.",
+  "x-note-version": "The 'version' field is not standard in PWA manifest spec but is used here for documentation/troubleshooting. It mirrors VERSION file for consistency.",
+  "x-note-v1": "Updated in v1.0.0: (1) Fixed two critical shortcut bugs (Control Panel was opening Dashboard due to relative URL). (2) Removed non-compliant screenshots. (3) Added version field. (4) Documented port limitations. See CHANGELOG for details."
+}

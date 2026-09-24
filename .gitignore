@@ -1,0 +1,189 @@
+# ============================================================
+# Git Ignore for DNSCrypt Smart Filter
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Prevents build artifacts, runtime files, secrets, and IDE
+#   files from being accidentally committed.
+#
+# Scope:
+#   Patterns are defined only for file types that actually exist
+#   or are created by this repository at runtime.
+# ============================================================
+
+# ============================================================
+# [1] Build artifacts
+# ============================================================
+# Outputs produced locally or in CI
+build/
+proxy/build/
+dist/
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+
+# ============================================================
+# [2] WebUI binaries (built by release.yml)
+# ============================================================
+# These files are never committed — they are built from main.go
+# ⚠️ Note: `proxy/dnscrypt-proxy.version` (Single Source of Truth)
+#           must remain visible in Git — see negation below.
+proxy/dnscrypt-webui-*
+proxy/dnscrypt-webui
+dnscrypt-webui-*
+!proxy/dnscrypt-proxy.version
+
+# ============================================================
+# [3] Runtime directory (proxy/run/)
+# ============================================================
+# The run/ directory is created at runtime by main.go.
+# Its contents (PID files, status files, caches) must never be
+# committed.
+proxy/run/*
+
+# ============================================================
+# [4] Runtime files (outside proxy/run/)
+# ============================================================
+*.pid
+*.status
+*.tmp
+*.tmp_*
+*.log
+*.old
+*.emergency.*
+
+# ============================================================
+# [5] Log rotation artifacts
+# ============================================================
+*.log.*.gz
+*.log.*.old
+*.log.emergency.*
+
+# ============================================================
+# [6] Bootstrap cache
+# ============================================================
+.bootstrap_cache
+
+# ============================================================
+# [7] User configs (never committed — user-specific)
+# ============================================================
+proxy/allowlist.txt
+proxy/denylist.txt
+proxy/blocklist.txt
+proxy/blocklist.raw
+proxy/selected_profile.txt
+proxy/credentials.txt
+proxy/blocked-ips.txt
+
+# ============================================================
+# [8] Go build artifacts
+# ============================================================
+*.test
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+__debug_bin*
+__debug_bin*.exe
+
+# ============================================================
+# [9] Development environment (temporary)
+# ============================================================
+/tmp/dnscrypt-dev/
+/tmp/dnscrypt_main.log
+/tmp/dnscrypt.status
+/tmp/dnscrypt.pid
+/tmp/shfmt
+/tmp/actionlint
+
+# ============================================================
+# [10] Package build artifacts
+# ============================================================
+*.filelist.txt
+.filelist.txt
+*.tmp-*.zip
+
+# ============================================================
+# [11] OS files
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*.swp
+
+# ============================================================
+# [12] IDE / Editor
+# ============================================================
+.vscode/
+!.vscode/settings.json.example
+.idea/
+*.iml
+*.swp
+*.swo
+*.swn
+*~
+*.bak
+*.orig
+*.rej
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
+# ============================================================
+# [13] Secrets & credentials (defensive)
+# ============================================================
+.secrets
+*.pem
+*.key
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.credentials
+*.secret
+credentials.txt
+!proxy/*.key.pub
+
+# ============================================================
+# [14] Local overrides
+# ============================================================
+*.local
+local.conf
+local.toml
+webui.conf.local
+
+# ============================================================
+# [15] Pre-commit cache
+# ============================================================
+.pre-commit-cache/
+.cache/
+
+# ============================================================
+# [16] Devcontainer cache
+# ============================================================
+.devcontainer/.cache/
+.devcontainer/**/node_modules/
+
+# ============================================================
+# [17] Documentation build
+# ============================================================
+docs/_build/
+docs/.cache/
+site/
+
+# ============================================================
+# [18] Misc
+# ============================================================
+*.cache
+*.pid.tmp

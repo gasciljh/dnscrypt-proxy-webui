@@ -1,0 +1,253 @@
+# ============================================================
+# DNSCrypt Smart Filter – Dependabot Configuration
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Purpose:
+#   Automatically updates dependencies and opens PRs for upgrades.
+#
+# Benefits:
+#   • Immediate security updates (CVEs in GitHub Actions)
+#   • Periodic updates (weekly for Actions, monthly for Go)
+#   • Automatic PRs with changelog + release notes
+#   • Fully customizable
+#
+# Important:
+#   Dependabot works for free only on public repositories.
+#   For private repositories: GitHub Advanced Security is required.
+# ============================================================
+
+version: 2
+
+# ============================================================
+# [1] Global settings
+# ============================================================
+# No global settings in v2 — everything is inside updates[].
+
+updates:
+
+  # ============================================================
+  # [1] GitHub Actions
+  # ============================================================
+  # Most important for security: outdated Actions may contain
+  # known vulnerabilities.
+  #
+  # Covered files:
+  #   • .github/workflows/ci.yml
+  #   • .github/workflows/release.yml
+  #   • .github/workflows/codeql.yml
+  #   • any new workflow
+  #
+  # Example automatic PR:
+  #   "Bump actions/checkout from v4 to v5"
+  # ============================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "gasciljh"
+    assignees:
+      - "gasciljh"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      prefix-development: "ci"
+      include: "scope"
+    target-branch: "main"
+    # Group all GitHub Actions updates into a single PR
+    # (reduces noise, simplifies review)
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ============================================================
+  # [2] Go Modules (proxy/go.mod)
+  # ============================================================
+  # The project currently uses stdlib only (no external
+  # dependencies). This section is useful if dependencies are
+  # added in the future.
+  #
+  # Current state:
+  #   • go.mod: contains `module dnscrypt-webui` + `go 1.22`
+  #   • go.sum: absent (no dependencies)
+  #
+  # Future benefit:
+  #   • If a package is added (e.g. `golang.org/x/sys`), Dependabot
+  #     keeps it up to date.
+  #   • Detects CVEs in newly added dependencies.
+  # ============================================================
+  - package-ecosystem: "gomod"
+    directory: "/proxy"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "gasciljh"
+    assignees:
+      - "gasciljh"
+    labels:
+      - "dependencies"
+      - "go"
+    commit-message:
+      prefix: "build"
+      prefix-development: "build"
+      include: "scope"
+    target-branch: "main"
+    # Group all Go updates into one PR (monthly)
+    groups:
+      go-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignore major updates automatically
+    # (reviewed manually as they may break compatibility)
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # ============================================================
+  # [3] Dev Containers (devcontainer.json features)
+  # ============================================================
+  # File: .devcontainer/devcontainer.json
+  #
+  # Covered features:
+  #   • ghcr.io/devcontainers/features/go
+  #   • ghcr.io/devcontainers/features/github-cli
+  #   • ghcr.io/devcontainers/features/common-utils
+  #
+  # Note:
+  #   Dependabot has supported the `devcontainers` ecosystem
+  #   since 2023. If issues arise, this section can be removed.
+  # ============================================================
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "gasciljh"
+    labels:
+      - "dependencies"
+      - "devcontainer"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    target-branch: "main"
+
+# ============================================================
+# Additional notes
+# ============================================================
+#
+# Security:
+#   Dependabot Security Updates run automatically thanks to
+#   this `dependabot.yml` — they detect CVEs in:
+#     • GitHub Actions
+#     • Go modules
+#     • Dev Container features
+#
+#   When a vulnerability is found:
+#     1. Dependabot opens a PR immediately (regardless of schedule).
+#     2. The PR carries the label "security".
+#     3. Its title begins with "Bump X to Y (security)".
+#
+# Chosen schedule:
+#   • GitHub Actions: weekly (Monday 06:00 UTC)
+#     → fast because Actions are frequently updated for security.
+#
+#   • Go Modules: monthly
+#     → slower because Go rarely needs updates.
+#
+#   • Dev Containers: monthly
+#     → same reason.
+#
+# Why not `daily`?
+#   • Too much review noise.
+#   • 90% of updates are not urgent.
+#   • Weekly / monthly = optimal balance.
+#
+# open-pull-requests-limit:
+#   • Actions: 5 PRs max (can be increased).
+#   • Go: 3 PRs.
+#   • Devcontainers: 2 PRs.
+#
+#   When the limit is reached, Dependabot stops opening new PRs
+#   until some are merged/closed.
+#
+# target-branch:
+#   We use `main` directly (no `develop`) because:
+#     • The project is maintained by a single author.
+#     • Small codebase — no need for a development branch.
+#     • PRs are small and easy to merge.
+#
+# labels:
+#   Each PR carries 2-3 labels for classification:
+#     • "dependencies" (always)
+#     • "github-actions" / "go" / "devcontainer" (per type)
+#     • "ci" (Actions only)
+#
+# groups:
+#   Dependabot supports "grouped updates" — merging all updates
+#   into one PR. Example: instead of 5 PRs (5 Actions), you get
+#   one PR: "Bump 5 github-actions dependencies".
+#
+#   Benefits:
+#     • Less noise.
+#     • Faster review.
+#     • Easier merge.
+#
+#   Caveat: if one of the updates has a problem, it must be
+#   isolated manually.
+#
+# Note about `ignore` for gomod:
+#   semver-major updates are ignored automatically (they may break
+#   compatibility). Example: updating `golang.org/x/sys` from
+#   v0.5.0 to v1.0.0 is a breaking change → reviewed manually.
+#
+# ============================================================
+# How to test the configuration
+# ============================================================
+#
+# 1) On GitHub:
+#    Settings → Code security and analysis
+#    → Dependabot version updates: Enabled ✅
+#
+# 2) In the Dependabot tab:
+#    Insights → Dependency graph → Dependabot
+#    Shows:
+#      • last scan
+#      • discovered dependencies
+#      • open PRs
+#
+# 3) Manually (trigger):
+#    Actions → Dependabot Updates → "Check for updates"
+#    (available after the first scheduled run)
+#
+# 4) Validate the file:
+#    python3 -c "import yaml; yaml.safe_load(open('.github/dependabot.yml'))"
+#    → must complete without errors.
+#
+# ============================================================

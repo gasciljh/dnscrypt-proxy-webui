@@ -1,0 +1,88 @@
+# ============================================================
+# DNSCrypt Smart Filter – CI Workflow
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Continuous Integration — builds the WebUI binaries for all
+#   4 supported architectures on every push/PR to main or develop.
+#
+# Steps:
+#   • Checkout source
+#   • Setup Go 1.22
+#   • Setup Android NDK r26b
+#   • Cross-compile for 4 architectures (arm64, arm, amd64, 386)
+#   • Upload each binary as an artifact
+#
+# Branch strategy:
+#   • main    → stable releases (protected)
+#   • develop → integration branch (features merged here first)
+#
+# Paths ignored:
+#   • Markdown files (**/*.md)
+#   • docs/** directory
+# ============================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.22'
+  NDK_VERSION: 'r26b'
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, arm, amd64, 386]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Setup NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Build
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          PROJECT_URL: https://github.com/${{ github.repository }}
+        run: |
+          chmod +x proxy/build.sh
+          cd proxy && ./build.sh --single ${{ matrix.arch }}
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-${{ matrix.arch }}
+          path: proxy/build/dnscrypt-webui-${{ matrix.arch }}
+          retention-days: 7
+          if-no-files-found: error

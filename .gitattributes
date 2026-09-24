@@ -1,0 +1,170 @@
+# ============================================================
+# Git Attributes for DNSCrypt Smart Filter
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# https://git-scm.com/docs/gitattributes
+# ============================================================
+# Purpose:
+#   Applies Git rules automatically for each file type.
+#
+# Scope:
+#   Rules are defined only for file types that actually exist
+#   in this repository. No speculative or defensive patterns.
+# ============================================================
+
+# ============================================================
+# Default: normalize line endings to LF on commit
+# ============================================================
+* text=auto eol=lf
+
+# ============================================================
+# Shell scripts: LF only
+# ============================================================
+*.sh          text eol=lf
+*.bash        text eol=lf
+action.sh     text eol=lf
+customize.sh  text eol=lf
+functions.sh  text eol=lf
+post-fs-data.sh text eol=lf
+service.sh    text eol=lf
+status.sh     text eol=lf
+uninstall.sh  text eol=lf
+watchdog.sh   text eol=lf
+
+# ============================================================
+# Go: LF only
+# ============================================================
+*.go          text eol=lf
+
+# ============================================================
+# Web: LF only
+# ============================================================
+*.html        text eol=lf
+*.css         text eol=lf
+*.js          text eol=lf
+*.json        text eol=lf
+*.svg         text eol=lf
+
+# ============================================================
+# Config: LF only
+# ============================================================
+*.toml        text eol=lf
+*.conf        text eol=lf
+*.yaml        text eol=lf
+*.yml         text eol=lf
+*.md          text eol=lf
+
+# ============================================================
+# module.prop: LF only (Magisk parser is sensitive)
+# ============================================================
+module.prop   text eol=lf
+
+# ============================================================
+# VERSION: LF only, single line
+# ============================================================
+VERSION       text eol=lf
+
+# ============================================================
+# Go mod: LF only, no formatting
+# ============================================================
+go.mod        text eol=lf
+go.sum        text eol=lf
+
+# ============================================================
+# Makefile: LF only (recipes require tabs)
+# ============================================================
+Makefile      text eol=lf
+
+# ============================================================
+# Binary files (no conversion)
+# ============================================================
+*.png         binary
+*.jpg         binary
+*.jpeg        binary
+*.gif         binary
+*.ico         binary
+*.pdf         binary
+*.zip         binary
+*.gz          binary
+*.tar         binary
+*.tar.gz      binary
+*.7z          binary
+
+# ============================================================
+# Built binaries (should not be committed)
+# ============================================================
+dnscrypt-webui*  binary
+dnscrypt-proxy   binary
+
+# ============================================================
+# Runtime artifacts (proxy/run/)
+# ============================================================
+proxy/run/*.status         binary
+proxy/run/*.pid            binary
+proxy/run/*.tmp            binary
+proxy/run/.bootstrap_cache binary
+
+# ============================================================
+# Diff behavior
+# ============================================================
+*.md          diff=markdown
+*.go          diff=golang
+*.sh          diff=shell
+
+go.sum        -diff
+checksums.txt -diff
+
+# ============================================================
+# Linguist (GitHub language detection)
+# ============================================================
+docs/**       linguist-documentation
+*.md          linguist-documentation
+*.txt         linguist-documentation
+
+*.sh          linguist-language=Shell
+*.html        linguist-language=HTML
+web/sw.js     linguist-language=JavaScript
+.github/**    linguist-detectable=false
+
+# ============================================================
+# Merge Strategy
+# ============================================================
+*.zip         merge=binary
+*.gz          merge=binary
+*.png         merge=binary
+*.svg         merge=binary
+
+proxy/run/*.status         merge=binary
+proxy/run/.bootstrap_cache merge=binary
+
+# ============================================================
+# Merge Strategy — Workflow files
+# ============================================================
+# CHANGELOG.md: append-only semantics — union merge prevents
+#               conflicts when multiple branches update it.
+CHANGELOG.md  -diff merge=union
+
+# VERSION: single-line file — union merge prevents conflicts
+#          during version bumps across branches.
+VERSION       merge=union
+
+# ============================================================
+# Export-ignore (not included in git archive)
+# ============================================================
+.github/       export-ignore
+.gitignore     export-ignore
+.gitattributes export-ignore
+.editorconfig  export-ignore
+.pre-commit-config.yaml export-ignore
+.secrets.baseline export-ignore
+docs/          export-ignore
+scripts/       export-ignore
+.devcontainer/ export-ignore
+Makefile       export-ignore
+build/         export-ignore
+dist/          export-ignore
+*.md           export-ignore
+proxy/build.sh      export-ignore
+
+proxy/run/     export-ignore

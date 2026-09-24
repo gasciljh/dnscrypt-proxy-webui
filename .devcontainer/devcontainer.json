@@ -1,0 +1,106 @@
+// ============================================================
+// DNSCrypt Smart Filter – Dev Container Configuration
+// Version: v1.0.0
+// Author: gasciljh
+// Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+// ============================================================
+// Purpose:
+//   Provides a reproducible development environment using VS Code
+//   Dev Containers.
+//
+//   On container creation:
+//     1. A minimal Ubuntu 22.04 image is pulled.
+//     2. Go 1.22, GitHub CLI, and common-utils are installed.
+//     3. .devcontainer/setup.sh runs as postCreateCommand to install
+//        the full toolchain (shellcheck, shfmt, golangci-lint,
+//        markdownlint, yamllint, actionlint, pre-commit, etc.).
+//     4. VS Code extensions are installed automatically.
+//
+// Usage:
+//   code .
+//   F1 → "Dev Containers: Reopen in Container"
+//   Wait ~2-4 minutes (first run only).
+//
+// Reference:
+//   https://containers.dev/implementors/json_reference/
+// ============================================================
+{
+  "name": "DNSCrypt Smart Filter Dev",
+
+  "author": "gasciljh",
+
+  "repository": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.22"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "upgradePackages": true
+    }
+  },
+
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "timonwong.shellcheck",
+        "foxundermoon.shell-format",
+        "yzhang.markdown-all-in-one",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "editorconfig.editorconfig"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "go.testFlags": ["-race", "-count=1"],
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go",
+          "editor.insertSpaces": false
+        },
+        "[shellscript]": {
+          "editor.defaultFormatter": "foxundermoon.shell-format",
+          "editor.tabSize": 4
+        },
+        "[yaml]": {
+          "editor.tabSize": 2
+        },
+        "[json]": {
+          "editor.tabSize": 2
+        },
+        "[jsonc]": {
+          "editor.tabSize": 2
+        },
+        "[markdown]": {
+          "editor.tabSize": 2,
+          "editor.wordWrap": "on"
+        },
+        "shellcheck.enable": true,
+        "shellcheck.run": "onType",
+        "shellcheck.severity": "warning"
+      }
+    }
+  },
+
+  "remoteUser": "vscode",
+
+  "containerEnv": {
+    "PROJECT_URL": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+    "GOFLAGS": "-buildvcs=false -trimpath"
+  }
+}

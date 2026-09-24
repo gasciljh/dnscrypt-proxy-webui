@@ -1,0 +1,530 @@
+# ============================================================
+# DNSCrypt Smart Filter — dnscrypt-proxy.toml
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+#
+# General notes:
+#   • This file controls the DNSCrypt engine (launched by the WebUI).
+#   • Do not edit [monitoring_ui] manually unless you know what you are doing.
+#   • Credentials are generated automatically during installation.
+#
+# Security hardening:
+#   • No default admin/admin (must be set by customize.sh).
+#   • Port 8080 is reserved for monitoring_ui (see [13] below).
+#   • Credentials are read from [monitoring_ui] only (section-restricted).
+# ============================================================
+
+# ============================================================
+# [1] Listen settings
+# ============================================================
+# The engine listens on localhost only — the firewall (iptables /
+# nftables) redirects DNS queries here.
+#
+# ⚠️ Do not change these addresses unless you know what you are doing.
+#    Changing to 0.0.0.0 exposes the engine to the network.
+#
+# ⚠️ Custom Chains:
+#    Redirection happens inside dedicated chains:
+#      • DNSCRYPT_OUT  (IPv4)
+#      • DNSCRYPT_OUT6 (IPv6)
+#    This prevents orphans when bootstrap_resolvers change.
+# ============================================================
+listen_addresses = ['127.0.0.1:5354', '[::1]:5354']
+max_clients = 250
+
+# Ignore the system DNS to avoid infinite loops
+ignore_system_dns = true
+
+# ============================================================
+# [2] Server selection
+# ============================================================
+ipv4_servers = true
+ipv6_servers = false
+dnscrypt_servers = true
+doh_servers = true
+odoh_servers = false
+
+# ------------------------------------------------------------
+# require_dnssec:
+#   false = do not require DNSSEC (broader compatibility)
+#   true  = require DNSSEC certificate (slower, more secure)
+#
+#   ⚠️ Enabling this reduces the number of available servers.
+# ============================================================
+require_dnssec = false
+
+# ------------------------------------------------------------
+# require_nolog / require_nofilter:
+#   true = select only servers that do not log or filter
+#
+#   ⚠️ true here means higher privacy — there is no reason to change it.
+# ============================================================
+require_nolog = true
+require_nofilter = true
+
+# ------------------------------------------------------------
+# disabled_server_names:
+#   List of server names to exclude from selection.
+#   Useful if you want to avoid a specific provider for
+#   regional or privacy reasons.
+#
+#   ⚠️ Names must match exactly what is in public-resolvers.md
+#      (case-sensitive).
+#
+#   Examples:
+#     disabled_server_names = ['cloudflare', 'google', 'quad9-doh-ip4-port443-filter-pri']
+#
+#   Leave empty to use all servers compatible with require_*.
+# ============================================================
+disabled_server_names = []
+
+# ============================================================
+# [3] Network performance
+# ============================================================
+force_tcp = false
+
+# ------------------------------------------------------------
+# http3:
+#   true = enable QUIC protocol (faster on 4G/5G networks)
+#
+# http3_probe:
+#   false = do not probe HTTP/3 before use (faster start)
+#   true  = probe before use (slower but more compatible)
+#
+#   ⚠️ On Android mobile networks, UDP on port 443 may be
+#      blocked, so http3_probe = false gives a better experience.
+# ============================================================
+http3 = true
+http3_probe = false
+
+# ------------------------------------------------------------
+# timeout: milliseconds. 5000 = 5 seconds.
+#   - Less than 3000: may fail on slow networks
+#   - Greater than 8000: noticeable delay when a server fails
+# ============================================================
+timeout = 5000
+keepalive = 30
+
+# ------------------------------------------------------------
+# lb_strategy:
+#   'wp2'          = Weighted Power of Two (recommended)
+#   'p2'           = Power of Two
+#   'ph'           = Consistent Hashing
+#   'fastest'      = Always pick the fastest (may cause load concentration)
+#   'random'       = Random (not recommended)
+#
+#   'wp2' provides the best balance between performance and stability.
+# ============================================================
+lb_strategy = 'wp2'
+
+# ------------------------------------------------------------
+# lb_estimator:
+#   true = dynamic estimation of response time (better distribution)
+# ============================================================
+lb_estimator = true
+
+# ------------------------------------------------------------
+# timeout_load_reduction:
+#   When a server's timeout ratio (0.0-1.0) is exceeded, the
+#   engine stops sending requests to that server.
+#
+#   0.75 = stop sending requests when 75% of requests time out.
+#
+#   Recommended default: 0.75
+#   Higher (0.9) = more tolerance for slow servers
+#   Lower (0.5)  = faster exclusion of bad servers
+# ============================================================
+timeout_load_reduction = 0.75
+
+# ------------------------------------------------------------
+# enable_hot_reload:
+#   true = automatically reload blocklists when they change
+#   ⚠️ WebUI uses SIGHUP instead (ensures instant updates)
+# ============================================================
+enable_hot_reload = true
+
+# ============================================================
+# [4] Logging
+# ============================================================
+# log_level: 0 = debug, 1 = info, 2 = notice, 3 = warning, 4 = error
+# We use 2 (notice) to reduce log size while keeping important info.
+log_level = 2
+
+# ⚠️ Important:
+#   • This log (dnscrypt-proxy.log) is different from the WebUI log
+#     (dnscrypt_main.log) that is managed by main.go.
+#   • main.go is the sole manager of dnscrypt_main.log rotation
+#     at 1 MB.
+#   • dnscrypt-proxy (this file) rotates its own log based on the
+#     values below.
+# ============================================================
+log_file = '/data/local/tmp/dnscrypt-proxy.log'
+log_file_latest = true
+
+# ------------------------------------------------------------
+# dnscrypt-proxy log rotation:
+#   max_size    = 6 MB (file size before rotation)
+#   max_age     = 3 days
+#   max_backups = 1 backup copy
+#
+#   Values tuned for memory-constrained Android devices.
+# ============================================================
+log_files_max_size = 6
+log_files_max_age = 3
+log_files_max_backups = 1
+
+# ============================================================
+# [5] Bootstrap resolvers
+# ============================================================
+# These are public DNS servers used only to download the actual
+# server list (public-resolvers.md) — after download, they are
+# not used.
+#
+# ⚠️ We use DoH (1.1.1.1) where possible because bootstrap over
+#    traditional DNS may be vulnerable to MITM.
+#
+# ⚠️ Custom Chains:
+#    These addresses are excluded from redirection via RETURN
+#    rules inside DNSCRYPT_OUT / DNSCRYPT_OUT6 (not directly in OUTPUT).
+#    Changing them is safe — Custom Chains are fully rebuilt on every
+#    startService/stopService. No orphans.
+# ============================================================
+bootstrap_resolvers = ['9.9.9.9:53', '8.8.8.8:53', '1.1.1.1:53', '1.0.0.1:53']
+
+# ------------------------------------------------------------
+# netprobe_timeout:
+#   Seconds. Maximum time to wait for the network before starting.
+#   120 seconds is enough for phones that boot slowly (Android on 4G).
+# ============================================================
+netprobe_timeout = 120
+netprobe_address = '9.9.9.9:53'
+
+# ============================================================
+# [6] DNSCrypt-level blocking
+# ============================================================
+# ------------------------------------------------------------
+# block_ipv6:
+#   true = reject AAAA (IPv6) requests with an immediate empty reply
+#
+#   ⚠️ Note: this does not cause a timeout; it returns an immediate
+#   empty reply. The goal: prevent ad leakage over IPv6 that might
+#   bypass the firewall.
+#
+#   If you experience slowness in certain apps (e.g. Meta) due to
+#   their repeated IPv6 attempts, this is the reason — but the
+#   security benefit is greater.
+# ============================================================
+block_ipv6 = true
+
+# ------------------------------------------------------------
+# block_unqualified:
+#   true = block unqualified requests (no dot), such as "router"
+#   Prevents DNS leaks via NetBIOS/mDNS.
+# ============================================================
+block_unqualified = true
+
+# ------------------------------------------------------------
+# block_undelegated:
+#   true = block undelegated domains (such as .local, .localhost)
+#   Prevents DNS leaks via internal domains.
+# ============================================================
+block_undelegated = true
+
+# ------------------------------------------------------------
+# reject_ttl:
+#   TTL for rejected replies (seconds). 10 = short for quick updates.
+# ============================================================
+reject_ttl = 10
+
+# ------------------------------------------------------------
+# blocked_query_response:
+#   'refused'  = RFC-compliant reply (recommended)
+#   'hinfo'    = reply with host information
+#   'a:0.0.0.0'= reply with an empty IPv4 address
+#   'nxdomain' = domain does not exist
+# ============================================================
+blocked_query_response = 'refused'
+
+# ============================================================
+# [7] Cache
+# ============================================================
+cache = true
+
+# ------------------------------------------------------------
+# cache_size:
+#   Number of entries. Default 10240 is enough for 4 GB+ devices.
+#
+#   Recommendations by device memory:
+#     1 GB RAM  → 2048
+#     2 GB RAM  → 4096
+#     3 GB RAM  → 6144
+#     4 GB+ RAM → 10240 (default)
+#
+#   ⚠️ Each entry consumes roughly 200 bytes on average.
+# ============================================================
+cache_size = 10240
+
+# ------------------------------------------------------------
+# Cache TTL: in seconds
+#   min_ttl     = 2400 (40 minutes) — minimum for any entry
+#   max_ttl     = 86400 (24 hours) — maximum
+#   neg_min_ttl = 60 (1 minute) — for negative errors
+#   neg_max_ttl = 600 (10 minutes) — for negative errors
+# ============================================================
+cache_min_ttl = 2400
+cache_max_ttl = 86400
+cache_neg_min_ttl = 60
+cache_neg_max_ttl = 600
+
+# ============================================================
+# [8] DNSCrypt certificates and keys
+# ============================================================
+# cert_refresh_delay: in minutes. 240 = 4 hours (default)
+cert_refresh_delay = 240
+
+# ------------------------------------------------------------
+# cert_ignore_timestamp:
+#   false = verify certificate validity (secure)
+#   true  = ignore timestamp (use only for diagnostics)
+# ============================================================
+cert_ignore_timestamp = false
+
+# ------------------------------------------------------------
+# dnscrypt_ephemeral_keys:
+#   false = use a fixed key per session (faster)
+#   true  = new key per query (slower, more private)
+# ============================================================
+dnscrypt_ephemeral_keys = false
+
+# ------------------------------------------------------------
+# pqdnscrypt:
+#   true = support Post-Quantum DNSCrypt (future-proof)
+#   No impact on performance today.
+# ============================================================
+pqdnscrypt = true
+
+# ------------------------------------------------------------
+# tls_disable_session_tickets:
+#   false = enable session tickets (faster)
+#   true  = disable them (higher privacy, lower performance)
+# ============================================================
+tls_disable_session_tickets = false
+
+# ============================================================
+# [9] Custom blocklists
+# ============================================================
+#
+# Note: do not edit these files manually.
+# Use the WebUI at http://127.0.0.1:9090
+# because the WebUI updates them atomically with conflict detection.
+#
+# ⚠️ WebUI uses streaming I/O to write blocklist.txt
+#     (2 MB RAM peak instead of 150 MB in older versions).
+#
+# File structure:
+#   blocklist.raw → Fixed source (downloaded from the internet)
+#   blocklist.txt → Final output (after applying Allow/Deny)
+#                   This is what dnscrypt-proxy actually reads
+# ============================================================
+
+[blocked_names]
+  blocked_names_file = 'blocklist.txt'
+  log_file = '/data/local/tmp/dnscrypt-blocked.log'
+  log_format = 'tsv'
+
+[allowed_names]
+  allowed_names_file = 'allowlist.txt'
+  log_file = '/data/local/tmp/dnscrypt-allowed.log'
+  log_format = 'tsv'
+
+[blocked_ips]
+  blocked_ips_file = 'blocked-ips.txt'
+  log_file = '/data/local/tmp/dnscrypt-blocked-ips.log'
+
+# ============================================================
+# [10] Public blocklist sources
+# ============================================================
+[sources.public-resolvers]
+  urls = [
+    'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md',
+    'https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md',
+    'https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-resolvers@master/v3/public-resolvers.md'
+  ]
+  cache_file = 'public-resolvers.md'
+  minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+  refresh_delay = 73
+  prefix = ''
+
+# ============================================================
+# [11] Broken servers (excluded)
+# ============================================================
+# These servers do not work reliably with DNSCrypt on Android
+# due to non-standard server-side implementation.
+[broken_implementations]
+  fragments_blocked = [
+    'cisco', 'cisco-ipv6', 'cisco-familyshield', 'cisco-familyshield-ipv6',
+    'cisco-sandbox', 'cleanbrowsing-adult', 'cleanbrowsing-adult-ipv6',
+    'cleanbrowsing-family', 'cleanbrowsing-family-ipv6',
+    'cleanbrowsing-security', 'cleanbrowsing-security-ipv6'
+  ]
+
+# ============================================================
+# [12] Query log (for Dashboard)
+# ============================================================
+[query_log]
+  file = '/data/local/tmp/dnscrypt-query.log'
+  format = 'tsv'
+
+# ============================================================
+# [13] Monitoring UI (monitoring_ui)
+# ============================================================
+# ⚠️ This UI runs on an internal port (8080), separate from:
+#   • WebUI    → 9090 (default, configurable in webui.conf)
+#   • Dashboard → 9091 (default, configurable in webui.conf)
+#
+#   Do not expose this port externally — it is for local use only,
+#   queried via an internal proxy in main.go (dashboard.html).
+#
+# ⚠️ Port 8080 (listen_address below) is reserved for monitoring_ui.
+#
+#    ✅ main.go refuses to start if:
+#         • PORT=8080
+#         • DASHBOARD_PORT=8080
+#
+#    ✅ customize.sh refuses to write if:
+#         • TEMP_PORT=8080
+#         • TEMP_DASHBOARD_PORT=8080
+#
+#    ✅ functions.sh rejects in:
+#         • get_webui_port / get_dashboard_port
+#
+#    ⚠️ Do not attempt to use 8080 for any other purpose.
+#
+# ⚠️ The username and password fields below are the sole source for:
+#      • main.go → getMonitoringAuth (section-restricted)
+#      • functions.sh → read_toml_credentials (section-restricted)
+#      • watchdog.sh → credentials reading (section-restricted)
+#
+#    Reading is restricted to [monitoring_ui] only — no linear scan.
+#    Any other section containing username/password is ignored.
+#
+# ⚠️ Metrics path documentation:
+#
+#    dnscrypt-proxy (monitoring_ui) serves metrics via:
+#         http://127.0.0.1:8080/api/metrics   (JSON — dnscrypt-proxy 2.1.18)
+#
+#    Note: older versions may use /metrics (Prometheus text).
+#    main.go handles both:
+#      - JSON response → passed through as-is
+#      - Prometheus text → converted to JSON via parsePrometheus
+#
+#    Flow:
+#      dashboard.html (9091)
+#        → GET /api/metrics (main.go dashboard server)
+#          → metricsProxyHandler
+#            → GET http://127.0.0.1:8080/api/metrics
+#              → monitoring_ui
+#
+# ------------------------------------------------------------
+# Credentials (username / password):
+#   Generated automatically by customize.sh.
+#
+#   ⚠️ Default values are empty ('') instead of admin/admin.
+#   main.go refuses to enable [monitoring_ui] if values are empty,
+#   and requires customize.sh to generate secure credentials.
+#
+#   If you use this file manually without customize.sh:
+#     1. Change the values below to a strong username and password
+#     2. Or leave them empty if you don't need the Dashboard
+# ------------------------------------------------------------
+[monitoring_ui]
+  enabled = true
+
+  # ⚠️ This address is reserved (8080). Do not change it.
+  # main.go refuses to start if PORT/DASHBOARD_PORT conflicts with it.
+  listen_address = '127.0.0.1:8080'
+
+  # --- Credentials ---
+  # ⚠️ Read from [monitoring_ui] only (section-restricted).
+  # Any username/password in another section is ignored.
+  #
+  # ⚠️ Must be filled by customize.sh before startup.
+  # If left empty, the Dashboard will not work (but the WebUI will).
+  username = ''
+  password = ''
+
+  # ------------------------------------------------------------
+  # enable_query_log:
+  #   true = log every query to dnscrypt-query.log
+  #   Required for Dashboard: recent_queries, top_domains
+  #
+  #   ⚠️ privacy_level controls the level of detail.
+  # ------------------------------------------------------------
+  enable_query_log = true
+
+  # ------------------------------------------------------------
+  # privacy_level:
+  #   1 = log domain names (required for Dashboard)
+  #   2 = log IP addresses only (no domains)
+  #   3 = log nothing (disables Dashboard)
+  #
+  #   ⚠️ If you choose 3, the Dashboard will not show query metrics.
+  # ------------------------------------------------------------
+  privacy_level = 1
+
+# ============================================================
+# [14] Runtime notes
+# ============================================================
+#
+# 📁 Runtime files (from main.go):
+#   • status_file:   proxy/run/dnscrypt.status
+#                    ← "User Intent" — written only by startService/stopService
+#   • pid_file:      proxy/run/dnscrypt.pid
+#   • progress_file: proxy/run/update_progress.txt
+#   • log_file:      /data/local/tmp/dnscrypt_main.log
+#
+# 🔍 Diagnostics:
+#   curl http://127.0.0.1:9090/healthz
+#   curl http://127.0.0.1:9090/readyz
+#   curl http://127.0.0.1:9090/api?action=runtime_info
+#
+# 🧠 Memory usage:
+#   • Idle WebUI:        ~15 MB
+#   • rebuildBlocklist:  ~2 MB peak
+#
+# 🔒 Security:
+#   • main.go sets CSP + X-Frame-Options + nosniff on all HTTP responses
+#   • handleLogin uses subtle.ConstantTimeCompare
+#   • handleAPI limits POST body to 5 MB
+#   • /readyz validates configuration on startup
+#   • STATUS_FILE = User Intent (not written from read-only functions)
+#   • Custom Chains: DNSCRYPT_OUT / DNSCRYPT_OUT6 (no orphans)
+#   • IPv6-safe rate limiting (getClientIP)
+#   • Port Guard 8080 (main.go + 6 shell scripts)
+#   • Section-Restricted TOML (read from [monitoring_ui] only)
+#   • metricsProxyHandler → /api/metrics (JSON pass-through)
+#
+# ⚠️ Port constraints:
+#   • PORT (webui.conf)          → 9090 default
+#   • DASHBOARD_PORT (webui.conf) → 9091 default
+#   • monitoring_ui (this file)  → 8080 ← RESERVED!
+#   • listen_addresses (this file) → 5354
+#
+#   main.go refuses to start if:
+#     • PORT = DASHBOARD_PORT
+#     • PORT = 8080
+#     • DASHBOARD_PORT = 8080
+#
+# ⚠️ Architectural note:
+#   Custom Chains are created/destroyed in:
+#     • startService() / stopService() → manage_firewall via runShell
+#     • manage_iptables / manage_ip6tables in functions.sh
+#
+#   When changing bootstrap_resolvers above:
+#     • DNSCRYPT_OUT is fully flushed (-F + -X)
+#     • DNSCRYPT_OUT is rebuilt with the new IPs
+#     • No orphans (regardless of how many times TOML changes)
+#
+# ============================================================

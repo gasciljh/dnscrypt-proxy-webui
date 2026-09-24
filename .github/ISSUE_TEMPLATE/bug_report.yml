@@ -1,0 +1,405 @@
+# ============================================================
+# DNSCrypt Smart Filter – Bug Report Template
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# GitHub Issue Forms (YAML-based) — the modern standard
+# Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# ============================================================
+
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in DNSCrypt Smart Filter
+title: "[Bug] "
+labels: ["bug", "triage"]
+assignees:
+  - gasciljh
+
+body:
+  # ============================================================
+  # [1] Initial warning
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 🐛 Thank you for reporting a bug!
+
+        Before you continue, make sure that you:
+
+        - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
+        - Checked [docs/TROUBLESHOOTING.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md)
+        - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue)
+        - Are running the **latest version** of the module
+
+        ---
+
+        > **Security notice**: if the issue is a **security vulnerability**, do not open a public Issue.
+        > Use [GitHub Private Vulnerability Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new) instead.
+
+  # ============================================================
+  # [2] Pre-flight checks
+  # ============================================================
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: ✅ Pre-flight checks
+      description: All items must be confirmed to continue
+      options:
+        - label: I have read FAQ.md and TROUBLESHOOTING.md
+          required: true
+        - label: I searched existing Issues and did not find the same problem
+          required: true
+        - label: I am running the latest version of the module (v1.0.0)
+          required: true
+        - label: This is not a security vulnerability (otherwise I would use Private Reporting)
+          required: true
+
+  # ============================================================
+  # [3] Problem description
+  # ============================================================
+  - type: textarea
+    id: description
+    attributes:
+      label: 📝 Problem description
+      description: A clear and concise description of the problem. What happened? What did you expect?
+      placeholder: |
+        Example:
+        After updating the module to v1.0.0, the WebUI stopped working.
+        When opening http://127.0.0.1:9090, a blank page appears.
+        I expected the main interface with the service status.
+    validations:
+      required: true
+
+  # ============================================================
+  # [4] Reproduction steps
+  # ============================================================
+  - type: textarea
+    id: steps
+    attributes:
+      label: 🔁 Steps to reproduce
+      description: How can the problem be reproduced? Be as specific as possible.
+      placeholder: |
+        1. Install the module v1.0.0 from Magisk
+        2. Reboot the device
+        3. Open the WebUI from the Action button
+        4. Click "Apply" for the PRO blocklist
+        5. ...
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  # ============================================================
+  # [5] Expected behavior
+  # ============================================================
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✅ Expected behavior
+      description: What should happen?
+      placeholder: 'Example: the PRO blocklist should be applied and a "Protection applied successfully" message should appear'
+    validations:
+      required: true
+
+  # ============================================================
+  # [6] Actual behavior
+  # ============================================================
+  - type: textarea
+    id: actual
+    attributes:
+      label: ❌ Actual behavior
+      description: What actually happens? (attach error messages if any)
+      placeholder: 'Example: a "Download failed" message appears and the blocklist does not change'
+    validations:
+      required: true
+
+  # ============================================================
+  # [7] Frequency
+  # ============================================================
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: 🔄 Frequency
+      description: Does the problem happen intermittently or always?
+      options:
+        - 🔴 Always (100%)
+        - 🟡 Often (50-99%)
+        - 🟠 Sometimes (10-49%)
+        - 🟢 Rarely (<10%)
+        - ❓ Not sure
+    validations:
+      required: true
+
+  # ============================================================
+  # [8] Device environment
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 📱 Environment information
+
+        > 💡 You can obtain most of this information with:
+        > ```bash
+        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
+        > ```
+
+  - type: input
+    id: module_version
+    attributes:
+      label: 🏷️ Module version
+      description: 'From `module.prop` or `status.sh` — example: v1.0.0'
+      placeholder: 'v1.0.0'
+    validations:
+      required: true
+
+  - type: input
+    id: android_version
+    attributes:
+      label: 🤖 Android version
+      description: 'Example: Android 14 (API 34) — from `getprop ro.build.version.release`'
+      placeholder: 'Android 14 (API 34)'
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 📱 Device
+      description: 'Full model — example: Pixel 6 Pro, Xiaomi 13, Samsung S23'
+      placeholder: 'Pixel 6 Pro'
+    validations:
+      required: true
+
+  - type: input
+    id: rom
+    attributes:
+      label: 💿 ROM
+      description: 'Example: Stock, LineageOS 21, Pixel Experience, MIUI 14'
+      placeholder: 'LineageOS 21'
+    validations:
+      required: true
+
+  - type: input
+    id: kernel
+    attributes:
+      label: ⚙️ Kernel
+      description: 'From `uname -r` — example: 5.15.94-lineageos'
+      placeholder: '5.15.94-lineageos'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: root_solution
+    attributes:
+      label: 🔓 Root solution
+      description: Which Root tool are you using?
+      options:
+        - Magisk
+        - Magisk Delta
+        - Magisk Canary
+        - KernelSU
+        - APatch
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: root_version
+    attributes:
+      label: 🔢 Root version
+      description: 'Example: Magisk 27.0, KernelSU 0.9.5'
+      placeholder: 'Magisk 27.0'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: 🏗️ CPU architecture
+      description: 'From `getprop ro.product.cpu.abi`'
+      options:
+        - arm64-v8a (ARM64)
+        - armeabi-v7a (ARMv7)
+        - x86_64 (x64)
+        - x86
+        - ❓ Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: soc
+    attributes:
+      label: 🔧 SoC
+      description: 'Optional — example: Snapdragon 8 Gen 2, Exynos 2200, Dimensity 9000'
+      placeholder: 'Snapdragon 8 Gen 2'
+    validations:
+      required: false
+
+  # ============================================================
+  # [9] Logs (optional but very useful)
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 📋 Logs and diagnostics
+
+        > 💡 All of these fields are **optional** but greatly speed up diagnostics.
+        > **Do not upload logs as images** — paste the text directly.
+
+  - type: textarea
+    id: log_main
+    attributes:
+      label: 📜 WebUI log (`dnscrypt_main.log`)
+      description: 'Last 50 lines from `/data/local/tmp/dnscrypt_main.log`'
+      placeholder: |
+        ```
+        [2026-09-24T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.0.0
+        [2026-09-24T10:30:01Z] 📋 LOG_LEVEL=info
+        ...
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: status_json
+    attributes:
+      label: 📊 `status.sh --json` output
+      description: 'Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"`'
+      placeholder: |
+        ```json
+        {
+          "version": "v1.0.0",
+          "dns_engine": {"running": true, "port": 5354},
+          "webui": {"running": true, "port": 9090},
+          ...
+        }
+        ```
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: firewall_state
+    attributes:
+      label: 🔥 Firewall state
+      description: 'iptables/ip6tables output — important for diagnosing Custom Chains'
+      placeholder: |
+        ```bash
+        $ iptables -t nat -L OUTPUT -n
+        Chain OUTPUT (policy ACCEPT)
+        target      prot opt source      destination
+        DNSCRYPT_OUT udp -- 0.0.0.0/0   0.0.0.0/0   udp dpt:53
+        DNSCRYPT_OUT tcp -- 0.0.0.0/0   0.0.0.0/0   tcp dpt:53
+
+        $ iptables -t nat -L DNSCRYPT_OUT -n
+        Chain DNSCRYPT_OUT (2 references)
+        target  prot opt source      destination
+        RETURN  all  -- 0.0.0.0/0   127.0.0.1
+        RETURN  all  -- 0.0.0.0/0   9.9.9.9
+        RETURN  all  -- 0.0.0.0/0   8.8.8.8
+        DNAT    all  -- 0.0.0.0/0   0.0.0.0/0    to:127.0.0.1:5354
+        ```
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: status_file
+    attributes:
+      label: 📄 Status file (`STATUS_FILE`)
+      description: 'Run: `su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"`'
+      placeholder: 'ON'
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: runtime_info
+    attributes:
+      label: 🧭 Runtime Info (`runtime_info`)
+      description: 'Run: `curl -s http://127.0.0.1:9090/api?action=runtime_info | jq` — useful for verifying PORT-2 fix'
+      placeholder: |
+        ```json
+        {
+          "version": "v1.0.0",
+          "webui_port": "9090",
+          "dashboard_port": "9091",
+          "bind_addr": "127.0.0.1",
+          ...
+        }
+        ```
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: dashboard_state
+    attributes:
+      label: 📈 Dashboard metrics (`/api/metrics`)
+      description: 'Run: `curl -s http://127.0.0.1:9091/api/metrics | head -20` — useful for verifying Fix #1'
+      placeholder: |
+        ```json
+        {
+          "generated_at": "...",
+          "total_queries": 15234,
+          "blocked_queries": 1523,
+          "cache_stats": {...}
+        }
+        ```
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra_logs
+    attributes:
+      label: 📁 Additional logs
+      description: 'Any other useful logs (dnscrypt-proxy.log, dnscrypt-blocked.log, etc.)'
+      placeholder: 'Paste only the relevant lines'
+      render: shell
+    validations:
+      required: false
+
+  # ============================================================
+  # [10] Additional context
+  # ============================================================
+  - type: textarea
+    id: additional
+    attributes:
+      label: 📌 Additional context
+      description: Anything else that may help diagnose the problem
+      placeholder: |
+        - Did the problem start after a specific update?
+        - Are you using a VPN or AdAway alongside the module?
+        - Did the problem occur after changing certain settings?
+        - Did you try any solutions? What worked and what did not?
+    validations:
+      required: false
+
+  # ============================================================
+  # [11] Screenshots
+  # ============================================================
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 🖼️ Screenshots (optional)
+      description: 'Drag and drop images here — or leave the field empty'
+      placeholder: 'You can paste images directly here (Ctrl+V)'
+    validations:
+      required: false
+
+  # ============================================================
+  # [12] Final confirmation
+  # ============================================================
+  - type: checkboxes
+    id: final_confirmation
+    attributes:
+      label: 🤝 Final confirmation
+      options:
+        - label: This report contains no sensitive data (credentials, tokens, etc.)
+          required: true
+        - label: I will follow up on replies and update the Issue if needed
+          required: true

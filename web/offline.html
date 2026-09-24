@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     DNSCrypt Smart Filter — Offline Page
+     Version: v1.0.0
+     Author: gasciljh
+     Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+     ============================================================
+     Purpose:
+       Standalone HTML page shown when:
+         • WebUI is unreachable (service stopped)
+         • Network timeout
+         • Server not responding
+
+     Notes:
+       • This page is served by the Service Worker and cannot
+         read runtime_info (no API available offline).
+       • It uses default ports (9090/9091).
+       • If ports were changed in webui.conf, the user is
+         warned to check that file.
+     ============================================================ -->
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta name="theme-color" content="#0d1117">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Offline — DNSCrypt Smart Filter</title>
+
+    <!-- Strict CSP: no inline scripts, no external sources -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+
+    <style>
+        /* ============================================================
+         * [1] Design tokens (matches index.html and dashboard.html)
+         * ============================================================ */
+        :root {
+            --bg: #0d1117;
+            --bg-card: rgba(22, 27, 34, 0.92);
+            --primary: #58a6ff;
+            --primary-dark: #1f6feb;
+            --success: #3fb950;
+            --danger: #f85149;
+            --warning: #d29922;
+            --text: #e6edf3;
+            --text-muted: #8b949e;
+            --border: rgba(255, 255, 255, 0.06);
+            --radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 16px;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* ============================================================
+         * [2] Main container
+         * ============================================================ */
+        .container {
+            max-width: 520px;
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 40px 28px;
+            text-align: center;
+            box-shadow:
+                0 30px 80px rgba(0, 0, 0, 0.7),
+                0 0 0 1px rgba(88, 166, 255, 0.05) inset;
+            animation: fadeIn 0.4s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Top decoration bar */
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ============================================================
+         * [3] Language toggle (top corner)
+         * ============================================================ */
+        .lang-toggle {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: inherit;
+            z-index: 10;
+        }
+
+        .lang-toggle:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--text);
+        }
+
+        /* ============================================================
+         * [4] Icon
+         * ============================================================ */
+        .icon-wrapper {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: radial-gradient(circle at center, rgba(248, 81, 73, 0.15), transparent 70%);
+            margin: 0 auto 24px;
+            animation: pulse 2.5s ease-in-out infinite;
+        }
+
+        .icon-wrapper .icon {
+            font-size: 56px;
+            line-height: 1;
+            filter: drop-shadow(0 4px 12px rgba(248, 81, 73, 0.3));
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.85;
+            }
+        }
+
+        /* ============================================================
+         * [5] Typography
+         * ============================================================ */
+        h1 {
+            font-size: 26px;
+            font-weight: 900;
+            color: var(--danger);
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+
+        code {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 13px;
+            direction: ltr;
+            display: inline-block;
+            margin: 0 2px;
+            white-space: nowrap;
+        }
+
+        /* ============================================================
+         * [6] Info box (diagnostic tips)
+         * ============================================================ */
+        .info-box {
+            background: rgba(88, 166, 255, 0.05);
+            border: 1px solid rgba(88, 166, 255, 0.15);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: start;
+        }
+
+        .info-box h2 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .info-box li {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            padding: 6px 0;
+            padding-inline-start: 20px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .info-box li::before {
+            content: '→';
+            position: absolute;
+            inset-inline-start: 0;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .info-box li strong {
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        /* ============================================================
+         * [6b] Ports info box
+         * ============================================================ */
+        .ports-box {
+            background: rgba(63, 185, 80, 0.05);
+            border: 1px solid rgba(63, 185, 80, 0.15);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: start;
+        }
+
+        .ports-box h2 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .port-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 12.5px;
+            gap: 10px;
+        }
+
+        .port-row:last-child {
+            border-bottom: none;
+        }
+
+        .port-label {
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .port-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 11.5px;
+            direction: ltr;
+        }
+
+        .port-value a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .port-value a:hover {
+            text-decoration: underline;
+        }
+
+        .ports-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-style: italic;
+            line-height: 1.5;
+        }
+
+        /* ============================================================
+         * [7] Buttons
+         * ============================================================ */
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            min-width: 140px;
+            padding: 14px 20px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            color: white;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(31, 111, 235, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(139, 148, 158, 0.15);
+            border: 1px solid rgba(139, 148, 158, 0.3);
+            color: var(--text-muted);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(139, 148, 158, 0.25);
+            color: var(--text);
+        }
+
+        /* Dashboard button (green) */
+        .btn-success {
+            background: linear-gradient(135deg, #238636, #2ea043);
+            box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(35, 134, 54, 0.4);
+        }
+
+        .btn-success:active {
+            transform: translateY(0);
+        }
+
+        /* ============================================================
+         * [8] Footer
+         * ============================================================ */
+        .footer {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        .footer .version {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--primary);
+            background: rgba(88, 166, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 10px;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* ============================================================
+         * [9] Connectivity indicator
+         * ============================================================ */
+        .connectivity-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 16px;
+            background: rgba(210, 153, 34, 0.1);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+            color: var(--warning);
+        }
+
+        .connectivity-status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--warning);
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* ============================================================
+         * [10] RTL overrides (Arabic mode)
+         * ============================================================ */
+        html[dir="rtl"] .lang-toggle {
+            right: auto;
+            left: 16px;
+        }
+
+        /* ============================================================
+         * [11] Accessibility
+         * ============================================================ */
+        button:focus-visible,
+        a:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ============================================================
+         * [12] Reduced motion
+         * ============================================================ */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* ============================================================
+         * [13] Small screens
+         * ============================================================ */
+        @media (max-width: 380px) {
+            .container {
+                padding: 28px 20px;
+            }
+            h1 {
+                font-size: 22px;
+            }
+            .icon-wrapper {
+                width: 80px;
+                height: 80px;
+            }
+            .icon-wrapper .icon {
+                font-size: 44px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Language toggle -->
+    <button
+        class="lang-toggle"
+        id="langToggle"
+        type="button"
+        aria-label="Toggle language">
+        <span id="langToggleText">🇸🇦 العربية</span>
+    </button>
+
+    <!-- Icon -->
+    <div class="icon-wrapper" aria-hidden="true">
+        <span class="icon">📡</span>
+    </div>
+
+    <!-- Title -->
+    <h1 id="title">Offline</h1>
+
+    <!-- Description -->
+    <p class="subtitle" id="subtitle">
+        Cannot reach DNSCrypt WebUI server.
+        <br>
+        Make sure the service is running on port <code>9090</code>.
+    </p>
+
+    <!-- Connectivity status -->
+    <div class="connectivity-status" role="status" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="statusText">Reconnecting...</span>
+    </div>
+
+    <!-- Ports info box -->
+    <div class="ports-box">
+        <h2>
+            <span aria-hidden="true">🔌</span>
+            <span id="portsTitle">Default Ports</span>
+        </h2>
+        <div class="port-row">
+            <span class="port-label">
+                <span aria-hidden="true">🖥️</span>
+                <span id="portsWebuiLabel">WebUI</span>
+            </span>
+            <span class="port-value">
+                <a href="http://127.0.0.1:9090/" id="portsWebuiLink">http://127.0.0.1:9090/</a>
+            </span>
+        </div>
+        <div class="port-row">
+            <span class="port-label">
+                <span aria-hidden="true">📊</span>
+                <span id="portsDashLabel">Dashboard</span>
+            </span>
+            <span class="port-value">
+                <a href="http://127.0.0.1:9091/" id="portsDashLink">http://127.0.0.1:9091/</a>
+            </span>
+        </div>
+        <div class="ports-note" id="portsNote">
+            ⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page cannot read settings (runs offline).
+        </div>
+    </div>
+
+    <!-- Diagnostic help -->
+    <div class="info-box">
+        <h2>
+            <span aria-hidden="true">💡</span>
+            <span id="helpTitle">How to restart the service?</span>
+        </h2>
+        <ul>
+            <li id="help1">
+                Open <strong>Magisk Manager</strong> or <strong>KernelSU</strong>.
+            </li>
+            <li id="help2">
+                Go to <strong>Modules</strong> → <strong>DNSCrypt Proxy</strong>.
+            </li>
+            <li id="help3">
+                Tap the <strong>Action</strong> button to restart.
+            </li>
+            <li id="help4">
+                Or from terminal:
+                <br>
+                <code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="actions">
+        <button
+            class="btn btn-primary"
+            id="retryBtn"
+            type="button"
+            aria-label="Retry connection">
+            <span aria-hidden="true">🔄</span>
+            <span id="retryText">Retry</span>
+        </button>
+
+        <a
+            class="btn btn-success"
+            id="openDashBtn"
+            href="http://127.0.0.1:9091/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open Dashboard">
+            <span aria-hidden="true">📊</span>
+            <span id="openDashText">Open Dashboard</span>
+        </a>
+
+        <button
+            class="btn btn-secondary"
+            id="diagnoseBtn"
+            type="button"
+            aria-label="Show diagnostics">
+            <span aria-hidden="true">🔧</span>
+            <span id="diagnoseText">Diagnose</span>
+        </button>
+    </div>
+
+    <!-- Diagnostics info (shown when "Diagnose" is pressed) -->
+    <div class="info-box" id="diagnosticsBox" style="display: none; margin-top: 16px;">
+        <h2>
+            <span aria-hidden="true">🔍</span>
+            <span id="diagTitle">Diagnostic Info</span>
+        </h2>
+        <ul id="diagList">
+            <li id="diagUrl">URL: <code>--</code></li>
+            <li id="diagTime">Time: <code>--</code></li>
+            <li id="diagUa">UA: <code>--</code></li>
+            <li id="diagProto">Protocol: <code>--</code></li>
+            <li id="diagOnline">Online: <code>--</code></li>
+        </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div>
+            <span aria-hidden="true">🛡️</span>
+            DNSCrypt Smart Filter
+            <span class="version" id="versionBadge">v1.0.0</span>
+        </div>
+        <div style="margin-top: 6px;">
+            <a
+                href="https://github.com/gasciljh/dnscrypt-proxy-webui"
+                target="_blank"
+                rel="noopener noreferrer">
+                <span aria-hidden="true">🔗</span>
+                <span id="projectText">Project on GitHub</span>
+            </a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    // ============================================================
+    // [1] Translations
+    // ============================================================
+    var translations = {
+        en: {
+            pageTitle: 'Offline — DNSCrypt Smart Filter',
+            langToggle: '🇸🇦 العربية',
+            title: 'Offline',
+            subtitle: 'Cannot reach DNSCrypt WebUI server.<br>Make sure the service is running on port <code>9090</code>.',
+            statusText: 'Reconnecting...',
+            portsTitle: 'Default Ports',
+            portsWebuiLabel: 'WebUI',
+            portsDashLabel: 'Dashboard',
+            portsNote: '⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page cannot read settings (runs offline).',
+            helpTitle: 'How to restart the service?',
+            help1: 'Open <strong>Magisk Manager</strong> or <strong>KernelSU</strong>.',
+            help2: 'Go to <strong>Modules</strong> → <strong>DNSCrypt Proxy</strong>.',
+            help3: 'Tap the <strong>Action</strong> button to restart.',
+            help4: 'Or from terminal:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
+            retryText: 'Retry',
+            openDashText: 'Open Dashboard',
+            diagnoseText: 'Diagnose',
+            diagTitle: 'Diagnostic Info',
+            projectText: 'Project on GitHub'
+        },
+        ar: {
+            pageTitle: 'غير متصل — DNSCrypt Smart Filter',
+            langToggle: '🇬🇧 English',
+            title: 'غير متصل',
+            subtitle: 'لا يمكن الوصول إلى خادم DNSCrypt WebUI.<br>تأكد من أن الخدمة تعمل على المنفذ <code>9090</code>.',
+            statusText: 'جاري إعادة الاتصال...',
+            portsTitle: 'المنافذ الافتراضية',
+            portsWebuiLabel: 'WebUI',
+            portsDashLabel: 'Dashboard',
+            portsNote: '⚠️ إذا قمت بتغيير المنافذ في <code>webui.conf</code>، استخدم القيم الفعلية. هذه الصفحة لا يمكنها قراءة الإعدادات (تعمل offline).',
+            helpTitle: 'كيف أُعيد تشغيل الخدمة؟',
+            help1: 'افتح <strong>Magisk Manager</strong> أو <strong>KernelSU</strong>.',
+            help2: 'اذهب إلى <strong>Modules</strong> → <strong>DNSCrypt Proxy</strong>.',
+            help3: 'اضغط زر <strong>Action</strong> لإعادة التشغيل.',
+            help4: 'أو من الطرفية:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
+            retryText: 'إعادة المحاولة',
+            openDashText: 'فتح Dashboard',
+            diagnoseText: 'تشخيص',
+            diagTitle: 'معلومات التشخيص',
+            projectText: 'المشروع على GitHub'
+        }
+    };
+
+    // ============================================================
+    // [2] Default language (English by default)
+    // ============================================================
+    var currentLang = 'en';
+    try {
+        currentLang = localStorage.getItem('dnscrypt-lang') || 'en';
+    } catch (e) {}
+
+    // ============================================================
+    // [3] Helper: get element by id
+    // ============================================================
+    function $(id) { return document.getElementById(id); }
+
+    // ============================================================
+    // [4] applyLanguage
+    // ============================================================
+    function applyLanguage(lang) {
+        var t = translations[lang];
+        if (!t) return;
+
+        // HTML lang + dir
+        document.documentElement.lang = lang;
+        document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+
+        // Title
+        document.title = t.pageTitle;
+
+        // Elements
+        var setText = function(id, html) {
+            var el = $(id);
+            if (el) el.innerHTML = html;
+        };
+
+        setText('langToggleText', t.langToggle);
+        setText('title', t.title);
+        setText('subtitle', t.subtitle);
+        setText('statusText', t.statusText);
+        setText('portsTitle', t.portsTitle);
+        setText('portsWebuiLabel', t.portsWebuiLabel);
+        setText('portsDashLabel', t.portsDashLabel);
+        setText('portsNote', t.portsNote);
+        setText('helpTitle', t.helpTitle);
+        setText('help1', t.help1);
+        setText('help2', t.help2);
+        setText('help3', t.help3);
+        setText('help4', t.help4);
+        setText('retryText', t.retryText);
+        setText('openDashText', t.openDashText);
+        setText('diagnoseText', t.diagnoseText);
+        setText('diagTitle', t.diagTitle);
+        setText('projectText', t.projectText);
+
+        // Save
+        try {
+            localStorage.setItem('dnscrypt-lang', lang);
+        } catch (e) {}
+    }
+
+    // ============================================================
+    // [5] toggleLanguage
+    // ============================================================
+    function toggleLanguage() {
+        currentLang = (currentLang === 'ar') ? 'en' : 'ar';
+        applyLanguage(currentLang);
+    }
+
+    // ============================================================
+    // [6] handleRetry — attempt to reconnect to the server
+    // ============================================================
+    function handleRetry() {
+        var btn = $('retryBtn');
+        if (btn) btn.disabled = true;
+
+        // Attempt to connect (HEAD /healthz)
+        var url = '/healthz?t=' + Date.now();
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('HEAD', url, true);
+        xhr.timeout = 3000;
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                // Server is running — reload
+                window.location.replace('/?_=' + Date.now());
+            } else {
+                if (btn) btn.disabled = false;
+                updateStatus(false);
+            }
+        };
+
+        xhr.onerror = function() {
+            if (btn) btn.disabled = false;
+            updateStatus(false);
+        };
+
+        xhr.ontimeout = function() {
+            if (btn) btn.disabled = false;
+            updateStatus(false);
+        };
+
+        xhr.send();
+    }
+
+    // ============================================================
+    // [7] updateStatus
+    // ============================================================
+    function updateStatus(isOnline) {
+        var statusEl = $('statusText');
+        var statusBox = document.querySelector('.connectivity-status');
+        var t = translations[currentLang];
+
+        if (isOnline) {
+            if (statusEl) statusEl.textContent = (currentLang === 'ar') ? 'متصل' : 'Connected';
+            if (statusBox) {
+                statusBox.style.background = 'rgba(63, 185, 80, 0.1)';
+                statusBox.style.borderColor = 'rgba(63, 185, 80, 0.3)';
+                statusBox.style.color = 'var(--success)';
+                var dot = statusBox.querySelector('.dot');
+                if (dot) {
+                    dot.style.background = 'var(--success)';
+                    dot.style.animation = 'none';
+                }
+            }
+        } else {
+            if (statusEl) statusEl.textContent = t.statusText;
+        }
+    }
+
+    // ============================================================
+    // [8] handleDiagnose — show diagnostic info
+    // ============================================================
+    function handleDiagnose() {
+        var box = $('diagnosticsBox');
+        if (!box) return;
+
+        // Toggle
+        if (box.style.display === 'block') {
+            box.style.display = 'none';
+            return;
+        }
+
+        // Fill info
+        var urlEl = $('diagUrl');
+        if (urlEl) {
+            urlEl.innerHTML = 'URL: <code>' + escapeHtml(window.location.href) + '</code>';
+        }
+
+        var timeEl = $('diagTime');
+        if (timeEl) {
+            timeEl.innerHTML = 'Time: <code>' + new Date().toISOString() + '</code>';
+        }
+
+        var uaEl = $('diagUa');
+        if (uaEl) {
+            var ua = (navigator.userAgent || 'unknown').substring(0, 60);
+            uaEl.innerHTML = 'UA: <code>' + escapeHtml(ua) + '...</code>';
+        }
+
+        var protoEl = $('diagProto');
+        if (protoEl) {
+            protoEl.innerHTML = 'Protocol: <code>' + window.location.protocol + '</code>';
+        }
+
+        var onlineEl = $('diagOnline');
+        if (onlineEl) {
+            var online = navigator.onLine ? '✅ true' : '❌ false';
+            onlineEl.innerHTML = 'Online: <code>' + online + '</code>';
+        }
+
+        box.style.display = 'block';
+    }
+
+    // ============================================================
+    // [9] escapeHtml
+    // ============================================================
+    function escapeHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // ============================================================
+    // [10] Auto-retry (every 15 seconds, up to a limit)
+    // ============================================================
+    var autoRetryCount = 0;
+    var AUTO_RETRY_MAX = 10;
+    var AUTO_RETRY_INTERVAL = 15000; // 15s
+
+    function startAutoRetry() {
+        if (autoRetryCount >= AUTO_RETRY_MAX) return;
+
+        setTimeout(function() {
+            autoRetryCount++;
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('HEAD', '/healthz?t=' + Date.now(), true);
+            xhr.timeout = 3000;
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    window.location.replace('/?_=' + Date.now());
+                } else {
+                    startAutoRetry();
+                }
+            };
+
+            xhr.onerror = function() { startAutoRetry(); };
+            xhr.ontimeout = function() { startAutoRetry(); };
+            xhr.send();
+        }, AUTO_RETRY_INTERVAL);
+    }
+
+    // ============================================================
+    // [11] Boot
+    // ============================================================
+    function boot() {
+        // Apply language
+        applyLanguage(currentLang);
+
+        // Bind events
+        var langBtn = $('langToggle');
+        if (langBtn) langBtn.addEventListener('click', toggleLanguage);
+
+        var retryBtn = $('retryBtn');
+        if (retryBtn) retryBtn.addEventListener('click', handleRetry);
+
+        var diagBtn = $('diagnoseBtn');
+        if (diagBtn) diagBtn.addEventListener('click', handleDiagnose);
+
+        // Update status (online check)
+        updateStatus(navigator.onLine);
+
+        // Listen to online/offline events
+        window.addEventListener('online', function() { updateStatus(true); });
+        window.addEventListener('offline', function() { updateStatus(false); });
+
+        // Start auto-retry
+        startAutoRetry();
+    }
+
+    // ============================================================
+    // [12] Ready
+    // ============================================================
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+
+})();
+</script>
+
+</body>
+</html>

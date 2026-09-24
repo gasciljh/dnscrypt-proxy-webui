@@ -1,0 +1,152 @@
+# ============================================================
+# EditorConfig for DNSCrypt Smart Filter
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# https://editorconfig.org
+# ============================================================
+# Purpose:
+#   Unifies file formatting across different editors.
+#   Supported by: VS Code, IntelliJ, Vim, Emacs, Sublime, ...
+#
+# Scope:
+#   Rules are defined only for file types that actually exist
+#   in this repository. No speculative or defensive patterns.
+# ============================================================
+
+root = true
+
+# ============================================================
+# Defaults
+# ============================================================
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# Go
+# ============================================================
+[*.go]
+indent_style = tab
+indent_size = 4
+
+# ============================================================
+# Shell Scripts
+# ============================================================
+[*.{sh,bash}]
+indent_style = space
+indent_size = 4
+switch_case_indent = true
+
+# ============================================================
+# JavaScript / JSON
+# ============================================================
+[*.{js,json}]
+indent_style = space
+indent_size = 2
+
+# ============================================================
+# YAML
+# ============================================================
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# ============================================================
+# Markdown
+# ============================================================
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+# ============================================================
+# HTML / CSS / SVG
+# ============================================================
+[*.{html,css,scss,svg}]
+indent_style = space
+indent_size = 2
+
+# ============================================================
+# Makefile (requires tab for recipes)
+# ============================================================
+[Makefile]
+indent_style = tab
+
+# ============================================================
+# TOML / Conf / Prop
+# ============================================================
+[*.{toml,conf,prop}]
+indent_style = space
+indent_size = 2
+
+# ============================================================
+# Git config
+# ============================================================
+[.gitattributes]
+insert_final_newline = false
+
+[.gitignore]
+insert_final_newline = true
+
+# ============================================================
+# Go mod
+# ============================================================
+[{go.mod,go.sum}]
+indent_style = tab
+indent_size = 4
+
+# ============================================================
+# Dockerfile
+# ============================================================
+[Dockerfile*]
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# Pre-commit config
+# ============================================================
+[.pre-commit-config.yaml]
+indent_style = space
+indent_size = 2
+
+# ============================================================
+# LICENSE
+# ============================================================
+[LICENSE]
+indent_style = space
+indent_size = 4
+
+# ============================================================
+# Runtime files (proxy/run/)
+# ============================================================
+# These files are created at runtime and never committed,
+# but the rules below apply if they exist locally.
+[proxy/run/*.status]
+insert_final_newline = false
+
+[proxy/run/*.pid]
+insert_final_newline = false
+
+[proxy/run/.bootstrap_cache]
+insert_final_newline = false
+
+# ============================================================
+# Binary assets (no trim)
+# ============================================================
+[web/*.png]
+insert_final_newline = false
+
+[web/*.ico]
+insert_final_newline = false
+
+# ============================================================
+# CodeQL config (within .github/workflows/)
+# ============================================================
+[.github/workflows/*.yml]
+indent_style = space
+indent_size = 2

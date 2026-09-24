@@ -1,0 +1,225 @@
+# ============================================================
+# DNSCrypt Smart Filter – Release Workflow
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Publishes a signed GitHub Release when a version tag is pushed.
+#   Can also be triggered manually via workflow_dispatch.
+#
+# Triggers:
+#   • Push of a tag matching v<MAJOR>.<MINOR>.<PATCH>
+#   • Push of a tag matching v<MAJOR>.<MINOR>.<PATCH>-<prerelease>
+#   • Manual dispatch
+#
+# Steps:
+#   • Checkout source (with full history for tag resolution)
+#   • Setup Go 1.22
+#   • Setup Android NDK r26b
+#   • Determine version (from tag or VERSION file)
+#   • Install packaging tools
+#   • Build WebUI binaries for 4 architectures
+#   • Verify the produced binaries (ELF + PIE)
+#   • Package the Magisk module ZIP
+#   • Upload artifacts as a workflow backup
+#   • Create the GitHub Release
+#   • Sync main → develop (post-release synchronization)
+#
+# Branch strategy:
+#   • main    → stable releases (protected)
+#   • develop → integration branch (features merged here first)
+#
+# Artifacts published on the release:
+#   • dist/dnscrypt-webui-<version>-module.zip
+#   • dist/dnscrypt-webui-<version>-module.zip.sha256
+#   • proxy/build/dnscrypt-webui-arm64
+#   • proxy/build/dnscrypt-webui-arm
+#   • proxy/build/dnscrypt-webui-amd64
+#   • proxy/build/dnscrypt-webui-386
+# ============================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: '1.22'
+  NDK_VERSION: 'r26b'
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Setup NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            V="${GITHUB_REF#refs/tags/}"
+          else
+            V=$(tr -d '\r\n' < VERSION)
+          fi
+          echo "value=$V" >> $GITHUB_OUTPUT
+          echo "no_v=${V#v}" >> $GITHUB_OUTPUT
+          echo "::notice::Version: $V"
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            zip unzip jq curl ca-certificates
+
+      - name: Build WebUI binaries
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          PROJECT_URL: https://github.com/${{ github.repository }}
+        run: |
+          chmod +x proxy/build.sh
+          cd proxy && ./build.sh --clean --parallel
+
+      - name: Verify WebUI binaries
+        run: |
+          ls -la proxy/build/
+          for arch in arm64 arm amd64 386; do
+            f="proxy/build/dnscrypt-webui-$arch"
+            [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
+            file "$f" | grep -q "pie executable" || { echo "::error::$f not PIE"; exit 1; }
+          done
+          echo "::notice::All 4 WebUI binaries OK"
+
+      - name: Package Magisk module
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/package_module.sh scripts/fetch_dns_binaries.sh
+          ./scripts/package_module.sh \
+            --version "${{ steps.version.outputs.value }}" \
+            --output-dir ./dist \
+            --verbose
+
+      - name: List final artifacts
+        run: |
+          echo "=== dist/ ==="
+          ls -la dist/
+          echo ""
+          echo "=== proxy/build/ ==="
+          ls -la proxy/build/
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.value }}
+          path: |
+            dist/
+            proxy/build/dnscrypt-webui-*
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.value }}
+          tag_name: ${{ steps.version.outputs.value }}
+          generate_release_notes: true
+          draft: false
+          files: |
+            dist/dnscrypt-webui-*-module.zip
+            dist/dnscrypt-webui-*-module.zip.sha256
+            proxy/build/dnscrypt-webui-arm64
+            proxy/build/dnscrypt-webui-arm
+            proxy/build/dnscrypt-webui-amd64
+            proxy/build/dnscrypt-webui-386
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ============================================================
+      # Post-release synchronization
+      # ============================================================
+      # Sync develop branch with main after a successful release.
+      #
+      # Rationale:
+      #   • Tags are created on main (protected branch).
+      #   • After the release, develop lags behind main.
+      #   • This step keeps develop up to date so future feature
+      #     branches start from the latest code.
+      #
+      # Safety:
+      #   • Does NOT fail the release on conflict.
+      #   • Only runs when a tag was pushed (not workflow_dispatch).
+      #   • Uses GITHUB_TOKEN with contents: write permission.
+      # ============================================================
+      - name: Sync main → develop
+        if: github.event_name == 'push'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Configure git"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "::endgroup::"
+
+          echo "::group::Fetch branches"
+          git fetch origin main
+          git fetch origin develop
+          echo "::endgroup::"
+
+          # Check if develop branch exists
+          if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
+            echo "::warning::develop branch does not exist — skipping sync"
+            exit 0
+          fi
+
+          echo "::group::Checkout develop"
+          git checkout -B develop origin/develop
+          echo "::endgroup::"
+
+          echo "::group::Attempt merge main into develop"
+          if git merge origin/main --no-edit --ff-only 2>/dev/null; then
+            echo "::notice::Fast-forward merge succeeded"
+          else
+            echo "::warning::Fast-forward not possible — trying regular merge"
+            if ! git merge origin/main --no-edit -m "chore: sync develop with main after ${{ steps.version.outputs.value }} release"; then
+              echo "::warning::Merge conflict detected — manual resolution required"
+              echo "::warning::develop will NOT be synced automatically"
+              git merge --abort || true
+              exit 0
+            fi
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Push develop"
+          if git push origin develop; then
+            echo "::notice::Successfully synced develop with main"
+          else
+            echo "::warning::Failed to push develop — check branch protection rules"
+          fi
+          echo "::endgroup::"

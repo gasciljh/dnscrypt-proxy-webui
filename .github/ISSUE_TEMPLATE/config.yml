@@ -1,0 +1,107 @@
+# ============================================================
+# DNSCrypt Smart Filter – Issue Templates Configuration
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Customizes the "New Issue" page on GitHub:
+#   • Disables "Open a blank issue" (forces the user to pick a template)
+#   • Adds quick links (Discussions, Security, Docs)
+#   • Routes questions to the correct channels
+#
+# Reference:
+# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+# ============================================================
+
+# ============================================================
+# [1] Prevent empty Issues
+# ============================================================
+# Disabling "Open a blank issue" forces the user to choose a template,
+# which automatically ensures the required information is collected
+# (version, device, logs, etc.).
+#
+# When to enable this?
+#   • Yes: projects that need structured information (like ours).
+#   • No: flexible projects that allow full freedom.
+# ============================================================
+blank_issues_enabled: false
+
+# ============================================================
+# [2] Quick contact links
+# ============================================================
+# Appear below "New Issue" — guide the user to the correct channel.
+# ============================================================
+contact_links:
+
+  # ------------------------------------------------------------
+  # [2.1] General discussions (questions, ideas, discussions)
+  # ------------------------------------------------------------
+  - name: 💬 Questions and Discussions
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
+    about: |
+      Ask questions, share ideas, or discuss the project with the community.
+      Suitable for: general questions, usage tips, initial suggestions.
+
+  # ------------------------------------------------------------
+  # [2.2] FAQ (Frequently Asked Questions)
+  # ------------------------------------------------------------
+  - name: ❓ Frequently Asked Questions (FAQ)
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md
+    about: |
+      Common questions with detailed answers.
+      Suitable for: "How do I do X?" — the answer may already be here.
+
+  # ------------------------------------------------------------
+  # [2.3] Troubleshooting guide
+  # ------------------------------------------------------------
+  - name: 🆘 Troubleshooting guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md
+    about: |
+      Comprehensive diagnostic guide with multiple sections (DNS, WebUI, Firewall, ...).
+      Suitable for: "X does not work" — start here before opening an Issue.
+
+  # ------------------------------------------------------------
+  # [2.4] Security reports (Private Vulnerability Reporting)
+  # ------------------------------------------------------------
+  - name: 🔒 Report a security vulnerability
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
+    about: |
+      Do not open a public Issue for security vulnerabilities!
+      Use this link for a private and confidential report.
+      Suitable for: XSS, CSRF, auth bypass, data leakage.
+
+  # ------------------------------------------------------------
+  # [2.5] Installation guide
+  # ------------------------------------------------------------
+  - name: 📘 Installation guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/INSTALL.md
+    about: |
+      Full step-by-step installation guide for Magisk / KernelSU / APatch.
+      Suitable for: installation issues, system requirements, initial setup.
+
+  # ------------------------------------------------------------
+  # [2.6] Compatibility matrix
+  # ------------------------------------------------------------
+  - name: ✅ Compatibility matrix
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/COMPATIBILITY.md
+    about: |
+      Comprehensive compatibility table: Android, ROMs, Kernels, Chipsets, Root solutions.
+      Suitable for: "Will it work on my device?" — the answer is here.
+
+  # ------------------------------------------------------------
+  # [2.7] Changelog
+  # ------------------------------------------------------------
+  - name: 📋 Changelog
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md
+    about: |
+      All notable changes, sorted by version.
+      Suitable for: "What is new in v1.0.0?" — the answer is here.
+
+  # ------------------------------------------------------------
+  # [2.8] Roadmap
+  # ------------------------------------------------------------
+  - name: 🗺️ Project roadmap
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md
+    about: |
+      What is coming in v1.1.0, v1.2.0, v2.0.0?
+      Suitable for: "Will feature X be added?" — check first.

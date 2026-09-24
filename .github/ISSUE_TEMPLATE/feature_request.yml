@@ -1,0 +1,310 @@
+# ============================================================
+# DNSCrypt Smart Filter – Feature Request Template
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# GitHub Issue Forms (YAML-based) — the modern standard
+# Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# ============================================================
+
+name: ✨ Feature Request
+description: Suggest a new feature or improvement for DNSCrypt Smart Filter
+title: "[Feature] "
+labels: ["enhancement", "triage"]
+assignees:
+  - gasciljh
+
+body:
+  # ============================================================
+  # [1] Initial warning
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## ✨ Thank you for contributing a new idea!
+
+        Before you continue, make sure that you:
+
+        - Read [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md)
+        - Checked [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
+        - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue) and [Discussions](https://github.com/gasciljh/dnscrypt-proxy-webui/discussions)
+        - The feature aligns with the [project philosophy](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/README.md)
+
+        ---
+
+        > 💡 **Tips for a successful request**:
+        > - Focus on the **problem** first, then the **proposed solution**.
+        > - Mention the **benefits** and **use cases**.
+        > - Mention the **alternatives** you considered.
+        > - Avoid vague requests ("improve performance").
+
+  # ============================================================
+  # [2] Pre-flight checks
+  # ============================================================
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: ✅ Pre-flight checks
+      description: All items must be confirmed to continue
+      options:
+        - label: I have read ROADMAP.md and FAQ.md
+          required: true
+        - label: I searched Issues and Discussions and did not find the same idea
+          required: true
+        - label: This feature has not been rejected before (I checked closed Issues)
+          required: true
+        - label: This idea aligns with the project philosophy (Zero-Telemetry, Localhost-Only, etc.)
+          required: true
+
+  # ============================================================
+  # [3] Request type
+  # ============================================================
+  - type: dropdown
+    id: request_type
+    attributes:
+      label: 🎯 Request type
+      description: What kind of feature do you want to suggest?
+      options:
+        - ✨ New feature
+        - ⚡ Performance improvement
+        - 🎨 UI/UX improvement
+        - 🔒 Security improvement
+        - 📖 Documentation improvement
+        - 🌐 New translation
+        - 🔧 Compatibility improvement
+        - 🛠️ Dev tooling
+        - ♻️ Refactor
+        - 🐳 Deployment / Docker
+        - 🔄 Other
+    validations:
+      required: true
+
+  # ============================================================
+  # [4] Problem statement
+  # ============================================================
+  - type: textarea
+    id: problem
+    attributes:
+      label: 🎯 Problem the feature solves
+      description: |
+        What bothers you currently? What does not work the way you want?
+        Write from a user perspective — not a technical one.
+      placeholder: |
+        Example:
+        I cannot export my custom rules (Allowlist/Denylist) as a backup.
+        When I reinstall the module, I lose all my manual rules.
+        I have to rewrite them by hand after every major upgrade.
+    validations:
+      required: true
+
+  # ============================================================
+  # [5] Proposed solution
+  # ============================================================
+  - type: textarea
+    id: solution
+    attributes:
+      label: 💡 Proposed solution
+      description: |
+        How do you imagine the feature? Be as specific as possible.
+        You can attach sketches or mockups (even hand-drawn).
+      placeholder: |
+        Example:
+        Add an "Export" button in the custom rules section:
+        - Produces a downloadable JSON file
+        - Contains allowlist.txt + denylist.txt
+        - Can be imported later via an "Import" button
+
+        Proposed design:
+        ┌──────────────────────────────┐
+        │  [Export]  [Import]          │
+        └──────────────────────────────┘
+    validations:
+      required: true
+
+  # ============================================================
+  # [6] Alternatives considered
+  # ============================================================
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: ⚖️ Alternatives considered
+      description: |
+        What alternatives did you try? Why did they not work?
+        This helps us understand why the proposed solution is the best.
+      placeholder: |
+        Example:
+        1. Manual copy via ADB from /data/adb/modules/.../proxy/
+           - ❌ Complex for the average user
+           - ❌ Requires adb + root permissions
+
+        2. Write the lines manually in an external text file
+           - ❌ Prone to errors
+           - ❌ Does not save automatically
+    validations:
+      required: true
+
+  # ============================================================
+  # [7] Benefits
+  # ============================================================
+  - type: textarea
+    id: benefits
+    attributes:
+      label: 🎁 Expected benefits
+      description: How will this feature improve the project? (quantify if possible)
+      placeholder: |
+        Example:
+        - ✅ Time saved: 5–10 minutes per recovery operation
+        - ✅ Fewer errors: no need for manual retyping
+        - ✅ Encourages customization: lowers the entry barrier for custom rules
+        - ✅ Serves 30–40% of users (based on survey X)
+    validations:
+      required: true
+
+  # ============================================================
+  # [8] Use cases
+  # ============================================================
+  - type: textarea
+    id: use_cases
+    attributes:
+      label: 🎬 Use cases
+      description: List real-world scenarios for the feature
+      placeholder: |
+        Example:
+        **UC-1: Major upgrade**
+        - User wants to upgrade the module from v1.0.0 to v1.1.0
+        - Exports the rules first
+        - Updates the module
+        - Imports the rules immediately
+
+        **UC-2: Transfer settings to a new device**
+        - User buys a new phone
+        - Exports the rules from the old one
+        - Imports them on the new one
+      value: |
+        **UC-1:**
+        -
+
+        **UC-2:**
+        -
+    validations:
+      required: false
+
+  # ============================================================
+  # [9] Suggested priority
+  # ============================================================
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 📊 Priority from your perspective
+      description: How important is this feature to you? (helps us prioritize the ROADMAP)
+      options:
+        - 🔴 Critical — I use it daily
+        - 🟠 Important — greatly enhances my experience
+        - 🟡 Useful — nice to have
+        - 🟢 Low — minor improvement
+        - ⚪ Idea — for future generations
+    validations:
+      required: true
+
+  # ============================================================
+  # [10] Willing to contribute?
+  # ============================================================
+  - type: dropdown
+    id: willing_to_contribute
+    attributes:
+      label: 🤝 Are you willing to contribute to the implementation?
+      description: |
+        This is completely optional — it does not affect feature acceptance.
+        But it helps us estimate the timeline.
+      options:
+        - 💪 Yes, I can send a PR
+        - 🤝 Yes, but I need guidance
+        - 🧪 I can help with testing
+        - 📖 I can help with documentation
+        - 👀 Sadly no — I leave it to the maintainer
+    validations:
+      required: false
+
+  # ============================================================
+  # [11] Mockups / Screenshots
+  # ============================================================
+  - type: textarea
+    id: mockups
+    attributes:
+      label: 🎨 Mockups / Screenshots (optional)
+      description: |
+        If you have a visual concept, upload it here.
+        Accepts: PNG, JPG, GIF, SVG, even hand-drawn sketches.
+      placeholder: 'Drag images here or paste with Ctrl+V'
+    validations:
+      required: false
+
+  # ============================================================
+  # [12] Examples from other projects (optional)
+  # ============================================================
+  - type: textarea
+    id: examples
+    attributes:
+      label: 🔗 Examples from other projects
+      description: |
+        Have you seen this feature in a similar project? (AdGuard, Pi-hole, NextDNS, etc.)
+        List the links — saves research time.
+      placeholder: |
+        - AdGuard Home: https://github.com/AdguardTeam/AdGuardHome/issues/...
+        - Pi-hole: feature X implemented with...
+    validations:
+      required: false
+
+  # ============================================================
+  # [13] Architectural considerations
+  # ============================================================
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: 🏗️ Technical considerations (optional)
+      description: |
+        If you are a developer, share any architectural notes:
+        - Potentially affected files
+        - Required API changes
+        - New dependencies
+        - Compatibility constraints
+      placeholder: |
+        Example:
+        - Requires a new endpoint: POST /api/export_rules
+        - Must update main.go (new handler)
+        - No new dependencies
+        - Compatibility: works on all versions
+    validations:
+      required: false
+
+  # ============================================================
+  # [14] Additional context
+  # ============================================================
+  - type: textarea
+    id: additional
+    attributes:
+      label: 📌 Additional context
+      description: Anything else you want to share
+      placeholder: |
+        - Related links
+        - Articles or discussions
+        - Assumed timeline
+        - Any other information
+    validations:
+      required: false
+
+  # ============================================================
+  # [15] Final confirmation
+  # ============================================================
+  - type: checkboxes
+    id: final_confirmation
+    attributes:
+      label: 🤝 Final confirmation
+      options:
+        - label: I understand that not every feature request will be implemented
+          required: true
+        - label: I will follow up on replies and answer the maintainer's questions
+          required: true
+        - label: I am ready to accept rejection of the feature if it does not align with the project philosophy
+          required: true

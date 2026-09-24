@@ -1,0 +1,67 @@
+# ============================================================
+# Pre-commit Configuration for DNSCrypt Smart Filter
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Runs automated checks before each commit to catch common
+#   issues early (formatting, syntax, merge conflicts, etc.).
+#
+# Installation:
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit install --hook-type commit-msg
+#
+# Manual run:
+#   pre-commit run --all-files
+#
+# Skip a specific hook (temporarily):
+#   SKIP=<hook-id> git commit -m "..."
+#
+# Hooks included:
+#   • pre-commit-hooks (official) — 9 hooks
+#     - trailing-whitespace
+#     - end-of-file-fixer
+#     - check-yaml
+#     - check-json
+#     - check-toml
+#     - check-merge-conflict
+#     - check-added-large-files
+#     - mixed-line-ending
+#     - check-executables-have-shebangs
+#
+#   • pre-commit-golang — 2 hooks
+#     - go-fmt
+#     - go-build
+# ============================================================
+
+minimum_pre_commit_version: '3.5.0'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        exclude: '\.(svg|json)$'
+      - id: check-yaml
+        args: ['--allow-multiple-documents', '--unsafe']
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: check-executables-have-shebangs
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        files: ^proxy/.*\.go$
+      - id: go-build
+        files: ^proxy/.*\.go$
+        pass_filenames: false
+        entry: bash -c 'cd proxy && go build ./...'

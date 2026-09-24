@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================================
+     DNSCrypt Smart Filter — PWA Icon (192×192)
+     Version: v1.0.0
+     Author: gasciljh
+     Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+     ============================================================
+     Small SVG icon for modern browsers (PWA, favicon fallback).
+     Rendered at 192×192 in web/manifest.json → icons[1].
+     Design: blue gradient background, shield, "DNS" text,
+             green status dot at bottom center.
+     ============================================================ -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="DNSCrypt Smart Filter">
+    <title>DNSCrypt Smart Filter</title>
+    <desc>Shield-shaped icon with DNS label and green status indicator</desc>
+
+    <defs>
+        <linearGradient id="bgGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#3a7bd5"/>
+            <stop offset="100%" stop-color="#1e5bb8"/>
+        </linearGradient>
+        <linearGradient id="shieldGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#4a7fc7"/>
+            <stop offset="100%" stop-color="#3a6fb0"/>
+        </linearGradient>
+        <radialGradient id="dotGrad192" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#5ee06b"/>
+            <stop offset="100%" stop-color="#2eb841"/>
+        </radialGradient>
+    </defs>
+
+    <!-- Background with rounded corners -->
+    <rect x="0" y="0" width="192" height="192" rx="42" ry="42" fill="url(#bgGrad192)"/>
+
+    <!-- Shield shape -->
+    <path d="M 96 20
+             L 156 44
+             L 156 96
+             Q 156 140 96 168
+             Q 36 140 36 96
+             L 36 44 Z"
+          fill="url(#shieldGrad192)"
+          stroke="#2d5a94"
+          stroke-width="2"/>
+
+    <!-- "DNS" text -->
+    <text x="96" y="118"
+          font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
+          font-size="60"
+          font-weight="900"
+          fill="#0d1117"
+          text-anchor="middle"
+          letter-spacing="1">DNS</text>
+
+    <!-- Green status dot -->
+    <circle cx="96" cy="142" r="9" fill="url(#dotGrad192)"/>
+    <circle cx="96" cy="142" r="13" fill="none" stroke="#5ee06b" stroke-width="1.5" opacity="0.55"/>
+</svg>

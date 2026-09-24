@@ -1,0 +1,208 @@
+# ============================================================
+# DNSCrypt Smart Filter – CODEOWNERS
+# Version: v1.0.0
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Reference:
+#   https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Purpose:
+#   Automatically assigns reviewers to every Pull Request based on
+#   the files being modified. GitHub triggers these reviewers
+#   automatically when a PR is opened.
+#
+# Syntax:
+#   <pattern>    <owner1> <owner2> ...
+#
+# Supported patterns:
+#   *           → all files (fallback)
+#   *.go        → all Go files
+#   /proxy/     → a specific directory
+#   /docs/*.md  → specific files
+#
+# Matching rules:
+#   • The last matching pattern wins (more specific overrides more general).
+#   • Order matters: general first, then specific.
+#   • Blank lines are for readability only.
+#   • No inline comments (only full lines starting with #).
+#
+# ⚠️ Note:
+#   CODEOWNERS works on FILE PATHS only — it does NOT control
+#   branch rules. For branch policies (which branches can be pushed
+#   to, PR targets, etc.), see:
+#     • docs/BRANCHING.md §6 (Branch Protection)
+#     • Repository Settings → Branches
+# ============================================================
+
+# ============================================================
+# [1] Default — all files
+# ============================================================
+# Must be at the top (least specific).
+# Any file not matched by a pattern below falls back to this.
+# ============================================================
+*                           @gasciljh
+
+# ============================================================
+# [2] Critical core — mandatory review
+# ============================================================
+
+# --- Backend Go (security core) ---
+/proxy/main.go              @gasciljh
+/proxy/go.mod               @gasciljh
+
+# --- Shell scripts (lifecycle + firewall) ---
+/proxy/functions.sh         @gasciljh
+/proxy/watchdog.sh          @gasciljh
+/proxy/service.sh           @gasciljh
+/proxy/customize.sh         @gasciljh
+/proxy/post-fs-data.sh      @gasciljh
+/proxy/uninstall.sh         @gasciljh
+/proxy/action.sh            @gasciljh
+/proxy/status.sh            @gasciljh
+
+# --- Config (security — Port Guard + credentials) ---
+/proxy/dnscrypt-proxy.toml  @gasciljh
+/proxy/webui.conf           @gasciljh
+
+# ============================================================
+# [3] Frontend
+# ============================================================
+/web/                       @gasciljh
+
+# ============================================================
+# [4] Security and versions
+# ============================================================
+# Any change in these files must be reviewed by the maintainer
+# (they control: version + versionCode, release signing,
+# SBOM + Attestations, security policy).
+/VERSION                    @gasciljh
+/module.prop                @gasciljh
+/update.json                @gasciljh
+
+# ============================================================
+# [5] CI/CD (critical — may publish releases)
+# ============================================================
+/.github/workflows/         @gasciljh
+/.github/CODEOWNERS         @gasciljh
+/.github/PULL_REQUEST_TEMPLATE.md           @gasciljh
+/.github/PULL_REQUEST_TEMPLATE/             @gasciljh
+/.github/dependabot.yml     @gasciljh
+
+# ============================================================
+# [6] Documentation (lighter review)
+# ============================================================
+/docs/                      @gasciljh
+/README.md                  @gasciljh
+/CHANGELOG.md               @gasciljh
+/CODE_OF_CONDUCT.md         @gasciljh
+/SECURITY.md                @gasciljh
+/LICENSE                    @gasciljh
+
+# ============================================================
+# [7] Build tooling
+# ============================================================
+/scripts/                   @gasciljh
+/Makefile                   @gasciljh
+
+# ============================================================
+# [8] Branching & release documentation (v1.0.0)
+# ============================================================
+# These files define the workflow used by contributors and must
+# be reviewed together with the corresponding CI/CD changes.
+/docs/BRANCHING.md          @gasciljh
+/docs/RELEASE_PROCESS.md    @gasciljh
+/scripts/release.sh         @gasciljh
+/scripts/release-patch.sh   @gasciljh
+
+# ============================================================
+# [9] Architecture Decision Records (ADRs)
+# ============================================================
+# All ADRs must be reviewed by the maintainer — they encode
+# long-term architectural decisions and cannot be edited once
+# accepted (only superseded by a new ADR).
+/docs/adr/                  @gasciljh
+
+# ============================================================
+# [10] Repo hygiene
+# ============================================================
+# Formatting, secrets detection, and dev environment config.
+/.gitattributes             @gasciljh
+/.gitignore                 @gasciljh
+/.editorconfig              @gasciljh
+/.pre-commit-config.yaml    @gasciljh
+/.secrets.baseline          @gasciljh
+/.devcontainer/             @gasciljh
+
+# ============================================================
+# Additional notes
+# ============================================================
+#
+# When new contributors join:
+#
+#   • Frontend:
+#       /web/               @gasciljh @frontend-reviewer
+#
+#   • Documentation:
+#       /docs/              @gasciljh @docs-reviewer
+#
+#   • Security (fast + mandatory):
+#       /proxy/main.go      @gasciljh @security-team
+#
+#   • CI/CD:
+#       /.github/workflows/ @gasciljh @ci-reviewer
+#
+#   • Architecture decisions (ADRs):
+#       /docs/adr/          @gasciljh @decision-architect
+#
+#   • Release tooling:
+#       /scripts/release.sh         @gasciljh @release-manager
+#       /scripts/release-patch.sh   @gasciljh @release-manager
+#
+# ============================================================
+# How it works
+# ============================================================
+#
+# When a PR modifies /proxy/main.go:
+#   1. GitHub reads CODEOWNERS.
+#   2. It finds the last matching pattern for the path.
+#   3. It assigns @gasciljh as a reviewer automatically.
+#   4. The user does not need to request a review manually.
+#
+# When a PR modifies an undefined file (e.g. /newfile.txt):
+#   → matched by `*` (first line) → @gasciljh.
+#
+# When a PR modifies /proxy/main.go and /docs/FAQ.md:
+#   → all matching owners are assigned (@gasciljh only, currently).
+#
+# When a PR adds a new ADR in /docs/adr/:
+#   → matched by `/docs/adr/` → @gasciljh (mandatory review —
+#     ADRs are immutable once accepted).
+#
+# When a PR modifies /scripts/release-patch.sh:
+#   → matched by `/scripts/` and `/scripts/release-patch.sh`.
+#     The more specific pattern wins — but both point to @gasciljh.
+#
+# ============================================================
+# Benefits
+# ============================================================
+#
+# ✅ Faster review: the reviewer is assigned immediately.
+# ✅ No oversight: every PR is automatically reviewed.
+# ✅ Fine-grained: each file can have a different reviewer.
+# ✅ Team-friendly: supports team handles like @org/team-name.
+# ✅ GitHub standard: officially supported feature.
+# ✅ ADR-aware: architectural decisions trigger the right reviewer.
+#
+# ============================================================
+# Notes on branch policy
+# ============================================================
+#
+# CODEOWNERS does NOT enforce branch rules. To protect branches
+# (e.g. prevent direct pushes to main, require CI to pass), use
+# Repository Settings → Branches, not this file.
+#
+# See docs/BRANCHING.md §6 for the full list of recommended
+# protection rules.
+#
+# ============================================================
