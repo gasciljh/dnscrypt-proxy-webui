@@ -57,7 +57,7 @@ jobs:
       matrix:
         arch: [arm64, arm, amd64, 386]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v7
         with:
