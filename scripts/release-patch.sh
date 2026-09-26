@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – release-patch.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -17,6 +17,54 @@
 #     • Verifies the version is a PATCH bump (not MINOR or MAJOR)
 #     • Delegates to scripts/release.sh (same bump logic)
 #     • Reminds the user to back-merge main → develop
+#
+# Wrapper design:
+#   This script is a THIN WRAPPER around scripts/release.sh.
+#   It does NOT contain any version bump logic of its own.
+#
+#   What it adds on top of release.sh:
+#     1. Branch check       — MUST be `main`
+#     2. MAJOR equality     — must not change
+#     3. MINOR equality     — must not change
+#     4. PATCH monotonicity — must be exactly current + 1
+#
+#   After those checks pass, it calls:
+#     scripts/release.sh <version> [--dry-run] [--no-push] --yes
+#
+#   Why delegation instead of duplication:
+#     • Single source of truth for the version bump logic
+#     • No drift between the two scripts over time
+#     • Bug fixes in release.sh apply automatically here
+#     • Adding a new versionCode rule affects both consistently
+#
+#   See:
+#     • docs/adr/0006-rename-hotfix-to-release-patch.md
+#     • The "Relationship with release-patch.sh" section in
+#       scripts/release.sh for the inverse view.
+#
+# The 3 safety rules (detailed):
+#
+#   Rule 1 — Branch must be `main`
+#     Rationale: PATCH releases land directly on the stable
+#     branch. Running from develop would bypass the branch
+#     protection model. See docs/BRANCHING.md §8.
+#
+#   Rule 2 — MAJOR and MINOR must not change
+#     Example:
+#       Current: v1.0.0
+#       Accept:  v1.0.1, v1.0.2, v1.0.3, ...  (PATCH +1)
+#       Reject:  v1.1.0  (MINOR bump — use release.sh)
+#       Reject:  v2.0.0  (MAJOR bump — use release.sh)
+#
+#   Rule 3 — PATCH must be exactly current + 1
+#     Rejects: v1.0.0 → v1.0.5  (skips patches — suspicious)
+#     Rejects: v1.0.0 → v1.0.1  (not a change — no-op)
+#     Accepts: v1.0.0 → v1.0.1, v1.0.1 → v1.0.2, ...
+#
+#   These rules are intentionally strict. If you need to skip
+#   a PATCH number for any reason, use release.sh manually
+#   with the exact version you want, and document the reason
+#   in CHANGELOG.md.
 #
 # Usage:
 #   ./scripts/release-patch.sh v1.0.1
@@ -35,8 +83,8 @@
 #   • CHANGELOG.md updated with the new patch version
 #
 # Full documentation:
-#   docs/BRANCHING.md §8      (Hotfix Flow)
-#   docs/RELEASE_PROCESS.md §2.3 (Hotfix release type)
+#   docs/BRANCHING.md §8          (Hotfix Flow)
+#   docs/RELEASE_PROCESS.md §2.3  (Hotfix release type)
 #
 # Exit codes:
 #   0 = success
@@ -44,6 +92,18 @@
 #   2 = repository state invalid
 #   3 = version rules violated
 #   4 = user aborted
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added a "Wrapper design" section making the delegation
+#     to release.sh explicit (mirrors the section added in
+#     scripts/release.sh v1.1.0).
+#   • Expanded the "3 safety rules" section with concrete
+#     accept/reject examples for each rule.
+#   • Clarified that skipping a PATCH number requires manual
+#     release.sh usage and a CHANGELOG note — not a bypass of
+#     this script.
 # ============================================================
 
 set -euo pipefail
@@ -114,9 +174,16 @@ Rules:
   • MINOR/MAJOR bumps are rejected — use `release.sh` for those.
   • After the release, `develop` MUST be back-merged.
 
+How this script works:
+  It is a thin wrapper around scripts/release.sh. It performs
+  three safety checks (branch, MAJOR equality, MINOR equality,
+  PATCH monotonicity), then delegates to release.sh with the
+  same options you provided here.
+
 See:
   docs/BRANCHING.md §8
   docs/RELEASE_PROCESS.md §2.3
+  docs/adr/0006-rename-hotfix-to-release-patch.md
 EOF
     exit 0
 }
@@ -352,6 +419,10 @@ fi
 
 # ============================================================
 # [10] Delegate to release.sh
+# ============================================================
+# All version bump logic, file updates, verification, commit,
+# tag, and push are handled by release.sh. This script only
+# adds the pre-flight checks above.
 # ============================================================
 log_step "Delegating to release.sh"
 

@@ -1,11 +1,30 @@
 # Glossary — Terms & Abbreviations
 
-> Comprehensive reference for all terms and abbreviations used in DNSCrypt Smart Filter.
+> Comprehensive reference for all terms and abbreviations used
+> in DNSCrypt Smart Filter.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • §5 Project-Specific Terms gained 6 new entries:
+>     MEM-1 (Dynamic memory limit), MEM-2 (Extended shellQuote),
+>     MEM-3 (MONITORING_UI_PORT constant), `profile_key`,
+>     `memory_limit_mb`, and "Soft limit".
+>   • §6 Go & Shell Terms gained 2 new entries:
+>     `debug.SetMemoryLimit` and `memLimitMu`.
+>   • §8 Metrics & Abstraction Terms gained a v1.1.0 note
+>     about the `runtime_info` additions.
+>   • §10 Common Abbreviations gained 4 entries:
+>     GC, RSS, OOM, LMK.
+>   • §11 Fixes Index gained a new section for the v1.1.0
+>     Runtime Improvements (MEM-1 / MEM-2 / MEM-3).
+>   • The Audit Corrections Registry remains at #33 — v1.1.0
+>     does not extend it (see `docs/SECURITY.md` §17).
+>   • §12 References updated with v1.1.0 additions.
 
 ---
 
@@ -21,7 +40,7 @@
 8. [Metrics & Abstraction Terms](#8-metrics--abstraction-terms)
 9. [Advanced Security Terms](#9-advanced-security-terms)
 10. [Common Abbreviations](#10-common-abbreviations)
-11. [Fixes Index (v1.0.0)](#11-fixes-index-v100)
+11. [Fixes Index](#11-fixes-index)
 
 ---
 
@@ -29,9 +48,11 @@
 
 ### 🌐 DNS — Domain Name System
 
-A system that translates domain names (e.g. `google.com`) into IP addresses (e.g. `142.250.185.46`).
+A system that translates domain names (e.g. `google.com`) into IP
+addresses (e.g. `142.250.185.46`).
 
-**Without it**: You would type `142.250.185.46` instead of `google.com`!
+**Without it**: You would type `142.250.185.46` instead of
+`google.com`!
 
 **Default port**: `53` (UDP/TCP).
 
@@ -39,26 +60,30 @@ A system that translates domain names (e.g. `google.com`) into IP addresses (e.g
 
 ### 🔐 DNSCrypt
 
-**DNS query encryption protocol** developed by [OpenDNS](https://www.opendns.com/).
+**DNS query encryption protocol** developed by
+[OpenDNS](https://www.opendns.com/).
 
 **Purpose**: Prevent ISPs from seeing or tampering with DNS queries.
 
 **Port**: `443` (UDP/TCP).
 **Encryption**: X25519 + XSalsa20-Poly1305.
 
-**Difference from DoH**: DNSCrypt is lighter (smaller data size) — better on mobile networks.
+**Difference from DoH**: DNSCrypt is lighter (smaller data size) —
+better on mobile networks.
 
 ---
 
 ### 🌐 DoH — DNS over HTTPS
 
-**Sending DNS queries over HTTPS** (port 443) — appears like a normal website visit.
+**Sending DNS queries over HTTPS** (port 443) — appears like a normal
+website visit.
 
 **Purpose**: Bypass firewalls that block port 53.
 
 **Providers**: Cloudflare, Google, Quad9.
 
-**Difference from DNSCrypt**: DoH uses standard HTTPS — works anywhere but slightly heavier.
+**Difference from DNSCrypt**: DoH uses standard HTTPS — works anywhere
+but slightly heavier.
 
 ---
 
@@ -66,40 +91,48 @@ A system that translates domain names (e.g. `google.com`) into IP addresses (e.g
 
 **Sending DNS queries over TLS** (port 853).
 
-**Difference from DoH**: DoT uses a dedicated port (853) → easier to block.
+**Difference from DoH**: DoT uses a dedicated port (853) → easier to
+block.
 
-**Difference from DNSCrypt**: DoT uses standard TLS 1.3 — but is easily blocked.
+**Difference from DNSCrypt**: DoT uses standard TLS 1.3 — but is easily
+blocked.
 
 ---
 
 ### 🛡️ DNSSEC — DNS Security Extensions
 
-**Security extensions for DNS** that cryptographically verify response authenticity (signature).
+**Security extensions for DNS** that cryptographically verify response
+authenticity (signature).
 
 **Purpose**: Prevent DNS spoofing attacks.
 
-**⚠️ Note**: DNSSEC ensures **authenticity** — not privacy (that's DNSCrypt/DoH's job).
+**⚠️ Note**: DNSSEC ensures **authenticity** — not privacy (that's
+DNSCrypt/DoH's job).
 
 ---
 
 ### 🚀 Bootstrap Resolvers
 
-**Public DNS servers** used only to download the actual server list (`public-resolvers.md`).
+**Public DNS servers** used only to download the actual server list
+(`public-resolvers.md`).
 
-**After download**: Not used — the engine starts using DNSCrypt/DoH servers.
+**After download**: Not used — the engine starts using DNSCrypt/DoH
+servers.
 
 **Example**:
 ```toml
 bootstrap_resolvers = ['9.9.9.9:53', '8.8.8.8:53', '1.1.1.1:53', '1.0.0.1:53']
 ```
 
-**⚠️ v1.0.0**: Excluded from DNS redirection via `RETURN` rules inside `DNSCRYPT_OUT`.
+**⚠️ v1.0.0**: Excluded from DNS redirection via `RETURN` rules inside
+`DNSCRYPT_OUT`.
 
 ---
 
 ### ⚠️ DNS Leak
 
-**Leakage of DNS queries** outside the encrypted tunnel (e.g. silently using the ISP's DNS).
+**Leakage of DNS queries** outside the encrypted tunnel (e.g. silently
+using the ISP's DNS).
 
 **Common causes**:
 - VPN does not redirect DNS.
@@ -131,6 +164,9 @@ bootstrap_resolvers = ['9.9.9.9:53', '8.8.8.8:53', '1.1.1.1:53', '1.0.0.1:53']
 
 **Managed by**: `main.go` via `startService()` / `stopService()`.
 
+**⚠️ v1.1.0 note**: The DNS version (2.1.18) is **separate** from the
+module version (v1.1.0). See §5 "DNS Version" for the distinction.
+
 ---
 
 ## 2. Network & Firewall Terms
@@ -157,7 +193,8 @@ iptables -t nat -I OUTPUT -p udp --dport 53 -j DNSCRYPT_OUT
 
 **Modern replacement for iptables** (Kernel 4.10+).
 
-**Advantages**: Faster, cleaner, supports IPv4 and IPv6 in the same rules.
+**Advantages**: Faster, cleaner, supports IPv4 and IPv6 in the same
+rules.
 
 **Example from the project**:
 ```bash
@@ -169,7 +206,8 @@ nft add chain inet dnscrypt_filter dnscrypt_chain '{ type nat hook output priori
 
 ### 📦 Custom Chains
 
-**Dedicated iptables chains** created and managed independently from the public chains.
+**Dedicated iptables chains** created and managed independently from
+the public chains.
 
 **In the project**:
 - `DNSCRYPT_OUT` (IPv4).
@@ -180,7 +218,8 @@ nft add chain inet dnscrypt_filter dnscrypt_chain '{ type nat hook output priori
 - ✅ Public `OUTPUT` is clean (two static rules).
 - ✅ Cleanup = `-F` + `-X` = complete wipe in one shot.
 
-**⚠️ Audit Correction #17** — Reason: Prevent **Orphans** when changing `bootstrap_resolvers`.
+**⚠️ Audit Correction #17** — Reason: Prevent **Orphans** when changing
+`bootstrap_resolvers`.
 
 ---
 
@@ -192,26 +231,30 @@ nft add chain inet dnscrypt_filter dnscrypt_chain '{ type nat hook output priori
 ```bash
 -j DNAT --to-destination 127.0.0.1:5354
 ```
-Means: "Any DNS query going to any server → redirect to local DNSCrypt engine".
+Means: "Any DNS query going to any server → redirect to local DNSCrypt
+engine".
 
 ---
 
 ### ⏪ RETURN
 
-**End processing of the packet in the current chain** and return to before the `jump`.
+**End processing of the packet in the current chain** and return to
+before the `jump`.
 
 **In the project**:
 ```bash
 -A DNSCRYPT_OUT -d 127.0.0.1 -j RETURN
 -A DNSCRYPT_OUT -d 9.9.9.9   -j RETURN
 ```
-Means: "Do not redirect DNS queries from the DNSCrypt engine itself → prevent infinite loop".
+Means: "Do not redirect DNS queries from the DNSCrypt engine itself →
+prevent infinite loop".
 
 ---
 
 ### 🔀 Orphan Rules
 
-**Leftover firewall rules** with no effect (orphaned) — due to lack of cleanup.
+**Leftover firewall rules** with no effect (orphaned) — due to lack of
+cleanup.
 
 **Problem**: Accumulate over time → pollute the firewall.
 
@@ -237,7 +280,8 @@ Means: "Do not redirect DNS queries from the DNSCrypt engine itself → prevent 
 
 **Advantage**: ~340 undecillion addresses!
 
-**⚠️ In the project**: Full support via `DNSCRYPT_OUT6` and `getClientIP()`.
+**⚠️ In the project**: Full support via `DNSCRYPT_OUT6` and
+`getClientIP()`.
 
 ---
 
@@ -248,13 +292,15 @@ Means: "Do not redirect DNS queries from the DNSCrypt engine itself → prevent 
 **IPv4**: `127.0.0.1`
 **IPv6**: `::1`
 
-**In the project**: All servers run on loopback (by default) for security.
+**In the project**: All servers run on loopback (by default) for
+security.
 
 ---
 
 ### 🔀 Race Condition
 
-**Condition where two operations reach the same data at the same time** → unexpected results.
+**Condition where two operations reach the same data at the same
+time** → unexpected results.
 
 **Solution**: Mutexes + Atomic writes.
 
@@ -266,7 +312,8 @@ Means: "Do not redirect DNS queries from the DNSCrypt engine itself → prevent 
 
 ### 🏗️ `rebuildMu`
 
-**`sync.Mutex` in `main.go`** that protects `rebuildBlocklist` from race conditions.
+**`sync.Mutex` in `main.go`** that protects `rebuildBlocklist` from
+race conditions.
 
 **Structure**:
 ```go
@@ -280,7 +327,8 @@ func rebuildBlocklist() error {
 ```
 
 **Problem before v1.0.0**:
-- `updateProfile` (in goroutine) + `atomicSaveRulesInternal` (in HTTP handler) → BLOCKLIST inconsistent.
+- `updateProfile` (in goroutine) + `atomicSaveRulesInternal` (in HTTP
+  handler) → BLOCKLIST inconsistent.
 
 **Solution**:
 - Coarse-grained lock — the entire function is protected.
@@ -315,7 +363,8 @@ func rebuildBlocklist() error {
 
 **In the project**: `web/sw.js` — manages Cache + detects updates.
 
-**⚠️ dual-origin limitation**: SW is bound to a single origin (9090 ≠ 9091).
+**⚠️ dual-origin limitation**: SW is bound to a single origin (9090 ≠
+9091).
 
 ---
 
@@ -327,7 +376,8 @@ func rebuildBlocklist() error {
 - ✅ SSE: Simple, unidirectional (server → client).
 - ⚠️ WebSocket: Complex, bidirectional.
 
-**In the project**: `/events` endpoint — sends service status, progress, statistics.
+**In the project**: `/events` endpoint — sends service status,
+progress, statistics.
 
 **⚠️ v1.0.0**: SSE Write Deadline = 30s (DoS protection).
 
@@ -335,7 +385,8 @@ func rebuildBlocklist() error {
 
 ### 🛡️ CSP — Content-Security-Policy
 
-**HTTP header** that restricts resource sources (Scripts, Styles, Images).
+**HTTP header** that restricts resource sources (Scripts, Styles,
+Images).
 
 **Purpose**: Prevent XSS attacks.
 
@@ -344,13 +395,19 @@ func rebuildBlocklist() error {
 Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'
 ```
 
-**⚠️ Note**: `'unsafe-inline'` is currently present (TODO v1.1: remove it).
+**⚠️ Note**: `'unsafe-inline'` is currently present (TODO v1.2: remove
+it).
+
+**v1.1.0 note**: `web/offline.html` **no longer has a CSP meta**. The
+previous `default-src 'none'` silently blocked the page's own scripts.
+See §9 "Offline Page CSP Removal".
 
 ---
 
 ### 🎯 CSRF — Cross-Site Request Forgery
 
-**Attack that tricks the browser** into sending an unwanted request (using the victim's cookies).
+**Attack that tricks the browser** into sending an unwanted request
+(using the victim's cookies).
 
 **Example**:
 ```html
@@ -358,7 +415,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 <!-- If opened from a malicious site → executes! -->
 ```
 
-**Solution in the project**: **CSRF-GET Protection** — all state endpoints → POST only.
+**Solution in the project**: **CSRF-GET Protection** — all state
+endpoints → POST only.
 
 **v1.0.0 — NEW-1**: Login POST-only.
 
@@ -401,7 +459,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 
 ### 🍪 SameSite — SameSite Cookie Attribute
 
-**Cookie value** that determines when it is sent across cross-site requests.
+**Cookie value** that determines when it is sent across cross-site
+requests.
 
 | Value | Top-level GET | Cross-site POST | Note |
 |---|:---:|:---:|---|
@@ -423,7 +482,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 
 ### 🎣 Clickjacking
 
-**Attack that places the page in a transparent iframe** and tricks the user into clicking.
+**Attack that places the page in a transparent iframe** and tricks the
+user into clicking.
 
 **Solution**: `X-Frame-Options: DENY` (present in the project).
 
@@ -539,7 +599,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 - `ON` — User wants the service running.
 - `OFF` — User stopped it manually.
 
-**⚠️ Audit Fix A**: Written only by `startService()` / `stopService()`.
+**⚠️ Audit Fix A**: Written only by `startService()` /
+`stopService()`.
 
 **Path**: `proxy/run/dnscrypt.status`.
 
@@ -547,7 +608,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 
 ### 🎯 User Intent
 
-**Architectural concept** — what the user actually wants (not the actual system state).
+**Architectural concept** — what the user actually wants (not the
+actual system state).
 
 **Difference**:
 - **User intent**: `ON` (for example).
@@ -559,11 +621,15 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 
 ### 🐕 Watchdog
 
-**Standalone process** that monitors WebUI and DNS Engine and restarts them on failure.
+**Standalone process** that monitors WebUI and DNS Engine and restarts
+them on failure.
 
-**In the project**: `proxy/watchdog.sh` — runs with exponential backoff.
+**In the project**: `proxy/watchdog.sh` — runs with exponential
+backoff.
 
 **v1.0.0**: Separate DNS backoff + reset on STATUS_FILE change.
+
+**v1.1.0**: Logs active profile + memory hint at startup.
 
 ---
 
@@ -590,6 +656,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 - #32: `rebuildMu` mutex (RACE-1).
 - #33: `runtime_info` dynamic ports (PORT-2).
 
+**v1.1.0 does NOT add audit corrections.** The registry remains at
+#33. See §5 "MEM-1 / MEM-2 / MEM-3" for v1.1.0 runtime improvements.
+
 ---
 
 ### 🩹 Hotfix
@@ -597,6 +666,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; 
 **Quick fix** for an existing release — without adding features.
 
 **Format**: `vX.Y.Z-hotfixN` (major.minor.patch-hotfixN).
+
+**In v1.1.0 context**: A hotfix from `v1.1.0` would be `v1.1.1` (PATCH
+release via `scripts/release-patch.sh`).
 
 ---
 
@@ -630,11 +702,11 @@ tiktok.com
 **Profile file** that determines the protection level (Blocklist).
 
 **5 levels**:
-- `light` — ~40K entries.
-- `normal` — ~120K.
-- `pro` — ~250K (recommended).
-- `proplus` — ~350K.
-- `ultimate` — ~500K.
+- `light` — ~40K entries, 80 MB soft limit (v1.1.0).
+- `normal` — ~120K, 100 MB soft limit (v1.1.0).
+- `pro` — ~250K (recommended), 120 MB soft limit (v1.1.0).
+- `proplus` — ~350K, 160 MB soft limit (v1.1.0).
+- `ultimate` — ~500K, 220 MB soft limit (v1.1.0).
 
 ---
 
@@ -654,7 +726,8 @@ tiktok.com
 
 **Security measure** that rejects port 8080 assignment.
 
-**Reason**: Port 8080 is reserved for `[monitoring_ui]` in `dnscrypt-proxy.toml`.
+**Reason**: Port 8080 is reserved for `[monitoring_ui]` in
+`dnscrypt-proxy.toml`.
 
 **Applied in**: 7 files (main.go + 6 shell scripts).
 
@@ -667,7 +740,8 @@ tiktok.com
 **Critical fix** that prevents race conditions in `rebuildBlocklist`.
 
 **Problem**:
-- `updateProfile` (in goroutine) + `atomicSaveRulesInternal` (HTTP handler)
+- `updateProfile` (in goroutine) + `atomicSaveRulesInternal` (HTTP
+  handler)
 - → BLOCKLIST inconsistent.
 
 **Solution**: `rebuildMu sync.Mutex` (coarse-grained locking).
@@ -708,7 +782,7 @@ tiktok.com
 
 ### 🔢 `runtime_info` Ports
 
-**New fields in `runtime_info`** that return the actual ports.
+**New fields in `runtime_info`** (v1.0.0 — PORT-2).
 
 **Structure**:
 ```json
@@ -731,14 +805,16 @@ tiktok.com
 
 **Architectural concept** — preserve user settings during upgrade.
 
-**Before v1.0.0**: `unzip -o` extracted defaults over custom → settings lost.
+**Before v1.0.0**: `unzip -o` extracted defaults over custom → settings
+lost.
 
 **After v1.0.0**:
 1. **Backup** before extraction (`[8b]`).
 2. **Restore** after extraction (`[9c]`).
 
 **Preserved files (5)**:
-- `webui.conf`, `dnscrypt-proxy.toml`, `selected_profile.txt`, `allowlist.txt`, `denylist.txt`.
+- `webui.conf`, `dnscrypt-proxy.toml`, `selected_profile.txt`,
+  `allowlist.txt`, `denylist.txt`.
 
 **⚠️ v1.0.0 — Fix #3.**
 
@@ -749,8 +825,8 @@ tiktok.com
 **Architectural concept** — one source of truth.
 
 **In the project**:
-- `VERSION` — module version.
-- `proxy/dnscrypt-proxy.version` — DNS version.
+- `VERSION` — module version (v1.1.0).
+- `proxy/dnscrypt-proxy.version` — DNS version (2.1.18).
 
 **⚠️ Level 4.**
 
@@ -789,7 +865,142 @@ tiktok.com
 | **NEW-5** | `shellQuote()` | Shell injection protection |
 | **NEW-6** | Auth cache (60s) | Reduce file I/O |
 
-**Audit Corrections**: #28, (merged with #24), #29, #30, #31, (Performance).
+**Audit Corrections**: #28, (merged with #24), #29, #30, #31,
+(Performance).
+
+---
+
+### 🆕 MEM-1 — Dynamic Memory Limit (v1.1.0)
+
+**Runtime improvement** (not an audit correction) that replaces the
+hardcoded `debug.SetMemoryLimit(80 MB)` with a per-profile limit.
+
+**Values**:
+
+| Profile | Soft limit |
+|---|---:|
+| light | 80 MB |
+| normal | 100 MB |
+| pro | 120 MB |
+| proplus | 160 MB |
+| ultimate | 220 MB |
+
+**Applied by**: `applyMemoryLimit(key)` called from `main()` (at
+startup) and `updateProfile()` (on profile change).
+
+**Rationale**: On the `ultimate` profile, actual usage approaches
+200 MB. With an 80 MB soft limit, the Go runtime runs GC
+continuously → "GC thrashing" → slow/unresponsive WebUI on low-RAM
+devices.
+
+**Exposed via**: `runtime_info.memory_limit_mb`.
+
+**Reference**: `docs/SECURITY.md` §5.30.1; `docs/ARCHITECTURE.md`
+§3.9.
+
+---
+
+### 🆕 MEM-2 — Extended `shellQuote` Charset (v1.1.0)
+
+**Runtime improvement** that extends `shellQuote()` from 20 to 24
+shell-significant characters.
+
+**Added characters**: `{`, `}`, `\n`, `\t`.
+
+**Rationale**: `{`/`}` could brace-expand; `\n`/`\t` could word-split
+when embedded in a shell command. **No known exploit existed** — this
+is defense-in-depth.
+
+**Reference**: `docs/SECURITY.md` §5.30.2.
+
+---
+
+### 🆕 MEM-3 — `MONITORING_UI_PORT` in Metrics Handler (v1.1.0)
+
+**Runtime improvement** that removes the last hardcoded `"8080"`
+string from `metricsProxyHandler`.
+
+**Before**:
+```go
+"http://127.0.0.1:8080/api/metrics"
+```
+
+**After**:
+```go
+"http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+```
+
+**Rationale**: Single source of truth for the reserved port.
+
+**Reference**: `docs/SECURITY.md` §5.30.3.
+
+---
+
+### 🆕 `profile_key` (v1.1.0)
+
+**New field in `runtime_info`** that identifies the active blocklist
+profile.
+
+**Values**: `light` / `normal` / `pro` / `proplus` / `ultimate`.
+
+**Source**: `main.go` reads `proxy/selected_profile.txt` at startup
+via `readSelectedProfile()`. Falls back to `"pro"` for unknown values.
+
+**Purpose**: Observability + System Info panel display.
+
+---
+
+### 🆕 `memory_limit_mb` (v1.1.0)
+
+**New field in `runtime_info`** that reports the effective Go soft
+memory limit for the active profile.
+
+**Type**: int (MB).
+
+**Values**: `80` / `100` / `120` / `160` / `220`.
+
+**Purpose**: Observability + System Info panel display + API
+verification.
+
+---
+
+### 🆕 Soft Limit (v1.1.0)
+
+**Go runtime concept** — `debug.SetMemoryLimit` is a **soft** limit.
+
+**Behavior**:
+- The Go runtime does **not** kill the process when the limit is
+  reached.
+- It runs garbage collection (GC) more aggressively instead.
+- Setting it **too low** → GC overhead → CPU waste → WebUI appears
+  slow.
+- Setting it **too high** → RAM waste.
+
+**Why per-profile values?** Different blocklist profiles have
+different working-set sizes. A single value either wastes memory on
+light profiles or starves the heavy ones.
+
+**Reference**: `docs/COMPATIBILITY.md` §5.4.1.
+
+---
+
+### 🆕 DNS Version vs Module Version (v1.1.0)
+
+**Two independent versions** coexist in the project:
+
+| Version | Source file | v1.1.0 value |
+|---|---|:---:|
+| **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
+| **Module version** (this project) | `VERSION` | `v1.1.0` |
+
+- The **DNS version** changes only when upstream ships a new
+  `dnscrypt-proxy` release.
+- The **module version** changes with each project release.
+- The two are **independent**. v1.1.0 did **not** bump the DNS version.
+
+**Common confusion**: Both are called "version" in the codebase.
+
+**Reference**: `docs/DNS_BINARIES.md` §1.1.
 
 ---
 
@@ -797,7 +1008,8 @@ tiktok.com
 
 ### 🔒 Mutex — Mutual Exclusion
 
-**Locking mechanism** that prevents two operations from accessing the same data at the same time.
+**Locking mechanism** that prevents two operations from accessing the
+same data at the same time.
 
 **In the project**:
 ```go
@@ -826,7 +1038,8 @@ func rebuildBlocklist() error {
 }
 ```
 
-**Constraint**: Does not distinguish between read and write (use `sync.RWMutex` for reads).
+**Constraint**: Does not distinguish between read and write (use
+`sync.RWMutex` for reads).
 
 ---
 
@@ -844,7 +1057,8 @@ func rebuildBlocklist() error {
 
 ### 🔒 `sync.Once`
 
-**Go primitive** that runs a function **only once** no matter how many times it is called.
+**Go primitive** that runs a function **only once** no matter how many
+times it is called.
 
 **In the project**:
 ```go
@@ -861,6 +1075,32 @@ func getSystemShell() string {
 **Benefit**: No overhead after the first call.
 
 **v1.0.0 — Fix #2.**
+
+---
+
+### 🔒 `memLimitMu` (v1.1.0)
+
+**`sync.Mutex` in `main.go`** that protects the memory-limit state.
+
+**Protected fields**:
+- `currentMemLimit int64`
+- `currentProfile string`
+
+**Structure**:
+```go
+var memLimitMu sync.Mutex
+
+func applyMemoryLimit(key string) {
+    memLimitMu.Lock()
+    defer memLimitMu.Unlock()
+    // ...
+}
+```
+
+**Rule**: `currentMemLimit` and `currentProfile` are read/written
+**only** while holding `memLimitMu`.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.9.1.
 
 ---
 
@@ -912,7 +1152,8 @@ func getSystemShell() string {
 
 ### 🎯 `getSystemShell()`
 
-**Go function** that determines the appropriate shell path for the platform.
+**Go function** that determines the appropriate shell path for the
+platform.
 
 **Logic**:
 1. `/system/bin/sh` (Android).
@@ -935,11 +1176,12 @@ func getSystemShell() string {
 
 **Go function** that wraps a path with safe quotes.
 
-**Structure**:
+**Structure (v1.1.0 — extended)**:
 ```go
 func shellQuote(s string) string {
     for _, r := range s {
-        if r == ' ' || r == '"' || ... {
+        if r == ' ' || r == '"' || ... ||
+           r == '{' || r == '}' || r == '\n' || r == '\t' {
             return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
         }
     }
@@ -955,8 +1197,9 @@ cmd := fmt.Sprintf(". %s/functions.sh; ...", shellQuote(MODDIR), port)
 **Benefits**:
 - ✅ Prevents shell injection.
 - ✅ Supports spaces in `MODDIR`.
+- ✅ **(v1.1.0)** Handles brace expansion + word-splitting.
 
-**⚠️ v1.0.0 — NEW-5.**
+**⚠️ v1.0.0 — NEW-5** + **v1.1.0 — MEM-2**.
 
 ---
 
@@ -1009,6 +1252,27 @@ func hasEndpoint(path, name string) bool {
 
 ---
 
+### 🎯 `debug.SetMemoryLimit` (v1.1.0 — MEM-1)
+
+**Go standard library function** (from `runtime/debug`) that sets a
+**soft** memory limit for the Go runtime.
+
+**Semantics**:
+- Not a hard cap — the runtime does **not** OOM on breach.
+- Prefers running GC more aggressively as the limit is approached.
+- Introduced in Go 1.19 (available in the project's Go 1.22 toolchain).
+
+**Usage in the project**:
+```go
+debug.SetMemoryLimit(220 * 1024 * 1024)  // 220 MB (ultimate)
+```
+
+**Rule**: Called only from `applyMemoryLimit(key)`.
+
+**Reference**: `docs/SECURITY.md` §5.30.1.
+
+---
+
 ## 7. CI/CD & Release Terms
 
 ### 🔄 CI — Continuous Integration
@@ -1035,7 +1299,7 @@ func hasEndpoint(path, name string) bool {
 - **MINOR**: New feature (compatible).
 - **PATCH**: Bug fix.
 
-**Example**: `v1.0.0`.
+**Example**: `v1.1.0`.
 
 ---
 
@@ -1052,6 +1316,8 @@ func hasEndpoint(path, name string) bool {
 | v1.0.0 | 1000000 |
 | v1.0.1 | 1000001 |
 | v1.1.0 | 1010000 |
+| v1.1.1 | 1010001 |
+| v1.2.0 | 1020000 |
 | v2.0.0 | 2000000 |
 
 **⚠️ Constraint**: `hotfix` ≤ 99.
@@ -1072,7 +1338,8 @@ func hasEndpoint(path, name string) bool {
 
 ### ✍️ Cosign
 
-**Signing tool** from Sigstore — signs binaries without keys (keyless).
+**Signing tool** from Sigstore — signs binaries without keys
+(keyless).
 
 **In the project**: Signs every file in the Release.
 
@@ -1097,7 +1364,8 @@ cosign verify-blob --signature X.sig --certificate X.pem X
 
 **Standard for commit messages** — `type(scope): subject`.
 
-**Types**: feat, fix, docs, security, perf, refactor, test, chore, release.
+**Types**: feat, fix, docs, security, perf, refactor, test, chore,
+release.
 
 **Example**:
 ```bash
@@ -1114,7 +1382,8 @@ security(iptables): implement Custom Chains to prevent orphan rules
 
 **Source**: [prometheus.io](https://prometheus.io/)
 
-**In the project**: `dnscrypt-proxy` uses Prometheus format for `monitoring_ui` metrics.
+**In the project**: `dnscrypt-proxy` uses Prometheus format for
+`monitoring_ui` metrics.
 
 **Port**: `8080` (monitoring_ui).
 
@@ -1145,7 +1414,8 @@ dnscrypt_proxy_cache_hits_total{type="positive"} 12500
 
 ### 🔄 `parsePrometheus()`
 
-**Function in `main.go`** that parses Prometheus text format into `map[string]float64`.
+**Function in `main.go`** that parses Prometheus text format into
+`map[string]float64`.
 
 **Behavior**:
 - Ignores comments (`#`) and empty lines.
@@ -1170,7 +1440,8 @@ func parsePrometheus(text string) map[string]float64 {
 
 ### 🔄 `buildDashboardJSON()`
 
-**Function in `main.go`** that converts `map[string]float64` into JSON schema expected by `dashboard.html`.
+**Function in `main.go`** that converts `map[string]float64` into JSON
+schema expected by `dashboard.html`.
 
 **Fields**:
 - `total_queries` — from `dnscrypt_proxy_query_total`.
@@ -1185,14 +1456,16 @@ func parsePrometheus(text string) map[string]float64 {
 
 ### 🔍 `findMetric()`
 
-**Helper function** that searches for the first key matching any of the patterns.
+**Helper function** that searches for the first key matching any of
+the patterns.
 
 **Usage**:
 ```go
 findMetric(prom, "dnscrypt_proxy_query_total", "dnscrypt_query_total")
 ```
 
-**Benefit**: Support for **multiple metric names** across dnscrypt-proxy versions.
+**Benefit**: Support for **multiple metric names** across
+dnscrypt-proxy versions.
 
 **⚠️ v1.0.0 — Fix #1.**
 
@@ -1200,7 +1473,8 @@ findMetric(prom, "dnscrypt_proxy_query_total", "dnscrypt_query_total")
 
 ### 🎭 Adapter Pattern
 
-**Design pattern** that converts an interface to another expected by the client.
+**Design pattern** that converts an interface to another expected by
+the client.
 
 **In the project**:
 - **Client** → `dashboard.html` (expects JSON).
@@ -1213,7 +1487,8 @@ Client → Adapter → Adaptee
 JSON ← metricsProxyHandler ← Prometheus text
 ```
 
-**Benefit**: No modification to `dnscrypt-proxy` (upstream) — conversion in `main.go`.
+**Benefit**: No modification to `dnscrypt-proxy` (upstream) —
+conversion in `main.go`.
 
 **⚠️ v1.0.0 — §16 (Metrics Abstraction).**
 
@@ -1252,7 +1527,8 @@ type portCacheEntry struct {
 var portCacheMap = make(map[int]portCacheEntry)
 ```
 
-**Benefit**: **Independent cache per port** (instead of a single variable).
+**Benefit**: **Independent cache per port** (instead of a single
+variable).
 
 **⚠️ v1.0.0 — Fix #7.**
 
@@ -1260,14 +1536,16 @@ var portCacheMap = make(map[int]portCacheEntry)
 
 ### 🌍 Platform-Agnostic Shell
 
-**Architectural concept** — code works on any platform (Android, Linux, macOS).
+**Architectural concept** — code works on any platform (Android,
+Linux, macOS).
 
 **Applied in v1.0.0**:
 - `getSystemShell()` instead of `/system/bin/sh`.
 - Fallback to alternative paths.
 - `sync.Once` for cache.
 
-**Benefit**: CI works on Linux, development on macOS, production on Android.
+**Benefit**: CI works on Linux, development on macOS, production on
+Android.
 
 **⚠️ v1.0.0 — §15 (ARCHITECTURE.md).**
 
@@ -1287,13 +1565,18 @@ var portCacheMap = make(map[int]portCacheEntry)
 
 **⚠️ v1.0.0 — §16 (ARCHITECTURE.md).**
 
+**v1.1.0 note**: `metricsProxyHandler` builds the upstream URL from
+the `MONITORING_UI_PORT` constant (MEM-3) instead of the hardcoded
+string `"8080"`. Behavior is unchanged.
+
 ---
 
 ### 🎯 Per-Port Cache
 
 **Architectural concept** — independent cache per port.
 
-**Before v1.0.0**: Single variable `cachedPortStatus` → gives wrong result when switching ports.
+**Before v1.0.0**: Single variable `cachedPortStatus` → gives wrong
+result when switching ports.
 
 **After v1.0.0**: `portCacheMap` (map per port).
 
@@ -1309,7 +1592,8 @@ var portCacheMap = make(map[int]portCacheEntry)
 
 **Security concept** — `/api/auth/login` accepts **POST only**.
 
-**Before v1.0.0**: Accepted GET → CSRF vector + credential leak in URL.
+**Before v1.0.0**: Accepted GET → CSRF vector + credential leak in
+URL.
 
 **After v1.0.0**:
 ```go
@@ -1334,9 +1618,11 @@ if hasEndpoint(r.URL.Path, "auth/login") {
 
 ### 🎯 `/readyz` Localhost-Only (NEW-4)
 
-**Security concept** — `/readyz` rejects requests from outside localhost.
+**Security concept** — `/readyz` rejects requests from outside
+localhost.
 
-**Before v1.0.0**: Available for any request (even on LAN) → reconnaissance.
+**Before v1.0.0**: Available for any request (even on LAN) →
+reconnaissance.
 
 **After v1.0.0**:
 ```go
@@ -1360,13 +1646,13 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 
 ---
 
-### 🛡️ `shellQuote()` (NEW-5)
+### 🛡️ `shellQuote()` (NEW-5 + MEM-2)
 
 **Function in `main.go`** that wraps a path with safe quotes.
 
 **⚠️ See §6 for full details.**
 
-**⚠️ v1.0.0 — NEW-5 (Audit #31).**
+**⚠️ v1.0.0 — NEW-5 (Audit #31)** + **v1.1.0 — MEM-2**.
 
 ---
 
@@ -1382,7 +1668,8 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 
 ### 📦 Auth Cache (NEW-6)
 
-**Architectural concept** — cache credentials in memory for 60 seconds.
+**Architectural concept** — cache credentials in memory for 60
+seconds.
 
 **Structure**:
 ```go
@@ -1397,7 +1684,8 @@ var (
 ```
 
 **Before v1.0.0**:
-- Every HTTP request reads the full `dnscrypt-proxy.toml` → ~5-10 ms per request.
+- Every HTTP request reads the full `dnscrypt-proxy.toml` → ~5-10 ms
+  per request.
 
 **After v1.0.0**:
 - Cache hit → ~0.05 ms per request.
@@ -1413,9 +1701,11 @@ var (
 
 ### 🔍 Exact Endpoint Matching (Fix #12)
 
-**Architectural concept** — match path exactly, not with `strings.Contains`.
+**Architectural concept** — match path exactly, not with
+`strings.Contains`.
 
-**Before v1.0.0**: `strings.Contains` matches `/api/update_profile_evil`.
+**Before v1.0.0**: `strings.Contains` matches
+`/api/update_profile_evil`.
 
 **After v1.0.0**: `hasEndpoint` rejects any non-matching path.
 
@@ -1432,7 +1722,8 @@ var (
 
 **Protection** against brute force via Basic Auth.
 
-**Before v1.0.0**: `checkAuth` did not record failed attempts → unlimited brute force on LAN.
+**Before v1.0.0**: `checkAuth` did not record failed attempts →
+unlimited brute force on LAN.
 
 **After v1.0.0**:
 ```go
@@ -1461,6 +1752,34 @@ if ok {
 
 ---
 
+### 🆕 Offline Page CSP Removal (v1.1.0)
+
+**Critical fix** in `web/offline.html`.
+
+**Before v1.1.0**: The page had a restrictive CSP meta:
+```html
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; ...">
+```
+
+**Problem**: `default-src 'none'` implicitly forbids `script-src`,
+which **silently blocked** the page's own inline `<script>`. The page
+rendered correctly but every interactive feature (Retry, Diagnose,
+language toggle, auto-retry) silently failed.
+
+**After v1.1.0**: CSP meta removed entirely.
+
+**Rationale**: The page has no user data, no forms, no network calls
+after load, and uses only `textContent`. There is nothing to protect
+with CSP. If a future version adds dynamic content from untrusted
+sources, CSP must be reintroduced — preferably with a nonce rather
+than `'unsafe-inline'`.
+
+**⚠️ v1.1.0 — Critical Fix (not an audit correction; it was a
+functional regression, not an exploitable vulnerability).**
+
+---
+
 ## 10. Common Abbreviations
 
 | Abbreviation | Meaning | Full Form |
@@ -1480,15 +1799,19 @@ if ok {
 | **DoH** | DNS over HTTPS | DNS over HTTPS |
 | **DoS** | Denial of Service | Denial of Service |
 | **DoT** | DNS over TLS | DNS over TLS |
+| **GC** | Garbage Collector / Collection | Garbage Collector / Collection |
 | **HTTP** | Hypertext Transfer Protocol | Hypertext Transfer Protocol |
 | **HTTPS** | HTTP Secure | HTTP Secure |
 | **IP** | Internet Protocol | Internet Protocol |
 | **JSON** | JavaScript Object Notation | JavaScript Object Notation |
 | **JWT** | JSON Web Token | JSON Web Token |
+| **LMK** | Low Memory Killer | Low Memory Killer (Android) |
 | **NAT** | Network Address Translation | Network Address Translation |
+| **OOM** | Out Of Memory | Out Of Memory |
 | **PEM** | Privacy Enhanced Mail | Privacy Enhanced Mail |
 | **PWA** | Progressive Web App | Progressive Web App |
 | **RBAC** | Role-Based Access Control | Role-Based Access Control |
+| **RSS** | Resident Set Size | Resident Set Size |
 | **SAST** | Static Application Security Testing | Static Application Security Testing |
 | **SBOM** | Software Bill of Materials | Software Bill of Materials |
 | **SemVer** | Semantic Versioning | Semantic Versioning |
@@ -1516,13 +1839,18 @@ if ok {
 | **RMW** | Read-Modify-Write | Read-Modify-Write |
 | **TTL** | Time To Live | Time To Live |
 
+**v1.1.0 Abbreviations**:
+
+| Abbreviation | Meaning | Full Form |
+|:---:|---|---|
+| **MEM** | Memory improvement ID | Memory improvement (MEM-1/2/3) |
+| **Soft limit** | Go runtime soft limit | `debug.SetMemoryLimit` |
+
 ---
 
-## 11. Fixes Index (v1.0.0)
+## 11. Fixes Index
 
-Quick reference for every fix in v1.0.0 with the full name and reference:
-
-### 🔴 Critical Fixes (7)
+### 🔴 v1.0.0 — Critical Fixes (7)
 
 | # | Fix | Reference |
 |:-:|---|---|
@@ -1534,7 +1862,7 @@ Quick reference for every fix in v1.0.0 with the full name and reference:
 | **#6** | Asset Serving | (outside glossary scope) |
 | **#7** | CodeQL config drift | (outside glossary scope) |
 
-### 🔴 Additional Security Fixes (NEW-1..NEW-6)
+### 🔴 v1.0.0 — Additional Security Fixes (NEW-1..NEW-6)
 
 | # | Fix | Reference |
 |:-:|---|---|
@@ -1545,21 +1873,21 @@ Quick reference for every fix in v1.0.0 with the full name and reference:
 | **NEW-5** | `shellQuote` injection protection | `shellQuote()` (§6 + §9) |
 | **NEW-6** | Auth cache (60s) | `Auth Cache` (§5 + §9) |
 
-### 🔴 Architectural Fixes (RACE-1 + PORT-2)
+### 🔴 v1.0.0 — Architectural Fixes (RACE-1 + PORT-2)
 
 | # | Fix | Reference |
 |:-:|---|---|
 | **RACE-1** | `rebuildMu` mutex | `RACE-1` + `rebuildMu` (§2 + §5) |
 | **PORT-2** | `runtime_info` dynamic ports | `PORT-2` + `runtime_info Ports` (§5) |
 
-### 🟠 High Fixes
+### 🟠 v1.0.0 — High Fixes
 
 | # | Fix | Reference |
 |:-:|---|---|
 | **#8** | Basic Auth rate limiting | `Basic Auth Rate Limiting` (§9) |
 | **#9** | `fuser` PID parsing | (outside glossary scope) |
 
-### 🟡 Medium Fixes
+### 🟡 v1.0.0 — Medium Fixes
 
 | # | Fix | Reference |
 |:-:|---|---|
@@ -1567,9 +1895,37 @@ Quick reference for every fix in v1.0.0 with the full name and reference:
 | **#11** | Per-port cache | `portCacheMap` (§8) |
 | **#12** | Exact endpoint matching | `Exact Endpoint Matching` (§9) |
 
+### 🆕 v1.1.0 — Runtime Improvements (Not Audit Corrections)
+
+| ID | Change | Reference |
+|:-:|---|---|
+| **MEM-1** | Dynamic memory limit per profile | `MEM-1` (§5) + `debug.SetMemoryLimit` (§6) |
+| **MEM-2** | Extended `shellQuote` charset | `MEM-2` (§5) + `shellQuote()` (§6) |
+| **MEM-3** | `MONITORING_UI_PORT` in metrics handler | `MEM-3` (§5) |
+
+### 🆕 v1.1.0 — New Fields
+
+| Field | Purpose | Reference |
+|:-:|---|---|
+| **`profile_key`** | Active profile identifier | `profile_key` (§5) |
+| **`memory_limit_mb`** | Effective Go soft limit | `memory_limit_mb` (§5) |
+
+### 🆕 v1.1.0 — Critical Fix (Not an Audit Correction)
+
+| # | Fix | Reference |
+|:-:|---|---|
+| **offline.html** | Removed restrictive CSP meta | `Offline Page CSP Removal` (§9) |
+
+### v1.0.0 — Audit Corrections Registry
+
+The last audit correction is **#33** (v1.0.0). See
+`docs/SECURITY.md` §17 for the full registry.
+
+**Next expected**: #34 (v1.2.x).
+
 ---
 
-## 📚 Additional References
+## 12. References
 
 ### RFCs and Specifications
 
@@ -1589,6 +1945,7 @@ Quick reference for every fix in v1.0.0 with the full name and reference:
 - [Netfilter Documentation](https://www.netfilter.org/documentation/)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [Exponential Backoff (AWS)](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 
 ### Internal Documentation
 
@@ -1603,25 +1960,25 @@ Quick reference for every fix in v1.0.0 with the full name and reference:
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
-| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide |
+| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (v1.0.0 → v1.1.0) |
 | [docs/FAQ.md](FAQ.md) | Frequently asked questions |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 
 ---
 
-## 🤝 Contributing
+## 13. Contributing
 
 Found a missing term? Or an unclear definition?
 
 - 🐛 **Open an Issue** titled `[Docs] Glossary: term X`.
 - 🔧 **Submit a PR** directly to add it.
 - 📖 Follow the existing formatting style.
-- ✅ Make sure to add the appropriate section (1-11).
+- ✅ Make sure to add the appropriate section (1-12).
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*
 
 ---

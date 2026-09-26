@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – Dev Container Configuration
-// Version: v1.0.0
+// Version: v1.1.0
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -10,10 +10,12 @@
 //
 //   On container creation:
 //     1. A minimal Ubuntu 22.04 image is pulled.
-//     2. Go 1.22, GitHub CLI, and common-utils are installed.
-//     3. .devcontainer/setup.sh runs as postCreateCommand to install
-//        the full toolchain (shellcheck, shfmt, golangci-lint,
-//        markdownlint, yamllint, actionlint, pre-commit, etc.).
+//     2. Go 1.22, GitHub CLI, and common-utils are installed
+//        (as devcontainer features).
+//     3. .devcontainer/setup.sh runs as postCreateCommand to
+//        install the full toolchain (shellcheck, shfmt,
+//        golangci-lint, markdownlint, yamllint, actionlint,
+//        pre-commit, etc.).
 //     4. VS Code extensions are installed automatically.
 //
 // Usage:
@@ -23,6 +25,59 @@
 //
 // Reference:
 //   https://containers.dev/implementors/json_reference/
+//
+// Features used:
+//   ┌────────────────────────────────┬────────┬───────────┐
+//   │ Feature                              │ Version │ Purpose   │
+//   ├────────────────────────────────┼────────┼───────────┤
+//   │ devcontainers/features/go            │ 1       │ Go 1.22   │
+//   │ devcontainers/features/github-cli    │ 1       │ gh CLI    │
+//   │ devcontainers/features/common-utils  │ 2       │ base utils│
+//   └────────────────────────────────┴────────┴───────────┘
+//
+//   The `:1` / `:2` suffix in each feature key is the feature's
+//   MAJOR version (devcontainer spec). Dependabot tracks these
+//   under the "devcontainers" ecosystem — see
+//   .github/dependabot.yml §[3].
+//
+// postCreateCommand chain:
+//   1. The image + features install their base tooling.
+//   2. .devcontainer/setup.sh runs (bash, idempotent, verbose).
+//   3. setup.sh installs the remaining dev tools:
+//        • shellcheck        (shell linting)
+//        • shfmt             (shell formatting)
+//        • golangci-lint v2  (Go linting)
+//        • staticcheck       (Go static analysis)
+//        • gosec             (Go security, optional)
+//        • actionlint        (GH Actions linting)
+//        • markdownlint-cli  (if npm is available)
+//        • yamllint          (Python)
+//        • detect-secrets    (Python)
+//        • pre-commit        (Python)
+//   4. setup.sh runs a final verification and prints a table of
+//      installed tool versions.
+//
+//   If postCreateCommand fails, re-run it manually:
+//     bash .devcontainer/setup.sh
+//
+// remoteUser:
+//   The container runs as `vscode` (non-root). This matters for
+//   tools that install into $HOME (go binaries, pip user packages,
+//   pre-commit hooks). Any tool that needs root uses sudo, which
+//   is pre-configured for the vscode user in devcontainer base
+//   images.
+//
+// v1.1.0 additions:
+//   • Version bumped to v1.1.0 (documentation only — no behavior
+//     changes since v1.0.0).
+//   • Added a "Features used" table for quick scanning.
+//   • Expanded the "postCreateCommand chain" section to list all
+//     tools installed by setup.sh (previously only mentioned by
+//     name).
+//   • Added a note about remoteUser behavior — this affects where
+//     Go binaries and Python packages land, which is a common
+//     source of confusion when debugging "command not found"
+//     errors.
 // ============================================================
 {
   "name": "DNSCrypt Smart Filter Dev",

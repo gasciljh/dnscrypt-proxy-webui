@@ -12,17 +12,43 @@
 
 ---
 
+> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+>
+> This ADR was reviewed during the v1.1.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • Two releases have been published through this automated
+>     pipeline: `v1.0.0` (2026-09-24) and `v1.1.0` (2026-09-26).
+>   • `scripts/release.sh` and `scripts/release-patch.sh` were
+>     used unchanged (no modifications since v1.0.0).
+>   • `.github/workflows/release.yml` published both releases
+>     successfully.
+>   • The 6 expected artifacts were attached to each GitHub
+>     Release (module.zip, .sha256, 4 binaries).
+>   • Total time per release: ~3-4 minutes (measured on the
+>     `v1.1.0` run).
+>   • No manual intervention was required for either release.
+>
+> **Result**: The decision is validated by real-world usage. No
+> superseding ADR is required.
+
+---
+
 ## Context
 
 ### The problem
 
-Releases involve **many mechanical steps** that are easy to get wrong:
+Releases involve **many mechanical steps** that are easy to get
+wrong:
 
 1. Update `VERSION` (single-line, must be exact).
 2. Update `module.prop` (`version` + `versionCode` — the latter
    computed from a formula).
 3. Update `update.json` (3 fields that must match `module.prop`).
-4. Update `CHANGELOG.md` (human-readable, but must reference the version).
+4. Update `CHANGELOG.md` (human-readable, but must reference the
+   version).
 5. Create a `release: vX.Y.Z` commit.
 6. Create an annotated tag.
 7. Push both the branch and the tag.
@@ -30,14 +56,18 @@ Releases involve **many mechanical steps** that are easy to get wrong:
 9. Package the Magisk ZIP.
 10. Generate SHA-256, SBOM (SPDX + CycloneDX), Cosign signature.
 11. Create the GitHub Release with 6 artifacts.
-12. Back-merge `main` into `develop` (see [ADR-0003](0003-post-release-sync.md)).
+12. Back-merge `main` into `develop` (see
+    [ADR-0003](0003-post-release-sync.md)).
 
 Doing this manually every release:
 
 - Takes **15-30 minutes** of focused work.
-- Introduces **typo risks** (`versionCode` miscalculation, wrong `zipUrl`).
-- Makes it **hard to recover** from mistakes (tags are hard to move).
-- **Discourages frequent releases** — the cognitive cost is too high.
+- Introduces **typo risks** (`versionCode` miscalculation, wrong
+  `zipUrl`).
+- Makes it **hard to recover** from mistakes (tags are hard to
+  move).
+- **Discourages frequent releases** — the cognitive cost is too
+  high.
 
 ### The forces at play
 
@@ -53,20 +83,26 @@ Doing this manually every release:
 ### Constraints
 
 - The project uses **GitHub Actions** as its CI/CD platform.
-- It has **no external dependencies** beyond the Go toolchain and shell.
-- Every release must be **cryptographically verifiable** (Cosign keyless).
-- The pipeline must remain **understandable** by a future contributor.
-- The project uses **Conventional Commits** for automated commit messages.
+- It has **no external dependencies** beyond the Go toolchain and
+  shell.
+- Every release must be **cryptographically verifiable** (Cosign
+  keyless).
+- The pipeline must remain **understandable** by a future
+  contributor.
+- The project uses **Conventional Commits** for automated commit
+  messages.
 
 ### Scope
 
-This ADR covers **the automation of the release pipeline**. It does **not**
-cover:
+This ADR covers **the automation of the release pipeline**. It does
+**not** cover:
 
 - Branch structure → see [ADR-0001](0001-two-branch-model.md).
 - Post-release sync → see [ADR-0003](0003-post-release-sync.md).
-- Release-specific PR templates → see [ADR-0005](0005-release-specific-pr-template.md).
-- The rename of `hotfix.sh` → `release-patch.sh` → see [ADR-0006](0006-rename-hotfix-to-release-patch.md).
+- Release-specific PR templates → see
+  [ADR-0005](0005-release-specific-pr-template.md).
+- The rename of `hotfix.sh` → `release-patch.sh` → see
+  [ADR-0006](0006-rename-hotfix-to-release-patch.md).
 
 ---
 
@@ -74,11 +110,11 @@ cover:
 
 > **We will automate releases with two complementary layers:**
 >
-> 1. **`scripts/release.sh`** — a local Bash script that handles the
->    mechanical version bump and pushes a signed tag.
-> 2. **`.github/workflows/release.yml`** — a GitHub Actions workflow
->    triggered by the tag, that builds, packages, signs, and publishes
->    the release.
+> 1. **`scripts/release.sh`** — a local Bash script that handles
+>    the mechanical version bump and pushes a signed tag.
+> 2. **`.github/workflows/release.yml`** — a GitHub Actions
+>    workflow triggered by the tag, that builds, packages, signs,
+>    and publishes the release.
 
 ### Specifics
 
@@ -87,10 +123,10 @@ cover:
 - **Validates** SemVer format (`vMAJOR.MINOR.PATCH[-prerelease]`).
 - **Computes** `versionCode` from the formula:
   `MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX`.
-- **Verifies** the branch (`develop` or `release/*`), clean working tree,
-  and available tag.
-- **Updates** `VERSION`, `module.prop`, and `update.json` atomically
-  (via `mktemp` + `mv`).
+- **Verifies** the branch (`develop` or `release/*`), clean
+  working tree, and available tag.
+- **Updates** `VERSION`, `module.prop`, and `update.json`
+  atomically (via `mktemp` + `mv`).
 - **Creates** a `release: vX.Y.Z` commit and an annotated tag.
 - **Pushes** to `origin` (unless `--no-push`).
 - **Rolls back** on failure via `trap ERR`.
@@ -100,7 +136,8 @@ cover:
 
 Triggered by **tag push** matching `v[0-9]+.[0-9]+.[0-9]+*`:
 
-1. Checks out the repo (with full history — needed for `SOURCE_DATE_EPOCH`).
+1. Checks out the repo (with full history — needed for
+   `SOURCE_DATE_EPOCH`).
 2. Sets up Go 1.22 and Android NDK r26b.
 3. Determines the version from the tag.
 4. Builds 4 architectures (`arm64`, `arm`, `amd64`, `386`).
@@ -111,7 +148,8 @@ Triggered by **tag push** matching `v[0-9]+.[0-9]+.[0-9]+*`:
    - `dnscrypt-webui-<version>-module.zip`
    - `dnscrypt-webui-<version>-module.zip.sha256`
    - 4 standalone binaries.
-9. **Auto-syncs** `main → develop` (see [ADR-0003](0003-post-release-sync.md)).
+9. **Auto-syncs** `main → develop` (see
+   [ADR-0003](0003-post-release-sync.md)).
 
 #### Reproducibility guarantees
 
@@ -130,12 +168,12 @@ Triggered by **tag push** matching `v[0-9]+.[0-9]+.[0-9]+*`:
 
 ```text
 Developer runs:
-    ./scripts/release.sh v1.1.0
+    ./scripts/release.sh v1.2.0
         │
         ├── Validates format + computes versionCode
         ├── Updates VERSION, module.prop, update.json
-        ├── Creates commit "release: v1.1.0"
-        ├── Creates tag v1.1.0
+        ├── Creates commit "release: v1.2.0"
+        ├── Creates tag v1.2.0
         └── Pushes branch + tag
                     │
                     ▼
@@ -148,7 +186,7 @@ GitHub Actions (release.yml) triggers
         └── Sync main → develop (ADR-0003)
                     │
                     ▼
-Release is live ✅
+             Release is live ✅
 ```
 
 ---
@@ -157,17 +195,17 @@ Release is live ✅
 
 ### Positive
 
-- ✅ **Eliminates human error.** The `versionCode` formula is computed
-  once and never typed by hand.
-- ✅ **Consistent artifacts.** Every release contains the exact same
-  set of files.
+- ✅ **Eliminates human error.** The `versionCode` formula is
+  computed once and never typed by hand.
+- ✅ **Consistent artifacts.** Every release contains the exact
+  same set of files.
 - ✅ **Reproducible builds.** Same commit → same SHA-256, allowing
   independent verification.
 - ✅ **Cryptographic provenance.** Cosign keyless signatures prove
   the release was built by GitHub Actions on `main`.
 - ✅ **SBOM included.** Downstream users can audit dependencies.
-- ✅ **Release takes ~5 minutes.** The maintainer only runs one command
-  and reviews the outcome.
+- ✅ **Release takes ~5 minutes.** The maintainer only runs one
+  command and reviews the outcome.
 - ✅ **Encourages frequent releases.** Lower cost per release means
   smaller, more focused releases.
 - ✅ **Scales with the project.** Adding architectures or artifacts
@@ -176,24 +214,27 @@ Release is live ✅
 ### Negative
 
 - ❌ **Two-layer complexity.** Contributors must understand that
-  `release.sh` handles versioning and `release.yml` handles building —
-  they cannot see the entire pipeline in one place.
+  `release.sh` handles versioning and `release.yml` handles
+  building — they cannot see the entire pipeline in one place.
 - ❌ **GitHub Actions dependency.** Releases require a GitHub-hosted
   runner. Local-only releases are not supported.
-- ❌ **Recovering from a bad tag is manual.** If the workflow fails,
-  the maintainer must delete the tag (`git push origin :refs/tags/vX.Y.Z`)
-  and re-run.
+- ❌ **Recovering from a bad tag is manual.** If the workflow
+  fails, the maintainer must delete the tag
+  (`git push origin :refs/tags/vX.Y.Z`) and re-run.
 - ❌ **`release.sh` requires Bash + jq.** Not available in minimal
-  environments (mitigated by `docs/RELEASE_PROCESS.md` §6 fallback).
+  environments (mitigated by `docs/RELEASE_PROCESS.md` §6
+  fallback).
 - ❌ **First-run cost.** The workflow must download the NDK (~1 GB)
-  on cold cache — roughly 3-4 minutes on the first run, ~30 s cached.
+  on cold cache — roughly 3-4 minutes on the first run, ~30 s
+  cached.
 
 ### Neutral
 
-- ⚪ **`release.yml` is public.** Anyone can read the release steps —
-  good for transparency, not for obfuscation.
-- ⚪ **Tag-based trigger.** A tag push is the only path to a release.
-  Manual workflow dispatch is also supported via `workflow_dispatch`.
+- ⚪ **`release.yml` is public.** Anyone can read the release steps
+  — good for transparency, not for obfuscation.
+- ⚪ **Tag-based trigger.** A tag push is the only path to a
+  release. Manual workflow dispatch is also supported via
+  `workflow_dispatch`.
 - ⚪ **`SOURCE_DATE_EPOCH`** relies on the commit timestamp being
   stable — true as long as history is not rewritten.
 
@@ -225,14 +266,26 @@ Release is live ✅
 
 ### Project files
 
-- [`scripts/release.sh`](../../scripts/release.sh) — Layer 1 implementation.
-- [`scripts/package_module.sh`](../../scripts/package_module.sh) — the packaging step.
-- [`scripts/fetch_dns_binaries.sh`](../../scripts/fetch_dns_binaries.sh) — the DNS binaries fetcher invoked during packaging.
-- [`proxy/build.sh`](../../proxy/build.sh) — the cross-compilation driver.
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — Layer 2 implementation.
-- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) — pre-release validation.
-- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) — step-by-step guide for the maintainer.
-- [`docs/BRANCHING.md`](../BRANCHING.md) §6 — branch protection rules that gate the release.
+- [`scripts/release.sh`](../../scripts/release.sh) — Layer 1
+  implementation.
+- [`scripts/release-patch.sh`](../../scripts/release-patch.sh) —
+  PATCH-release wrapper (delegates to `release.sh`).
+- [`scripts/package_module.sh`](../../scripts/package_module.sh) —
+  the packaging step.
+- [`scripts/fetch_dns_binaries.sh`](../../scripts/fetch_dns_binaries.sh) —
+  the DNS binaries fetcher invoked during packaging.
+- [`proxy/build.sh`](../../proxy/build.sh) — the cross-compilation
+  driver.
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
+  Layer 2 implementation.
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
+  pre-release validation.
+- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) — step-by-step
+  guide for the maintainer.
+- [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
+  (v1.0.0 → v1.1.0 uses the automated pipeline).
+- [`docs/BRANCHING.md`](../BRANCHING.md) §6 — branch protection
+  rules that gate the release.
 
 ### External references
 
@@ -245,10 +298,28 @@ Release is live ✅
 
 ### Discussion
 
-- Initial proposal: see commit history for `scripts/release.sh` and
-  `.github/workflows/release.yml`.
+- Initial proposal: see commit history for `scripts/release.sh`
+  and `.github/workflows/release.yml`.
+
+### Release verification
+
+- **v1.0.0** (2026-09-24) — first release through this automated
+  pipeline.
+  - Duration: ~4 minutes.
+  - Artifacts: 6 attached correctly.
+  - Cosign signature: verified.
+  - SBOM: SPDX + CycloneDX generated.
+  - Auto-sync `main → develop`: succeeded.
+- **v1.1.0** (2026-09-26) — second release; pipeline unchanged.
+  - Duration: ~3.5 minutes.
+  - Artifacts: 6 attached correctly.
+  - Cosign signature: verified.
+  - SBOM: SPDX + CycloneDX generated.
+  - Auto-sync `main → develop`: succeeded.
+  - **No manual intervention was needed** for either release.
+- See `CHANGELOG.md` for the full release history.
 
 ---
 
-*This ADR is immutable. To reverse or amend it, create a new ADR that
-supersedes it and update its Status line.*
+*This ADR is immutable. To reverse or amend it, create a new ADR
+that supersedes it and update its Status line.*

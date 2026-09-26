@@ -1,16 +1,31 @@
 # Branching Strategy — DNSCrypt Smart Filter
 
-Complete guide to the project's Git workflow: branches, naming conventions, merge rules, and protection policies.
+Complete guide to the project's Git workflow: branches, naming
+conventions, merge rules, and protection policies.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `Last updated` reflects the v1.1.0 release date.
+>   • Release examples updated from `v1.1.0` (which is now the
+>     current release) to `v1.2.0` (the next planned release).
+>   • Hotfix examples updated from `v1.0.1` to `v1.1.1` — the
+>     first realistic PATCH release from `v1.1.0`.
+>   • `Related Documentation` now includes `docs/UPGRADE.md`
+>     (added as a first-class reference in v1.1.0).
+>   • `Project Files` table extended with `docs/UPGRADE.md`.
+>   • No changes to the core branching strategy — the two-branch
+>     model, naming rules, and protection policy are unchanged.
 
 > **📖 Related documents**:
 > - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
 > - Architecture Decision Records → [`docs/adr/README.md`](adr/README.md)
 > - Contribution guide → [`docs/CONTRIBUTING.md`](CONTRIBUTING.md)
+> - Upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 
 ---
 
@@ -70,6 +85,12 @@ The decisions that shaped this strategy are documented as **ADRs**:
 | [ADR-0005](adr/0005-release-specific-pr-template.md) | Release-specific PR template |
 | [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md) | Rename `hotfix.sh` → `release-patch.sh` |
 
+**Current ADR count**: 6 (5 accepted + 1 superseded).
+
+The `release-patch.sh` script named in ADR-0006 is now in active
+use — for example, `v1.1.0 → v1.1.1` would be a PATCH release
+processed by that script (see §8).
+
 Full index: [`docs/adr/README.md`](adr/README.md).
 
 ### 1.4 Repository Map
@@ -80,10 +101,8 @@ main ─────●──────────────────●
        [release/*]        [release/*]     [hotfix/*]
           │                  │               │
 develop ──●──●──●──●──●──●───●──●──●──●──●───●──── (integration)
-            ↑  ↑  ↑       ↑
-        [feat]│  │    [fix]
-            [docs]│
-              [chore]
+           ↑         ↑         ↑         ↑
+        [feat]    [docs]    [chore]    [fix]
 ```
 
 ---
@@ -103,6 +122,8 @@ develop ──●──●──●──●──●──●───●──
 
 **Every commit on `main` corresponds to a released version.**
 
+Current state: `v1.1.0` (released 2026-09-26).
+
 ### 2.2 `develop` — Integration Branch
 
 | Aspect | Value |
@@ -114,7 +135,8 @@ develop ──●──●──●──●──●──●───●──
 | **Direct push** | ⚠️ Allowed by maintainer (Branch Protection is lighter). |
 | **Requires PR** | ⚠️ Recommended for contributors, optional for maintainer. |
 
-**`develop` should always build successfully.** If `ci.yml` fails on `develop`, it must be fixed before opening a release PR.
+**`develop` should always build successfully.** If `ci.yml` fails on
+`develop`, it must be fixed before opening a release PR.
 
 ### 2.3 `feature/*` — New Features
 
@@ -166,11 +188,14 @@ develop ──●──●──●──●──●──●───●──
 | **Direct push** | ⚠️ Only version bumps allowed. |
 | **Requires PR** | ✅ Yes, with 1 approval + CI pass. |
 
-**Example**: `release/v1.1.0`, `release/v2.0.0`.
+**Example**: `release/v1.2.0`, `release/v2.0.0`.
 
-**Rule**: Only version bumps, changelog updates, and critical fixes are allowed on `release/*`. No new features.
+**Rule**: Only version bumps, changelog updates, and critical fixes
+are allowed on `release/*`. No new features.
 
-**Automation**: The PATCH release variant uses [`scripts/release-patch.sh`](../scripts/release-patch.sh) — see [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md).
+**Automation**: The PATCH release variant uses
+[`scripts/release-patch.sh`](../scripts/release-patch.sh) — see
+[ADR-0006](adr/0006-rename-hotfix-to-release-patch.md).
 
 ### 2.7 `hotfix/*` — Emergency Fixes
 
@@ -183,11 +208,17 @@ develop ──●──●──●──●──●──●───●──
 | **Direct push** | ✅ Yes. |
 | **Requires PR** | ✅ Yes, fast-tracked. |
 
-**Example**: `hotfix/v1.0.1-login-bypass`.
+**Example**: `hotfix/v1.1.1-login-bypass`.
 
-**Note**: The `hotfix/*` **branch prefix** remains (it aligns with the widely-recognized Git Flow terminology). Only the **script name** was renamed — see [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md).
+**Note**: The `hotfix/*` **branch prefix** remains (it aligns with
+the widely-recognized Git Flow terminology). Only the **script
+name** was renamed — see
+[ADR-0006](adr/0006-rename-hotfix-to-release-patch.md).
 
-**Automation**: After a hotfix is merged into `main`, the PATCH release is prepared via [`scripts/release-patch.sh`](../scripts/release-patch.sh). The back-merge into `develop` is **manual** (via `make sync`).
+**Automation**: After a hotfix is merged into `main`, the PATCH
+release is prepared via
+[`scripts/release-patch.sh`](../scripts/release-patch.sh). The
+back-merge into `develop` is **manual** (via `make sync`).
 
 ---
 
@@ -206,8 +237,8 @@ Where `<type>` is one of:
 | `feature/` | New functionality | `feature/webui-2fa` |
 | `fix/` | Non-critical bug fix | `fix/watchdog-backoff-reset` |
 | `docs/` | Documentation | `docs/api-jwt-auth` |
-| `release/` | Release preparation | `release/v1.1.0` |
-| `hotfix/` | Emergency fix | `hotfix/v1.0.1-login-bypass` |
+| `release/` | Release preparation | `release/v1.2.0` |
+| `hotfix/` | Emergency fix | `hotfix/v1.1.1-login-bypass` |
 | `chore/` | Maintenance, tooling | `chore/bump-dnscrypt-2.1.19` |
 | `refactor/` | Code refactoring | `refactor/split-main-go` |
 | `test/` | Adding/updating tests | `test/hasEndpoint-coverage` |
@@ -225,10 +256,10 @@ Where `<type>` is one of:
 For release branches only, the version must match `VERSION` exactly:
 
 ```text
-release/v1.1.0          ✅
-release/v1.1.0-beta1    ✅
-release/1.1.0           ❌ (missing 'v')
-release/v1.1            ❌ (incomplete)
+release/v1.2.0          ✅
+release/v1.2.0-beta1    ✅
+release/1.2.0           ❌ (missing 'v')
+release/v1.2            ❌ (incomplete)
 ```
 
 ---
@@ -268,34 +299,36 @@ git checkout -b docs/update-faq
 git commit -m "docs(faq): add section about IPv6 rate limits"
 ```
 
-**Note**: CI `paths-ignore` will skip the build matrix for docs-only changes, saving CI minutes.
+**Note**: CI `paths-ignore` will skip the build matrix for docs-only
+changes, saving CI minutes.
 
 ### 4.4 Preparing a Release
 
 ```text
 1. git checkout develop
 2. git pull origin develop
-3. git checkout -b release/v1.1.0
-4. ./scripts/release.sh v1.1.0 --no-push     # updates VERSION + module.prop + update.json
+3. git checkout -b release/v1.2.0
+4. ./scripts/release.sh v1.2.0 --no-push     # updates VERSION + module.prop + update.json
 5. Verify: git diff
-6. Update CHANGELOG.md: add ## [1.1.0] - YYYY-MM-DD section
-7. git commit -m "release: v1.1.0"
-8. git push -u origin release/v1.1.0
+6. Update CHANGELOG.md: add ## [1.2.0] - YYYY-MM-DD section
+7. git commit -m "release: v1.2.0"
+8. git push -u origin release/v1.2.0
 9. Open PR → main using ?template=release.md
 10. Wait for CI + CodeQL to pass
 11. Approve + merge
 12. git checkout main && git pull origin main
-13. ./scripts/release.sh v1.1.0                # now push: creates tag
+13. ./scripts/release.sh v1.2.0                # now push: creates tag
 14. GitHub Actions publishes the release
 15. It auto-syncs main → develop
 ```
 
-**Simpler alternative**: skip the `release/*` branch, and run `release.sh` directly from `develop`:
+**Simpler alternative**: skip the `release/*` branch, and run
+`release.sh` directly from `develop`:
 
 ```text
 1. git checkout develop
 2. git pull origin develop
-3. ./scripts/release.sh v1.1.0                # interactive, with confirmation
+3. ./scripts/release.sh v1.2.0                # interactive, with confirmation
 4. Wait for GitHub Actions
 ```
 
@@ -306,21 +339,23 @@ Use the `release/*` flow when you need a **stabilization window**.
 ```text
 1. git checkout main
 2. git pull origin main
-3. git checkout -b hotfix/v1.0.1-critical-fix
+3. git checkout -b hotfix/v1.1.1-critical-fix
 4. ... fix ...
 5. git commit -m "fix(critical): patch login bypass"
-6. git push -u origin hotfix/v1.0.1-critical-fix
+6. git push -u origin hotfix/v1.1.1-critical-fix
 7. Open PR → main using ?template=release.md (fast-track review)
 8. Squash merge
 9. Tag + push:
-   ./scripts/release-patch.sh v1.0.1
+   ./scripts/release-patch.sh v1.1.1
 10. After release publishes: back-merge main → develop
     make sync
 ```
 
-**Fast-track**: hotfix PRs can be merged with a single review, and CI failures can be waived by the maintainer if the fix is critical.
+**Fast-track**: hotfix PRs can be merged with a single review, and
+CI failures can be waived by the maintainer if the fix is critical.
 
-**Full details**: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) §2.3 and §9.
+**Full details**: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) §2.3
+and §9.
 
 ---
 
@@ -392,21 +427,26 @@ Use **Conventional Commits** for the PR title:
 
 ### 5.5 Release PR Template
 
-PRs targeting `main` (from `release/*` or `hotfix/*`) should use the dedicated template:
+PRs targeting `main` (from `release/*` or `hotfix/*`) should use the
+dedicated template:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.1.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.2.0?template=release.md
 ```
 
 **Why a separate template?**
 
-Releases have a **different lifecycle** than features — version correctness, `CHANGELOG` completeness, tag planning, and rollback preparedness are the primary concerns. The unified template is optimized for feature PRs.
+Releases have a **different lifecycle** than features — version
+correctness, `CHANGELOG` completeness, tag planning, and rollback
+preparedness are the primary concerns. The unified template is
+optimized for feature PRs.
 
 **Full decision**: [ADR-0005](adr/0005-release-specific-pr-template.md).
 
 ### 5.6 After Merge
 
-**Always delete the source branch** (GitHub can do this automatically after merge):
+**Always delete the source branch** (GitHub can do this
+automatically after merge):
 
 - ✅ Auto-delete enabled in Repository Settings.
 - ✅ If not, delete manually: `git push origin --delete <branch>`.
@@ -443,7 +483,9 @@ Configure at **Settings → Branches → Add rule**:
 - `CI / Build 386`
 - `CodeQL / Analyze Go`
 
-**Note**: `github-actions[bot]` must be in the "Restrict who can push" allowlist so the post-release sync ([ADR-0003](adr/0003-post-release-sync.md)) can push to `develop`.
+**Note**: `github-actions[bot]` must be in the "Restrict who can
+push" allowlist so the post-release sync
+([ADR-0003](adr/0003-post-release-sync.md)) can push to `develop`.
 
 ### 6.2 `develop` (Relaxed)
 
@@ -521,18 +563,20 @@ The rationale for these rules is documented in:
 When you run:
 
 ```bash
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 ```
 
-The script pushes a tag → `release.yml` triggers → publishes the release → **automatically syncs `main → develop`**.
+The script pushes a tag → `release.yml` triggers → publishes the
+release → **automatically syncs `main → develop`**.
 
 For PATCH releases:
 
 ```bash
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 ```
 
-Same pipeline, but with 3 safety rules enforced (see [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)).
+Same pipeline, but with 3 safety rules enforced (see
+[ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)).
 
 Full process: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
 
@@ -555,24 +599,34 @@ Use a `hotfix/*` branch only when:
 - Data corruption in `blocklist.txt`.
 - Rate limit bypass on `/readyz`.
 
+**Current context (v1.1.0)**: The first realistic hotfix scenario
+would be `v1.1.0 → v1.1.1`. The chain of releases is:
+
+| From | To | Type |
+|---|---|---|
+| `v1.0.0` | `v1.1.0` | MINOR (features) |
+| `v1.1.0` | `v1.1.1` | PATCH (hotfix) |
+| `v1.1.1` | `v1.2.0` | MINOR (features) |
+
 ### 8.2 Hotfix Steps
 
 ```text
 1. git checkout main
 2. git pull origin main
-3. git checkout -b hotfix/v1.0.1-login-bypass
+3. git checkout -b hotfix/v1.1.1-login-bypass
 4. ... minimal fix ...
 5. git commit -m "fix(auth): patch login bypass"
-6. git push -u origin hotfix/v1.0.1-login-bypass
+6. git push -u origin hotfix/v1.1.1-login-bypass
 7. Open PR → main using ?template=release.md
 8. Fast-track review + merge
 9. Prepare the PATCH release:
-   ./scripts/release-patch.sh v1.0.1
+   ./scripts/release-patch.sh v1.1.1
 10. Back-merge to develop:
     make sync
 ```
 
-**Note**: The `scripts/release-patch.sh` script enforces 3 safety rules:
+**Note**: The `scripts/release-patch.sh` script enforces 3 safety
+rules:
 
 1. Must be run from `main` (not `develop`).
 2. `MAJOR` and `MINOR` components must not change.
@@ -590,11 +644,13 @@ A hotfix increments the **PATCH** component:
 | `v1.1.0` | Fix critical bug | `v1.1.1` |
 | `v1.1.2` | Fix critical bug | `v1.1.3` |
 
-**Rule**: hotfix versions are **never** used for features. If a feature is needed, wait for the next MINOR release.
+**Rule**: hotfix versions are **never** used for features. If a
+feature is needed, wait for the next MINOR release.
 
 ### 8.4 Back-Merge Requirement
 
-**Critical**: after a hotfix lands on `main`, `develop` must be synced:
+**Critical**: after a hotfix lands on `main`, `develop` must be
+synced:
 
 ```bash
 # Recommended:
@@ -607,16 +663,19 @@ git merge origin/main --no-edit
 git push origin develop
 ```
 
-**Why**: without this, `develop` will be missing the hotfix, and the next `release/*` PR will reintroduce the bug.
+**Why**: without this, `develop` will be missing the hotfix, and the
+next `release/*` PR will reintroduce the bug.
 
-For **regular releases** (`release/*`), `release.yml` performs this automatically. For **hotfixes** (`hotfix/*`), it is manual because GitHub Actions cannot distinguish a hotfix tag from a regular tag.
+For **regular releases** (`release/*`), `release.yml` performs this
+automatically. For **hotfixes** (`hotfix/*`), it is manual because
+GitHub Actions cannot distinguish a hotfix tag from a regular tag.
 
 ### 8.5 PATCH-Release Script
 
 | Aspect | Value |
 |---|---|
 | **Script** | `scripts/release-patch.sh` |
-| **Usage** | `./scripts/release-patch.sh v1.0.1` |
+| **Usage** | `./scripts/release-patch.sh v1.1.1` |
 | **Branch** | Must be `main` |
 | **Bump** | `PATCH` only (delegates to `release.sh`) |
 | **Safety rules** | 3 (branch, MAJOR equal, MINOR equal) |
@@ -633,7 +692,9 @@ scripts/release.sh                 ← Full release logic (any bump)
 scripts/release-patch.sh           ← Wraps with 3 PATCH-only rules
 ```
 
-`release-patch.sh` **does not duplicate** the version bump logic — it delegates to `release.sh`. This keeps the two scripts perfectly in sync.
+`release-patch.sh` **does not duplicate** the version bump logic —
+it delegates to `release.sh`. This keeps the two scripts perfectly
+in sync.
 
 ---
 
@@ -656,26 +717,26 @@ git checkout -b fix/my-fix
 
 # Start a release
 git checkout develop && git pull
-git checkout -b release/v1.1.0
-./scripts/release.sh v1.1.0 --no-push
+git checkout -b release/v1.2.0
+./scripts/release.sh v1.2.0 --no-push
 # ... update CHANGELOG.md ...
-git commit -m "release: v1.1.0"
-git push -u origin release/v1.1.0
+git commit -m "release: v1.2.0"
+git push -u origin release/v1.2.0
 # → Open PR against main using ?template=release.md
 
 # Publish (from main after merge)
 git checkout main && git pull
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 
 # Hotfix
 git checkout main && git pull
-git checkout -b hotfix/v1.0.1-critical
+git checkout -b hotfix/v1.1.1-critical
 # ... fix ...
-git push -u origin hotfix/v1.0.1-critical
+git push -u origin hotfix/v1.1.1-critical
 # → Open PR against main using ?template=release.md
 
 # Prepare the PATCH release (after merge)
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 
 # Sync develop after PATCH release
 make sync
@@ -733,7 +794,8 @@ make sync
 | [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture |
 | [`docs/API.md`](API.md) | HTTP API reference |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
+| [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting guide |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (including v1.1.0) |
 | [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community guidelines |
 | [`docs/ROADMAP.md`](ROADMAP.md) | Future plans |
 | [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
@@ -767,6 +829,7 @@ make sync
 | `VERSION` | Single source of truth (version) |
 | `module.prop` | Magisk module definition |
 | `update.json` | Auto-update metadata |
+| `docs/UPGRADE.md` | Version upgrade guide |
 
 ### 10.4 External Resources
 
@@ -779,6 +842,6 @@ make sync
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*

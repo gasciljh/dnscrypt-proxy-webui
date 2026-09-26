@@ -1,6 +1,6 @@
 # ============================================================
 # EditorConfig for DNSCrypt Smart Filter
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://editorconfig.org
@@ -12,12 +12,32 @@
 # Scope:
 #   Rules are defined only for file types that actually exist
 #   in this repository. No speculative or defensive patterns.
+#
+# v1.1.0 notes:
+#   • Go 1.22 is the current toolchain (go.mod).
+#   • Two files were added in the v1.0.0 → v1.1.0 cycle that
+#     are covered by existing patterns:
+#       - web/icon-192.svg, web/icon-512.svg → [*.svg]
+#       - web/manifest.json → [*.json]
+#     No new patterns were required.
+#   • `[*.go]` no longer sets `indent_size` — see the comment
+#     in that section for the rationale.
+#   • `.secrets.baseline` and `.pre-commit-config.yaml` are
+#     covered by existing patterns (`.yaml` / no extension).
 # ============================================================
 
 root = true
 
 # ============================================================
 # Defaults
+# ============================================================
+# Applied to every file unless a more specific section below
+# overrides a given property.
+#
+#   charset      — UTF-8 (no BOM)
+#   end_of_line  — LF on every platform (Android/Linux/macOS/WSL)
+#   insert_final_newline — POSIX-friendly for shell scripts
+#   trim_trailing_whitespace — removes invisible noise
 # ============================================================
 [*]
 charset = utf-8
@@ -30,12 +50,33 @@ indent_size = 4
 # ============================================================
 # Go
 # ============================================================
+# Go always uses one tab per indentation level. This is enforced
+# by gofmt (which CI runs via `gofmt -l proxy/`).
+#
+# ⚠️ indent_size is INTENTIONALLY OMITTED here.
+#    Most editors ignore indent_size when indent_style = tab —
+#    the numeric value would be misleading. Editors that need a
+#    visual tab width use their own display preference.
+#
+# See: https://go.dev/doc/effective_go#formatting
+# ============================================================
 [*.go]
 indent_style = tab
-indent_size = 4
+# indent_size is intentionally omitted — see comment above.
 
 # ============================================================
 # Shell Scripts
+# ============================================================
+# All shell scripts in proxy/ and scripts/ are formatted with:
+#   shfmt -i 4 -ci
+#
+# -i 4  → 4-space indentation (matches this section)
+# -ci   → indent switch case labels inside the case block
+#
+# The `switch_case_indent = true` property below mirrors -ci.
+#
+# ShellCheck is run separately via pre-commit (see
+# .pre-commit-config.yaml and proxy/*.sh).
 # ============================================================
 [*.{sh,bash}]
 indent_style = space
@@ -45,6 +86,15 @@ switch_case_indent = true
 # ============================================================
 # JavaScript / JSON
 # ============================================================
+# Applies to:
+#   • web/sw.js          (Service Worker)
+#   • web/manifest.json  (PWA manifest)
+#   • update.json        (Magisk auto-update metadata)
+#   • .secrets.baseline  (detect-secrets baseline)
+#
+# 2-space indentation matches common JSON formatting and
+# minimize diff noise on regeneration.
+# ============================================================
 [*.{js,json}]
 indent_style = space
 indent_size = 2
@@ -52,12 +102,30 @@ indent_size = 2
 # ============================================================
 # YAML
 # ============================================================
+# Applies to:
+#   • .github/workflows/*.yml
+#   • .github/dependabot.yml
+#   • .github/ISSUE_TEMPLATE/*.yml
+#   • .pre-commit-config.yaml
+#
+# 2-space indentation is required by the GitHub Actions and
+# YAML linting rules (yamllint, actionlint).
+# ============================================================
 [*.{yml,yaml}]
 indent_style = space
 indent_size = 2
 
 # ============================================================
 # Markdown
+# ============================================================
+# Applies to every .md file in the repository.
+#
+# `trim_trailing_whitespace = false` is DELIBERATE:
+# some Markdown dialects use two trailing spaces to force a
+# line break (<br>). Removing them silently breaks the render.
+#
+# Markdownlint (see .pre-commit-config.yaml) tolerates this
+# because it runs its own line-length and structure checks.
 # ============================================================
 [*.md]
 indent_style = space
@@ -67,18 +135,39 @@ trim_trailing_whitespace = false
 # ============================================================
 # HTML / CSS / SVG
 # ============================================================
+# Applies to:
+#   • web/index.html, dashboard.html, offline.html
+#   • web/icon-192.svg, icon-512.svg
+#
+# 2-space indentation is standard for web markup and matches
+# the format generated by the icon generation pipeline.
+# ============================================================
 [*.{html,css,scss,svg}]
 indent_style = space
 indent_size = 2
 
 # ============================================================
-# Makefile (requires tab for recipes)
+# Makefile
+# ============================================================
+# Makefile recipes REQUIRE tabs. This is a hard rule of GNU
+# Make and cannot be overridden. The `SHELL` variable inside
+# the Makefile uses tabs for command blocks.
+#
+# `indent_size` is intentionally omitted (same rationale as Go).
 # ============================================================
 [Makefile]
 indent_style = tab
 
 # ============================================================
 # TOML / Conf / Prop
+# ============================================================
+# Applies to:
+#   • proxy/dnscrypt-proxy.toml
+#   • proxy/webui.conf
+#   • module.prop
+#
+# 2-space indentation matches the TOML formatting convention
+# and the existing files.
 # ============================================================
 [*.{toml,conf,prop}]
 indent_style = space
@@ -96,12 +185,18 @@ insert_final_newline = true
 # ============================================================
 # Go mod
 # ============================================================
+# go.mod and go.sum are formatted by the `go mod` tooling.
+# The Go toolchain uses tabs.
+# ============================================================
 [{go.mod,go.sum}]
 indent_style = tab
 indent_size = 4
 
 # ============================================================
 # Dockerfile
+# ============================================================
+# Reserved for future use (no Dockerfile exists today).
+# 4-space indentation matches common Dockerfile style.
 # ============================================================
 [Dockerfile*]
 indent_style = space
@@ -110,12 +205,19 @@ indent_size = 4
 # ============================================================
 # Pre-commit config
 # ============================================================
+# Redundant with [*.{yml,yaml}] above, but kept explicit so
+# that the intent (2-space YAML) is obvious when reading this
+# file in isolation.
+# ============================================================
 [.pre-commit-config.yaml]
 indent_style = space
 indent_size = 2
 
 # ============================================================
 # LICENSE
+# ============================================================
+# The MIT License text uses 4-space indentation for its
+# paragraphs (matching SPDX's canonical layout).
 # ============================================================
 [LICENSE]
 indent_style = space
@@ -124,8 +226,15 @@ indent_size = 4
 # ============================================================
 # Runtime files (proxy/run/)
 # ============================================================
-# These files are created at runtime and never committed,
-# but the rules below apply if they exist locally.
+# These files are created at runtime by main.go and never
+# committed. The rules below apply if they exist locally
+# during development.
+#
+# Note (v1.1.0): proxy/run/ does NOT contain a
+# `memory_limit_mb` file — the limit is held in memory
+# (currentMemLimit in main.go). The files below are the only
+# ones that exist in run/.
+# ============================================================
 [proxy/run/*.status]
 insert_final_newline = false
 
@@ -136,7 +245,11 @@ insert_final_newline = false
 insert_final_newline = false
 
 # ============================================================
-# Binary assets (no trim)
+# Binary assets (no trim, no final newline)
+# ============================================================
+# PNG and ICO files are binary. EditorConfig rules that touch
+# line endings or trailing whitespace must not apply to them,
+# otherwise the files would be corrupted on save.
 # ============================================================
 [web/*.png]
 insert_final_newline = false
@@ -146,6 +259,9 @@ insert_final_newline = false
 
 # ============================================================
 # CodeQL config (within .github/workflows/)
+# ============================================================
+# Redundant with [*.{yml,yaml}] above, but kept explicit for
+# the same reason as .pre-commit-config.yaml.
 # ============================================================
 [.github/workflows/*.yml]
 indent_style = space

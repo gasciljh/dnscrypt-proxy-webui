@@ -1,7 +1,7 @@
 id=dnscrypt-proxy-webui
 name=DNSCrypt Proxy (Smart Filter)
-version=v1.0.0
-versionCode=1000000
+version=v1.1.0
+versionCode=1010000
 author=gasciljh
-description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), bilingual WebUI (AR/EN), separate monitoring Dashboard with JSON metrics, SSE live status, atomic writes, content-hash conflict detection, Watchdog with auto-restart, iptables/ip6tables/nftables Custom Chains, installable PWA. Zero telemetry.
+description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), bilingual WebUI (EN/AR), separate monitoring Dashboard with JSON metrics, SSE live status, atomic writes, content-hash conflict detection, Watchdog with auto-restart, iptables/ip6tables/nftables Custom Chains, installable PWA. v1.1.0 adds dynamic per-profile memory limits (light=80MB → ultimate=220MB), extended shellQuote charset, and MONITORING_UI_PORT constant. Zero telemetry.
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json

@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Makefile
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -10,6 +10,10 @@
 #
 #   The VERSION variable is read dynamically from the VERSION file
 #   (Single Source of Truth). No version is hardcoded here.
+#
+#   As of v1.1.0, main.go computes the Go runtime soft memory
+#   limit per blocklist profile (light=80MB → ultimate=220MB).
+#   This is a runtime concern and does NOT affect this Makefile.
 #
 # Targets:
 #   make all               - Alias for `make build`
@@ -24,8 +28,13 @@
 #   make release-patch VERSION=vX.Y.Z   - PATCH release (from main)
 #   make sync                           - Sync develop with main
 #
-# Branching model:
-#   See docs/BRANCHING.md for the full strategy.
+# Documentation references:
+#   • docs/BRANCHING.md        - Git branching strategy
+#   • docs/RELEASE_PROCESS.md  - Release step-by-step
+#   • docs/UPGRADE.md §3.0     - v1.0.0 → v1.1.0 upgrade guide
+#   • docs/adr/0002            - Automated releases ADR
+#   • docs/adr/0003            - Post-release sync ADR
+#   • docs/adr/0006            - release-patch.sh naming ADR
 # ============================================================
 
 SHELL := /usr/bin/env bash
@@ -59,9 +68,13 @@ help:
 	@echo "  Docs:"
 	@echo "    docs/BRANCHING.md                   - Git branching strategy"
 	@echo "    docs/RELEASE_PROCESS.md             - Release step-by-step"
+	@echo "    docs/UPGRADE.md                     - Version upgrade guide"
 
 # ============================================================
 # Version
+# ============================================================
+# Reads VERSION file (Single Source of Truth).
+# As of v1.1.0, this returns "v1.1.0".
 # ============================================================
 version:
 	@echo "$(VERSION)"
@@ -69,12 +82,19 @@ version:
 # ============================================================
 # Build
 # ============================================================
+# Cross-compiles main.go for 4 Android architectures via
+# proxy/build.sh. See proxy/build.sh for options.
+# ============================================================
 build:
 	@echo "Building $(VERSION)..."
 	@cd "$(PROXY_DIR)" && ./build.sh --clean --parallel
 
 # ============================================================
 # Package
+# ============================================================
+# Currently identical to `build` — the actual ZIP packaging is
+# done by scripts/package_module.sh, invoked from release.yml.
+# Kept as a separate target for future flexibility.
 # ============================================================
 package:
 	@echo "Packaging $(VERSION)..."
@@ -101,13 +121,14 @@ clean:
 #   • GitHub Actions publishes the release automatically
 #
 # See: docs/RELEASE_PROCESS.md
+#      docs/UPGRADE.md §3.1 (general upgrade procedure)
 #      docs/adr/0002-automated-releases.md
 # ============================================================
 release:
 	@if [ "$(origin VERSION)" != "command line" ]; then \
 		echo "❌ No version specified."; \
 		echo ""; \
-		echo "   Usage: make release VERSION=v1.1.0"; \
+		echo "   Usage: make release VERSION=v1.2.0"; \
 		echo "   Current file VERSION: $(VERSION)"; \
 		echo ""; \
 		echo "   See docs/RELEASE_PROCESS.md for details."; \
@@ -122,7 +143,7 @@ release:
 # Release-Patch (PATCH only — emergency)
 # ============================================================
 # Usage:
-#   make release-patch VERSION=v1.0.1
+#   make release-patch VERSION=v1.1.1
 #
 # Workflow:
 #   • MUST be run from `main` branch
@@ -133,13 +154,14 @@ release:
 #     main → develop
 #
 # See: docs/BRANCHING.md §8
+#      docs/UPGRADE.md §3.0 (v1.0.0 → v1.1.0 example)
 #      docs/adr/0006-rename-hotfix-to-release-patch.md
 # ============================================================
 release-patch:
 	@if [ "$(origin VERSION)" != "command line" ]; then \
 		echo "❌ No version specified."; \
 		echo ""; \
-		echo "   Usage: make release-patch VERSION=v1.0.1"; \
+		echo "   Usage: make release-patch VERSION=v1.1.1"; \
 		echo "   Current file VERSION: $(VERSION)"; \
 		echo ""; \
 		echo "   See docs/BRANCHING.md §8 for details."; \

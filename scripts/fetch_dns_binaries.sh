@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – fetch_dns_binaries.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -24,8 +24,30 @@
 #   • Local cache (~/.cache/dnscrypt-proxy-webui/dns-binaries)
 #   • Offline mode (--offline)
 #   • JSON output for CI (--json)
-#   • Retry logic per source (--retry on CI)
 #   • Idempotent — safe to run multiple times
+#
+# Retry strategy:
+#   There is no explicit retry loop in this script. Resilience
+#   comes from two layers:
+#     • curl's own --retry 2 (per URL, 1s apart)
+#     • 5 sequential fallback sources (if one fails, try the next)
+#   This is sufficient for transient failures. For permanent
+#   failures (nonexistent version, network down), the script
+#   exits with code 1 — callers (package_module.sh, CI) are
+#   expected to handle that.
+#
+#   ⚠️ Earlier versions of this header claimed "Retry logic per
+#   source (--retry on CI)". No such --retry flag exists. The
+#   claim was inaccurate and has been removed.
+#
+# DNS version vs module version:
+#   This script deals with the dnscrypt-proxy upstream version
+#   (e.g. 2.1.18), NOT the module version (e.g. v1.1.0). They
+#   are independent:
+#     • Module version   → VERSION file (managed by release.sh)
+#     • DNS version      → proxy/dnscrypt-proxy.version (this file)
+#   Changing the DNS version requires editing only that one file
+#   (see docs/DNS_BINARIES.md §10).
 #
 # Usage:
 #   ./scripts/fetch_dns_binaries.sh
@@ -38,6 +60,17 @@
 #                       from 60 to 5000 requests/hour.
 #   DNS_CACHE_DIR     — Override the default cache directory.
 #   NO_COLOR          — Disable colored output.
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes in this script since v1.0.0).
+#   • Removed the unused MAX_RETRIES variable. Retries are handled
+#     entirely by curl (--retry 2 per URL) and by the 5-source
+#     fallback chain.
+#   • Corrected the "Retry logic per source (--retry on CI)" line
+#     in the previous header. That flag never existed.
+#   • Added an explicit note about the DNS-version / module-version
+#     separation, since both are called "version" in the codebase.
 # ============================================================
 
 set -euo pipefail
@@ -62,9 +95,6 @@ ALL_ARCHS="arm64 arm x86_64 i386"
 
 # Timeout for each HTTP request (seconds)
 HTTP_TIMEOUT=30
-
-# Number of download retries before failing
-MAX_RETRIES=3
 
 # ============================================================
 # [2] Colors (conditional on TTY and NO_COLOR)
@@ -203,6 +233,9 @@ MANIFEST_FILE="$CACHE_DIR/.manifest.json"
 
 # ============================================================
 # [7] Read DNS version (Single Source of Truth)
+# ============================================================
+# ⚠️ This is the dnscrypt-proxy upstream version (e.g. 2.1.18),
+#    NOT the module version (e.g. v1.1.0). See the header note.
 # ============================================================
 read_dns_version() {
     # 1) CLI override
@@ -423,7 +456,11 @@ build_candidate_urls() {
 }
 
 # ============================================================
-# [14] Download a single URL with retry
+# [14] Download a single URL
+# ============================================================
+# Uses curl's built-in --retry 2 (with --retry-delay 1) for
+# transient failures. No external retry loop — the 5-source
+# fallback chain in [13] handles permanent failures.
 # ============================================================
 download_url() {
     local url="$1"

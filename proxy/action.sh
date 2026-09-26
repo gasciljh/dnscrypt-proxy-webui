@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – action.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -24,6 +24,18 @@
 #   • Loads functions.sh if available, otherwise uses inline fallbacks.
 #   • The version is read dynamically from module.prop (not hardcoded).
 #   • Port Guard: rejects port 8080 (reserved for monitoring_ui).
+#
+# v1.1.0 additions:
+#   • --check now reports the active profile + expected memory hint
+#   • Structured --check output with clear sections
+#   • English-only messages (global release)
+#   • Fallback for get_profile_memory_hint if functions.sh is missing
+#
+# Coordination with main.go v1.1.0:
+#   • The constant _MONITORING_UI_PORT below MUST stay in sync
+#     with MONITORING_UI_PORT in main.go.
+#   • The memory hint is DISPLAY-ONLY. main.go remains the
+#     authority for the actual debug.SetMemoryLimit() value.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -48,6 +60,8 @@ WEBUI_PID_FILE="/data/local/tmp/webui.pid"
 WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
 STATUS_FILE="/data/local/tmp/dnscrypt.status"
 CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
+
+SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 log_msg() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - [action] $1" >> "$LOG_FILE" 2>/dev/null
@@ -174,6 +188,36 @@ _inline_read_port() {
     printf "%s" "$default"
 }
 
+# ------------------------------------------------------------
+# _inline_get_profile_memory_hint (v1.1.0)
+# ------------------------------------------------------------
+# Self-contained fallback for functions.sh:get_profile_memory_hint.
+# Returns a user-facing string like "120 MB (pro)".
+# ------------------------------------------------------------
+_inline_get_profile_memory_hint() {
+    local profile="pro"
+
+    if [ -f "$SELECTED_PROFILE_FILE" ]; then
+        local p
+        p=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
+        case "$p" in
+            light|normal|pro|proplus|ultimate) profile="$p" ;;
+        esac
+    fi
+
+    local mb
+    case "$profile" in
+        light)    mb="80"  ;;
+        normal)   mb="100" ;;
+        pro)      mb="120" ;;
+        proplus)  mb="160" ;;
+        ultimate) mb="220" ;;
+        *)        mb="80"  ;;
+    esac
+
+    printf "%s MB (%s)" "$mb" "$profile"
+}
+
 # ============================================================
 # [6] Display help
 # ============================================================
@@ -221,6 +265,13 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_port_listening()  { is_port_open "$1" "${2:-tcp}"; }
     get_port()           { get_webui_port "$1"; }
     read_conf()          { get_conf_value "$1" "$2" "$3"; }
+
+    # v1.1.0 — memory hint wrapper
+    if command -v get_profile_memory_hint >/dev/null 2>&1; then
+        get_mem_hint()   { get_profile_memory_hint; }
+    else
+        get_mem_hint()   { _inline_get_profile_memory_hint; }
+    fi
 else
     _FB_RUN_DIR=$(_fallback_get_run_dir)
     WEBUI_PID_FILE="$_FB_RUN_DIR/webui.pid"
@@ -230,6 +281,7 @@ else
     is_port_listening()  { _inline_is_port_open "$1" "${2:-tcp}"; }
     get_port()           { _inline_read_port "$1" "PORT" "9090"; }
     read_conf()          { _inline_read_conf "$1" "$2" "$3"; }
+    get_mem_hint()       { _inline_get_profile_memory_hint; }
 fi
 
 # ============================================================
@@ -280,6 +332,11 @@ fi
 # ============================================================
 # [12] Path 2: comprehensive check (--check)
 # ============================================================
+# v1.1.0:
+#   • Structured sections (Service, Runtime, Config, Profile)
+#   • Includes the expected memory limit for the active profile
+#   • English-only output
+# ============================================================
 if [ "$CHECK_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
@@ -287,7 +344,8 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo "╚══════════════════════════════════════════════╝"
     echo ""
 
-    # --- WebUI ---
+    # --- Section 1: Services ---
+    echo "─── Service Status ─────────────────────────"
     if is_port_listening "$PORT" tcp; then
         printf "  🟢 WebUI    : Running on port %s\n" "$PORT"
     else
@@ -309,45 +367,6 @@ if [ "$CHECK_MODE" = "1" ]; then
         fi
     fi
 
-    # --- Status file ---
-    # STATUS_FILE = user intent (may differ from actual state)
-    if [ -f "$STATUS_FILE" ]; then
-        st=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
-        printf "  📄 Intent   : %s (user intent)\n" "${st:-UNKNOWN}"
-    else
-        printf "  📄 Intent   : (no file)\n"
-    fi
-
-    # --- Active run/ directory ---
-    if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
-        printf "  📁 run/     : %s\n" "$RUN_DIR_ACTIVE"
-    else
-        printf "  📁 run/     : %s\n" "$(dirname "$WEBUI_PID_FILE")"
-    fi
-
-    # --- Configured ports ---
-    DASH_PORT=$(read_conf "$CONF_FILE" "DASHBOARD_PORT" "9091")
-    printf "  🌐 WebUI    : %s\n" "$PORT"
-    printf "  📊 Dashboard: %s\n" "$DASH_PORT"
-
-    # --- Auto-restart config ---
-    AUTO_DNS=$(read_conf "$CONF_FILE" "AUTO_RESTART_DNS" "1")
-    AUTO_WEBUI=$(read_conf "$CONF_FILE" "AUTO_RESTART_WEBUI" "1")
-    printf "  🔄 Auto-DNS : %s\n" "$([ "$AUTO_DNS" = "1" ] && echo "enabled" || echo "disabled")"
-    printf "  🔄 Auto-WebUI: %s\n" "$([ "$AUTO_WEBUI" = "1" ] && echo "enabled" || echo "disabled")"
-
-    # --- BIND_ADDR ---
-    BIND_ADDR=$(read_conf "$CONF_FILE" "BIND_ADDR" "127.0.0.1")
-    printf "  🔌 BIND_ADDR: %s\n" "$BIND_ADDR"
-
-    # --- Version + functions.sh ---
-    printf "  🏷️  Version  : %s\n" "$VERSION"
-    if [ "$FUNCTIONS_LOADED" = "1" ]; then
-        printf "  📚 functions: ✅ loaded\n"
-    else
-        printf "  📚 functions: ⚠️ not loaded (fallback)\n"
-    fi
-
     # --- Watchdog ---
     if [ -f "$WATCHDOG_PID_FILE" ]; then
         wd_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -355,7 +374,7 @@ if [ "$CHECK_MODE" = "1" ]; then
             wd_comm=$(cat "/proc/$wd_pid/comm" 2>/dev/null)
             case "$wd_comm" in
                 sh|ash|bash|busybox|*sh)
-                    printf "  🐕 Watchdog : running (PID: %s)\n" "$wd_pid"
+                    printf "  🐕 Watchdog : Running (PID: %s)\n" "$wd_pid"
                     ;;
                 *)
                     printf "  🐕 Watchdog : PID %s was reused\n" "$wd_pid"
@@ -365,17 +384,79 @@ if [ "$CHECK_MODE" = "1" ]; then
     else
         printf "  🐕 Watchdog : inactive\n"
     fi
+    echo ""
+
+    # --- Section 2: Runtime ---
+    echo "─── Runtime ────────────────────────────────"
+    if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
+        printf "  📁 run/     : %s\n" "$RUN_DIR_ACTIVE"
+    else
+        printf "  📁 run/     : %s\n" "$(dirname "$WEBUI_PID_FILE")"
+    fi
+
+    # STATUS_FILE = user intent (may differ from actual state)
+    if [ -f "$STATUS_FILE" ]; then
+        st=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
+        printf "  📄 Intent   : %s (user intent)\n" "${st:-UNKNOWN}"
+    else
+        printf "  📄 Intent   : (no file)\n"
+    fi
+
+    # Version + functions.sh
+    printf "  🏷️  Version  : %s\n" "$VERSION"
+    if [ "$FUNCTIONS_LOADED" = "1" ]; then
+        printf "  📚 functions: ✅ loaded\n"
+    else
+        printf "  📚 functions: ⚠️ not loaded (fallback)\n"
+    fi
+    echo ""
+
+    # --- Section 3: Configuration ---
+    echo "─── Configuration ──────────────────────────"
+    DASH_PORT=$(read_conf "$CONF_FILE" "DASHBOARD_PORT" "9091")
+    printf "  🌐 WebUI port    : %s\n" "$PORT"
+    printf "  📊 Dashboard port: %s\n" "$DASH_PORT"
+
+    # Auto-restart config
+    AUTO_DNS=$(read_conf "$CONF_FILE" "AUTO_RESTART_DNS" "1")
+    AUTO_WEBUI=$(read_conf "$CONF_FILE" "AUTO_RESTART_WEBUI" "1")
+    printf "  🔄 Auto-DNS      : %s\n" "$([ "$AUTO_DNS" = "1" ] && echo "enabled" || echo "disabled")"
+    printf "  🔄 Auto-WebUI    : %s\n" "$([ "$AUTO_WEBUI" = "1" ] && echo "enabled" || echo "disabled")"
+
+    # BIND_ADDR
+    BIND_ADDR=$(read_conf "$CONF_FILE" "BIND_ADDR" "127.0.0.1")
+    printf "  🔌 BIND_ADDR     : %s\n" "$BIND_ADDR"
+    echo ""
+
+    # --- Section 4: Profile + Memory (v1.1.0) ---
+    echo "─── Profile & Memory ───────────────────────"
+    ACTIVE_PROFILE="pro"
+    if [ -f "$SELECTED_PROFILE_FILE" ]; then
+        _ap=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
+        case "$_ap" in
+            light|normal|pro|proplus|ultimate) ACTIVE_PROFILE="$_ap" ;;
+        esac
+    fi
+
+    MEMORY_HINT=$(get_mem_hint 2>/dev/null)
+    [ -z "$MEMORY_HINT" ] && MEMORY_HINT="unknown"
+
+    printf "  📋 Profile       : %s\n" "$ACTIVE_PROFILE"
+    printf "  🧠 Memory limit  : %s\n" "$MEMORY_HINT"
+    printf "  ℹ️  Managed by    : main.go (Go runtime soft limit)\n"
+    echo ""
 
     # --- Module disabled? ---
     if [ -f "$MODDIR/disable" ]; then
-        printf "  ⚠️  Module   : disabled\n"
+        printf "  ⚠️  Module        : DISABLED (remove 'disable' file to enable)\n"
+        echo ""
     fi
 
     # --- Credentials ---
     if [ -f "$CRED_FILE" ]; then
-        printf "  🔐 Credentials: available\n"
+        printf "  🔐 Credentials   : available\n"
     else
-        printf "  ⚠️  Credentials: missing\n"
+        printf "  ⚠️  Credentials   : missing\n"
     fi
 
     echo ""

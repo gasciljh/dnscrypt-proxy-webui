@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter — dnscrypt-proxy.toml
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -14,6 +14,18 @@
 #   • No default admin/admin (must be set by customize.sh).
 #   • Port 8080 is reserved for monitoring_ui (see [13] below).
 #   • Credentials are read from [monitoring_ui] only (section-restricted).
+#
+# v1.1.0 coordination:
+#   • Memory limits are set by main.go at runtime (per profile).
+#     See section [14] for the exact values.
+#   • The reserved port definition lives in:
+#       main.go → MONITORING_UI_PORT
+#       functions.sh → _MONITORING_UI_PORT
+#       customize.sh → _MONITORING_UI_PORT
+#       action.sh → _MONITORING_UI_PORT
+#       service.sh → _MONITORING_UI_PORT (implicit via functions.sh)
+#       status.sh → _MONITORING_UI_PORT
+#     Any change to the reserved port requires updating all of them.
 # ============================================================
 
 # ============================================================
@@ -263,6 +275,12 @@ cache = true
 #     4 GB+ RAM → 10240 (default)
 #
 #   ⚠️ Each entry consumes roughly 200 bytes on average.
+#
+#   ⚠️ v1.1.0 note:
+#      The Go runtime soft memory limit is set by main.go based on
+#      the active blocklist profile (see section [14] below). The
+#      DNS engine (this file) is a separate process with its own
+#      memory footprint — the two are independent.
 # ============================================================
 cache_size = 10240
 
@@ -427,6 +445,11 @@ tls_disable_session_tickets = false
 #            → GET http://127.0.0.1:8080/api/metrics
 #              → monitoring_ui
 #
+#    v1.1.0: metricsProxyHandler builds the upstream URL using the
+#    MONITORING_UI_PORT constant (defined in main.go) instead of a
+#    hardcoded "8080". Changing the reserved port requires editing
+#    both this file and the constant.
+#
 # ------------------------------------------------------------
 # Credentials (username / password):
 #   Generated automatically by customize.sh.
@@ -490,9 +513,28 @@ tls_disable_session_tickets = false
 #   curl http://127.0.0.1:9090/readyz
 #   curl http://127.0.0.1:9090/api?action=runtime_info
 #
-# 🧠 Memory usage:
-#   • Idle WebUI:        ~15 MB
-#   • rebuildBlocklist:  ~2 MB peak
+# 🧠 Memory usage (v1.1.0):
+#
+#   The WebUI (main.go) adjusts the Go runtime soft memory limit
+#   dynamically based on the active blocklist profile:
+#
+#   ┌──────────────┬─────────────┬────────────────────────────────────┐
+#   │ Profile      │ Limit (MB)  │ Typical use case                   │
+#   ├──────────────┼─────────────┼────────────────────────────────────┤
+#   │ light        │  80 MB      │ 1 GB RAM devices, minimal blocking │
+#   │ normal       │ 100 MB      │ 2 GB RAM devices                   │
+#   │ pro          │ 120 MB      │ 3 GB RAM devices (default)         │
+#   │ proplus      │ 160 MB      │ 4 GB RAM devices                   │
+#   │ ultimate     │ 220 MB      │ 6 GB+ RAM devices, max blocking    │
+#   └──────────────┴─────────────┴────────────────────────────────────┘
+#
+#   Note: debug.SetMemoryLimit is a SOFT limit. The runtime prefers
+#   running GC more aggressively over OOMing. Setting it too low
+#   causes GC overhead; too high wastes RAM.
+#
+#   Baseline figures (independent of the soft limit):
+#     • Idle WebUI:        ~15 MB RSS
+#     • rebuildBlocklist:  ~2 MB peak (streaming I/O)
 #
 # 🔒 Security:
 #   • main.go sets CSP + X-Frame-Options + nosniff on all HTTP responses
@@ -505,6 +547,12 @@ tls_disable_session_tickets = false
 #   • Port Guard 8080 (main.go + 6 shell scripts)
 #   • Section-Restricted TOML (read from [monitoring_ui] only)
 #   • metricsProxyHandler → /api/metrics (JSON pass-through)
+#   • Login POST-only (CSRF protection)
+#   • Basic Auth rate limiting (5/15min)
+#   • shellQuote on dynamic shell paths
+#   • readConfPort range check (1–65535)
+#   • rebuildMu mutex (RACE-1)
+#   • Auth cache 60s
 #
 # ⚠️ Port constraints:
 #   • PORT (webui.conf)          → 9090 default

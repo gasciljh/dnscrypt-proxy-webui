@@ -1,10 +1,11 @@
 # ============================================================
 # DNSCrypt Smart Filter – Dependabot Configuration
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Reference: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# Reference:
+#   https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
 # Purpose:
 #   Automatically updates dependencies and opens PRs for upgrades.
@@ -18,32 +19,124 @@
 # Important:
 #   Dependabot works for free only on public repositories.
 #   For private repositories: GitHub Advanced Security is required.
+#
+# Ecosystem coverage:
+#   ┌───────────────┬──────────────┬───────────────────┐
+#   │ Ecosystem        │ Directory      │ Schedule             │
+#   ├───────────────┼──────────────┼───────────────────┤
+#   │ github-actions   │ /              │ weekly Mon 06:00 UTC │
+#   │ gomod            │ /proxy         │ monthly Mon 06:00    │
+#   │ devcontainers    │ /              │ monthly Mon 06:00    │
+#   └───────────────┴──────────────┴───────────────────┘
+#
+# Schedule rationale:
+#   • github-actions → weekly. Actions are frequently updated for
+#     security reasons (e.g. actions/checkout deprecates old Node
+#     runtimes). Weekly keeps the repository current without
+#     excessive noise.
+#
+#   • gomod → monthly. Go rarely needs updates — the project uses
+#     only the standard library, so go.mod has no dependencies.
+#     This section is forward-looking: if a package is added in
+#     the future (e.g. golang.org/x/sys), Dependabot will handle
+#     it automatically.
+#
+#   • devcontainers → monthly. Dev container features change
+#     infrequently. Monthly is more than enough.
+#
+#   Why not daily?
+#     • Too much review noise.
+#     • ~90% of updates are not urgent.
+#     • Weekly / monthly is the right balance for a solo
+#       maintainer with a small codebase.
+#
+# Grouped updates:
+#   Each ecosystem groups its minor/patch updates into a single
+#   PR. Example: instead of 5 separate PRs (one per Action), you
+#   get one PR titled "Bump 5 github-actions dependencies".
+#
+#   Benefits:
+#     • Less review noise.
+#     • Faster merge cycle.
+#     • Easier to track in the PR list.
+#
+#   Caveat: if one update in the group has a problem, it must be
+#   isolated manually (edit the PR or revert the group and re-run).
+#
+# open-pull-requests-limit:
+#   • Actions: 5 PRs max
+#   • Go: 3 PRs
+#   • Devcontainers: 2 PRs
+#
+#   When the limit is reached, Dependabot stops opening new PRs
+#   until some are merged or closed. This prevents the PR list
+#   from being flooded during a burst of updates.
+#
+# target-branch decision:
+#   All three ecosystems target `main` directly (not `develop`).
+#
+#   Rationale:
+#     • The project is maintained by a single author.
+#     • Small codebase — no need for a development branch for
+#       dependency updates.
+#     • Dependency PRs are small and low-risk; they can go
+#       straight to the stable branch.
+#
+#   This is consistent with the project's documented policy that
+#   `main` accepts PRs from `release/*` and `hotfix/*` only —
+#   except for automation that explicitly opts into main. See
+#   docs/adr/0001-two-branch-model.md for the branch model.
+#
+# ⚠️ If the project grows to multiple maintainers or the
+#    codebase expands significantly, consider switching the
+#    target-branch to `develop` for consistency with the
+#    feature/fix workflow.
+#
+# Labels applied to each PR:
+#   • "dependencies"  — always
+#   • Ecosystem label — "github-actions" / "go" / "devcontainer"
+#   • "ci"            — Actions only (since they affect CI)
+#
+# Commit message prefixes:
+#   • ci(scope)    — for Actions
+#   • build(scope) — for Go modules
+#   • chore(scope) — for dev containers
+#
+#   This aligns with Conventional Commits and keeps the commit
+#   log scannable.
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added an "Ecosystem coverage" table for quick scanning.
+#   • Added a "Schedule rationale" section explaining why each
+#     ecosystem has its chosen cadence.
+#   • Added a "Grouped updates" section with benefits and caveats.
+#   • Added a "target-branch decision" section clarifying why
+#     main is targeted and referencing ADR-0001.
+#   • Moved the long inline comments from the YAML body into the
+#     header to keep the file itself short and readable.
 # ============================================================
 
 version: 2
 
 # ============================================================
-# [1] Global settings
+# [1] GitHub Actions
 # ============================================================
-# No global settings in v2 — everything is inside updates[].
-
+# Most important for security: outdated Actions may contain
+# known vulnerabilities (e.g. arbitrary code execution via a
+# compromised release, deprecated Node runtime).
+#
+# Covered files:
+#   • .github/workflows/ci.yml
+#   • .github/workflows/codeql.yml
+#   • .github/workflows/release.yml
+#   • any new workflow
+#
+# Example automatic PR:
+#   "ci: bump actions/checkout from v6 to v7"
+# ============================================================
 updates:
-
-  # ============================================================
-  # [1] GitHub Actions
-  # ============================================================
-  # Most important for security: outdated Actions may contain
-  # known vulnerabilities.
-  #
-  # Covered files:
-  #   • .github/workflows/ci.yml
-  #   • .github/workflows/release.yml
-  #   • .github/workflows/codeql.yml
-  #   • any new workflow
-  #
-  # Example automatic PR:
-  #   "Bump actions/checkout from v4 to v5"
-  # ============================================================
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -87,9 +180,12 @@ updates:
   #   • go.sum: absent (no dependencies)
   #
   # Future benefit:
-  #   • If a package is added (e.g. `golang.org/x/sys`), Dependabot
+  #   • If a package is added (e.g. golang.org/x/sys), Dependabot
   #     keeps it up to date.
   #   • Detects CVEs in newly added dependencies.
+  #
+  # Example automatic PR:
+  #   "build(deps): bump golang.org/x/sys from v0.5.0 to v0.6.0"
   # ============================================================
   - package-ecosystem: "gomod"
     directory: "/proxy"
@@ -119,8 +215,11 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    # Ignore major updates automatically
-    # (reviewed manually as they may break compatibility)
+    # Ignore major updates automatically — reviewed manually as
+    # they may break compatibility.
+    #
+    # Example: golang.org/x/sys v0.x → v1.x is a breaking change
+    # and should be reviewed before merging.
     ignore:
       - dependency-name: "*"
         update-types:
@@ -138,7 +237,11 @@ updates:
   #
   # Note:
   #   Dependabot has supported the `devcontainers` ecosystem
-  #   since 2023. If issues arise, this section can be removed.
+  #   since 2023. If issues arise, this section can be removed
+  #   without affecting the other two.
+  #
+  # Example automatic PR:
+  #   "chore(devcontainer): bump devcontainers/features/go"
   # ============================================================
   - package-ecosystem: "devcontainers"
     directory: "/"
@@ -159,95 +262,41 @@ updates:
     target-branch: "main"
 
 # ============================================================
-# Additional notes
+# How Dependabot interacts with the release process
 # ============================================================
 #
-# Security:
-#   Dependabot Security Updates run automatically thanks to
-#   this `dependabot.yml` — they detect CVEs in:
-#     • GitHub Actions
-#     • Go modules
-#     • Dev Container features
+# Dependabot PRs are merged into `main` directly (see
+# target-branch above). They do NOT trigger a release by
+# themselves — a release requires an explicit version bump via
+# scripts/release.sh. However, merged Dependabot PRs are
+# included in the next scheduled release's CHANGELOG.
 #
-#   When a vulnerability is found:
-#     1. Dependabot opens a PR immediately (regardless of schedule).
-#     2. The PR carries the label "security".
-#     3. Its title begins with "Bump X to Y (security)".
-#
-# Chosen schedule:
-#   • GitHub Actions: weekly (Monday 06:00 UTC)
-#     → fast because Actions are frequently updated for security.
-#
-#   • Go Modules: monthly
-#     → slower because Go rarely needs updates.
-#
-#   • Dev Containers: monthly
-#     → same reason.
-#
-# Why not `daily`?
-#   • Too much review noise.
-#   • 90% of updates are not urgent.
-#   • Weekly / monthly = optimal balance.
-#
-# open-pull-requests-limit:
-#   • Actions: 5 PRs max (can be increased).
-#   • Go: 3 PRs.
-#   • Devcontainers: 2 PRs.
-#
-#   When the limit is reached, Dependabot stops opening new PRs
-#   until some are merged/closed.
-#
-# target-branch:
-#   We use `main` directly (no `develop`) because:
-#     • The project is maintained by a single author.
-#     • Small codebase — no need for a development branch.
-#     • PRs are small and easy to merge.
-#
-# labels:
-#   Each PR carries 2-3 labels for classification:
-#     • "dependencies" (always)
-#     • "github-actions" / "go" / "devcontainer" (per type)
-#     • "ci" (Actions only)
-#
-# groups:
-#   Dependabot supports "grouped updates" — merging all updates
-#   into one PR. Example: instead of 5 PRs (5 Actions), you get
-#   one PR: "Bump 5 github-actions dependencies".
-#
-#   Benefits:
-#     • Less noise.
-#     • Faster review.
-#     • Easier merge.
-#
-#   Caveat: if one of the updates has a problem, it must be
-#   isolated manually.
-#
-# Note about `ignore` for gomod:
-#   semver-major updates are ignored automatically (they may break
-#   compatibility). Example: updating `golang.org/x/sys` from
-#   v0.5.0 to v1.0.0 is a breaking change → reviewed manually.
+# For CVE fixes specifically, the maintainer may choose to
+# immediately cut a PATCH release with scripts/release-patch.sh
+# rather than waiting for the next scheduled release. See
+# docs/RELEASE_PROCESS.md §2.3 for the PATCH release flow.
 #
 # ============================================================
-# How to test the configuration
+# How to verify the configuration
 # ============================================================
 #
-# 1) On GitHub:
+# 1. On GitHub:
 #    Settings → Code security and analysis
 #    → Dependabot version updates: Enabled ✅
 #
-# 2) In the Dependabot tab:
+# 2. In the Dependabot tab:
 #    Insights → Dependency graph → Dependabot
 #    Shows:
 #      • last scan
 #      • discovered dependencies
 #      • open PRs
 #
-# 3) Manually (trigger):
+# 3. Manual trigger:
 #    Actions → Dependabot Updates → "Check for updates"
 #    (available after the first scheduled run)
 #
-# 4) Validate the file:
+# 4. Validate the file locally:
 #    python3 -c "import yaml; yaml.safe_load(open('.github/dependabot.yml'))"
-#    → must complete without errors.
+#    → must complete without errors
 #
 # ============================================================

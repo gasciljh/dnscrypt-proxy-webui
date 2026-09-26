@@ -1,6 +1,6 @@
 # ============================================================
 # Git Ignore for DNSCrypt Smart Filter
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -9,14 +9,35 @@
 #   files from being accidentally committed.
 #
 # Scope:
-#   Patterns are defined only for file types that actually exist
-#   or are created by this repository at runtime.
+#   Patterns are defined only for file types that actually
+#   exist or are created by this repository at runtime.
+#
+# v1.1.0 notes:
+#   • Version bumped from v1.0.0 to v1.1.0 (documentation only).
+#   • Removed two no-op negations (see comments in the sections
+#     below). Both were dead code that suggested protections
+#     which did not actually exist.
+#   • Added clarifying comments for sections that previously
+#     had none.
+#   • No new patterns were required for the v1.1.0 files —
+#     `docs/adr/0004-0006.md`, `scripts/release-patch.sh`, and
+#     `.github/PULL_REQUEST_TEMPLATE/release.md` are all tracked
+#     files and require no ignore rule.
+#
+# Reminder:
+#   If you add a new pattern here, add a matching exclusion in
+#   .gitattributes if the file is binary, or a matching section
+#   in .editorconfig if it has specific formatting rules.
 # ============================================================
 
 # ============================================================
 # [1] Build artifacts
 # ============================================================
-# Outputs produced locally or in CI
+# Outputs produced locally or in CI:
+#   • build/       — local build tree (if ever used)
+#   • proxy/build/ — WebUI binaries output (from build.sh)
+#   • dist/        — Magisk ZIP + checksums (from package_module.sh)
+# ============================================================
 build/
 proxy/build/
 dist/
@@ -26,26 +47,53 @@ dist/
 *.tar.xz
 
 # ============================================================
-# [2] WebUI binaries (built by release.yml)
+# [2] WebUI binaries (built by build.sh / release.yml)
 # ============================================================
 # These files are never committed — they are built from main.go
-# ⚠️ Note: `proxy/dnscrypt-proxy.version` (Single Source of Truth)
-#           must remain visible in Git — see negation below.
+# and injected into the Magisk ZIP at packaging time.
+#
+# Patterns cover:
+#   • proxy/dnscrypt-webui-arm64
+#   • proxy/dnscrypt-webui-arm
+#   • proxy/dnscrypt-webui-amd64
+#   • proxy/dnscrypt-webui-386
+#   • dnscrypt-webui-* (root-level, from --package)
+#
+# ⚠️ Note: previous versions of this file contained a
+#    `!proxy/dnscrypt-proxy.version` negation here. That
+#    negation was a no-op: the patterns above start with
+#    `dnscrypt-webui-` and cannot match `dnscrypt-proxy.version`.
+#    It has been removed in v1.1.0.
+# ============================================================
 proxy/dnscrypt-webui-*
 proxy/dnscrypt-webui
 dnscrypt-webui-*
-!proxy/dnscrypt-proxy.version
 
 # ============================================================
 # [3] Runtime directory (proxy/run/)
 # ============================================================
 # The run/ directory is created at runtime by main.go.
-# Its contents (PID files, status files, caches) must never be
-# committed.
+# Its contents:
+#   • dnscrypt.status       — user intent (ON/OFF)
+#   • dnscrypt.pid          — DNS engine PID
+#   • webui.pid             — WebUI PID
+#   • watchdog.pid          — Watchdog PID
+#   • update_progress.txt   — progress file during profile update
+#   • .bootstrap_cache      — 5-minute TTL cache of bootstrap IPs
+#
+# None of these must ever be committed.
+#
+# Note (v1.1.0): the memory limit is held in memory
+# (currentMemLimit in main.go), NOT in a file. There is no
+# `memory_limit_mb` file in run/.
+# ============================================================
 proxy/run/*
 
 # ============================================================
 # [4] Runtime files (outside proxy/run/)
+# ============================================================
+# Fallback locations when proxy/run/ is not writable (SELinux,
+# permissions). See main.go initPaths().
 # ============================================================
 *.pid
 *.status
@@ -58,6 +106,9 @@ proxy/run/*
 # ============================================================
 # [5] Log rotation artifacts
 # ============================================================
+# Produced by main.go (orderly rotation at 1 MB) and by
+# functions.sh (emergency rotation at 50 MB).
+# ============================================================
 *.log.*.gz
 *.log.*.old
 *.log.emergency.*
@@ -65,10 +116,21 @@ proxy/run/*
 # ============================================================
 # [6] Bootstrap cache
 # ============================================================
+# Created by functions.sh (5-minute TTL from TOML).
+# ============================================================
 .bootstrap_cache
 
 # ============================================================
 # [7] User configs (never committed — user-specific)
+# ============================================================
+# These files are either:
+#   • Downloaded at runtime (blocklist.txt, blocklist.raw)
+#   • Edited by the user via the WebUI (allowlist, denylist)
+#   • Generated by customize.sh at install (selected_profile)
+#
+# ⚠️ proxy/webui.conf and proxy/dnscrypt-proxy.toml are NOT
+#    in this list — they are template files that ship with the
+#    module and MUST be tracked.
 # ============================================================
 proxy/allowlist.txt
 proxy/denylist.txt
@@ -80,6 +142,9 @@ proxy/blocked-ips.txt
 
 # ============================================================
 # [8] Go build artifacts
+# ============================================================
+# Go 1.22 is the current toolchain (see proxy/go.mod).
+# These artifacts can appear during local testing or debugging.
 # ============================================================
 *.test
 *.exe
@@ -93,6 +158,8 @@ __debug_bin*.exe
 # ============================================================
 # [9] Development environment (temporary)
 # ============================================================
+# Files created during local development and never committed.
+# ============================================================
 /tmp/dnscrypt-dev/
 /tmp/dnscrypt_main.log
 /tmp/dnscrypt.status
@@ -102,6 +169,8 @@ __debug_bin*.exe
 
 # ============================================================
 # [10] Package build artifacts
+# ============================================================
+# Files created by scripts/package_module.sh during staging.
 # ============================================================
 *.filelist.txt
 .filelist.txt
@@ -123,6 +192,12 @@ desktop.ini
 # ============================================================
 # [12] IDE / Editor
 # ============================================================
+# ⚠️ .vscode/settings.json.example is intentionally NOT
+#    ignored — it is a tracked example file. The negation is
+#    redundant because the pattern `!.vscode/settings.json.example`
+#    would override `.vscode/` for that specific file, but Git
+#    supports it. It is kept for clarity.
+# ============================================================
 .vscode/
 !.vscode/settings.json.example
 .idea/
@@ -143,6 +218,19 @@ desktop.ini
 # ============================================================
 # [13] Secrets & credentials (defensive)
 # ============================================================
+# This section is DEFENSIVE ONLY. None of these files exist
+# in the repository today. The patterns guard against a
+# contributor accidentally committing a real secret.
+#
+# ⚠️ Removed in v1.1.0: the previous `!proxy/*.key.pub`
+#    negation was a no-op — `*.key` cannot match `*.key.pub`
+#    because the file ends with `.pub`, not `.key`.
+#
+# ⚠️ The `.secrets.baseline` file is NOT ignored — it is
+#    the detect-secrets baseline and must be tracked. It is
+#    covered by the general `*.baseline` exception (there is
+#    none), so no special pattern is needed here.
+# ============================================================
 .secrets
 *.pem
 *.key
@@ -153,10 +241,12 @@ desktop.ini
 *.credentials
 *.secret
 credentials.txt
-!proxy/*.key.pub
 
 # ============================================================
 # [14] Local overrides
+# ============================================================
+# Files a developer may create locally to test with custom
+# settings. Never committed.
 # ============================================================
 *.local
 local.conf
@@ -178,12 +268,17 @@ webui.conf.local
 # ============================================================
 # [17] Documentation build
 # ============================================================
+# Reserved for future use (no docs build system today).
+# ============================================================
 docs/_build/
 docs/.cache/
 site/
 
 # ============================================================
 # [18] Misc
+# ============================================================
+# Catch-all for transient files created by tools that do not
+# have a dedicated section above.
 # ============================================================
 *.cache
 *.pid.tmp

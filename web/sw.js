@@ -1,6 +1,6 @@
 /* ============================================================
  * DNSCrypt Smart Filter — Service Worker
- * Version: v1.0.0
+ * Version: v1.1.0
  * Author: gasciljh
  * Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
  * ============================================================
@@ -40,14 +40,42 @@
  *         /favicon-32x32.png , /favicon-16x16.png , /favicon.ico
  *
  *   Notes:
- *     • CACHE_VERSION is updated by sync_versions.sh (or manually)
- *       on every release. Bumping it forces clients to fetch the
- *       new assets.
- *     • This Service Worker is cached per origin. WebUI (9090)
- *       and Dashboard (9091) share the same origin if both are
- *       served from the same host but are technically different
+ *     • The Service Worker is bound to a single origin. WebUI
+ *       (9090) and Dashboard (9091) are technically different
  *       origins → each will have its own SW cache. This is a
  *       documented limitation (see docs/ARCHITECTURE.md §6.4).
+ *     • PWA shortcuts in manifest.json use hardcoded ports and
+ *       cannot read runtime_info (evaluated before JS runs).
+ *       See manifest.json x-note-port-limitation.
+ *
+ * ============================================================
+ * v1.1.0 changes:
+ *   • CACHE_VERSION bumped from v1.0.0 to v1.1.0. This forces
+ *     all clients to fetch the new assets on next activation.
+ *   • Removed the previous comment claiming CACHE_VERSION is
+ *     "updated automatically by sync_versions.sh". No such
+ *     script exists — the value is updated manually at each
+ *     release (see "How to update CACHE_VERSION" below).
+ *   • Reformatted section headers for consistency with the
+ *     rest of the codebase (v1.1.0 style).
+ *   • Documented the icon source pipeline in PRECACHE_ASSETS
+ *     (mirrors manifest.json x-note-icon-source).
+ *   • Documented the /offline.html dependency chain for the
+ *     offline fallback (unified source principle).
+ *
+ * How to update CACHE_VERSION (manual, at each release):
+ *   1. Bump the module version in VERSION, module.prop, and
+ *      update.json (handled automatically by scripts/release.sh).
+ *   2. Manually edit CACHE_VERSION in this file to match the
+ *      new release tag (e.g. 'v1.1.0' → 'v1.2.0').
+ *   3. Commit the change with the release.
+ *
+ *   There is no automation for this step. It is a deliberate
+ *   manual decision: bumping CACHE_VERSION invalidates every
+ *   client's cache, forcing a full re-download of the 11
+ *   precached assets. Do NOT bump it for non-release changes
+ *   (e.g. minor tweaks that don't ship a new version).
+ *
  * ============================================================ */
 
 'use strict';
@@ -55,8 +83,11 @@
 // ============================================================
 // [1] Configuration
 // ============================================================
-// CACHE_VERSION is updated automatically by sync_versions.sh
-const CACHE_VERSION = 'v1.0.0';
+// CACHE_VERSION — see "How to update CACHE_VERSION" above.
+// The value must match the current release tag (VERSION file).
+// Example: if VERSION is "v1.2.0", this must be 'v1.2.0'.
+// ============================================================
+const CACHE_VERSION = 'v1.1.0';
 
 const STATIC_CACHE  = `dnscrypt-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dnscrypt-runtime-${CACHE_VERSION}`;
@@ -72,43 +103,76 @@ const DEBUG = false; // true for debugging only
 //   • PNG Icons:     3 files (icon-192.png, icon-512.png, apple-touch-icon.png)
 //   • Favicons:      3 files (favicon-32x32.png, favicon-16x16.png, favicon.ico)
 //
+// ⚠️ Icon source pipeline (mirrors manifest.json x-note-icon-source):
+//   The SVG sources are cached here as-is. The generated PNG/ICO
+//   files (see /scripts/generate-icons.sh) are ALSO cached, so
+//   browsers that prefer PNG get the cached version. Do NOT
+//   assume a single source — the pipeline is:
+//
+//     icon-192.svg     → icon-192.png        (192×192)
+//     icon-512.svg     → icon-512.png        (512×512)
+//     icon-512.svg     → apple-touch-icon.png (180×180)
+//     icon-512.svg     → favicon-32x32.png   (32×32)
+//     icon-512.svg     → favicon-16x16.png   (16×16)
+//     favicon-16/32    → favicon.ico         (multi-size)
+//
+//   The Service Worker does NOT regenerate PNGs — it only caches
+//   what was already produced by the build pipeline. If you
+//   change an SVG source, regenerate the PNGs first (see
+//   scripts/generate-icons.sh --force) BEFORE bumping
+//   CACHE_VERSION. Otherwise clients would cache stale PNGs.
+//
+// ⚠️ /offline.html is the UNIFIED SOURCE for the offline page:
+//   buildOfflineResponse() (see [4] below) tries to fetch it
+//   from the cache first, and only falls back to an inline
+//   string if the cache lookup fails. This is why /offline.html
+//   MUST be in PRECACHE_ASSETS — without it, the first offline
+//   visit after install would show the minimal inline page
+//   instead of the full offline.html experience.
+//
 // ⚠️ PWA dual-origin note:
 //   This list is cached in the origin of the current page.
 //   • If index.html is opened from 9090 → Cache holds the assets.
 //   • If dashboard.html is opened from 9091 → Separate cache.
 //   • /manifest.json is shared (same content, different scope).
 //
-// ⚠️ We do NOT cache sw.js — the browser always fetches it from the network.
+// ⚠️ We do NOT cache sw.js — the browser always fetches it from
+// the network. This guarantees that a new SW version is picked up
+// on every page load (browsers do a byte-comparison).
 // ============================================================
 const PRECACHE_ASSETS = [
     // --- HTML + Manifest ---
     '/',
     '/manifest.json',
-    '/offline.html',
+    '/offline.html',   // ← unified source for offline fallback
 
     // --- SVG Icons (modern browsers) ---
-    '/icon-192.svg',
-    '/icon-512.svg',
+    '/icon-192.svg',   // source for /icon-192.png
+    '/icon-512.svg',   // source for 4 PNGs (see [2] header)
 
-    // --- PNG Icons ---
-    '/icon-192.png',
-    '/icon-512.png',
-    '/apple-touch-icon.png',
+    // --- PNG Icons (generated from SVG) ---
+    '/icon-192.png',   // ← from icon-192.svg
+    '/icon-512.png',   // ← from icon-512.svg
+    '/apple-touch-icon.png',  // ← from icon-512.svg
 
-    // --- Favicons ---
-    '/favicon-32x32.png',
-    '/favicon-16x16.png',
-    '/favicon.ico'
+    // --- Favicons (generated from icon-512.svg + favicon-16/32) ---
+    '/favicon-32x32.png',  // ← from icon-512.svg
+    '/favicon-16x16.png',  // ← from icon-512.svg
+    '/favicon.ico'         // ← multi-size (16 + 32)
 ];
 
 // HTML network-first timeout
 const HTML_TIMEOUT_MS = 5000;
 
-// Last version notified to clients (prevents duplicates)
+// Last version notified to clients (prevents duplicate notifications
+// when activate fires more than once in the same page lifecycle).
 let lastActivatedVersion = null;
 
 // ============================================================
 // [3] Suppressed logging
+// ============================================================
+// Logging is gated by the DEBUG flag to keep production consoles
+// clean. Enable locally for troubleshooting.
 // ============================================================
 function debugLog(...args) {
     if (DEBUG) console.log('[SW ' + CACHE_VERSION + ']', ...args);
@@ -126,6 +190,15 @@ function debugWarn(...args) {
 //   2. Fall back to an inline string if that fails.
 //
 // This prevents duplication between sw.js and offline.html.
+//
+// The inline fallback is intentionally minimal — it exists only
+// for the edge case where the Service Worker has been registered
+// but /offline.html was never successfully cached (e.g. first
+// install offline). It is not a replacement for the full
+// offline.html page.
+//
+// Dependency: /offline.html MUST be in PRECACHE_ASSETS (see [2])
+// for step 1 to ever succeed.
 // ============================================================
 async function buildOfflineResponse() {
     try {
@@ -181,6 +254,11 @@ async function buildOfflineResponse() {
 // ============================================================
 // [5] install: cache essential assets
 // ============================================================
+// Uses Promise.allSettled-style semantics via per-asset catch:
+// if one asset fails to cache (e.g. temporary network issue), the
+// install still succeeds. This is deliberate — a partial precache
+// is better than a failed install.
+// ============================================================
 self.addEventListener('install', (event) => {
     debugLog('Installing...');
 
@@ -203,6 +281,11 @@ self.addEventListener('install', (event) => {
 
 // ============================================================
 // [6] activate: cleanup old caches
+// ============================================================
+// • Deletes every cache whose name is neither STATIC_CACHE nor
+//   RUNTIME_CACHE (i.e. caches from a previous CACHE_VERSION).
+// • Takes control of clients via clients.claim().
+// • Notifies each client once per version.
 // ============================================================
 self.addEventListener('activate', (event) => {
     debugLog('Activating...');
@@ -247,6 +330,17 @@ self.addEventListener('activate', (event) => {
 
 // ============================================================
 // [7] message handler
+// ============================================================
+// Supported messages from clients:
+//   • SKIP_WAITING     — activate this SW immediately
+//   • PING             — liveness check
+//   • GET_VERSION      — return CACHE_VERSION
+//   • GET_RUNTIME_INFO — return cache names + asset list + scope
+//   • CLEAR_CACHES     — delete all caches
+//   • CHECK_UPDATE     — ask the browser to check for a new SW
+//
+// The reply is always posted via event.source.postMessage() so
+// the requesting client can react.
 // ============================================================
 self.addEventListener('message', (event) => {
     if (!event.data) return;
@@ -343,6 +437,19 @@ self.addEventListener('message', (event) => {
 // ============================================================
 // [8] Determine which requests should bypass the cache
 // ============================================================
+// Returns true if the request must NOT be handled by the SW.
+// The browser then handles it as a normal network request.
+//
+// Rationale for each bypass:
+//   • External origins    — never interfere with third parties
+//   • /api/*              — must always be fresh (state changes)
+//   • /events             — SSE stream, cannot be cached
+//   • /auth/*             — must always hit the server
+//   • /healthz, /readyz   — liveness probes need fresh responses
+//   • /sw.js              — the browser must see byte changes
+//   • Non-GET             — mutation methods must not be cached
+//   • Authorization hdr   — bearer/token requests are session-scoped
+// ============================================================
 function shouldBypass(request) {
     let url;
     try {
@@ -381,6 +488,10 @@ function shouldBypass(request) {
 // ============================================================
 // [9] Is this a navigation request for HTML?
 // ============================================================
+// Two ways to detect:
+//   • request.mode === 'navigate'  (modern browsers)
+//   • Accept header contains 'text/html'  (fallback for older)
+// ============================================================
 function isNavigationRequest(request) {
     if (request.mode === 'navigate') return true;
     const accept = request.headers.get('accept') || '';
@@ -389,6 +500,16 @@ function isNavigationRequest(request) {
 
 // ============================================================
 // [10] Network-First for HTML with AbortController
+// ============================================================
+// Flow:
+//   1. Start a fetch with a 5-second AbortController timeout.
+//   2. On success (HTTP 200, type basic):
+//        • Cache the response in RUNTIME_CACHE (for offline fallback).
+//        • Return the fresh response to the client.
+//   3. On timeout (AbortError) or network failure:
+//        • Try the exact request from cache.
+//        • Else try '/' from cache (app shell).
+//        • Else return the offline response (503).
 // ============================================================
 function networkFirstHtml(request) {
     return new Promise((resolve) => {
@@ -452,6 +573,13 @@ function networkFirstHtml(request) {
 // ============================================================
 // [11] Stale-While-Revalidate for assets
 // ============================================================
+// Flow:
+//   1. Look up the request in cache.
+//   2. Start a network fetch in parallel.
+//   3. Return the cached response immediately if present.
+//   4. If not cached, wait for the network response.
+//   5. On network success, update RUNTIME_CACHE for next time.
+// ============================================================
 function staleWhileRevalidate(request) {
     return caches.match(request).then((cached) => {
         const fetchPromise = fetch(request)
@@ -476,6 +604,11 @@ function staleWhileRevalidate(request) {
 
 // ============================================================
 // [12] fetch: main entry point
+// ============================================================
+// Routing decision:
+//   1. Bypass list → let the browser handle it (no respondWith).
+//   2. Navigation → network-first (HTML fresh, offline fallback).
+//   3. Everything else → stale-while-revalidate.
 // ============================================================
 self.addEventListener('fetch', (event) => {
     const { request } = event;

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
-     Version: v1.0.0
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -12,8 +12,15 @@
        • Top domains
        • Recent queries
        • Source refresh status
-       • Runtime info (with dynamic ports)
+       • Runtime info (with dynamic ports + profile + memory)
        • Diagnostic file viewer
+     ============================================================
+     v1.1.0 changes:
+       • Version badge and footer updated to v1.1.0
+       • Runtime Info now displays profile key + memory limit
+         (new fields exposed by main.go v1.1.0)
+       • storeToken() documented as a no-op shim (see §[2])
+       • EventSource note clarified (same-origin cookies)
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -27,7 +34,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Dashboard v1.0.0</title>
+    <title>DNSCrypt Dashboard v1.1.0</title>
     <style>
         :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:12px; }
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -259,7 +266,7 @@
         </div>
 
         <div class="footer">
-            <span id="footerText">DNSCrypt Proxy Dashboard – v1.0.0 Zero-Footprint</span>
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.1.0 Zero-Footprint</span>
             · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
         </div>
     </div>
@@ -297,7 +304,7 @@
         // ============================================================
         // [1] Settings
         // ============================================================
-        var VERSION = 'v1.0.0';
+        var VERSION = 'v1.1.0';
 
         // Dynamic ports (updated from runtime_info)
         var PORTS = {
@@ -338,6 +345,7 @@
                 riPidFile:'PID File', riProgressFile:'Progress File', riLogFile:'Log File',
                 riBindAddr:'Bind Address',
                 riWebuiPort:'WebUI Port', riDashboardPort:'Dashboard Port',
+                riProfile:'Profile', riMemoryLimit:'Memory Limit',
                 diagFilesTitle:'📁 Diagnostic Files', dfRefresh:'Refresh',
                 dfActiveFiles:'Active Files', dfArchiveFiles:'Archived Files',
                 dfEmergencyFiles:'Emergency Files', dfSensitiveFiles:'Sensitive Files',
@@ -393,6 +401,7 @@
                 riPidFile:'ملف PID', riProgressFile:'ملف التقدم', riLogFile:'ملف السجل',
                 riBindAddr:'عنوان الاستماع',
                 riWebuiPort:'منفذ WebUI', riDashboardPort:'منفذ Dashboard',
+                riProfile:'البروفايل', riMemoryLimit:'حد الذاكرة',
                 diagFilesTitle:'📁 ملفات التشخيص', dfRefresh:'تحديث',
                 dfActiveFiles:'ملفات نشطة', dfArchiveFiles:'ملفات مضغوطة',
                 dfEmergencyFiles:'ملفات طارئة', dfSensitiveFiles:'ملفات حساسة',
@@ -464,7 +473,17 @@
         }
 
         // ============================================================
-        // [2] Token helper — cookie-only
+        // [2] Token helpers — cookie-only (v1.0.0+)
+        // ============================================================
+        // Backward-compat shims. Since v1.0.0, /api/auth/login no
+        // longer returns a token in the JSON response (see
+        // docs/SECURITY.md — Audit Correction #15-a).
+        //
+        // The Dashboard relies entirely on the HttpOnly session
+        // cookie set by the server. The three functions below are
+        // preserved as no-ops for consistency with index.html and
+        // to avoid touching call sites if a future migration to
+        // bearer tokens occurs.
         // ============================================================
         function getStoredToken() { return null; }
         function storeToken(tk) { void tk; }
@@ -703,6 +722,12 @@
                     if (linkText) linkText.textContent = t('projectLink');
                 }
 
+                // v1.1.0 — memory limit display
+                var memDisplay = 'unknown';
+                if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+                    memDisplay = String(data.memory_limit_mb) + ' MB';
+                }
+
                 var items = [
                     { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
                     { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
@@ -710,6 +735,8 @@
                     { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
                     { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
                     { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
+                    { icon:'📋', label:t('riProfile'), value:data.profile_key||'unknown' },
+                    { icon:'🧠', label:t('riMemoryLimit'), value:memDisplay },
                     { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
                     { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
                     { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
@@ -1208,6 +1235,9 @@
             if (sessionExpired) return;
             if (sse) { sse.close(); sse = null; }
             try {
+                // Note: cookies are sent automatically for same-origin
+                // requests, so the EventSource constructor options are
+                // unnecessary here. This matches index.html.
                 sse = new EventSource('/events?t=' + Date.now());
                 sse.onopen = function() {
                     sseConnected = true;

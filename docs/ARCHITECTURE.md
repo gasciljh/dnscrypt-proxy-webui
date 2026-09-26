@@ -2,10 +2,30 @@
 
 Comprehensive architecture document explaining how the system works internally.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • Added §3.9 (Memory Limit Flow) documenting the dynamic
+>     per-profile memory limit introduced by MEM-1.
+>   • Added §4.9 (v1.1.0 Backend Additions) covering MEM-1,
+>     MEM-2 (extended shellQuote), MEM-3 (MONITORING_UI_PORT
+>     constant in metrics handler).
+>   • Updated §1.2 (Architectural Principles) with three new
+>     principles that emerged from the v1.1.0 changes.
+>   • Updated §4.5 (Security Features) with v1.1.0 items.
+>   • Updated §10 (Performance) with the actual memory limits
+>     per profile and the GC overhead trade-off.
+>   • Updated §11 (Trade-offs) with §11.21 (dynamic vs static
+>     memory limit).
+>   • Updated §16 (Metrics Abstraction) with the two new fields
+>     exposed via runtime_info.
+>   • Added MEM-1 / MEM-2 / MEM-3 to the Legend and the Official
+>     Fix Numbers table at the bottom of the file.
+>   • No structural changes — v1.1.0 is a polish release.
 
 ---
 
@@ -46,7 +66,7 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | Principle | Implementation |
 |--------|---------|
 | **Separation of Concerns** | Go for HTTP, Shell for OS, JS for UI |
-| **Zero-Footprint** | 80 MB memory limit, streaming I/O |
+| **Zero-Footprint** | Streaming I/O, bounded buffers, 1 MB log rotation |
 | **Atomic Operations** | All writes via `.tmp` + `rename` |
 | **Graceful Degradation** | Fallbacks everywhere |
 | **Localhost-Only** | All servers on `127.0.0.1` (by default) |
@@ -68,6 +88,9 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | **Serialized Blocklist Rebuilds** | `rebuildMu` prevents race condition |
 | **Dynamic Ports** | `runtime_info` returns actual ports |
 | **Auth Cache** | 60 s TTL to reduce I/O |
+| **v1.1.0 — Dynamic Memory Limit** | Per-profile soft limit via `memoryLimitForProfile()` |
+| **v1.1.0 — Extended Shell Escaping** | `shellQuote()` covers `{`, `}`, `\n`, `\t` |
+| **v1.1.0 — Port Constant Reuse** | `MONITORING_UI_PORT` used in every reference (no hardcoded "8080") |
 
 ### 1.3 Dependencies
 
@@ -89,51 +112,53 @@ DNSCrypt-proxy version is determined by `proxy/dnscrypt-proxy.version` — see [
 ### 2.1 Overall Diagram
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                     Android Device (Rooted)                 │
+┌─────────────────────────────────────────────────────┐
+│                     Android Device (Rooted)                  │
+│                                                              │
+│  ┌─────────────────────────────────────────────┐    │
+│  │              Magisk / KernelSU Module               │    │
+│  │                                                     │    │
+│  │  ┌────────────┐    ┌─────────────────────┐    │    │
+│  │  │  WebUI       │    │  DNSCrypt-proxy         │    │    │
+│  │  │  (Go binary) │◄──┤  (Go binary - upstream)  │   │    │
+│  │  │  :9090       │    │  :5354                  │    │    │
+│  │  │  :9091 Dash  │    │  :8080 monitoring_ui    │    │    │
+│  │  │  (JSON conv) │    │  (Prometheus metrics)   │    │    │
+│  │  │  + MEM-1     │    │                         │    │    │
+│  │  └──────┬─────┘    └────────────┬────────┘    │    │
+│  │          │                          │               │    │
+│  │          │ HTTP/SSE                 │ DNS           │    │
+│  │          │                          │               │    │
+│  │  ┌──────▼─────────────────────▼──────────┐  │    │
+│  │  │           Shell Scripts (BusyBox sh)          │  │    │
+│  │  │  customize / service / action / status / ...  │  │    │
+│  │  │  manage_firewall → Custom Chains             │  │    │
+│  │  │  getSystemShell() fallback                    │  │    │
+│  │  │  get_profile_memory_hint()  (v1.1.0)          │  │    │
+│  │  └──────┬────────────────────┬────────────┘  │    │
+│  │          │                        │                 │    │
+│  │  ┌──────▼──────┐   ┌─────────▼───────────┐  │    │
+│  │  │  Watchdog     │    │  iptables / nftables    │  │    │
+│  │  │  (standalone) │    │  DNSCRYPT_OUT / _OUT6   │  │    │
+│  │  │  reads STATUS │    │  (Custom Chains)        │  │    │
+│  │  │  DNS backoff  │    │                         │  │    │
+│  │  └─────────────┘    └─────────────────────┘  │    │
+│  └─────────────────────────────────────────────┘    │
 │                                                             │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │              Magisk / KernelSU Module                 │  │
-│  │                                                       │  │
-│  │  ┌──────────────┐   ┌────────────────────────────┐   │  │
-│  │  │  WebUI       │   │  DNSCrypt-proxy            │   │  │
-│  │  │  (Go binary) │◄──┤  (Go binary - upstream)    │   │  │
-│  │  │  :9090       │   │  :5354                     │   │  │
-│  │  │  :9091 Dash  │   │  :8080 monitoring_ui       │   │  │
-│  │  │  (JSON conv) │   │  (Prometheus metrics)      │   │  │
-│  │  └──────┬───────┘   └─────────────┬──────────────┘   │  │
-│  │         │                         │                   │  │
-│  │         │ HTTP/SSE                │ DNS               │  │
-│  │         │                         │                   │  │
-│  │  ┌──────▼─────────────────────────▼──────────────┐   │  │
-│  │  │           Shell Scripts (BusyBox sh)          │   │  │
-│  │  │  customize / service / action / status / ...  │   │  │
-│  │  │  manage_firewall → Custom Chains              │   │  │
-│  │  │  getSystemShell() fallback                    │   │  │
-│  │  └──────┬─────────────────────────────────────────┘   │  │
-│  │         │                                             │  │
-│  │  ┌──────▼───────┐   ┌────────────────────────────┐   │  │
-│  │  │  Watchdog    │   │  iptables / nftables       │   │  │
-│  │  │  (standalone)│   │  DNSCRYPT_OUT / _OUT6      │   │  │
-│  │  │  reads STATUS│   │  (Custom Chains)           │   │  │
-│  │  │  DNS backoff │   │                            │   │  │
-│  │  └──────────────┘   └────────────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │           User Applications                          │   │
-│  │  (Chrome, Games, Apps → :53 → 127.0.0.1:5354)       │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+│  ┌─────────────────────────────────────────────┐    │
+│  │           User Applications                         │    │
+│  │  (Chrome, Games, Apps → :53 → 127.0.0.1:5354)      │    │
+│  └─────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────┘
 ```
 
 ### 2.2 Components
 
 | Component | Language | Responsibilities |
 |---|---|---|
-| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON |
+| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON, dynamic memory limit |
 | **dnscrypt-proxy** | Go (upstream) | The actual DNS engine |
-| **Shell scripts** | sh | Install, launch, watchdog, firewall |
+| **Shell scripts** | sh | Install, launch, watchdog, firewall, memory hint |
 | **index.html** | HTML+JS | Main interface |
 | **dashboard.html** | HTML+JS | Monitoring dashboard |
 | **sw.js** | JS | Service Worker (PWA) |
@@ -195,6 +220,9 @@ main.go
 │      ├── atomicWriteStream(blocklist.txt)
 │      └── rebuildMu.Unlock()  (defer)
 │
+├──► atomicWriteFile(SELECTED_FILE, key)
+├──► applyMemoryLimit(key)   ← v1.1.0: MEM-1
+│
 ├──► stopService() / startService()
 │
 └──► writeProgress(100, "Protection applied")
@@ -229,47 +257,49 @@ handleAPI  (hasEndpoint: exact matching)
 ### 3.4 Dashboard Metrics
 
 ```text
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  User Browser                                           │
 │  GET http://127.0.0.1:9091/api/metrics                  │
-└────────────────────────┬────────────────────────────────┘
+└────────────────────┬───────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  main.go :9091 (Dashboard Server)                       │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  metricsProxyHandler                              │  │
-│  │  1. checkAuth(r)                                  │  │
+┌─────────────────────────────────────────────────┐
+│  main.go :9091 (Dashboard Server)                        │
+│  ┌────────────────────────────────────────────┐  │
+│  │  metricsProxyHandler                               │  │
+│  │  1. checkAuth(r)                                   │  │
 │  │  2. getMonitoringAuth()  ← auth cache 60 s        │  │
-│  │  3. HTTP GET http://127.0.0.1:8080/api/metrics   │  │
-│  │     (Basic Auth)                                  │  │
-│  └──────────────────────┬────────────────────────────┘  │
-└─────────────────────────┼───────────────────────────────┘
+│  │  3. HTTP GET http://127.0.0.1:<MONITORING_UI_PORT> │  │
+│  │              /api/metrics                          │  │
+│  │     (Basic Auth)                                   │  │
+│  │     ← v1.1.0: uses the constant, not "8080"       │  │
+│  └──────────────────┬─────────────────────────┘  │
+└─────────────────────┼───────────────────────────┘
                           │
                           ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  dnscrypt-proxy :8080 (monitoring_ui)                   │
 │  returns JSON (or Prometheus text fallback)             │
-└─────────────────────────┬───────────────────────────────┘
+└─────────────────────┬──────────────────────────┘
                           │
                           ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  main.go — metricsProxyHandler (continues)              │
-│  ┌───────────────────────────────────────────────────┐  │
+│  ┌───────────────────────────────────────────┐  │
 │  │  4. body, _ := io.ReadAll(resp.Body)              │  │
-│  │  5. if valid JSON → pass through                  │  │
-│  │  6. else → parsePrometheus()                      │  │
+│  │  5. if valid JSON → pass through                 │  │
+│  │  6. else → parsePrometheus()                     │  │
 │  │           + buildDashboardJSON()                  │  │
 │  │  7. json.NewEncoder(w).Encode(...)                │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────┬───────────────────────────────┘
+│  └───────────────────────────────────────────┘  │
+└─────────────────────┬──────────────────────────┘
                           │
                           ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  User Browser                                           │
 │  JSON response with: generated_at, total_queries,       │
 │  blocked_queries, cache_stats, ...                      │
-└─────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────┘
 ```
 
 **Fix #1 (v1.0.0)**:
@@ -307,17 +337,17 @@ scripts/fetch_dns_binaries.sh
 ### 3.6 Login Flow (v1.0.0 — Fix NEW-1)
 
 ```text
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  User Browser                                           │
 │  POST /api/auth/login                                   │
 │  Content-Type: application/json                         │
 │  Body: {"username": "admin", "password": "..."}         │
-└────────────────────────┬────────────────────────────────┘
+└────────────────────┬───────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  main.go — handleAPI                                    │
-│  ┌───────────────────────────────────────────────────┐  │
+│  ┌───────────────────────────────────────────┐  │
 │  │  if hasEndpoint(r.URL.Path, "auth/login") {       │  │
 │  │      if r.Method != http.MethodPost {             │  │
 │  │          w.Header().Set("Allow", "POST")          │  │
@@ -326,51 +356,51 @@ scripts/fetch_dns_binaries.sh
 │  │      }                                            │  │
 │  │      handleLogin(w, r)                            │  │
 │  │  }                                                │  │
-│  └───────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────┘
+│  └───────────────────────────────────────────┘  │
+└────────────────────┬───────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  handleLogin()                                          │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  1. ip := getClientIP(r)  ← IPv6-safe             │  │
-│  │  2. if isLockedOut(ip) → 429                      │  │
+│  ┌───────────────────────────────────────────┐  │
+│  │  1. ip := getClientIP(r)  ← IPv6-safe            │  │
+│  │  2. if isLockedOut(ip) → 429                     │  │
 │  │  3. read credentials (POST body)                  │  │
 │  │  4. subtle.ConstantTimeCompare                    │  │
-│  │  5. if fail → recordLoginAttempt(ip, false)       │  │
-│  │  6. if success → createSession + Set-Cookie       │  │
+│  │  5. if fail → recordLoginAttempt(ip, false)      │  │
+│  │  6. if success → createSession + Set-Cookie      │  │
 │  │     (no token in response — cookie-only)          │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+│  └───────────────────────────────────────────┘  │
+└────────────────────────────────────────────────┘
 ```
 
 ### 3.7 Rebuild Blocklist Concurrency (RACE-1)
 
 ```text
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  Thread 1 (updateProfile — in goroutine)                │
-│  ┌───────────────────────────────────────────────────┐  │
+│  ┌───────────────────────────────────────────┐  │
 │  │  os.Rename(tempFile, RAW_BLOCKLIST_FILE)          │  │
-│  │  rebuildBlocklist()                                │  │
-│  │    ├── rebuildMu.Lock()                           │  │
-│  │    ├── ... (I/O)                                   │  │
-│  │    └── defer rebuildMu.Unlock()                   │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+│  │  rebuildBlocklist()                               │  │
+│  │    ├── rebuildMu.Lock()                          │  │
+│  │    ├── ... (I/O)                                 │  │
+│  │    └── defer rebuildMu.Unlock()                  │  │
+│  └───────────────────────────────────────────┘  │
+└────────────────────────────────────────────────┘
                     ⚡ ⚡ ⚡
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  Thread 2 (atomicSaveRulesInternal — HTTP handler)      │
-│  ┌───────────────────────────────────────────────────┐  │
+│  ┌───────────────────────────────────────────┐  │
 │  │  rulesStateMu.Lock()                              │  │
 │  │  atomicWriteFile(ALLOWLIST_FILE, ...)             │  │
-│  │  rebuildBlocklist()                                │  │
-│  │    ├── rebuildMu.Lock()  ← waits for Thread 1     │  │
-│  │    ├── ... (I/O)                                   │  │
+│  │  rebuildBlocklist()                               │  │
+│  │    ├── rebuildMu.Lock()  ← waits for Thread 1    │  │
+│  │    ├── ... (I/O)                                  │  │
 │  │    └── defer rebuildMu.Unlock()                   │  │
 │  │  currentRules = rulesStateSnapshot{...}           │  │
 │  │  rulesStateMu.Unlock()                            │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
+│  └───────────────────────────────────────────┘  │
+└────────────────────────────────────────────────┘
 ```
 
 Result: `BLOCKLIST` is always consistent (no race conditions).
@@ -378,53 +408,118 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 ### 3.8 Dynamic Ports (PORT-2)
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Startup (main.go)                                      │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  serverPort = getWebUIPort()      ← from webui.conf│ │
-│  │  dashboardPort = getDashboardPort()← from webui.conf│ │
-│  │  if serverPort == dashboardPort → FATAL           │  │
-│  │  if serverPort == "8080" → FATAL                  │  │
-│  │  if dashboardPort == "8080" → FATAL               │  │
-│  └───────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────┘
-                    │
-                    │ GET /api/runtime_info
-                    ▼
-┌─────────────────────────────────────────────────────────┐
-│  buildRuntimeInfo()                                     │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  {                                                │  │
-│  │    "version": "...",                              │  │
-│  │    "webui_port": "9090",                          │  │
-│  │    "dashboard_port": "9091",                      │  │
-│  │    "bind_addr": "127.0.0.1",                      │  │
-│  │    ...                                            │  │
-│  │  }                                                │  │
-│  └───────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Startup (main.go)                                           │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  serverPort = getWebUIPort()      ← from webui.conf  │   │
+│  │  dashboardPort = getDashboardPort()← from webui.conf │   │
+│  │  if serverPort == dashboardPort → FATAL              │   │
+│  │  if serverPort == MONITORING_UI_PORT → FATAL         │   │
+│  │  if dashboardPort == MONITORING_UI_PORT → FATAL      │   │
+│  └───────────────────────────────────────────────┘  │
+└──────────────────┬──────────────────────────────────┘
+                       │
+                       │ GET /api/runtime_info
+                       ▼
+┌──────────────────────────────────────────────────┐
+│  buildRuntimeInfo()                                       │
+│  ┌────────────────────────────────────────────┐  │
+│  │  {                                                 │  │
+│  │    "version": "...",                               │  │
+│  │    "webui_port": "9090",                           │  │
+│  │    "dashboard_port": "9091",                       │  │
+│  │    "bind_addr": "127.0.0.1",                       │  │
+│  │    "profile_key": "pro",       ← v1.1.0 (MEM-1)   │  │
+│  │    "memory_limit_mb": 120,     ← v1.1.0 (MEM-1)   │  │
+│  │    ...                                             │  │
+│  │  }                                                 │  │
+│  └────────────────────────────────────────────┘  │
+└────────────────────┬─────────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  Frontend (index.html / dashboard.html)                 │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │  if (data.webui_port) PORTS.webui = ...           │  │
-│  │  if (data.dashboard_port) {                       │  │
-│  │      PORTS.dashboard = ...                        │  │
-│  │      updateDashboardLink()                        │  │
-│  │  }                                                │  │
-│  └───────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  Frontend (index.html / dashboard.html)                  │
+│  ┌────────────────────────────────────────────┐  │
+│  │  if (data.webui_port) PORTS.webui = ...            │  │
+│  │  if (data.dashboard_port) {                        │  │
+│  │      PORTS.dashboard = ...                         │  │
+│  │      updateDashboardLink()                         │  │
+│  │  }                                                 │  │
+│  │  // v1.1.0: also display profile + memory limit    │  │
+│  │  riItem("riProfile", data.profile_key)             │  │
+│  │  riItem("riMemoryLimit", data.memory_limit_mb)     │  │
+│  └────────────────────────────────────────────┘  │
+└────────────────────┬────────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  Links work with custom ports                           │
-│  • Dashboard link in index.html                        │
-│  • "Back to WebUI" link in dashboard.html              │
-│  • LAN access (window.location.hostname)               │
+│  • Dashboard link in index.html                         │
+│  • "Back to WebUI" link in dashboard.html               │
+│  • LAN access (window.location.hostname)                │
 │  • IPv6 support ([::1])                                 │
-└─────────────────────────────────────────────────────────┘
+│  • System Info panel shows profile + memory limit       │
+└────────────────────────────────────────────────┘
 ```
+
+### 3.9 Memory Limit Flow (v1.1.0 — MEM-1)
+
+```text
+┌──────────────────────────────────────────────────┐
+│  Startup (main.go)                                        │
+│  ┌─────────────────────────────────────────────┐  │
+│  │  initialProfile := readSelectedProfile()            │  │
+│  │  applyMemoryLimit(initialProfile)                   │  │
+│  │     ↓                                               │  │
+│  │  limit := memoryLimitForProfile(profile)            │  │
+│  │     light=80, normal=100, pro=120,                  │  │
+│  │     proplus=160, ultimate=220 (MB)                  │  │
+│  │     ↓                                               │  │
+│  │  debug.SetMemoryLimit(limit)                        │  │
+│  │  (Go runtime: SOFT limit → GC pressure, not OOM)   │  │
+│  └─────────────────────────────────────────────┘  │
+└───────────────────┬──────────────────────────────┘
+                       │
+                       │ user changes profile
+                       ▼
+┌──────────────────────────────────────────────────┐
+│  POST /api/update_profile?profile=ultimate                │
+│  ┌────────────────────────────────────────────┐  │
+│  │  updateProfile("ultimate")                         │  │
+│  │    ├── download + validate                        │  │
+│  │    ├── rebuildBlocklist (with rebuildMu)          │  │
+│  │    ├── atomicWriteFile(SELECTED_FILE, "ultimate") │  │
+│  │    └── applyMemoryLimit("ultimate")   ← v1.1.0   │  │
+│  │           ↓                                        │  │
+│  │         debug.SetMemoryLimit(220 MB)               │  │
+│  │         log: "memory limit adjusted: 120 → 220"   │  │
+│  └────────────────────────────────────────────┘  │
+└───────────────────┬──────────────────────────────┘
+                       │
+                       │ Shell scripts need the hint
+                       ▼
+┌─────────────────────────────────────────────────┐
+│  functions.sh                                           │
+│  ┌───────────────────────────────────────────┐  │
+│  │  get_profile_memory_hint()                        │  │
+│  │    → "120 MB (pro)"  /  "220 MB (ultimate)"      │  │
+│  │                                                   │  │
+│  │  Read-only. Does not call SetMemoryLimit.         │  │
+│  │  Used by service.sh / action.sh / status.sh       │  │
+│  │  for user-facing display (System Info, logs).     │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
+```
+
+**Key invariants**:
+
+| Invariant | Where enforced |
+|---|---|
+| `debug.SetMemoryLimit` is called only from `main.go` | Go runtime |
+| The limit is a **soft** limit (no OOM on breach) | Go runtime design |
+| The limit is recomputed at startup + on every profile change | `main()` + `updateProfile()` |
+| Shell scripts only **read** the hint, never set the limit | `get_profile_memory_hint()` |
+| `runtime_info` exposes the effective limit for observability | `buildRuntimeInfo()` |
 
 ---
 
@@ -449,7 +544,7 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 | `[35]` | metricsProxyHandler |
 | `[36]` | main() |
 
-**Size**: ~3550 lines.
+**Size**: ~3600 lines (v1.1.0).
 
 ### 4.2 API Endpoints
 
@@ -464,55 +559,54 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 | POST | `/api/toggle_service` | Toggle on/off | Yes | 60 s |
 | POST | `/api/restart_service` | Restart | Yes | 60 s |
 | POST | `/api/ensure_running_service` | Ensure DNS running | Partial | 60 s |
-| **POST** | **`/api/auth/login`** | **Login (POST-only)** | No | 15 s |
-| **POST** | **`/api/auth/logout`** | **Logout (POST-only)** | Yes | 15 s |
-| GET | `/api/runtime_info` | Runtime info + ports | Yes | 15 s |
+| POST | `/api/auth/login` | Login (POST-only) | No | 15 s |
+| POST | `/api/auth/logout` | Logout (POST-only) | Yes | 15 s |
+| GET | `/api/runtime_info` | Runtime info + ports + profile + memory | Yes | 15 s |
 | GET | `/api/download_log` | Download log file | Yes | 15 s |
 | GET | `/api/metrics` | Prometheus → JSON | Yes | 15 s |
 | GET | `/events` | SSE stream | Yes | ∞ (30 s per flush) |
 
-**v1.0.0 notes**:
-- `/api/auth/login` and `/api/auth/logout`: **POST only** (405 otherwise).
-- `/readyz`: **localhost-only** (403 for external requests).
-- All POST endpoints use `hasEndpoint()` (exact match).
-- `runtime_info` returns `webui_port` + `dashboard_port` (PORT-2).
+**v1.1.0 notes**:
+- `runtime_info` returns two additional fields: `profile_key` and `memory_limit_mb`.
+- `metricsProxyHandler` uses the `MONITORING_UI_PORT` constant, not the hardcoded string `"8080"`.
 
 ### 4.3 Concurrency Model
 
 | Resource | Protection | Notes |
 |---|---|---|
 | `currentRules` | `sync.RWMutex` (`rulesStateMu`) | Atomic rules state |
-| **`rebuildMu`** | **`sync.Mutex`** | **Serializes rebuildBlocklist (RACE-1)** |
+| `rebuildMu` | `sync.Mutex` | Serializes rebuildBlocklist (RACE-1) |
 | `sessions` | `sync.RWMutex` (`sessionsMu`) | Session map |
-| `loginAttempts` | `sync.Mutex` | Rate limiting (login + **Basic Auth**) |
-| **`authCacheMu`** | **`sync.RWMutex`** | **Auth cache 60 s (NEW-6)** |
+| `loginAttempts` | `sync.Mutex` | Rate limiting (login + Basic Auth) |
+| `authCacheMu` | `sync.RWMutex` | Auth cache 60 s (NEW-6) |
 | `serviceMutex` | `sync.Mutex` (`TryLock`) | Service lifecycle |
 | `cachedStatus` | `sync.Mutex` | Status cache |
 | `cachedCount` | `sync.Mutex` | Entries count cache |
 | `sseClients` | `sync.Mutex` | SSE clients map |
 | `downloadClient` | `sync.Mutex` | HTTP client cache |
 | `runDirUsable` | `sync.Mutex` | Cache 30 s |
-| **`portCacheMap`** | **`sync.Mutex`** | **Per-port cache (Fix #11)** |
-| **`systemShell`** | **`sync.Once`** | **Platform detection (Fix #2)** |
+| `portCacheMap` | `sync.Mutex` | Per-port cache (Fix #11) |
+| `systemShell` | `sync.Once` | Platform detection (Fix #2) |
+| **`memLimitMu`** | **`sync.Mutex`** | **Memory limit state (v1.1.0 — MEM-1)** |
 
 ### 4.4 SSE Implementation
 
 #### 4.4.1 Diagram
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  broadcastEvent(event, data)                             │
+┌──────────────────────────────────────────────────┐
+│  broadcastEvent(event, data)                              │
 │    ├── sseMutex.Lock()                                   │
 │    ├── for each client channel:                          │
 │    │   ├── select { case ch <- msg: default: }           │
 │    │   └── (non-blocking)                                │
 │    └── sseMutex.Unlock()                                 │
-└──────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
 │
 │ (client channels)
 ▼
-┌──────────────────────────────────────────────────────────┐
-│  sseHandler(w, r)  [per-client goroutine]                │
+┌──────────────────────────────────────────────────┐
+│  sseHandler(w, r)  [per-client goroutine]                 │
 │    ├── rc := http.NewResponseController(w)               │
 │    ├── ch := make(chan string, 100)  ← Buffered          │
 │    ├── loop:                                             │
@@ -521,7 +615,7 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 │    │   │     rc.SetWriteDeadline(now + 30 s)  ← Deadline │
 │    │   │     fmt.Fprint(w, msg)                          │
 │    │   │     if err := flusher.Flush(); err != nil {     │
-│    │   │       return  ← releases goroutine              │
+│    │   │       return  ← releases goroutine             │
 │    │   │     }                                           │
 │    │   │   case <-ticker.C:                              │
 │    │   │     rc.SetWriteDeadline(now + 30 s)             │
@@ -532,7 +626,7 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 │    │   │ }                                               │
 │    │   └── }                                             │
 │    └── }                                                 │
-└──────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────┘
 ```
 
 #### 4.4.2 Why Write Deadline?
@@ -578,19 +672,21 @@ if err := flusher.Flush(); err != nil {
 - Constant-time comparison (`subtle.ConstantTimeCompare`)
 - `MaxBytesReader` (5 MB limit on POST)
 - Session GC (every 30 min)
-- Rate limiting (5 attempts / 15 min) — **includes Basic Auth**
+- Rate limiting (5 attempts / 15 min) — includes Basic Auth
 - Atomic writes (`atomicWriteStream` + `fsync`)
 - BIND_ADDR check (refuses 0.0.0.0 without credentials)
 - Secure cookies (conditional — localhost only)
 - SameSite=Lax (PWA-friendly CSRF protection)
 - SSE Write Deadline (30 s — DoS protection)
-- **Exact endpoint matching** (`hasEndpoint`)
-- **Login POST-only** (CSRF protection)
-- **`/readyz` localhost-only** (info leak prevention)
-- **`shellQuote()`** (shell injection protection)
-- **`readConfPort` range check** (1-65535)
-- **Auth cache 60 s** (I/O reduction)
-- **`rebuildMu` mutex** (RACE-1: BLOCKLIST consistency)
+- Exact endpoint matching (`hasEndpoint`)
+- Login POST-only (CSRF protection)
+- `/readyz` localhost-only (info leak prevention)
+- `shellQuote()` (shell injection protection) — **extended in v1.1.0**
+- `readConfPort` range check (1-65535)
+- Auth cache 60 s (I/O reduction)
+- `rebuildMu` mutex (RACE-1: BLOCKLIST consistency)
+- **v1.1.0 — MEM-1**: Dynamic per-profile memory limit (prevents GC thrashing)
+- **v1.1.0 — MEM-3**: `MONITORING_UI_PORT` constant in `metricsProxyHandler` (single source of truth)
 
 ### 4.6 Backend Fixes — §4.6.x
 
@@ -625,15 +721,15 @@ func getStatusUncached() string {
 **Contract:**
 
 ```text
-┌──────────────────────────────────────────────────┐
+┌───────────────────────────────────────────┐
 │  STATUS_FILE = "user intent"                     │
 │                                                  │
-│  ON  → user wants the service running            │
-│  OFF → user stopped it manually                  │
+│  ON  → user wants the service running           │
+│  OFF → user stopped it manually                 │
 │                                                  │
 │  Writers:  startService() / stopService() only   │
 │  Readers:  getStatus, Watchdog, status.sh        │
-└──────────────────────────────────────────────────┘
+└───────────────────────────────────────────┘
 ```
 
 #### 4.6.2 Fix B — Metrics Proxy Path
@@ -645,7 +741,7 @@ http://127.0.0.1:8080/api/metrics   // ← always 404
 http://127.0.0.1:8080/api/metrics   // ← correct in dnscrypt-proxy 2.1.18
 ```
 
-Note: the endpoint was later corrected to `/api/metrics` for JSON, and Prometheus text is used only as fallback.
+Note: the endpoint was later corrected to `/api/metrics` for JSON, and Prometheus text is used only as fallback. In v1.1.0, the URL is built from `MONITORING_UI_PORT`.
 
 #### 4.6.3 Fix C — IPv6 Client IP
 
@@ -1236,6 +1332,160 @@ done
 rm -rf "$BACKUP_TMP"
 ```
 
+### 4.9 v1.1.0 Backend Additions
+
+v1.1.0 introduces three runtime improvements in `main.go`.
+They are documented here (rather than as audit corrections)
+because they close edge cases rather than fix known
+exploitable vulnerabilities.
+
+#### 4.9.1 MEM-1 — Dynamic Memory Limit per Profile
+
+**Before**:
+
+```go
+// main() — top of function
+debug.SetMemoryLimit(80 * 1024 * 1024)  // ← hardcoded
+```
+
+**Problem**:
+- On the `ultimate` profile, actual working set approaches or
+  exceeds 200 MB during `rebuildBlocklist` and under concurrent
+  load.
+- With an 80 MB soft limit, the Go runtime runs GC continuously
+  ("GC thrashing"). On low-RAM devices, this manifested as an
+  application freeze.
+
+**After**:
+
+```go
+const (
+    MEMORY_LIMIT_LIGHT     = 80 * 1024 * 1024
+    MEMORY_LIMIT_NORMAL    = 100 * 1024 * 1024
+    MEMORY_LIMIT_PRO       = 120 * 1024 * 1024
+    MEMORY_LIMIT_PROPLUS   = 160 * 1024 * 1024
+    MEMORY_LIMIT_ULTIMATE  = 220 * 1024 * 1024
+    MEMORY_LIMIT_DEFAULT   = 80 * 1024 * 1024
+)
+
+var (
+    memLimitMu      sync.Mutex
+    currentMemLimit int64 = MEMORY_LIMIT_DEFAULT
+    currentProfile  string = "pro"
+)
+
+func readSelectedProfile() string {
+    data, err := os.ReadFile(SELECTED_FILE)
+    if err != nil {
+        return "pro"
+    }
+    key := strings.TrimSpace(string(data))
+    if _, ok := profiles[key]; !ok {
+        return "pro"
+    }
+    return key
+}
+
+func memoryLimitForProfile(key string) int64 {
+    switch strings.ToLower(strings.TrimSpace(key)) {
+    case "light":    return MEMORY_LIMIT_LIGHT
+    case "normal":   return MEMORY_LIMIT_NORMAL
+    case "pro":      return MEMORY_LIMIT_PRO
+    case "proplus":  return MEMORY_LIMIT_PROPLUS
+    case "ultimate": return MEMORY_LIMIT_ULTIMATE
+    default:         return MEMORY_LIMIT_DEFAULT
+    }
+}
+
+func applyMemoryLimit(key string) {
+    memLimitMu.Lock()
+    defer memLimitMu.Unlock()
+
+    limit := memoryLimitForProfile(key)
+    if limit == currentMemLimit && key == currentProfile {
+        return
+    }
+
+    old := debug.SetMemoryLimit(limit)
+    currentMemLimit = limit
+    currentProfile = key
+
+    logWithLevel("info", fmt.Sprintf(
+        "memory limit adjusted: %d MB → %d MB (profile=%s, previous runtime value=%d MB)",
+        old/(1024*1024), limit/(1024*1024), key, old/(1024*1024)))
+}
+```
+
+**Called from**:
+- `main()` at startup (after `initPaths()`, before server startup).
+- `updateProfile()` after `atomicWriteFile(SELECTED_FILE)`.
+
+**Exposed via**:
+- `runtime_info.memory_limit_mb` (integer MB).
+- `runtime_info.profile_key` (string).
+- Startup log line and shell-level `get_profile_memory_hint()`.
+
+**Key properties**:
+
+| Property | Value |
+|---|---|
+| Type | Soft limit (Go runtime) |
+| Enforced by | `debug.SetMemoryLimit` |
+| Re-applied on | Startup + every profile change |
+| Shell access | Read-only hint (`get_profile_memory_hint`) |
+| Observability | `runtime_info`, startup log, System Info panel |
+
+#### 4.9.2 MEM-2 — Extended `shellQuote` Character Set
+
+**Before (v1.0.0)**:
+20 characters: `` ` ``, `"`, `'`, `$`, `` ` ``, `\`, `!`, `&`, `|`, `;`,
+`(`, `)`, `<`, `>`, `*`, `?`, `[`, `]`, `#`, `~`.
+
+**After (v1.1.0)**:
+24 characters — adds `{`, `}`, `\n`, `\t`.
+
+```go
+func shellQuote(s string) string {
+    for _, r := range s {
+        if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
+            r == '\\' || r == '!' || r == '&' || r == '|' || r == ';' ||
+            r == '(' || r == ')' || r == '<' || r == '>' || r == '*' ||
+            r == '?' || r == '[' || r == ']' || r == '#' || r == '~' ||
+            r == '{' || r == '}' || r == '\n' || r == '\t' {
+            return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+        }
+    }
+    return s
+}
+```
+
+**Rationale**:
+- `{`, `}` — brace expansion in shells.
+- `\n`, `\t` — word-splitting separators in embedded strings.
+- Defense in depth; no known exploitable path existed.
+
+#### 4.9.3 MEM-3 — `MONITORING_UI_PORT` in Metrics Handler
+
+**Before**:
+
+```go
+req, err := http.NewRequestWithContext(r.Context(), "GET",
+    "http://127.0.0.1:8080/api/metrics", nil)
+//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ hardcoded
+```
+
+**After**:
+
+```go
+monitoringURL := "http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+req, err := http.NewRequestWithContext(r.Context(), "GET", monitoringURL, nil)
+```
+
+**Rationale**:
+- Single source of truth for the reserved port.
+- Reduces the list of files to audit if the reserved port ever changes.
+- Matches the same pattern already used in `getWebUIPort()` and `getDashboardPort()`.
+
 ---
 
 ## 5. Shell Scripts
@@ -1274,6 +1524,7 @@ service.sh
   ├── wait for boot
   ├── wait for network
   ├── read webui.conf (with Port Guard)
+  ├── log active profile + memory hint (v1.1.0)
   ├── start WebUI
   └── start Watchdog (standalone)
 ```
@@ -1336,11 +1587,11 @@ watchdog.sh (real PID)
         │                                    ▼
         │                              [saving...]
         │                                    │
-        │                           ┌────────┴────────┐
-        │                           │                 │
+        │                           ┌───────┴──────┐
+        │                           │                │
         │                         [ok]            [error]
-        │                           │                 │
-        │                           ▼                 ▼
+        │                           │                │
+        │                           ▼               ▼
         └────────────────────── VIEW ◄──── ROLLBACK
 ```
 
@@ -1356,35 +1607,36 @@ watchdog.sh (real PID)
 - **iOS Support**: `apple-touch-icon.png`
 - **Dynamic Ports**: links updated from `runtime_info`
 - **LAN Support**: `window.location.hostname` instead of `127.0.0.1`
+- **v1.1.0**: System Info panel shows `profile_key` + `memory_limit_mb`
 
 ### 6.4 Dual-Origin Limitation
 
 ```text
-┌──────────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │  Architectural problem:                                  │
 │                                                          │
-│  • WebUI :9090  ← separate origin                        │
-│  • Dashboard :9091 ← separate origin                     │
+│  • WebUI :9090  ← separate origin                       │
+│  • Dashboard :9091 ← separate origin                    │
 │                                                          │
 │  Service Worker is limited to a single origin.           │
-└──────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────────┐
-│  Practical impact:                                        │
+┌─────────────────────────────────────────────────┐
+│  Practical impact:                                       │
 │                                                          │
-│  • PWA installed from 9090 → offline for WebUI only      │
-│  • PWA installed from 9091 → offline for Dashboard only  │
+│  • PWA installed from 9090 → offline for WebUI only     │
+│  • PWA installed from 9091 → offline for Dashboard only │
 │  • Both = assets stored twice                            │
-└──────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────────┐
-│  Future solution (v1.1.0):                                │
-│                                                          │
-│  Unify on a single port (Option A):                      │
-│  • Dashboard served from the same 9090 at /dashboard     │
+┌──────────────────────────────────────────────────┐
+│  Future solution (v1.2.x):                                │
+│                                                           │
+│  Unify on a single port (Option A):                       │
+│  • Dashboard served from the same 9090 at /dashboard      │
 │  • Single origin → single SW → offline for both          │
-│  • refactor main.go (mux routing)                        │
-└──────────────────────────────────────────────────────────┘
+│  • refactor main.go (mux routing)                         │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1405,8 +1657,10 @@ watchdog.sh (real PID)
 | DNS version | `proxy/dnscrypt-proxy.version` | ✓ | manual |
 | `portCacheMap` | memory | lost on restart | `isPortOpenCached` |
 | `systemShell` | memory (sync.Once) | lost on restart | `getSystemShell` |
-| **`authCache`** | **memory** | **lost on restart** | **`getMonitoringAuth`** |
-| **`rebuildMu`** | **memory** | **lost on restart** | **`rebuildBlocklist`** |
+| `authCache` | memory | lost on restart | `getMonitoringAuth` |
+| `rebuildMu` | memory | lost on restart | `rebuildBlocklist` |
+| **`currentMemLimit`** | **memory** | **recomputed at startup** | **`applyMemoryLimit` (v1.1.0)** |
+| **`currentProfile`** | **memory** | **recomputed at startup** | **`applyMemoryLimit` (v1.1.0)** |
 
 ### 7.2 Client-side State
 
@@ -1418,67 +1672,67 @@ watchdog.sh (real PID)
 | Show idle | localStorage | persistent |
 | Server hashes | memory | page lifetime |
 | `currentStatus` | memory | page lifetime |
-| **`PORTS`** | **memory** | **page lifetime (updated from runtime_info)** |
+| `PORTS` | memory | page lifetime (updated from runtime_info) |
 
 ### 7.3 Conflict Detection
 
 ```text
 Client                          Server
-  │                              │
+  │                               │
   ├── save(content, hash_A) ────►│
-  │                              │
-  │                              ├── if hash_A ≠ current_hash:
-  │                              │      return 409 conflict
-  │◄──── 200 {hash: B} ──────────┤
-  │                              │
+  │                               │
+  │                               ├── if hash_A ≠ current_hash:
+  │                               │      return 409 conflict
+  │◄──── 200 {hash: B} ────────┤
+  │                               │
   ├── next save: hash_B          │
 ```
 
 ### 7.4 State Machine — STATUS_FILE
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                                                         │
-│  User Intent (STATUS_FILE)      Actual State (probe)   │
-│  ────────────────────────       ─────────────────────  │
-│                                                         │
-│  START                              ┌─── ON ────┐       │
-│    │                                │           │       │
-│    ├─► startService() ──► [ON] ────►│           │       │
-│    │                          ▲     │           │       │
-│    │                     Watchdog   │           │       │
-│    │                     restarts   │           │       │
-│    │                     on crash   │           │       │
-│    │                          │     │           │       │
-│    │                     [ON] ──────│           │       │
-│    │                          [crash]│           │       │
-│    │                          [OFF]─┘           │       │
-│    │                                            │       │
-│    └─► stopService() ──► [OFF]                 │       │
-│                                                │       │
-│  User stops ──────────────────────────► [OFF]──┘       │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│                                                            │
+│  User Intent (STATUS_FILE)      Actual State (probe)       │
+│  ─────────────────────       ────────────────────   │
+│                                                            │
+│  START                                ┌─── ON ────┐       │
+│    │                                  │            │       │
+│    ├─► startService() ──► [ON] ────►│            │       │
+│    │                          ▲      │            │       │
+│    │                     Watchdog     │            │       │
+│    │                     restarts     │            │       │
+│    │                     on crash     │            │       │
+│    │                          │       │            │       │
+│    │                     [ON]─┴──────│            │       │
+│    │                          [crash] │            │       │
+│    │                            [OFF]─┘            │       │
+│    │                                               │       │
+│    └─► stopService() ──► [OFF]                    │       │
+│                                                    │       │
+│  User stops ────────────────────► [OFF]───────┘       │
+│                                                            │
+└───────────────────────────────────────────────────┘
 ```
 
 ### 7.5 User Intent vs Actual State
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│  STATUS_FILE (User Intent)                             │
-│  ─────────────────────────                             │
-│  • written only by startService() / stopService()      │
-│  • NOT written by getStatusUncached (read-only)        │
-│  • Watchdog depends on it                              │
-└────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│  STATUS_FILE (User Intent)                            │
+│  ─────────────────────────                       │
+│  • written only by startService() / stopService()     │
+│  • NOT written by getStatusUncached (read-only)       │
+│  • Watchdog depends on it                             │
+└───────────────────────────────────────────────┘
                         ↕
-┌────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────┐
 │  Actual State (probe)                                  │
-│  ─────────────────────                                 │
+│  ─────────────────────                             │
 │  • isProcessRunning() + isPortOpenCached(5354)         │
-│  • read from getStatusUncached()                        │
-│  • used in getStatus()                                  │
-└────────────────────────────────────────────────────────┘
+│  • read from getStatusUncached()                       │
+│  • used in getStatus()                                 │
+└────────────────────────────────────────────────┘
 ```
 
 **Difference**:
@@ -1545,7 +1799,7 @@ Client                          Server
 
 ```text
 dnscrypt-proxy-webui/
-├── VERSION                        # module version (v1.0.0)
+├── VERSION                        # module version (v1.1.0)
 ├── module.prop
 ├── update.json
 ├── README.md
@@ -1573,6 +1827,8 @@ dnscrypt-proxy-webui/
 │   ├── CODEOWNERS
 │   ├── dependabot.yml
 │   ├── PULL_REQUEST_TEMPLATE.md
+│   ├── PULL_REQUEST_TEMPLATE/
+│   │   └── release.md
 │   └── SECURITY.md
 │
 ├── .devcontainer/
@@ -1582,7 +1838,9 @@ dnscrypt-proxy-webui/
 ├── scripts/
 │   ├── fetch_dns_binaries.sh
 │   ├── generate-icons.sh
-│   └── package_module.sh
+│   ├── package_module.sh
+│   ├── release.sh
+│   └── release-patch.sh
 │
 ├── proxy/
 │   ├── action.sh
@@ -1615,9 +1873,10 @@ dnscrypt-proxy-webui/
 │   ├── offline.html
 │   └── sw.js
 │
-└── docs/                          # 14 documentation files
+└── docs/                          # 23 documentation files
     ├── API.md
     ├── ARCHITECTURE.md
+    ├── BRANCHING.md
     ├── COMPATIBILITY.md
     ├── CONTRIBUTING.md
     ├── DEVELOPMENT.md
@@ -1626,10 +1885,19 @@ dnscrypt-proxy-webui/
     ├── GLOSSARY.md
     ├── HALL_OF_FAME.md
     ├── INSTALL.md
+    ├── RELEASE_PROCESS.md
     ├── ROADMAP.md
     ├── SECURITY.md
     ├── TROUBLESHOOTING.md
-    └── UPGRADE.md
+    ├── UPGRADE.md
+    └── adr/
+        ├── README.md
+        ├── 0001-two-branch-model.md
+        ├── 0002-automated-releases.md
+        ├── 0003-post-release-sync.md
+        ├── 0004-unified-pr-template.md          (superseded)
+        ├── 0005-release-specific-pr-template.md
+        └── 0006-rename-hotfix-to-release-patch.md
 ```
 
 ### 8.3 Runtime Files (System)
@@ -1644,7 +1912,6 @@ dnscrypt-proxy-webui/
 ├── dnscrypt-proxy.log             # DNSCrypt log
 ├── dnscrypt_credentials.txt       # credentials
 ├── dnscrypt_install.log           # install log
-└── dnscrypt_backup_uninstall/     # uninstall backup
 
 ~/.cache/dnscrypt-proxy-webui/
 └── dns-binaries/
@@ -1738,22 +2005,24 @@ Watchdog → POST ensure_running
 ### 9.4 State-integrity Guarantee
 
 ```text
-┌─────────────────────────────────────────────────────────┐
+┌─────────────────────────────────────────────────┐
 │  Guarantee:                                              │
-│  ─────────                                               │
-│  • STATUS_FILE is never written from a read-only fn.    │
-│  • Watchdog restarts after crash (reliably).            │
-│  • Watchdog respects user stop.                         │
-│  • Firewall state always matches STATUS_FILE.           │
-│  • BLOCKLIST always consistent (after RACE-1).          │
+│  ─────────                                             │
+│  • STATUS_FILE is never written from a read-only fn.     │
+│  • Watchdog restarts after crash (reliably).             │
+│  • Watchdog respects user stop.                          │
+│  • Firewall state always matches STATUS_FILE.            │
+│  • BLOCKLIST always consistent (after RACE-1).           │
+│  • Memory limit always matches active profile (v1.1.0).  │
 │                                                          │
 │  Implementation:                                         │
-│  ───────────────                                         │
-│  • main.go: getStatusUncached read-only                 │
-│  • main.go: rebuildBlocklist protected by rebuildMu     │
-│  • service.sh: STATUS_FILE = OFF only on disable        │
-│  • watchdog.sh: read-only                               │
-└─────────────────────────────────────────────────────────┘
+│  ───────────────                                      │
+│  • main.go: getStatusUncached read-only                  │
+│  • main.go: rebuildBlocklist protected by rebuildMu      │
+│  • main.go: applyMemoryLimit called on startup + change  │
+│  • service.sh: STATUS_FILE = OFF only on disable         │
+│  • watchdog.sh: read-only                                │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1768,7 +2037,24 @@ Watchdog → POST ensure_running
 | `rebuildBlocklist` (500K lines) | +2 MB peak |
 | Download (50 MB) | +2 MB peak |
 | SSE per connection | ~4 KB + 30 s max |
-| Total limit (Go) | 80 MB |
+
+**v1.1.0 — Dynamic soft limit per profile**:
+
+| Profile | Soft limit | Typical use case |
+|---|---:|---|
+| light | 80 MB | 1 GB RAM devices, minimal blocking |
+| normal | 100 MB | 2 GB RAM devices |
+| pro | 120 MB | 3 GB RAM devices (default) |
+| proplus | 160 MB | 4 GB RAM devices |
+| ultimate | 220 MB | 6 GB+ RAM devices, max blocking |
+
+**Soft limit semantics**:
+- `debug.SetMemoryLimit` is a **soft** limit.
+- The Go runtime does not OOM when the limit is breached — it
+  runs GC more aggressively instead.
+- Setting the limit too low → GC overhead (CPU waste).
+- Setting it too high → RAM waste.
+- Hence the per-profile values.
 
 ### 10.2 CPU Profile
 
@@ -1787,6 +2073,7 @@ Watchdog → POST ensure_running
 | `hasEndpoint` (exact match) | <100 ns |
 | `getSystemShell` (cached) | <10 ns |
 | `getMonitoringAuth` (cached) | ~50 ns |
+| **`applyMemoryLimit` (v1.1.0)** | **~10 ns** (mutex + compare, no syscall in the common case) |
 | `rebuildBlocklist` (with rebuildMu) | same values (no overhead) |
 
 ### 10.3 Disk I/O
@@ -2047,6 +2334,65 @@ Note: time is dominated by the network call to monitoring_ui.
 | Cache with inotify | complex, unreliable on Android |
 | **Cache 60 s** | ✅ good balance |
 
+### 11.22 v1.1.0 — Dynamic vs Static Memory Limit
+
+**Decision**: dynamic, per-profile soft limit
+(`MEMORY_LIMIT_*` constants + `memoryLimitForProfile()`).
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Keep 80 MB hardcoded | `ultimate` profile triggers GC thrashing → looks like a freeze on low-RAM devices |
+| Set 220 MB hardcoded for all | wastes memory on light/normal/pro profiles; no benefit on small devices |
+| Env var only | not persisted; not visible to the WebUI; no compile-time check |
+| Compute per request | unnecessary; profile changes are rare; extra mutex traffic |
+| External config file | adds parsing complexity; no gain over the constant table |
+| **Per-profile constants + re-apply on change** | ✅ simple, observable, no new deps |
+
+**Chosen limits (MB)**:
+
+| Profile | Limit | Reason |
+|---|---:|---|
+| light | 80 | 1 GB devices — bound cache and pipeline |
+| normal | 100 | 2 GB devices |
+| pro | 120 | 3 GB devices — good default |
+| proplus | 160 | 4 GB devices |
+| ultimate | 220 | 6 GB+ devices — heavy workload |
+
+**Observability**:
+- `runtime_info.memory_limit_mb` — effective limit.
+- `runtime_info.profile_key` — active profile.
+- Startup log line — computed limit.
+- Shell hint — `get_profile_memory_hint()`.
+
+### 11.23 v1.1.0 — Extended shellQuote vs Minimal Set
+
+**Decision**: extend `shellQuote()` to also cover `{`, `}`, `\n`, `\t`.
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Keep 20-char set (v1.0.0) | `{`/`}` could brace-expand; `\n`/`\t` could word-split |
+| Use `printf %q` (bash) | not portable to `/system/bin/sh` |
+| Base64-encode every path | breaks readability and debugging |
+| Replace shell entirely with direct exec | major refactor, out of scope |
+| **Extend the character set** | ✅ minimal, safe, no behavior change for clean paths |
+
+### 11.24 v1.1.0 — Constant vs Hardcoded Reserved Port
+
+**Decision**: use `MONITORING_UI_PORT` in `metricsProxyHandler`.
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Keep hardcoded `"8080"` | one more place to update if the port ever changes |
+| Config file for the port | overkill (single fixed value) |
+| Env var | not persisted; breaks if unset |
+| **Reuse the existing Go constant** | ✅ single source of truth already present |
+
 ---
 
 ## 12. Blocklist Filtering Strategy
@@ -2063,7 +2409,7 @@ All filtering happens in `main.go` via `rebuildBlocklist()`.
 | Memory | loads files in memory (150 MB peak) | streaming I/O (2 MB peak) |
 | Atomicity | no — manual tmp_dir + mv | `atomicWriteStream` + `fsync` |
 | Pollution | writes to `/data/local/tmp/*_norm.txt` | no intermediate files |
-| Concurrency | unprotected | **`rebuildMu` (RACE-1)** |
+| Concurrency | unprotected | `rebuildMu` (RACE-1) |
 
 ### 12.3 Full Path
 
@@ -2154,14 +2500,14 @@ When adding a new filtering feature:
 Before the Custom Chains change, `manage_iptables` added dynamic `RETURN` rules directly into `OUTPUT`:
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  OUTPUT (nat) — before                              │
+┌──────────────────────────────────────────────┐
+│  OUTPUT (nat) — before                               │
 │                                                      │
 │  1. -d 127.0.0.1 -p udp --dport 53 -j RETURN  ← dyn │
 │  2. -d 127.0.0.1 -p tcp --dport 53 -j RETURN  ← dyn │
 │  3. -d 9.9.9.9   -p udp --dport 53 -j RETURN  ← dyn │
 │  ...                                                 │
-└─────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────┘
 ```
 
 **Catastrophic scenario**:
@@ -2174,25 +2520,25 @@ Before the Custom Chains change, `manage_iptables` added dynamic `RETURN` rules 
 ### 13.2 Solution — Custom Chains
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  OUTPUT (nat) — after                               │
+┌──────────────────────────────────────────────┐
+│  OUTPUT (nat) — after                                │
 │                                                      │
 │  1. -p udp --dport 53 -j DNSCRYPT_OUT   ← static    │
 │  2. -p tcp --dport 53 -j DNSCRYPT_OUT   ← static    │
-└─────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────┘
                       │
                       │ jump
                       ▼
-┌─────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────┐
 │  DNSCRYPT_OUT (nat) — Custom Chain                   │
 │                                                      │
 │  1. -d 127.0.0.1 -j RETURN    ← dynamic (safe)      │
 │  2. -d 9.9.9.9   -j RETURN    ← dynamic (safe)      │
 │  3. -d 8.8.8.8   -j RETURN    ← dynamic (safe)      │
-│  4. -j DNAT --to-destination 127.0.0.1:5354         │
+│  4. -j DNAT --to-destination 127.0.0.1:5354          │
 │                                                      │
-│  Cleanup: -F DNSCRYPT_OUT + -X DNSCRYPT_OUT         │
-└─────────────────────────────────────────────────────┘
+│  Cleanup: -F DNSCRYPT_OUT + -X DNSCRYPT_OUT          │
+└──────────────────────────────────────────────┘
 ```
 
 ### 13.3 Advantages
@@ -2209,19 +2555,19 @@ Before the Custom Chains change, `manage_iptables` added dynamic `RETURN` rules 
 ### 13.4 Implementation Across Files
 
 ```text
-┌──────────────────────────────────────────────────────┐
-│  functions.sh                                        │
+┌───────────────────────────────────────────────┐
+│  functions.sh                                         │
 │    ├── manage_iptables()   → DNSCRYPT_OUT            │
 │    ├── manage_ip6tables()  → DNSCRYPT_OUT6           │
 │    ├── manage_nftables()   → dnscrypt_filter (table) │
-│    ├── _legacy_cleanup_iptables()                    │
-│    └── _legacy_cleanup_ip6tables()                   │
-├──────────────────────────────────────────────────────┤
-│  post-fs-data.sh → inline_firewall_cleanup()         │
-│  uninstall.sh → _inline_cleanup_firewall()           │
-│  customize.sh → _inline_cleanup_firewall()           │
-│  main.go → startService() / stopService()            │
-└──────────────────────────────────────────────────────┘
+│    ├── _legacy_cleanup_iptables()                     │
+│    └── _legacy_cleanup_ip6tables()                    │
+├───────────────────────────────────────────────┤
+│  post-fs-data.sh → inline_firewall_cleanup()          │
+│  uninstall.sh → _inline_cleanup_firewall()            │
+│  customize.sh → _inline_cleanup_firewall()            │
+│  main.go → startService() / stopService()             │
+└───────────────────────────────────────────────┘
 ```
 
 ### 13.5 Legacy Cleanup (Migration)
@@ -2302,24 +2648,24 @@ Before this level, the project suffered from:
 | **SHA256 Verification** | binary integrity check |
 | **Local Cache** | `~/.cache/...` |
 | **Offline Mode** | build without internet |
-| **Retry Logic** | 3 attempts with exponential backoff |
+| **Retry Logic** | `curl --retry 2` per URL + 5-source fallback |
 
 ### 14.3 Main Components
 
 ```text
-┌───────────────────────────────────────────────────────┐
-│  [1] Single Source of Truth                            │
-│      proxy/dnscrypt-proxy.version → "2.1.18"          │
-└────────────────────┬──────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  [1] Single Source of Truth                             │
+│      proxy/dnscrypt-proxy.version → "2.1.18"           │
+└────────────────────────────────────────────────┘
                      │
-        ┌────────────┼────────────┬──────────────┐
-        ▼            ▼            ▼              ▼
-┌──────────┐ ┌───────────┐ ┌──────────┐ ┌──────────┐
-│ fetch_   │ │ package_  │ │ release  │ │ ci.yml   │
-│ dns_     │ │ module.sh │ │ .yml     │ │ (verify) │
-│ binaries │ │           │ │          │ │          │
-│ .sh      │ │           │ │          │ │          │
-└──────────┘ └───────────┘ └──────────┘ └──────────┘
+        ┌──────────┼───────────┬─────────────┐
+        ▼           ▼             ▼              ▼
+┌──────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐
+│ fetch_    │  │ package_ │  │ release  │  │ ci.yml   │
+│ dns_      │  │ module.sh│  │ .yml     │  │ (verify) │
+│ binaries  │  │          │  │          │  │          │
+│ .sh       │  │          │  │          │  │          │
+└──────────┘ └─────────┘ └─────────┘ └──────────┘
 ```
 
 ### 14.4 Fetch Mechanism (5 sources)
@@ -2357,21 +2703,21 @@ Before this level, the project suffered from:
 ### 14.7 SHA256 Verification
 
 ```text
-┌─────────────────────────────────┐
-│  On fetch:                       │
+┌────────────────────────────┐
+│  On fetch:                      │
 │   1. download binary            │
 │   2. compute SHA256             │
 │   3. save in .manifest.json     │
-└──────────────┬──────────────────┘
+└────────────┬───────────────┘
                ▼
-┌─────────────────────────────────┐
+┌─────────────────────────────┐
 │  On use:                         │
-│   1. read SHA from manifest     │
-│   2. compute actual SHA         │
-│   3. compare                    │
-│   ✅ → use                       │
-│   ❌ → re-fetch                  │
-└─────────────────────────────────┘
+│   1. read SHA from manifest      │
+│   2. compute actual SHA          │
+│   3. compare                     │
+│   ✅ → use                      │
+│   ❌ → re-fetch                 │
+└─────────────────────────────┘
 ```
 
 ### 14.8 Retry Logic
@@ -2385,27 +2731,21 @@ Before this level, the project suffered from:
 **Solution**:
 
 ```bash
-FETCH_RETRIES=3
-FETCH_RETRY_DELAY=5
+# Two layers:
+# 1) curl --retry 2 --retry-delay 1 (per URL, inside download_url)
+# 2) 5-source fallback chain (in build_candidate_urls)
 
-while [ "$ATTEMPT" -le "$FETCH_RETRIES" ]; do
-    if ./scripts/fetch_dns_binaries.sh $FORCE_FLAG $VERBOSE_FLAG; then
-        SUCCESS=1
-        break
-    fi
-    DELAY=$((FETCH_RETRY_DELAY * ATTEMPT))
-    sleep "$DELAY"
-    ATTEMPT=$((ATTEMPT+1))
-done
+# Note: MAX_RETRIES=3 was removed in v1.1.0 — it was declared
+# but never used. Retries are handled entirely by curl + the
+# fallback chain.
 ```
 
-**Backoff schedule**:
+**Retry schedule (per URL)**:
 | Attempt | Delay | Total |
 |:---:|---|:---:|
 | 1 | — | 0 s |
-| 2 | 5 s | 5 s |
-| 3 | 10 s | 15 s |
-| (fail) | — | exit 1 |
+| 2 | 1 s | 1 s |
+| (fail) | — | next source |
 
 ### 14.9 Version Update (Single Command)
 
@@ -2419,7 +2759,7 @@ done
 
 ```bash
 # edit one file
-echo "2.1.18" > proxy/dnscrypt-proxy.version
+echo "2.1.19" > proxy/dnscrypt-proxy.version
 ```
 
 ### 14.10 Design Decisions
@@ -2535,31 +2875,35 @@ func runShell(cmd string) error {
 ### 16.2 Solution — Adapter Pattern
 
 ```text
-┌──────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────┐
 │  Client Layer                                        │
 │  (dashboard.html)                                    │
 │  expects: JSON                                       │
-└────────────────────┬─────────────────────────────────┘
+└─────────────────┬────────────────────────────┘
                      │
                      ▼
-┌──────────────────────────────────────────────────────┐
-│  Adapter Layer                                       │
-│  (metricsProxyHandler)                               │
-│  ┌────────────────────────────────────────────────┐  │
-│  │  1. HTTP GET /metrics                          │  │
+┌────────────────────────────────────────────────┐
+│  Adapter Layer                                         │
+│  (metricsProxyHandler)                                 │
+│  ┌──────────────────────────────────────────┐  │
+│  │  1. HTTP GET /metrics (via MONITORING_UI_PORT)  │  │
 │  │  2. parsePrometheus(text) → map[string]float64 │  │
 │  │  3. buildDashboardJSON(map) → map[string]any   │  │
-│  │  4. json.Encode(response)                      │  │
-│  └────────────────────────────────────────────────┘  │
-└────────────────────┬─────────────────────────────────┘
+│  │  4. json.Encode(response)                       │  │
+│  └──────────────────────────────────────────┘  │
+└─────────────────┬──────────────────────────────┘
                      │
                      ▼
-┌──────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────┐
 │  Upstream Layer                                      │
 │  (monitoring_ui :8080)                               │
 │  returns: Prometheus text                            │
-└──────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────┘
 ```
+
+**v1.1.0 (MEM-3)**: The URL now uses the `MONITORING_UI_PORT`
+constant. The behavior is unchanged, but the reserved port has
+a single source of truth.
 
 ### 16.3 Multiple Metric Names Support
 
@@ -2607,6 +2951,43 @@ result[name] += val  // 100 + 50 = 150
 | Parse time | N/A (fail) | ~50 µs (10 metrics) |
 | End-to-end | N/A (fail) | ~5–15 ms |
 
+### 16.7 v1.1.0 — Exposing Profile & Memory via runtime_info
+
+`runtime_info` now carries two additional fields that the
+Dashboard and WebUI surface in the System Info panel:
+
+```json
+{
+  "profile_key": "pro",
+  "memory_limit_mb": 120
+}
+```
+
+**Where these come from**:
+
+| Field | Source | Type |
+|---|---|---|
+| `profile_key` | `readSelectedProfile()` at startup / `currentProfile` after change | string |
+| `memory_limit_mb` | `memoryLimitForProfile(currentProfile) / (1024*1024)` | int |
+
+**Why expose them**:
+
+- **Observability** — a user reporting GC/perf issues can paste
+  the runtime_info output and the maintainer immediately knows
+  which memory limit was in effect.
+- **Verification** — the System Info panel in both WebUI and
+  Dashboard displays the effective limit, so the user can
+  compare against the expected value for their profile.
+- **No extra cost** — `memory_limit_mb` is a simple integer
+  division on a value already stored in memory.
+
+**Shell equivalent**:
+
+- `functions.sh:get_profile_memory_hint()` returns a
+  human-readable string like `"120 MB (pro)"` for use by
+  `service.sh`, `action.sh`, and `status.sh`.
+- It is **read-only** — it does not call `debug.SetMemoryLimit`.
+
 ---
 
 ## Legend — Post-Release Fixes
@@ -2637,6 +3018,9 @@ result[name] += val  // 100 + 50 = 150
 | **X** | rebuildMu mutex (RACE-1) | §4.8.12 |
 | **Y** | runtime_info ports (PORT-2) | §4.8.13 |
 | **Z** | Preserve Settings on Upgrade | §4.8.14 |
+| **MEM-1** | Dynamic memory limit per profile | §4.9.1 |
+| **MEM-2** | Extended shellQuote charset | §4.9.2 |
+| **MEM-3** | MONITORING_UI_PORT in metrics handler | §4.9.3 |
 
 ### Official Fix Numbers
 
@@ -2662,6 +3046,15 @@ result[name] += val  // 100 + 50 = 150
 | **NEW-6** | Auth cache (60 s) | §4.8.11 |
 | **RACE-1** | rebuildMu mutex | §4.8.12 |
 | **PORT-2** | runtime_info ports | §4.8.13 |
+| **MEM-1** | Dynamic memory limit per profile | §4.9.1 |
+| **MEM-2** | Extended shellQuote charset | §4.9.2 |
+| **MEM-3** | MONITORING_UI_PORT in metrics handler | §4.9.3 |
+
+> **v1.1.0 note**: MEM-1 / MEM-2 / MEM-3 are not audit
+> corrections — they close edge cases rather than fix known
+> exploitable vulnerabilities. See `docs/SECURITY.md` §17 for
+> the distinction between audit corrections and runtime
+> improvements.
 
 ---
 
@@ -2676,12 +3069,13 @@ result[name] += val  // 100 + 50 = 150
 - [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix
 - [docs/ROADMAP.md](ROADMAP.md) — Roadmap
 - [Effective Go](https://go.dev/doc/effective_go)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [Netfilter Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [DNSCrypt Protocol Specification](https://dnscrypt.info/protocol)
 
 ---
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh

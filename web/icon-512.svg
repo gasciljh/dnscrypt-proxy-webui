@@ -1,25 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
-     DNSCrypt Smart Filter — PWA Icon (512×512, maskable)
-     Version: v1.0.0
+     DNSCrypt Smart Filter — PWA Icon (512×512)
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
-     Large SVG icon for modern browsers (PWA, splash screen,
-     maskable icon). Rendered at 512×512 in web/manifest.json
-     → icons[3] and used as the source for all generated PNGs
-     (192, 512, apple-touch, favicon-32, favicon-16) via
-     scripts/generate-icons.sh.
+     Large SVG icon for modern browsers. Rendered at 512×512 in
+     web/manifest.json → icons[3] (purpose: any).
 
      Design:
-       • Blue gradient background (matches theme_color)
-       • Shield with subtle border
+       • Blue gradient background (full-bleed, no rounded corners)
+       • Shield with subtle inner highlight edge
        • "DNS" bold label
-       • Green status dot with glow (running indicator)
+       • Green status dot with Gaussian glow
 
-     Maskable-safe area:
-       • Content is centred within a 40% safe circle
-       • Outer 10% padding is background only (no critical art)
+     Role in the icon pipeline (verified against
+     scripts/generate-icons.sh):
+
+       SVG source           → Generated PNG
+       ─────────────────────────────────────────────
+       icon-192.svg         → icon-192.png        (192×192)
+       icon-512.svg         → icon-512.png        (512×512)
+       icon-512.svg         → apple-touch-icon.png (180×180)
+       icon-512.svg         → favicon-32x32.png   (32×32)
+       icon-512.svg         → favicon-16x16.png   (16×16)
+
+     ⚠️ This SVG is NOT the source for icon-192.png. That PNG is
+        generated from icon-192.svg (see the previous file).
+        Prior documentation claimed otherwise — corrected here.
+
+     Purpose in manifest.json:
+       • This SVG: declared as `"purpose": "any"`.
+       • icon-512.png (derived from this SVG): declared as
+         `"purpose": "maskable"`.
+
+     ⚠️ Maskable-safe zone — honest assessment:
+       The maskable safe zone is a circle of radius 40% of the
+       canvas (≈205 px in a 512 canvas, i.e. from 51.2 to 460.8
+       on each axis).
+
+       The shield currently extends from y=52 to y=448 — that is
+       right at the top boundary (52 vs 51.2). Horizontal extent
+       (x=96 to x=416) is safely inside.
+
+       Result: on the majority of Android launchers the icon
+       renders fine, but on devices that apply an aggressive
+       circular mask (e.g. some OEM launchers at 45%+), the top
+       of the shield may be clipped by a few pixels.
+
+       A future release may ship a dedicated maskable variant
+       with a wider safe-zone margin. Until then, the manifest
+       accepts this trade-off rather than shipping a shrunk,
+       visually-weaker icon.
+
+     v1.1.0 note:
+       • Version bumped from v1.0.0 to v1.1.0 to match the module
+         release. No design changes were made.
+       • Corrected the "source for all PNGs" claim — the 192 PNG
+         comes from icon-192.svg, not from this file.
+       • Corrected the "maskable icon" claim — this SVG is
+         declared `any` in manifest.json. Only the PNG carries
+         the maskable purpose.
+       • Replaced the unsupported "40% safe circle" claim with an
+         honest assessment of the current safe-zone situation.
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>
@@ -47,7 +90,7 @@
         </filter>
     </defs>
 
-    <!-- Background (full-bleed for maskable) -->
+    <!-- Background (full-bleed for maskable compatibility) -->
     <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad512)"/>
 
     <!-- Shield shape -->

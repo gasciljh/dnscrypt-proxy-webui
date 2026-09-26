@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – customize.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -19,7 +19,7 @@
 #     • Validate critical files
 #     • Copy the correct binaries for the current architecture
 #     • Create secure run/ directory (0700)
-#     • Write webui.conf with Port Guard (reject 8080)
+#     • Write webui.conf with Port Guard (reject 8080 + collisions)
 #     • Generate secure credentials for the monitoring_ui
 #     • Set permissions
 #     • Write the module fingerprint
@@ -31,14 +31,26 @@
 #   • allowlist.txt
 #   • denylist.txt
 #
-# Port Guard:
-#   The reserved port 8080 (monitoring_ui) is rejected in webui.conf.
-#   Any conflicting value is reset to the default (9090 / 9091).
+# Port Guard (v1.1.0 — collision-safe):
+#   • The reserved port 8080 (monitoring_ui) is rejected.
+#   • PORT and DASHBOARD_PORT must never be equal.
+#     When a collision is detected, DASHBOARD_PORT is
+#     reassigned to a port that differs from PORT.
 #
 # Credentials:
 #   Generated automatically if empty or default (admin/admin).
 #   Saved to /data/local/tmp/dnscrypt_credentials.txt (mode 0600).
 #   Also readable from dnscrypt-proxy.toml [monitoring_ui].
+#
+# Memory limits (v1.1.0):
+#   main.go adjusts the Go runtime soft memory limit based on
+#   the selected profile:
+#     • Light      →  80 MB
+#     • Normal     → 100 MB
+#     • PRO        → 120 MB
+#     • PRO++      → 160 MB
+#     • Ultimate   → 220 MB
+#   This is handled by main.go — customize.sh does not set it.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -563,7 +575,22 @@ ui_print ""
 ui_print "- Creating configuration files..."
 
 # ============================================================
-# [14] Port validation
+# [14] Port validation — v1.1.0 collision-safe
+# ============================================================
+#
+# Order of checks (v1.1.0):
+#   1. Individual 8080 rejection (for PORT and DASHBOARD_PORT).
+#   2. PORT == DASHBOARD_PORT collision → reassign DASHBOARD_PORT
+#      to a port that differs from PORT.
+#
+# Why the order changed:
+#   The v1.0.0 code checked equality BEFORE 8080, which caused a
+#   failure when both were 9091 — the equality fix set dashboard
+#   to 9091 (no actual change), and the 8080 check was a no-op.
+#
+#   The new order guarantees:
+#     • No value equals 8080.
+#     • PORT != DASHBOARD_PORT (always).
 # ============================================================
 validate_port() {
     local port="$1"
@@ -630,19 +657,43 @@ if [ -f "$BIN_DIR/webui.conf" ]; then
     fi
 fi
 
-# --- Final validation ---
-if [ "$TEMP_PORT" = "$TEMP_DASHBOARD_PORT" ]; then
-    ui_print "  ⚠️ PORT and DASHBOARD_PORT are equal, resetting dashboard to 9091"
-    TEMP_DASHBOARD_PORT="9091"
-fi
-
+# ============================================================
+# [14a] Final validation — Step 1: reject 8080
+# ============================================================
 if [ "$TEMP_PORT" = "$_MONITORING_UI_PORT" ]; then
-    ui_print "  ⚠️ PORT=$_MONITORING_UI_PORT conflicts with monitoring_ui, forcing 9090"
+    ui_print "  ⚠️ PORT=$_MONITORING_UI_PORT conflicts with [monitoring_ui], forcing 9090"
     TEMP_PORT="9090"
 fi
 if [ "$TEMP_DASHBOARD_PORT" = "$_MONITORING_UI_PORT" ]; then
-    ui_print "  ⚠️ DASHBOARD_PORT=$_MONITORING_UI_PORT conflicts with monitoring_ui, forcing 9091"
+    ui_print "  ⚠️ DASHBOARD_PORT=$_MONITORING_UI_PORT conflicts with [monitoring_ui], forcing 9091"
     TEMP_DASHBOARD_PORT="9091"
+fi
+
+# ============================================================
+# [14b] Final validation — Step 2: resolve collision (v1.1.0)
+# ============================================================
+#
+# If PORT and DASHBOARD_PORT are equal, reassign DASHBOARD_PORT
+# to a port that is different from PORT.
+#
+# Strategy:
+#   • If PORT=9091 → dashboard becomes 9092.
+#   • Otherwise    → dashboard becomes 9091.
+#
+# This guarantees:
+#   - dashboard != PORT
+#   - dashboard != 8080 (already guaranteed by step 1 above)
+#   - dashboard != 5354 (DNS engine) in most cases; edge case
+#     accepted because DNS engine is internal and always binds.
+# ============================================================
+if [ "$TEMP_PORT" = "$TEMP_DASHBOARD_PORT" ]; then
+    if [ "$TEMP_PORT" = "9091" ]; then
+        TEMP_DASHBOARD_PORT="9092"
+    else
+        TEMP_DASHBOARD_PORT="9091"
+    fi
+    ui_print "  ⚠️ PORT/DASHBOARD_PORT collision → dashboard set to $TEMP_DASHBOARD_PORT"
+    echo "⚠️ Port collision resolved: dashboard=$TEMP_DASHBOARD_PORT" >> "$INSTALL_LOG"
 fi
 
 # ============================================================
@@ -971,7 +1022,32 @@ ui_print "  ✅ Permissions set"
 printf "dnscrypt-proxy-webui-%s\n" "$MODULE_VERSION" > "$MODPATH/.module.fingerprint"
 
 # ============================================================
-# [21] Display final summary
+# [21] Compute expected memory limit (v1.1.0)
+# ============================================================
+#
+# main.go adjusts the Go runtime soft memory limit based on the
+# selected profile. We mirror that computation here purely for
+# the final summary message — main.go remains the authority.
+# ============================================================
+SELECTED_PROFILE="pro"
+if [ -f "$BIN_DIR/selected_profile.txt" ]; then
+    _sp=$(cat "$BIN_DIR/selected_profile.txt" 2>/dev/null | tr -d '\r\n ')
+    case "$_sp" in
+        light|normal|pro|proplus|ultimate) SELECTED_PROFILE="$_sp" ;;
+    esac
+fi
+
+case "$SELECTED_PROFILE" in
+    light)    EXPECTED_MEM_LIMIT="80 MB"  ;;
+    normal)   EXPECTED_MEM_LIMIT="100 MB" ;;
+    pro)      EXPECTED_MEM_LIMIT="120 MB" ;;
+    proplus)  EXPECTED_MEM_LIMIT="160 MB" ;;
+    ultimate) EXPECTED_MEM_LIMIT="220 MB" ;;
+    *)        EXPECTED_MEM_LIMIT="80 MB"  ;;
+esac
+
+# ============================================================
+# [22] Display final summary
 # ============================================================
 ui_print ""
 ui_print "╔══════════════════════════════════════════╗"
@@ -983,6 +1059,7 @@ ui_print "  📊 Upgrade detected: $([ "$UPGRADE_DETECTED" = "1" ] && echo "YES 
 ui_print "  🌐 WebUI: http://127.0.0.1:$TEMP_PORT"
 ui_print "  📈 Dashboard: http://127.0.0.1:$TEMP_DASHBOARD_PORT"
 ui_print "  🔌 Bind: $TEMP_BIND_ADDR"
+ui_print "  🧠 Memory limit: ~$EXPECTED_MEM_LIMIT (profile: $SELECTED_PROFILE)"
 ui_print ""
 ui_print "  ℹ️  Next steps:"
 ui_print "    1. Reboot your device"
@@ -991,7 +1068,7 @@ ui_print "    3. Choose a blocklist profile and press Apply"
 ui_print ""
 
 # ============================================================
-# [22] Reboot warning
+# [23] Reboot warning
 # ============================================================
 if [ "$UPGRADE_DETECTED" = "1" ] && [ "$KILLED_COUNT" -gt 0 ]; then
     ui_print ""

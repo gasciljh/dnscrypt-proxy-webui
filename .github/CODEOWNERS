@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – CODEOWNERS
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -33,6 +33,24 @@
 #   to, PR targets, etc.), see:
 #     • docs/BRANCHING.md §6 (Branch Protection)
 #     • Repository Settings → Branches
+#     • Repository Settings → Rules → Rulesets
+#
+# ============================================================
+# v1.1.0 additions:
+#   • Added /docs/adr/ — all Architecture Decision Records are
+#     reviewed together. ADRs are immutable once accepted and
+#     encode long-term architectural choices, so they get the
+#     same reviewer as core code.
+#   • Added /scripts/release-patch.sh — the PATCH-release
+#     automation introduced during the v1.0.0 cycle
+#     (see docs/adr/0006).
+#   • Added /.github/PULL_REQUEST_TEMPLATE/ — the release-specific
+#     PR template introduced in docs/adr/0005.
+#   • Reorganized patterns into numbered sections matching the
+#     style used in other repository configuration files.
+#   • Expanded the "Notes on branch policy" section to point at
+#     the newer Rulesets UI in addition to classic Branch
+#     Protection.
 # ============================================================
 
 # ============================================================
@@ -121,6 +139,8 @@
 # All ADRs must be reviewed by the maintainer — they encode
 # long-term architectural decisions and cannot be edited once
 # accepted (only superseded by a new ADR).
+#
+# See: docs/adr/README.md §4 (ADR Lifecycle)
 /docs/adr/                  @gasciljh
 
 # ============================================================
@@ -158,6 +178,9 @@
 #   • Release tooling:
 #       /scripts/release.sh         @gasciljh @release-manager
 #       /scripts/release-patch.sh   @gasciljh @release-manager
+#
+# To add a reviewer, append the handle to the matching line.
+# Multiple owners are space-separated.
 #
 # ============================================================
 # How it works
@@ -200,7 +223,16 @@
 #
 # CODEOWNERS does NOT enforce branch rules. To protect branches
 # (e.g. prevent direct pushes to main, require CI to pass), use
-# Repository Settings → Branches, not this file.
+# one of:
+#
+#   • Classic Branch Protection:
+#       Repository Settings → Branches
+#
+#   • Rulesets (newer UI):
+#       Repository Settings → Rules → Rulesets
+#
+#   • Tag protection:
+#       Repository Settings → Rules → Rulesets (target: tags)
 #
 # See docs/BRANCHING.md §6 for the full list of recommended
 # protection rules.

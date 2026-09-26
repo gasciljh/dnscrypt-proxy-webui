@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – uninstall.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,7 +12,6 @@
 #   Magisk/KernelSU manager, or manually for cleanup.
 #
 # Responsibilities:
-#   • Save a backup of user configuration + credentials
 #   • Kill all running processes (dnscrypt-proxy, dnscrypt-webui)
 #   • Clean the firewall (Custom Chains + Legacy, via functions.sh
 #     if available, otherwise inline)
@@ -21,28 +20,43 @@
 #   • Remove runtime files (run/, PIDs, STATUS_FILE, logs, caches)
 #   • Remove module configuration files (webui.conf, .toml, blocklists)
 #   • Remove the module fingerprint + disable file
-#   • Preserve the backup by default
-#     (use --delete-backup to remove it after uninstall)
+#   • Remove any legacy backup directory from older versions
 #
 # Options:
-#   uninstall.sh                  Full cleanup + preserve backup (default)
-#   uninstall.sh --delete-backup  Delete the backup as well
-#   uninstall.sh --keep-backup    (deprecated) — same as default
-#   uninstall.sh --help           Show help
+#   uninstall.sh          Full cleanup (default)
+#   uninstall.sh --help   Show help
 #
-# Backup location:
-#   /data/local/tmp/dnscrypt_backup_uninstall/
+# v1.1.0 — Backup removed:
+#   Previous versions (v1.0.0) created a backup at:
+#     /data/local/tmp/dnscrypt_backup_uninstall/
+#
+#   This behavior is now intentionally removed. Reasons:
+#     • The module no longer ships a restore utility.
+#     • Backups created false expectations of recoverability.
+#     • Users who want to keep settings should do so manually
+#       before uninstalling.
+#
+#   Any existing backup directory from v1.0.0 is cleaned up
+#   automatically by this script (see section [16]).
 #
 # Security:
 #   • MODDIR must be inside /data/adb/modules/
 #   • MODDIR cannot equal the modules directory itself
-#   • The backup is preserved unless --delete-backup is passed
 #
 # Design:
 #   • Loads functions.sh if available; otherwise uses inline
 #     fallbacks (aggressive_cleanup + firewall cleanup)
 #   • The inline cleanup is self-contained (nftables + iptables
 #     + ip6tables) and does NOT depend on functions.sh
+#
+# Non-responsibilities (deliberately NOT done here):
+#   • No `debug.SetMemoryLimit` reset — the Go runtime releases
+#     memory when the process exits; there is no persistent state.
+#   • No firewall rule creation — this is a removal script; only
+#     cleanup runs.
+#   • No system-wide DNS reconfiguration beyond private_dns_mode
+#     reset. Any custom resolvers set by the user are preserved.
+#   • No backup creation — settings are removed permanently.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -57,40 +71,26 @@ case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
 # ============================================================
 # [2] Parse command-line arguments
 # ============================================================
-# - KEEP_BACKUP is deprecated (no-op, kept for compatibility)
-# - DELETE_BACKUP removes the backup after the operation
-# ============================================================
-KEEP_BACKUP=0
-DELETE_BACKUP=0
-DEPRECATED_WARNED=0
-
 for arg in "$@"; do
     case "$arg" in
-        --keep-backup)
-            # Deprecated — default preserves the backup anyway
-            KEEP_BACKUP=1
-            DEPRECATED_WARNED=1
-            ;;
-        --delete-backup)
-            # New — actual deletion
-            DELETE_BACKUP=1
-            ;;
         --help|-h)
             cat << EOF
 DNSCrypt Smart Filter – uninstall.sh
 
 Usage:
-  uninstall.sh                  Full cleanup + preserve backup (default)
-  uninstall.sh --delete-backup  Delete the backup as well
-  uninstall.sh --keep-backup    (deprecated) — same as default
-  uninstall.sh --help           Show this help
-
-Paths:
-  Backup directory: /data/local/tmp/dnscrypt_backup_uninstall/
+  uninstall.sh          Full cleanup (default)
+  uninstall.sh --help   Show this help
 
 Note:
   This script is normally invoked automatically by Magisk when the
   module is removed. Do not run it manually except for cleanup.
+
+  No backup is created. All module settings are removed permanently.
+  If you want to keep your settings, copy them manually before
+  uninstalling:
+
+    cp -a /data/adb/modules/dnscrypt-proxy-webui/proxy/ \\
+          /sdcard/dnscrypt-backup/
 EOF
             exit 0
             ;;
@@ -98,19 +98,15 @@ EOF
     esac
 done
 
-# Warn about the deprecated flag (printed once)
-if [ "$DEPRECATED_WARNED" = "1" ]; then
-    echo "⚠️  --keep-backup is deprecated (default already preserves)." >&2
-    echo "    Use --delete-backup to remove the backup." >&2
-    echo "" >&2
-fi
-
 # ============================================================
 # [3] Global paths
 # ============================================================
 LOG_FILE="/data/local/tmp/dnscrypt_main.log"
-BACKUP_DIR="/data/local/tmp/dnscrypt_backup_uninstall"
 RUN_DIR="$MODDIR/proxy/run"
+BIN_DIR="$MODDIR/proxy"
+
+# Legacy backup directory (v1.0.0) — cleaned up below
+LEGACY_BACKUP_DIR="/data/local/tmp/dnscrypt_backup_uninstall"
 
 # ============================================================
 # [4] Protected log_msg
@@ -126,10 +122,9 @@ log_msg() {
 }
 
 log_msg "════════════════════════════════════════════"
-log_msg "Uninstall started (v1.0.0)"
+log_msg "Uninstall started (v1.1.0)"
 log_msg "MODDIR=$MODDIR"
 log_msg "RUN_DIR=$RUN_DIR"
-log_msg "DELETE_BACKUP=$DELETE_BACKUP"
 
 # ============================================================
 # [5] Security checks
@@ -155,6 +150,18 @@ case "$MODULE_ID" in
         log_msg "⚠️ MODULE_ID=$MODULE_ID is not recognized, but continuing"
         ;;
 esac
+
+# ============================================================
+# [5b] Read active profile (v1.1.0 — for summary only)
+# ============================================================
+ACTIVE_PROFILE="unknown"
+if [ -f "$BIN_DIR/selected_profile.txt" ]; then
+    _ap=$(cat "$BIN_DIR/selected_profile.txt" 2>/dev/null | tr -d '\r\n ')
+    case "$_ap" in
+        light|normal|pro|proplus|ultimate) ACTIVE_PROFILE="$_ap" ;;
+    esac
+fi
+log_msg "Active profile at uninstall: $ACTIVE_PROFILE"
 
 # ============================================================
 # [6] Save route_localnet before changing it
@@ -299,80 +306,25 @@ _inline_cleanup_firewall() {
 }
 
 # ============================================================
-# [9] Backup before deletion
+# [9] Cleanup any legacy backup directory (v1.0.0)
 # ============================================================
-BIN_DIR="$MODDIR/proxy"
-BACKUP_OK=0
-
-if [ -d "$BIN_DIR" ]; then
-    mkdir -p "$BACKUP_DIR" 2>/dev/null
-
-    if [ -d "$BACKUP_DIR" ]; then
-        BACKUP_COUNT=0
-
-        # --- Configuration files ---
-        for f in selected_profile.txt \
-                 blocklist.txt \
-                 blocklist.raw \
-                 allowlist.txt \
-                 denylist.txt \
-                 webui.conf \
-                 dnscrypt-proxy.toml \
-                 blocked-ips.txt; do
-            if [ -f "$BIN_DIR/$f" ]; then
-                if cp -f "$BIN_DIR/$f" "$BACKUP_DIR/$f" 2>/dev/null; then
-                    BACKUP_COUNT=$((BACKUP_COUNT + 1))
-                fi
-            fi
-        done
-
-        # --- Credentials ---
-        if [ -f "/data/local/tmp/dnscrypt_credentials.txt" ]; then
-            if cp -f "/data/local/tmp/dnscrypt_credentials.txt" \
-                     "$BACKUP_DIR/credentials.txt" 2>/dev/null; then
-                BACKUP_COUNT=$((BACKUP_COUNT + 1))
-            fi
-        fi
-
-        # --- module.prop (for reference) ---
-        if [ -f "$MODDIR/module.prop" ]; then
-            cp -f "$MODDIR/module.prop" "$BACKUP_DIR/module.prop.bak" 2>/dev/null
-        fi
-
-        # --- Status file ---
-        if [ -d "$RUN_DIR" ]; then
-            mkdir -p "$BACKUP_DIR/run" 2>/dev/null
-            if [ -f "$RUN_DIR/dnscrypt.status" ]; then
-                cp -f "$RUN_DIR/dnscrypt.status" "$BACKUP_DIR/run/dnscrypt.status" 2>/dev/null
-                BACKUP_COUNT=$((BACKUP_COUNT + 1))
-            fi
-        fi
-
-        # --- Restore instructions ---
-        cat > "$BACKUP_DIR/RESTORE.txt" << EOF
-# DNSCrypt Smart Filter – Backup Info
-# Created: $(date)
-# Version: v1.0.0
+# Previous versions created a backup at:
+#   /data/local/tmp/dnscrypt_backup_uninstall/
 #
-# To restore settings:
-#   1. Reinstall the module
-#   2. Copy files from this directory to:
-#      /data/adb/modules/dnscrypt-proxy-webui/proxy/
-#   3. Reboot
-#
-# Files:
-EOF
-        ls -la "$BACKUP_DIR" 2>/dev/null | grep -v "^total" | grep -v "^d" | awk '{print "  " $NF}' >> "$BACKUP_DIR/RESTORE.txt" 2>/dev/null
-
-        if [ "$BACKUP_COUNT" -gt 0 ]; then
-            BACKUP_OK=1
-            log_msg "💾 Backup saved: $BACKUP_COUNT files → $BACKUP_DIR"
-        else
-            log_msg "⚠️ Backup directory created but empty"
-        fi
+# This version no longer creates backups. Any existing directory
+# from a prior v1.0.0 install is removed here to leave a clean
+# state after uninstall.
+# ============================================================
+LEGACY_BACKUP_REMOVED=0
+if [ -d "$LEGACY_BACKUP_DIR" ]; then
+    if rm -rf "$LEGACY_BACKUP_DIR" 2>/dev/null; then
+        LEGACY_BACKUP_REMOVED=1
+        log_msg "🗑️  Removed legacy backup directory: $LEGACY_BACKUP_DIR"
     else
-        log_msg "⚠️ Could not create backup directory (continuing)"
+        log_msg "⚠️ Failed to remove legacy backup directory: $LEGACY_BACKUP_DIR"
     fi
+else
+    log_msg "ℹ️ No legacy backup directory present (nothing to remove)"
 fi
 
 # ============================================================
@@ -421,6 +373,9 @@ else
 fi
 
 # --- Restore route_localnet (rather than forcing it to 0) ---
+# The original value (usually "0" on stock Android) is captured
+# in section [6]. Restoring it avoids clobbering a custom value
+# that the user or another module may have set intentionally.
 if [ -n "$ORIGINAL_ROUTE_LOCALNET" ] && command -v sysctl >/dev/null 2>&1; then
     if sysctl -w "net.ipv4.conf.all.route_localnet=$ORIGINAL_ROUTE_LOCALNET" >/dev/null 2>&1; then
         log_msg "✅ route_localnet restored to $ORIGINAL_ROUTE_LOCALNET"
@@ -552,15 +507,15 @@ log_msg "🗑️  Removing module configuration files..."
 
 MODULE_COUNT=0
 
-if [ -d "$MODDIR/proxy" ]; then
+if [ -d "$BIN_DIR" ]; then
     # --- Core configuration files ---
     for f in selected_profile.txt \
              webui.conf \
              webui.conf.tmp \
              dnscrypt-proxy.toml \
              dnscrypt-proxy.toml.bak; do
-        if [ -f "$MODDIR/proxy/$f" ]; then
-            rm -f "$MODDIR/proxy/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
+        if [ -f "$BIN_DIR/$f" ]; then
+            rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
@@ -577,8 +532,8 @@ if [ -d "$MODDIR/proxy" ]; then
              blocklist.raw.filtered \
              blocklist.raw.filtered.tmp \
              blocked-ips.txt; do
-        if [ -f "$MODDIR/proxy/$f" ]; then
-            rm -f "$MODDIR/proxy/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
+        if [ -f "$BIN_DIR/$f" ]; then
+            rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
@@ -587,15 +542,15 @@ if [ -d "$MODDIR/proxy" ]; then
              allowlist.txt.tmp_write \
              denylist.txt \
              denylist.txt.tmp_write; do
-        if [ -f "$MODDIR/proxy/$f" ]; then
-            rm -f "$MODDIR/proxy/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
+        if [ -f "$BIN_DIR/$f" ]; then
+            rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
     # --- Auth (legacy) ---
     for f in auth.json .auth_token; do
-        if [ -f "$MODDIR/proxy/$f" ]; then
-            rm -f "$MODDIR/proxy/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
+        if [ -f "$BIN_DIR/$f" ]; then
+            rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
@@ -604,14 +559,14 @@ if [ -d "$MODDIR/proxy" ]; then
              public-resolvers.md.minisig \
              relays.md \
              relays.md.minisig; do
-        if [ -f "$MODDIR/proxy/$f" ]; then
-            rm -f "$MODDIR/proxy/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
+        if [ -f "$BIN_DIR/$f" ]; then
+            rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
     log_msg "✅ Removed $MODULE_COUNT module config files"
 else
-    log_msg "⚠️ $MODDIR/proxy does not exist, skipping config cleanup"
+    log_msg "⚠️ $BIN_DIR does not exist, skipping config cleanup"
 fi
 
 # ============================================================
@@ -628,48 +583,30 @@ if [ -f "$MODDIR/disable" ]; then
 fi
 
 # ============================================================
-# [16] Backup handling
+# [16] (removed) — backup handling no longer applies
 # ============================================================
-# Default: preserve the backup (safe)
-# --delete-backup: remove it after the operation
-# --keep-backup: deprecated (no-op, kept for compatibility)
+# In v1.0.0 this section created a backup at:
+#   /data/local/tmp/dnscrypt_backup_uninstall/
+#
+# In v1.1.0 the backup is not created. Any legacy backup
+# directory was cleaned up in section [9].
 # ============================================================
-if [ "$BACKUP_OK" = "1" ]; then
-    if [ "$DELETE_BACKUP" = "1" ]; then
-        # Actual deletion
-        if rm -rf "$BACKUP_DIR" 2>/dev/null; then
-            log_msg "🗑️  Backup deleted as requested (--delete-backup)"
-        else
-            log_msg "⚠️ Failed to delete backup at: $BACKUP_DIR"
-        fi
-    else
-        # Default: preserve
-        log_msg "📦 Backup preserved at: $BACKUP_DIR"
-        log_msg "   (use --delete-backup to remove it automatically)"
-    fi
-else
-    log_msg "ℹ️ No backup was created (empty or missing source files)"
-fi
 
 # ============================================================
 # [17] Final summary
 # ============================================================
 log_msg "════════════════════════════════════════════"
 log_msg "✅ Uninstall completed successfully"
+log_msg "   • Removed profile: $ACTIVE_PROFILE"
 log_msg "   • run/ directory: $([ "$RUN_COUNT" -gt 0 ] && echo "removed" || echo "not present")"
 log_msg "   • Runtime files removed: $RUNTIME_COUNT"
 log_msg "   • Module config files removed: $MODULE_COUNT"
 log_msg "   • Firewall: Custom Chains removed (DNSCRYPT_OUT / DNSCRYPT_OUT6)"
 log_msg "   • Legacy rules: cleaned (best-effort)"
-if [ "$BACKUP_OK" = "1" ]; then
-    if [ "$DELETE_BACKUP" = "1" ]; then
-        log_msg "   • 📦 Backup: deleted"
-    else
-        log_msg "   • 📦 Backup: $BACKUP_DIR (preserved)"
-    fi
-else
-    log_msg "   • ℹ️ No backup created"
-fi
+log_msg "   • route_localnet: restored to ${ORIGINAL_ROUTE_LOCALNET:-0}"
+log_msg "   • Legacy backup dir: $([ "$LEGACY_BACKUP_REMOVED" = "1" ] && echo "removed" || echo "not present")"
+log_msg "   • Non-actions: memory limit auto-released on process exit"
+log_msg "   • Note: no backup was created (v1.1.0 behavior)"
 log_msg "════════════════════════════════════════════"
 
 exit 0

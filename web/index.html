@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.0.0
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -14,6 +14,14 @@
        • Diagnostic file viewer
        • Live status via SSE
        • PWA support (installable, offline-capable)
+     ============================================================
+     v1.1.0 changes:
+       • Version badge and welcome message updated to v1.1.0
+       • Runtime Info now displays profile key + memory limit
+         (new fields exposed by main.go v1.1.0)
+       • storeToken() documented as a no-op shim (see §[3])
+       • EventSource consistency with dashboard.html
+         (removed the redundant withCredentials option)
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -28,7 +36,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.0.0</title>
+    <title>DNSCrypt Proxy v1.1.0</title>
     <style>
         :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:20px; }
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -318,7 +326,7 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.0.0</span>
+                <span class="badge" id="versionBadge">v1.1.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
@@ -455,7 +463,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.0.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.1.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -493,7 +501,7 @@
     // ============================================================
     // [1] Initial settings
     // ============================================================
-    var VERSION = 'v1.0.0';
+    var VERSION = 'v1.1.0';
 
     // Dynamic ports (updated from runtime_info)
     var PORTS = {
@@ -504,7 +512,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.0.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.1.0',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -558,6 +566,7 @@
             riRunDir: 'Runtime Dir', riStatusFile: 'Status File',
             riPidFile: 'PID File', riProgressFile: 'Progress File', riLogFile: 'Log File',
             riWebuiPort: 'WebUI Port', riDashboardPort: 'Dashboard Port',
+            riProfile: 'Profile', riMemoryLimit: 'Memory Limit',
             riCopyAll: '📋 Copy All', riCopySuccess: '✅ Copied', riCopyError: '❌ Copy failed',
             riRawJson: '🔍 Raw JSON', riHideJson: '🔍 Hide JSON',
             diagFilesTitle: '📁 Diagnostic Files', dfRefresh: 'Refresh',
@@ -580,7 +589,7 @@
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.0.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.1.0',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -634,6 +643,7 @@
             riRunDir: 'مجلد التشغيل', riStatusFile: 'ملف الحالة',
             riPidFile: 'ملف PID', riProgressFile: 'ملف التقدم', riLogFile: 'ملف السجل',
             riWebuiPort: 'منفذ WebUI', riDashboardPort: 'منفذ Dashboard',
+            riProfile: 'البروفايل', riMemoryLimit: 'حد الذاكرة',
             riCopyAll: '📋 نسخ الكل', riCopySuccess: '✅ تم النسخ', riCopyError: '❌ فشل النسخ',
             riRawJson: '🔍 JSON خام', riHideJson: '🔍 إخفاء JSON',
             diagFilesTitle: '📁 ملفات التشخيص', dfRefresh: 'تحديث',
@@ -732,7 +742,24 @@
     }
 
     // ============================================================
-    // [3] Token helpers — cookie-only
+    // [3] Token helpers — cookie-only (v1.0.0+)
+    // ============================================================
+    // Backward-compat shims.
+    //
+    // Since v1.0.0, /api/auth/login no longer returns a token in
+    // the JSON response (see docs/SECURITY.md — Audit Correction
+    // #15-a). Authentication relies entirely on the HttpOnly
+    // session cookie set by the server.
+    //
+    // These three functions are preserved as no-ops so that the
+    // rest of the codebase does not need conditional logic. Any
+    // future migration to bearer tokens would only need to change
+    // the bodies of these functions, not their call sites.
+    //
+    // Do NOT remove them without auditing the call sites:
+    //   • getStoredToken()  ← xhrRequest, xhrGet, xhrPost
+    //   • storeToken(tk)    ← performLogin
+    //   • clearStoredToken() ← doLogout, handleSessionExpired
     // ============================================================
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
@@ -1206,6 +1233,15 @@
                 if (linkText) linkText.textContent = t('projectLink');
             }
 
+            // Build the Runtime Info items list.
+            // v1.1.0 adds two entries: profile + memory limit.
+            // Both come from main.go's /api?action=runtime_info and
+            // may be absent on older servers (fallback to "unknown").
+            var memDisplay = 'unknown';
+            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+                memDisplay = String(data.memory_limit_mb) + ' MB';
+            }
+
             var html = '';
             var items = [
                 { label: t('riVersion'), value: data.version || 'unknown' },
@@ -1214,6 +1250,8 @@
                 { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
                 { label: t('riWebuiPort'), value: data.webui_port || '9090' },
                 { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+                { label: t('riProfile'), value: data.profile_key || 'unknown' },
+                { label: t('riMemoryLimit'), value: memDisplay },
                 { label: t('riRunDir'), value: data.run_dir || 'unknown' },
                 { label: t('riStatusFile'), value: data.status_file || 'unknown' },
                 { label: t('riPidFile'), value: data.pid_file || 'unknown' },
@@ -1813,7 +1851,10 @@
     function initSSE() {
         if (sse) { sse.close(); sse = null; }
         try {
-            sse = new EventSource('/events?t=' + Date.now(), { withCredentials: true });
+            // Note: cookies are sent automatically for same-origin
+            // requests, so the EventSource constructor options are
+            // unnecessary here. This matches dashboard.html.
+            sse = new EventSource('/events?t=' + Date.now());
             sse.addEventListener('open', function() {
                 sseBackoff = 5000;
             });

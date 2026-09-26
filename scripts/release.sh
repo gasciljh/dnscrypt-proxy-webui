@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – release.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -22,11 +22,11 @@
 #   4. GitHub Actions publishes the release automatically
 #
 # Usage:
-#   ./scripts/release.sh v1.1.0
-#   ./scripts/release.sh v1.1.0-beta1
-#   ./scripts/release.sh v1.1.0 --dry-run
-#   ./scripts/release.sh v1.1.0 --no-push
-#   ./scripts/release.sh v1.1.0 --yes
+#   ./scripts/release.sh v1.2.0
+#   ./scripts/release.sh v1.2.0-beta1
+#   ./scripts/release.sh v1.2.0 --dry-run
+#   ./scripts/release.sh v1.2.0 --no-push
+#   ./scripts/release.sh v1.2.0 --yes
 #
 # Options:
 #   --dry-run       Show what would happen, change nothing
@@ -46,6 +46,49 @@
 #   2 = repository state invalid
 #   3 = version files inconsistent
 #   4 = user aborted
+#
+# Relationship with release-patch.sh:
+#   scripts/release-patch.sh is a thin wrapper around this script.
+#   It adds 3 safety rules on top:
+#     1. Current branch MUST be `main` (not `develop`).
+#     2. MAJOR and MINOR components MUST NOT change.
+#     3. PATCH MUST be exactly current + 1.
+#
+#   release-patch.sh delegates the actual bump logic to this
+#   script — the two are always in sync because there is no
+#   duplicated code. See docs/adr/0006-rename-hotfix-to-release-patch.md.
+#
+#   Which one to use:
+#     • release.sh       → stable, prerelease, or any SemVer bump
+#                          (run from develop or release/*)
+#     • release-patch.sh → PATCH-only (run from main)
+#
+# versionCode formula:
+#   versionCode = MAJOR × 1,000,000
+#               + MINOR ×    10,000
+#               + PATCH ×       100
+#               + HOTFIX
+#
+#   In this script, HOTFIX is always 0. The HOTFIX component is
+#   reserved for future use (e.g. a release that re-tags the
+#   same MAJOR.MINOR.PATCH with an incremented build counter).
+#   Current releases do not use it.
+#
+#   Constraints:
+#     • PATCH  must be ≤ 99 (two digits, because PATCH is ×100)
+#     • HOTFIX must be ≤ 99 (two digits, because HOTFIX is ×1)
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes in this script since v1.0.0).
+#   • Added a "Relationship with release-patch.sh" section to
+#     make the delegation explicit.
+#   • Documented the versionCode formula including the unused
+#     HOTFIX component. The prior header was silent on HOTFIX,
+#     which could confuse a reader comparing it with docs/.
+#   • Expanded the [14] update.json comment to explain why jq is
+#     required for that step but optional for the rest of the
+#     script.
 # ============================================================
 
 set -euo pipefail
@@ -114,6 +157,10 @@ Workflow:
   2. Ensure CHANGELOG.md is updated
   3. Run release.sh
   4. GitHub Actions publishes the release automatically
+
+For PATCH-only releases (hotfixes):
+  Use ./scripts/release-patch.sh instead. See
+  docs/BRANCHING.md §8 and docs/adr/0006.
 EOF
     exit 0
 }
@@ -191,7 +238,7 @@ log_step "[2/9] Validating version format"
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
     log_error "Invalid version: '$VERSION'"
     log_info "Required format: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]"
-    log_info "Examples: v1.0.0, v1.1.0, v1.1.0-beta1, v2.0.0-rc1"
+    log_info "Examples: v1.1.0, v1.2.0, v1.2.0-beta1, v2.0.0-rc1"
     exit 1
 fi
 log_ok "Version format valid: $VERSION"
@@ -200,9 +247,12 @@ log_ok "Version format valid: $VERSION"
 # [7] Compute versionCode
 # ============================================================
 # Formula: MAJOR*1000000 + MINOR*10000 + PATCH*100 + HOTFIX
-# Note: HOTFIX is 0 for stable versions.
-# Prerelease versions use 0 for HOTFIX (GitHub releases handle
-# the distinction via the tag suffix).
+#
+# HOTFIX is always 0 in this script. The prerelease suffix
+# (e.g. "-beta1") is ignored for versionCode — a prerelease
+# uses the same code as its stable counterpart.
+#
+# See the header for the full explanation.
 # ============================================================
 log_step "[3/9] Computing versionCode"
 
@@ -293,6 +343,9 @@ fi
 log_ok "Required files present: VERSION, module.prop, update.json, CHANGELOG.md"
 
 # --- CHANGELOG check ---
+# Warn (do not block) if CHANGELOG.md lacks a section for this
+# version or an [Unreleased] section. The maintainer may still
+# want to proceed for a snapshot release.
 if ! grep -qE "^## \[${VERSION#v}\]|^## \[Unreleased\]" CHANGELOG.md; then
     log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
     log_info "Consider adding it before releasing"
@@ -410,6 +463,20 @@ fi
 
 # ============================================================
 # [14] Update update.json (requires jq)
+# ============================================================
+# update.json is a JSON object with 4 keys:
+#   version, versionCode, zipUrl, changelog
+#
+# Only version and versionCode are updated here. zipUrl and
+# changelog are set by the packaging pipeline in release.yml —
+# they use a fixed URL template with the tag substituted at
+# build time.
+#
+# jq is REQUIRED for this step. Without jq, the script skips
+# update.json entirely and logs a warning. The release can
+# still proceed, but the maintainer must update update.json
+# manually afterwards. This is deliberate: sed-based JSON
+# editing is fragile and can silently corrupt the file.
 # ============================================================
 if [ "$HAS_JQ" = "1" ]; then
     if [ "$DRY_RUN" = "0" ]; then

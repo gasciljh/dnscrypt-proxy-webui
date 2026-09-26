@@ -1,12 +1,13 @@
 # ============================================================
 # DNSCrypt Smart Filter – CodeQL Workflow
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Purpose:
-#   Static Application Security Testing (SAST) using GitHub CodeQL.
-#   Runs on every push/PR to main or develop + weekly on Monday 06:00 UTC.
+#   Static Application Security Testing (SAST) using GitHub
+#   CodeQL. Runs on every push/PR to main or develop, plus a
+#   weekly scheduled scan on Monday at 06:00 UTC.
 #
 # Steps:
 #   • Checkout source
@@ -19,10 +20,82 @@
 #   • main    → stable releases (protected)
 #   • develop → integration branch (features merged here first)
 #
-# Query suite:
-#   • security-extended — broader security coverage than the
-#     default queries, catching additional CWEs and potential
-#     vulnerabilities.
+# Query suite — security-extended:
+#   CodeQL ships with multiple query suites. This workflow uses
+#   `security-extended`, which is broader than the default:
+#
+#   ┌───────────────┬────────────────────────────────┐
+#   │ Suite            │ Scope                               │
+#   ├───────────────┼────────────────────────────────┤
+#   │ default          │ Core security queries only          │
+#   │ security-extended│ Core + additional CWEs (recommended │
+#   │                  │ for security-sensitive projects)    │
+#   │ security-and-    │ Above + quality/maintainability     │
+#   │ quality          │ checks (noisier)                    │ 
+#   └───────────────┴────────────────────────────────┘
+#
+#   This project is security-sensitive (root module, handles
+#   credentials, modifies firewall), so security-extended is the
+#   right trade-off: more findings without excessive noise.
+#
+# CodeQL for Go — build requirement:
+#   CodeQL analyzes Go by observing an actual build. The "Build"
+#   step below calls `go build` on main.go. This is required —
+#   without it, CodeQL cannot extract the AST and would fail
+#   with "no code found" for the language.
+#
+#   ⚠️ The build uses CGO_ENABLED=0 (default when no CC is set)
+#   because CodeQL runs on ubuntu-22.04 without the Android NDK.
+#   This is intentional: the analysis cares about source
+#   semantics, not the target architecture.
+#
+# Trigger matrix:
+#   ┌───────────────┬─────────┬───────────────────┐
+#   │ Event            │ Branch   │ Notes                │
+#   ├───────────────┼──────────┼──────────────────┤
+#   │ push             │ main     │ full analysis        │
+#   │ push             │ develop  │ full analysis        │
+#   │ pull_request     │ main     │ full analysis        │
+#   │ pull_request     │ develop  │ full analysis        │
+#   │ schedule         │ —        │ weekly Mon 06:00 UTC │
+#   │ workflow_dispatch│ any      │ manual               │
+#   └───────────────┴─────────┴───────────────────┘
+#
+#   The weekly scheduled run catches new CVEs published against
+#   the codebase even when no commits were pushed. CodeQL updates
+#   its query database regularly; the schedule ensures the
+#   project benefits from those updates.
+#
+# category field:
+#   The `category: "/language:go"` field tags each analysis with
+#   a stable identifier. This matters when a repository has
+#   multiple languages — the category prevents analyses from
+#   overwriting each other on the GitHub Security tab.
+#
+# ⚠️ Action versions:
+#   This workflow uses github/codeql-action@v3, which is a
+#   well-established release. The other actions
+#   (actions/checkout, actions/setup-go) use the same versions
+#   as ci.yml (v7) for consistency.
+#
+#   If any `uses:` line fails with "reference not found", see the
+#   note in ci.yml — the resolution is the same (check the
+#   action's releases page and update the version).
+#
+#   Dependabot tracks the github-actions ecosystem weekly and
+#   will open PRs for updates automatically.
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added the "Query suite" comparison table explaining why
+#     security-extended is used.
+#   • Added a note about CodeQL's Go build requirement (it must
+#     observe an actual compile; skipping the build breaks the
+#     analysis).
+#   • Added a Trigger matrix table.
+#   • Documented the `category` field's role in multi-language
+#     repositories.
 # ============================================================
 
 name: CodeQL

@@ -1,11 +1,25 @@
 # ============================================================
 # DNSCrypt Smart Filter – Feature Request Template
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # GitHub Issue Forms (YAML-based) — the modern standard
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# ============================================================
+# v1.1.0 additions:
+#   • Pre-flight checklist now requires checking docs/adr/ for
+#     existing architectural decisions on the same topic.
+#   • Added "ADR proposal" as a request_type option — feature
+#     requests that reverse or amend an accepted architectural
+#     decision should be routed through the ADR system.
+#   • Added an "ADR-related features" section to make this path
+#     explicit and give the proposer a place to reference the
+#     relevant ADR(s).
+#   • Updated pre-flight to reference docs/BRANCHING.md and
+#     docs/RELEASE_PROCESS.md for process-related ideas.
+#   • ROADMAP reference updated to mention the version numbers
+#     currently tracked (v1.2.0, v1.3.0, v2.0.0).
 # ============================================================
 
 name: ✨ Feature Request
@@ -27,7 +41,8 @@ body:
         Before you continue, make sure that you:
 
         - Read [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md)
-        - Checked [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
+        - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
+        - Checked [docs/adr/](https://github.com/gasciljh/dnscrypt-proxy-webui/tree/main/docs/adr) for existing architectural decisions
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue) and [Discussions](https://github.com/gasciljh/dnscrypt-proxy-webui/discussions)
         - The feature aligns with the [project philosophy](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/README.md)
 
@@ -38,6 +53,8 @@ body:
         > - Mention the **benefits** and **use cases**.
         > - Mention the **alternatives** you considered.
         > - Avoid vague requests ("improve performance").
+        > - If your idea **changes** an existing architectural decision,
+        >   consider proposing it as an **ADR** (see request type below).
 
   # ============================================================
   # [2] Pre-flight checks
@@ -49,6 +66,8 @@ body:
       description: All items must be confirmed to continue
       options:
         - label: I have read ROADMAP.md and FAQ.md
+          required: true
+        - label: I checked docs/adr/ for existing architectural decisions on this topic
           required: true
         - label: I searched Issues and Discussions and did not find the same idea
           required: true
@@ -76,6 +95,7 @@ body:
         - 🛠️ Dev tooling
         - ♻️ Refactor
         - 🐳 Deployment / Docker
+        - 📋 ADR proposal (reverses or amends an existing decision)
         - 🔄 Other
     validations:
       required: true
@@ -172,7 +192,7 @@ body:
       placeholder: |
         Example:
         **UC-1: Major upgrade**
-        - User wants to upgrade the module from v1.0.0 to v1.1.0
+        - User wants to upgrade the module from v1.1.0 to v1.2.0
         - Exports the rules first
         - Updates the module
         - Imports the rules immediately
@@ -257,7 +277,53 @@ body:
       required: false
 
   # ============================================================
-  # [13] Architectural considerations
+  # [13] ADR-related features (v1.1.0)
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 📐 ADR-related features (v1.1.0)
+
+        > If your proposal **changes** or **reverses** an existing
+        > architecture decision, please fill in the section below.
+        >
+        > The project keeps all architectural decisions as ADRs in
+        > [`docs/adr/`](https://github.com/gasciljh/dnscrypt-proxy-webui/tree/main/docs/adr).
+        > Reversals are handled by creating a **new** ADR that
+        > supersedes the old one — never by editing an accepted ADR.
+        >
+        > This section is optional. Skip it if your proposal does not
+        > touch an existing decision.
+
+  - type: input
+    id: adr_reference
+    attributes:
+      label: 📐 Related ADR(s)
+      description: 'ADR numbers this proposal relates to (e.g. "ADR-0001, ADR-0006") — or leave empty'
+      placeholder: 'ADR-0001'
+    validations:
+      required: false
+
+  - type: textarea
+    id: adr_impact
+    attributes:
+      label: 📐 How does this affect the referenced decision?
+      description: |
+        Does it **amend** the decision (backward-compatible extension)
+        or **reverse** it (contradicts the original rationale)?
+      placeholder: |
+        Example (amend):
+        This extends ADR-0001 with a third permanent branch
+        (`staging`) but does not change the two-branch rationale.
+
+        Example (reverse):
+        This reverses ADR-0004 (unified PR template). The new
+        template would be split into 3 instead of 2.
+    validations:
+      required: false
+
+  # ============================================================
+  # [14] Technical considerations
   # ============================================================
   - type: textarea
     id: technical_notes
@@ -269,17 +335,20 @@ body:
         - Required API changes
         - New dependencies
         - Compatibility constraints
+        - Whether an ADR might be needed
       placeholder: |
         Example:
         - Requires a new endpoint: POST /api/export_rules
         - Must update main.go (new handler)
         - No new dependencies
         - Compatibility: works on all versions
+        - May need an ADR if the endpoint shape is
+          considered a public API commitment
     validations:
       required: false
 
   # ============================================================
-  # [14] Additional context
+  # [15] Additional context
   # ============================================================
   - type: textarea
     id: additional
@@ -289,13 +358,13 @@ body:
       placeholder: |
         - Related links
         - Articles or discussions
-        - Assumed timeline
+        - Assumed timeline (aligned with which ROADMAP version?)
         - Any other information
     validations:
       required: false
 
   # ============================================================
-  # [15] Final confirmation
+  # [16] Final confirmation
   # ============================================================
   - type: checkboxes
     id: final_confirmation

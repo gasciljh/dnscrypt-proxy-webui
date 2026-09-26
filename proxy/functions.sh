@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – functions.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -49,6 +49,16 @@
 #   read_toml_credentials reads ONLY from [monitoring_ui].
 #   Section tracking ignores any username/password in other
 #   sections.
+#
+# v1.1.0 coordination with main.go:
+#   • The constant `_MONITORING_UI_PORT` below MUST stay in sync
+#     with `MONITORING_UI_PORT` in main.go. Any change to one
+#     requires changing the other.
+#   • Memory limits (light/normal/pro/proplus/ultimate) are
+#     managed by main.go only. This file provides a read-only
+#     helper `get_profile_memory_hint` for user-facing display.
+#   • Port collision resolution is handled by customize.sh at
+#     install time; this file only enforces the 8080 rejection.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -65,6 +75,17 @@ case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
 # ============================================================
 # ⚠️ CRITICAL: This constant must stay in sync with MONITORING_UI_PORT
 # in main.go. Any change here must also be applied there.
+#
+# The reserved port is used by dnscrypt-proxy's internal monitoring_ui.
+# Changing it requires coordinated updates in:
+#   • main.go          → MONITORING_UI_PORT
+#   • functions.sh     → _MONITORING_UI_PORT (this file)
+#   • customize.sh     → _MONITORING_UI_PORT
+#   • action.sh        → _MONITORING_UI_PORT
+#   • service.sh       → _MONITORING_UI_PORT
+#   • status.sh        → _MONITORING_UI_PORT
+#   • watchdog.sh      → (uses TOML directly)
+#   • dnscrypt-proxy.toml → listen_address
 # ============================================================
 _MONITORING_UI_PORT="8080"
 
@@ -122,6 +143,7 @@ init_runtime_paths
 # --- Fixed paths ---
 TOML_FILE="$MODDIR/proxy/dnscrypt-proxy.toml"
 WEBUI_CONF="$MODDIR/proxy/webui.conf"
+SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 # --- Firewall cache variables ---
 _FW_CACHE=""
@@ -274,6 +296,15 @@ get_conf_value() {
 # ============================================================
 # [9] Read WebUI/Dashboard ports — Port Guard
 # ============================================================
+#
+# Port Guard: reject the reserved monitoring_ui port (8080).
+#
+# v1.1.0 note:
+#   This function does NOT handle PORT/DASHBOARD_PORT equality.
+#   That collision is resolved at install time by customize.sh
+#   ([14b]). At runtime, main.go refuses to start if the two
+#   ports are equal — the shell layer cannot intervene.
+# ============================================================
 get_webui_port() {
     local conf_file="${1:-$WEBUI_CONF}"
     local port
@@ -308,6 +339,45 @@ get_dashboard_port() {
     fi
     printf "9091"
     return 1
+}
+
+# ============================================================
+# [9b] v1.1.0 — profile memory hint (read-only)
+# ============================================================
+#
+# Returns a user-facing string describing the expected soft
+# memory limit for the active profile.
+#
+# ⚠️ This is a HINT only. main.go is the authority for the
+#    actual debug.SetMemoryLimit() value.
+#
+# Usage:
+#   get_profile_memory_hint
+#     → "120 MB (pro)"
+#     → "80 MB (light)"
+# ============================================================
+get_profile_memory_hint() {
+    local profile="pro"
+
+    if [ -f "$SELECTED_PROFILE_FILE" ]; then
+        local p
+        p=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
+        case "$p" in
+            light|normal|pro|proplus|ultimate) profile="$p" ;;
+        esac
+    fi
+
+    local mb
+    case "$profile" in
+        light)    mb="80"  ;;
+        normal)   mb="100" ;;
+        pro)      mb="120" ;;
+        proplus)  mb="160" ;;
+        ultimate) mb="220" ;;
+        *)        mb="80"  ;;
+    esac
+
+    printf "%s MB (%s)" "$mb" "$profile"
 }
 
 # ============================================================

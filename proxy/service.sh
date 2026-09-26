@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – service.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -27,6 +27,18 @@
 #   • Watchdog runs as a separate file so that $$ inside it
 #     refers to the real Watchdog PID (not service.sh's).
 #   • All error paths are logged to dnscrypt_main.log.
+#
+# v1.1.0 additions:
+#   • Logs the active profile + memory hint at startup
+#     (via functions.sh → get_profile_memory_hint)
+#   • Fallback for get_profile_memory_hint if functions.sh
+#     is unavailable (keeps logs informative on all systems)
+#   • Clearer structured log messages
+#
+# Coordination with main.go v1.1.0:
+#   • main.go adjusts the Go runtime soft memory limit based on
+#     the selected profile. This script only REPORTS the hint;
+#     main.go remains the authority for the actual limit.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -49,6 +61,7 @@ STATUS_FILE="/data/local/tmp/dnscrypt.status"
 CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
 
 TOML_FILE="$MODDIR/proxy/dnscrypt-proxy.toml"
+SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 # ============================================================
 # [2b] Read module version (before first log_msg call)
@@ -215,6 +228,32 @@ _inline_get_port() {
     printf "9090"
 }
 
+# --- Fallback: get_profile_memory_hint (v1.1.0) ---
+_inline_get_profile_memory_hint() {
+    local profile="pro"
+    local selected="$MODDIR/proxy/selected_profile.txt"
+
+    if [ -f "$selected" ]; then
+        local p
+        p=$(cat "$selected" 2>/dev/null | tr -d '\r\n ')
+        case "$p" in
+            light|normal|pro|proplus|ultimate) profile="$p" ;;
+        esac
+    fi
+
+    local mb
+    case "$profile" in
+        light)    mb="80"  ;;
+        normal)   mb="100" ;;
+        pro)      mb="120" ;;
+        proplus)  mb="160" ;;
+        ultimate) mb="220" ;;
+        *)        mb="80"  ;;
+    esac
+
+    printf "%s MB (%s)" "$mb" "$profile"
+}
+
 # ============================================================
 # [5b] Fallback: start_webui
 # ============================================================
@@ -274,6 +313,13 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
     do_start_webui()    { start_native_webui "$1" "$2"; }
     do_get_port()       { get_webui_port "$1"; }
     do_read_conf()      { get_conf_value "$1" "$2" "$3"; }
+
+    # v1.1.0 — memory hint wrapper
+    if command -v get_profile_memory_hint >/dev/null 2>&1; then
+        do_mem_hint()   { get_profile_memory_hint; }
+    else
+        do_mem_hint()   { _inline_get_profile_memory_hint; }
+    fi
 else
     do_cleanup_proxy()  { _inline_cleanup_proxy; }
     do_cleanup_webui()  { _inline_cleanup_webui; }
@@ -281,6 +327,7 @@ else
     do_start_webui()    { _inline_start_webui "$1" "$2"; }
     do_get_port()       { _inline_get_port "$1"; }
     do_read_conf()      { _inline_read_conf "$1" "$2" "$3"; }
+    do_mem_hint()       { _inline_get_profile_memory_hint; }
 fi
 
 # ============================================================
@@ -443,6 +490,26 @@ else
 fi
 
 # ============================================================
+# [14b] v1.1.0 — Log active profile + memory hint
+# ============================================================
+#
+# The actual Go memory limit is managed by main.go. This
+# section only logs the expected value at boot time so that
+# operators can confirm the profile was loaded correctly.
+# ============================================================
+ACTIVE_PROFILE="pro"
+if [ -f "$SELECTED_PROFILE_FILE" ]; then
+    _ap=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
+    case "$_ap" in
+        light|normal|pro|proplus|ultimate) ACTIVE_PROFILE="$_ap" ;;
+    esac
+fi
+
+MEMORY_HINT=$(do_mem_hint)
+log_msg "Active profile: $ACTIVE_PROFILE"
+log_msg "Expected memory limit: $MEMORY_HINT (managed by main.go)"
+
+# ============================================================
 # [15] Verify WebUI binary exists
 # ============================================================
 WEBUI="$BIN_DIR/dnscrypt-webui"
@@ -512,5 +579,21 @@ else
         log_msg "WARNING: Watchdog PID file not created — check watchdog.sh"
     fi
 fi
+
+# ============================================================
+# [18] Final structured summary (v1.1.0)
+# ============================================================
+#
+# A single consolidated log block describing the final state.
+# Useful for diagnostics when reading the boot log.
+# ============================================================
+log_msg "─────────────────────────────────────────────"
+log_msg "service.sh summary ($MODULE_VERSION):"
+log_msg "  • WebUI:        port $PORT (started=$([ "$WEBUI_STARTED" = "1" ] && echo yes || echo no))"
+log_msg "  • Profile:      $ACTIVE_PROFILE"
+log_msg "  • Memory hint:  $MEMORY_HINT"
+log_msg "  • Auto-restart: DNS=$AUTO_RESTART_DNS WebUI=$AUTO_RESTART_WEBUI"
+log_msg "  • functions.sh: $([ "$FUNCTIONS_LOADED" = "1" ] && echo loaded || echo fallback)"
+log_msg "─────────────────────────────────────────────"
 
 exit 0

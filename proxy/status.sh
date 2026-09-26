@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – status.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -13,6 +13,7 @@
 #   status.sh --short        Short display (OK / STOPPED / ...)
 #   status.sh --json         JSON output
 #   status.sh --check        Single-line summary
+#   status.sh --verbose      Extended display (adds Profile/Memory + Ports)
 #   status.sh --help         Show help
 #
 # Exit codes:
@@ -24,9 +25,11 @@
 # Reports:
 #   • DNS Engine  (port 5354/UDP)
 #   • WebUI       (port from webui.conf)
+#   • Dashboard   (port from webui.conf)
 #   • Watchdog    (PID file + process verification)
 #   • STATUS_FILE (user intent — may differ from actual state)
 #   • Active profile + blocklist entry count
+#   • Expected memory limit (v1.1.0 — display-only hint)
 #   • Blocklist stats (raw + filtered)
 #   • Configuration (AUTO_RESTART_*, BIND_ADDR, IPv6)
 #   • Runtime directory
@@ -34,9 +37,25 @@
 # Design:
 #   • Loads functions.sh if available; otherwise uses inline
 #     fallbacks (is_port_open, read_conf, read_webui_port, ...)
-#   • Includes FIX: the wrapper for is_ipv6_available delegates
-#     directly to _inline_is_ipv6_available to avoid infinite
-#     recursion (previous wrapper called itself).
+#   • The wrapper for is_ipv6_available delegates directly to
+#     _inline_is_ipv6_available to avoid infinite recursion.
+#     (The v1.0.0 development cycle hit a self-referencing bug
+#      that caused a SIGSEGV after ~18,000 iterations. The fix
+#      is preserved here as a documented invariant.)
+#
+# v1.1.0 additions:
+#   • JSON mode: profile.key + profile.memory_limit_mb
+#   • Full mode: "Profile & Memory" section
+#   • --check mode: PROFILE= and MEM= fields
+#   • --verbose mode: additional ports + config dump
+#   • Self-contained profile memory hint (does not require
+#     functions.sh)
+#
+# Coordination with main.go v1.1.0:
+#   • The memory limit shown here is a HINT. main.go is the
+#     authority for debug.SetMemoryLimit().
+#   • The profile value is read from selected_profile.txt,
+#     matching main.go's readSelectedProfile().
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -92,14 +111,16 @@ MODULE_VERSION="$(get_module_version)"
 SHORT_MODE=0
 JSON_MODE=0
 CHECK_MODE=0
+VERBOSE_MODE=0
 FORCE_MODE=0
 
 for arg in "$@"; do
     case "$arg" in
-        --short|-s) SHORT_MODE=1 ;;
-        --json|-j)  JSON_MODE=1 ;;
-        --check|-c) CHECK_MODE=1 ;;
-        --force|-f) FORCE_MODE=1 ;;
+        --short|-s)   SHORT_MODE=1 ;;
+        --json|-j)    JSON_MODE=1 ;;
+        --check|-c)   CHECK_MODE=1 ;;
+        --verbose|-V) VERBOSE_MODE=1 ;;
+        --force|-f)   FORCE_MODE=1 ;;
         --help|-h)
             cat << EOF
 DNSCrypt Smart Filter - status.sh ${MODULE_VERSION}
@@ -109,6 +130,7 @@ Usage:
   status.sh --short/-s      Short display (OK / STOPPED / ...)
   status.sh --check/-c      Single-line summary with all details
   status.sh --json/-j       JSON output
+  status.sh --verbose/-V    Extended display (adds ports + full config)
   status.sh --force/-f      Force check (bypass cache, slower but accurate)
   status.sh --help/-h       Show this help
 
@@ -264,21 +286,49 @@ _inline_is_ipv6_available() {
     return 0
 }
 
+# --- inline: get_profile_memory_hint (v1.1.0) ---
+_inline_get_profile_memory_hint() {
+    local profile="pro"
+
+    if [ -f "$SELECTED_FILE" ]; then
+        local p
+        p=$(cat "$SELECTED_FILE" 2>/dev/null | tr -d '\r\n ')
+        case "$p" in
+            light|normal|pro|proplus|ultimate) profile="$p" ;;
+        esac
+    fi
+
+    local mb
+    case "$profile" in
+        light)    mb="80"  ;;
+        normal)   mb="100" ;;
+        pro)      mb="120" ;;
+        proplus)  mb="160" ;;
+        ultimate) mb="220" ;;
+        *)        mb="80"  ;;
+    esac
+
+    printf "%s MB (%s)" "$mb" "$profile"
+}
+
 # ============================================================
 # [7] Unified wrappers
 # ============================================================
-# FIX: the previous wrapper for is_ipv6_available caused infinite
-# recursion (SIGSEGV after ~18,000 iterations):
+# Note on is_ipv6_available:
+#   The v1.0.0 development cycle hit a self-referencing bug:
 #
-#   is_ipv6_available() {
-#       command -v is_ipv6_available >/dev/null 2>&1 \
-#           && is_ipv6_available \
-#           || _inline_is_ipv6_available
-#   }
+#     is_ipv6_available() {
+#         command -v is_ipv6_available >/dev/null 2>&1 \
+#             && is_ipv6_available \
+#             || _inline_is_ipv6_available
+#     }
 #
-# The wrapper redefined itself and then called itself.
-# functions.sh already provides is_ipv6_available, so the
-# fallback wrapper simply delegates to _inline_is_ipv6_available.
+#   The wrapper redefined itself and then called itself,
+#   causing a SIGSEGV after ~18,000 iterations.
+#
+#   The fix (preserved here as an invariant) is to delegate
+#   directly to _inline_is_ipv6_available whenever functions.sh
+#   does not provide an authoritative is_ipv6_available.
 # ============================================================
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_tcp_open()           { is_port_open "$1" tcp; }
@@ -286,15 +336,56 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
     read_conf()             { get_conf_value "$1" "$2" "$3"; }
     read_webui_port()       { get_webui_port "$CONF_FILE" 2>/dev/null; }
     read_dashboard_port()   { get_dashboard_port "$CONF_FILE" 2>/dev/null; }
-    is_ipv6_available()     { _inline_is_ipv6_available; }
+
+    if command -v is_ipv6_available >/dev/null 2>&1; then
+        ipv6_available()    { is_ipv6_available; }
+    else
+        ipv6_available()    { _inline_is_ipv6_available; }
+    fi
+
+    if command -v get_profile_memory_hint >/dev/null 2>&1; then
+        mem_hint()          { get_profile_memory_hint; }
+    else
+        mem_hint()          { _inline_get_profile_memory_hint; }
+    fi
 else
     is_tcp_open()           { _inline_is_port_open "$1" tcp; }
     is_udp_open()           { _inline_is_port_open "$1" udp; }
     read_conf()             { _inline_read_conf "$1" "$2" "$3"; }
     read_webui_port()       { _inline_read_port "$CONF_FILE" "PORT" "9090"; }
     read_dashboard_port()   { _inline_read_port "$CONF_FILE" "DASHBOARD_PORT" "9091"; }
-    is_ipv6_available()     { _inline_is_ipv6_available; }
+    ipv6_available()        { _inline_is_ipv6_available; }
+    mem_hint()              { _inline_get_profile_memory_hint; }
 fi
+
+# ============================================================
+# [7b] Profile resolver (v1.1.0)
+# ============================================================
+# Reads the active profile key and computes its display name.
+# Self-contained — does not require functions.sh.
+# ============================================================
+PROFILE_KEY=""
+PROFILE_NAME="unknown"
+
+if [ -f "$SELECTED_FILE" ]; then
+    PROFILE_KEY=$(cat "$SELECTED_FILE" 2>/dev/null | tr -d '\r\n ')
+    case "$PROFILE_KEY" in
+        light)    PROFILE_NAME="Light" ;;
+        normal)   PROFILE_NAME="Normal" ;;
+        pro)      PROFILE_NAME="PRO" ;;
+        proplus)  PROFILE_NAME="PRO++" ;;
+        ultimate) PROFILE_NAME="Ultimate" ;;
+        "")       PROFILE_NAME="unknown" ;;
+        *)        PROFILE_NAME="$PROFILE_KEY" ;;
+    esac
+else
+    # File missing → main.go defaults to "pro"
+    PROFILE_KEY="pro"
+    PROFILE_NAME="PRO"
+fi
+
+MEMORY_HINT=$(mem_hint 2>/dev/null)
+[ -z "$MEMORY_HINT" ] && MEMORY_HINT="80 MB (pro)"
 
 # ============================================================
 # [8] Collect data
@@ -359,22 +450,6 @@ if [ -f "$BLOCKLIST_FILE" ]; then
     [ -z "$LAST_UPDATE" ] && LAST_UPDATE="unknown"
 fi
 
-# --- Profile ---
-PROFILE_NAME="unknown"
-PROFILE_KEY=""
-if [ -f "$SELECTED_FILE" ]; then
-    PROFILE_KEY=$(cat "$SELECTED_FILE" 2>/dev/null | tr -d '\r\n ')
-    case "$PROFILE_KEY" in
-        light)    PROFILE_NAME="Light" ;;
-        normal)   PROFILE_NAME="Normal" ;;
-        pro)      PROFILE_NAME="PRO" ;;
-        proplus)  PROFILE_NAME="PRO++" ;;
-        ultimate) PROFILE_NAME="Ultimate" ;;
-        "")       PROFILE_NAME="unknown" ;;
-        *)        PROFILE_NAME="$PROFILE_KEY" ;;
-    esac
-fi
-
 # --- Disabled ---
 IS_DISABLED="NO"
 [ -f "$MODDIR/disable" ] && IS_DISABLED="YES"
@@ -406,7 +481,7 @@ fi
 
 # --- IPv6 ---
 IPV6_AVAILABLE="NO"
-if is_ipv6_available; then
+if ipv6_available; then
     IPV6_AVAILABLE="YES"
 fi
 
@@ -459,13 +534,14 @@ if [ "$CHECK_MODE" = "1" ]; then
     dns_str="DNS=$( [ "$DNS_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
     webui_str="WEBUI=$( [ "$WEBUI_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
     profile_str="PROFILE=${PROFILE_KEY:-unknown}"
+    mem_str="MEM=${MEMORY_HINT}"
     entries_str="ENTRIES=$BLOCKLIST_COUNT"
     rundir_str="RUNDIR=$ACTIVE_RUN_DIR"
     disabled_str=""
     [ "$IS_DISABLED" = "YES" ] && disabled_str=" DISABLED"
 
-    printf "%s | %s | %s | %s | %s | %s%s\n" \
-        "$MODULE_VERSION" "$dns_str" "$webui_str" "$profile_str" "$entries_str" "$rundir_str" "$disabled_str"
+    printf "%s | %s | %s | %s | %s | %s | %s%s\n" \
+        "$MODULE_VERSION" "$dns_str" "$webui_str" "$profile_str" "$mem_str" "$entries_str" "$rundir_str" "$disabled_str"
 
     if [ "$IS_DISABLED" = "YES" ]; then
         exit 3
@@ -483,6 +559,9 @@ fi
 # ============================================================
 if [ "$JSON_MODE" = "1" ]; then
     CHECKED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)
+
+    # Extract numeric part of memory hint for machine-readable use
+    MEM_MB=$(printf '%s' "$MEMORY_HINT" | grep -oE '^[0-9]+' || echo "0")
 
     cat << EOF
 {
@@ -518,7 +597,8 @@ if [ "$JSON_MODE" = "1" ]; then
   "status_file": "$(esc_json "$STATUS_FROM_FILE")",
   "profile": {
     "key": "$(esc_json "$PROFILE_KEY")",
-    "name": "$(esc_json "$PROFILE_NAME")"
+    "name": "$(esc_json "$PROFILE_NAME")",
+    "memory_limit_mb": $MEM_MB
   },
   "blocklist": {
     "entries": $BLOCKLIST_COUNT,
@@ -558,7 +638,19 @@ if [ "$SHORT_MODE" = "1" ]; then
 fi
 
 # ============================================================
-# [13] Full mode (default)
+# [13] Verbose mode (v1.1.0 — new)
+# ============================================================
+# Adds an extra "Ports & Environment" section on top of the
+# default full display. Useful for diagnostic reports.
+# ============================================================
+if [ "$VERBOSE_MODE" = "1" ]; then
+    # Reuse the full-mode rendering path (defined below) but add
+    # an extra section by pre-setting a flag.
+    VERBOSE_EXTRA=1
+fi
+
+# ============================================================
+# [14] Full mode (default)
 # ============================================================
 if [ -t 1 ]; then
     RED=$(printf '\033[0;31m')
@@ -597,7 +689,7 @@ WATCHDOG_TEXT=$([ "$WATCHDOG_RUNNING" = "YES" ] && printf "running (PID: %s)" "$
 IPV6_ICON=$([ "$IPV6_AVAILABLE" = "YES" ] && printf "${GREEN}[+]${NC}" || printf "${DIM}[-]${NC}")
 
 # ============================================================
-# [14] Display
+# [15] Display
 # ============================================================
 echo ""
 echo "============================================================"
@@ -630,8 +722,13 @@ printf "  ${BOLD}WebUI:${NC}     ${BLUE}http://127.0.0.1:%s${NC}\n" "$PORT"
 printf "  ${BOLD}Dashboard:${NC} ${BLUE}http://127.0.0.1:%s${NC}\n" "$DASHBOARD_PORT"
 echo ""
 
-printf "%s--- Active Blocklist ---%s\n" "$CYAN" "$NC"
+printf "%s--- Profile & Memory ---%s\n" "$CYAN" "$NC"
 printf "  Profile:       %s\n" "$PROFILE_NAME"
+printf "  Memory limit:  %s\n" "$MEMORY_HINT"
+printf "  ${DIM}Managed by:    main.go (Go runtime soft limit)${NC}\n"
+echo ""
+
+printf "%s--- Active Blocklist ---%s\n" "$CYAN" "$NC"
 printf "  Entries:       %s\n" "$BLOCKLIST_COUNT"
 printf "  File size:     %s bytes\n" "$BLOCKLIST_SIZE"
 printf "  Last update:   %s\n" "$LAST_UPDATE"
@@ -667,7 +764,34 @@ fi
 echo ""
 
 # ============================================================
-# [15] Help hints
+# [15b] Verbose extra section (v1.1.0)
+# ============================================================
+if [ "$VERBOSE_MODE" = "1" ]; then
+    printf "%s--- Verbose: Ports & Environment ---%s\n" "$MAGENTA" "$NC"
+
+    # All known ports
+    printf "  WebUI port:        %s\n" "$PORT"
+    printf "  Dashboard port:    %s\n" "$DASHBOARD_PORT"
+    printf "  Monitoring UI:     %s (reserved)\n" "$_MONITORING_UI_PORT"
+    printf "  DNS engine port:   5354\n"
+    printf "  DNS engine proto:  UDP/TCP\n"
+    echo ""
+
+    # Config file paths
+    printf "  ${DIM}webui.conf:        %s${NC}\n" "$CONF_FILE"
+    printf "  ${DIM}dnscrypt-proxy.toml: %s${NC}\n" "$TOML_FILE"
+    printf "  ${DIM}selected_profile:  %s${NC}\n" "$SELECTED_FILE"
+    printf "  ${DIM}blocklist.txt:     %s${NC}\n" "$BLOCKLIST_FILE"
+    printf "  ${DIM}blocklist.raw:     %s${NC}\n" "$RAW_BLOCKLIST_FILE"
+    echo ""
+
+    # Raw STATUS_FILE content
+    printf "  STATUS_FILE raw:   %s\n" "${STATUS_FROM_FILE:-<missing>}"
+    echo ""
+fi
+
+# ============================================================
+# [16] Help hints
 # ============================================================
 if [ "$IS_DISABLED" = "YES" ]; then
     printf "%sWARNING: Module is disabled.${NC}\n" "$YELLOW"
@@ -686,7 +810,7 @@ elif [ "$DNS_RUNNING" = "NO" ] || [ "$WEBUI_RUNNING" = "NO" ]; then
 fi
 
 # ============================================================
-# [16] Exit code
+# [17] Exit code
 # ============================================================
 if [ "$IS_DISABLED" = "YES" ]; then
     exit 3

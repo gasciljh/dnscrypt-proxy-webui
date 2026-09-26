@@ -1,17 +1,36 @@
 # Architecture Decision Records (ADRs) — DNSCrypt Smart Filter
 
-> A curated log of the architectural and process decisions that shape the project.
+> A curated log of the architectural and process decisions that
+> shape the project.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `Last updated` reflects the v1.1.0 release date.
+>   • §3.3 (Examples from this project) extended with the
+>     v1.1.0 runtime improvements (MEM-1 / MEM-2 / MEM-3) as
+>     examples of contributions that do **not** need an ADR.
+>   • §6.5 (Index Statistics) annotated with the v1.0.0 and
+>     v1.1.0 release cycles.
+>   • **New subsection** §6.6 — ADRs by Release Cycle — for a
+>     clear timeline view.
+>   • §9 (Relationship with CHANGELOG) extended with a new
+>     subsection "Runtime Improvements vs ADRs" that explains
+>     why MEM-1/2/3 did not generate ADRs.
+>   • §10 (References) extended with `docs/UPGRADE.md`.
+>   • No new ADRs were added in v1.1.0. The registry remains at
+>     **6 ADRs** (5 accepted + 1 superseded).
 
 > **📖 Related documents**:
 > - Git workflow → [`../BRANCHING.md`](../BRANCHING.md)
 > - Release process → [`../RELEASE_PROCESS.md`](../RELEASE_PROCESS.md)
 > - Contribution guide → [`../CONTRIBUTING.md`](../CONTRIBUTING.md)
 > - Architecture → [`../ARCHITECTURE.md`](../ARCHITECTURE.md)
+> - Version upgrade guide → [`../UPGRADE.md`](../UPGRADE.md)
 
 ---
 
@@ -32,8 +51,9 @@
 
 ## 1. What is an ADR?
 
-An **Architecture Decision Record (ADR)** is a short, immutable document
-that captures a **significant decision** made during the project's lifetime.
+An **Architecture Decision Record (ADR)** is a short, immutable
+document that captures a **significant decision** made during the
+project's lifetime.
 
 Each ADR answers three questions:
 
@@ -46,12 +66,17 @@ Each ADR answers three questions:
 ADRs are:
 
 - **Lightweight** — one file per decision, 30-100 lines.
-- **Immutable** — never edited after acceptance; reversed by a new ADR.
+- **Immutable** — never edited after acceptance; reversed by a new
+  ADR.
 - **Numbered** — sequential, never reused.
 - **Versioned** — committed to the repository alongside code.
 
 The concept was popularized by Michael Nygard in 2011 and is used by
 Kubernetes, Rust, React, and dozens of other major projects.
+
+**In this project**: ADRs are used for both **process** decisions
+(e.g. the two-branch model) and **architectural** decisions. See
+§3.3 for examples across both v1.0.0 and v1.1.0.
 
 ---
 
@@ -67,6 +92,18 @@ Kubernetes, Rust, React, and dozens of other major projects.
 | **Onboarding friction** | New contributors rediscover history | Read the ADR index |
 | **Audit trail** | No trace of when/why a choice was made | Immutable log |
 
+**Example**: The v1.1.0 runtime improvement MEM-1 (dynamic memory
+limit) touched `main.go`, `functions.sh`, four shell scripts, and
+the `runtime_info` API. Without the ADR system, a future
+contributor might wonder: "Why does `main.go` call
+`applyMemoryLimit()` at startup **and** after every profile change?"
+
+The answer — "because the limit is a function of the active
+profile, and profile changes happen at those two points" — is
+trivial to document, but easy to lose. Whether it warrants a full
+ADR is a judgment call (see §3.3); what matters is that the
+**rationale is captured somewhere canonical**.
+
 ### 2.2 What they are NOT
 
 - ❌ **Not a tutorial** — see `docs/ARCHITECTURE.md`.
@@ -74,7 +111,8 @@ Kubernetes, Rust, React, and dozens of other major projects.
 - ❌ **Not a spec** — see `docs/API.md`.
 - ❌ **Not a plan** — see `docs/ROADMAP.md`.
 
-ADRs are specifically about **decisions** — the "why" behind the "what".
+ADRs are specifically about **decisions** — the "why" behind the
+"what".
 
 ---
 
@@ -96,6 +134,8 @@ ADRs are specifically about **decisions** — the "why" behind the "what".
 - ❌ The change is **purely cosmetic** (use commit message).
 - ❌ The decision is **easily reversible** within a sprint.
 - ❌ The decision is already documented in an existing ADR.
+- ❌ The change is a **runtime improvement** that does not alter
+  the architecture (e.g. MEM-1 / MEM-2 / MEM-3 — see §3.3).
 
 ### 3.3 Examples from this project
 
@@ -113,6 +153,49 @@ ADRs are specifically about **decisions** — the "why" behind the "what".
 | `runtime_info` dynamic ports (PORT-2) | Architecture | ✅ |
 | Fix a typo in a variable name | Bug fix | ❌ |
 | Change button color in `index.html` | Cosmetic | ❌ |
+| **MEM-1 — Dynamic memory limit per profile (v1.1.0)** | **Runtime improvement** | **❌** |
+| **MEM-2 — Extended `shellQuote` charset (v1.1.0)** | **Runtime improvement** | **❌** |
+| **MEM-3 — `MONITORING_UI_PORT` constant (v1.1.0)** | **Runtime improvement** | **❌** |
+| **`offline.html` CSP fix (v1.1.0)** | **Bug fix** | **❌** |
+
+**Why MEM-1/2/3 do not need ADRs**:
+
+- They do **not** change the project's architecture (still Go
+  runtime + `debug.SetMemoryLimit` + shell scripts).
+- They tune **values** (per-profile MB) and **constants**
+  (`MONITORING_UI_PORT`), not structure.
+- Their rationale is fully captured in `docs/SECURITY.md` §5.30
+  and `CHANGELOG.md` §[v1.1.0].
+
+**When would a memory-related change need an ADR?** If we ever:
+
+- Replace `debug.SetMemoryLimit` with a **custom memory manager**.
+- Introduce **hard** memory limits (e.g. cgroups on Android).
+- Move memory budgeting to a **separate service or helper**.
+
+Those would qualify as architectural decisions.
+
+### 3.4 Quick Decision Flow
+
+```text
+Is it a bug fix?  ──yes──▶ Commits only
+       │
+       no
+       ▼
+Is it cosmetic?  ──yes──▶ Commit message only
+       │
+       no
+       ▼
+Is it a runtime improvement?  ──yes──▶ SECURITY.md + CHANGELOG.md
+       │
+       no
+       ▼
+Is it a small refactor?  ──yes──▶ PR description
+       │
+       no
+       ▼
+   ✅ ADR
+```
 
 ---
 
@@ -121,16 +204,16 @@ ADRs are specifically about **decisions** — the "why" behind the "what".
 ### 4.1 States
 
 ```text
-┌───────────┐   ┌───────────┐   ┌───────────────┐
-│ PROPOSED  │──▶│ ACCEPTED  │──▶│  DEPRECATED   │
-└───────────┘   └───────────┘   └───────────────┘
+┌───────────┐    ┌───────────┐    ┌─────────────┐
+│ PROPOSED    │──▶│ ACCEPTED    │──▶│  DEPRECATED   │
+└───────────┘    └───────────┘    └─────────────┘
                       │
                       │ (reversed by a new ADR)
                       ▼
-                ┌───────────────┐
+                ┌─────────────┐
                 │  SUPERSEDED   │
                 │  by ADR-00XX  │
-                └───────────────┘
+                └─────────────┘
 ```
 
 | State | Meaning |
@@ -143,20 +226,27 @@ ADRs are specifically about **decisions** — the "why" behind the "what".
 ### 4.2 Rules
 
 1. **Never edit an Accepted ADR** — its content is historical.
-2. **To reverse a decision**, create a **new ADR** that supersedes it.
-3. **Update the superseded ADR** with a single line: `Status: Superseded by ADR-00XX`.
+2. **To reverse a decision**, create a **new ADR** that supersedes
+   it.
+3. **Update the superseded ADR** with a single line:
+   `Status: Superseded by ADR-00XX`.
 4. **Update this index** when the status changes.
-5. **Never delete an ADR** — even rejected ones are kept as "Proposed" or "Rejected".
+5. **Never delete an ADR** — even rejected ones are kept as
+   "Proposed" or "Rejected".
 
 ### 4.3 Immutability Example
 
-If ADR-0004 decides "use a unified PR template" and later we decide to
-create a release-specific template:
+If ADR-0004 decides "use a unified PR template" and later we decide
+to create a release-specific template:
 
-- ✅ Create `ADR-0005-release-specific-pr-template.md` with `Status: Accepted`.
-- ✅ Edit `ADR-0004` to add: `**Status**: Superseded by [ADR-0005](0005-...)`.
+- ✅ Create `ADR-0005-release-specific-pr-template.md` with
+  `Status: Accepted`.
+- ✅ Edit `ADR-0004` to add:
+  `**Status**: Superseded by [ADR-0005](0005-...)`.
 - ❌ Do NOT rewrite ADR-0004's content.
 - ❌ Do NOT delete ADR-0004.
+
+This is exactly what happened in v1.0.0 (see §6.1).
 
 ---
 
@@ -239,6 +329,31 @@ docs/adr/
 | Superseded | **1** |
 | Proposed | 0 |
 | Rejected | 0 |
+| **Added in v1.0.0 cycle** | **6** |
+| **Added in v1.1.0 cycle** | **0** |
+
+**Note**: v1.1.0 did not add any new ADRs. The three runtime
+improvements (MEM-1 / MEM-2 / MEM-3) are documented in
+`docs/SECURITY.md` §5.30 but do **not** warrant ADRs (see §3.3).
+
+### 6.6 ADRs by Release Cycle
+
+```text
+v1.0.0 cycle (2026-09-24):
+  ├── ADR-0001  Two-branch model
+  ├── ADR-0002  Automated releases
+  ├── ADR-0003  Post-release sync
+  ├── ADR-0004  Unified PR template           (superseded)
+  ├── ADR-0005  Release-specific PR template  (supersedes 0004)
+  └── ADR-0006  Rename hotfix.sh → release-patch.sh
+
+v1.1.0 cycle (2026-09-26):
+  └── (no new ADRs)
+
+v1.2.0 cycle (planned):
+  └── (to be determined — likely a memory-related ADR if the
+       architecture changes; otherwise none)
+```
 
 ---
 
@@ -263,11 +378,11 @@ Copy this into a new file when creating an ADR:
 
 ## Context
 
-Describe the situation that led to this decision. What forces are at play?
-What constraints exist? What problem are we solving?
+Describe the situation that led to this decision. What forces are at
+play? What constraints exist? What problem are we solving?
 
-Be specific. Avoid jargon. Assume the reader knows the project but not
-the internal history.
+Be specific. Avoid jargon. Assume the reader knows the project but
+not the internal history.
 
 ## Decision
 
@@ -275,7 +390,8 @@ State the decision clearly in the active voice:
 
 > "We will ..."
 
-One paragraph. If the decision has multiple parts, use a numbered list.
+One paragraph. If the decision has multiple parts, use a numbered
+list.
 
 ## Consequences
 
@@ -347,11 +463,14 @@ Before submitting an ADR, verify:
 
 ### 8.3 Anti-patterns
 
-- ❌ **Retroactive justification** — writing an ADR after the fact to look thorough.
+- ❌ **Retroactive justification** — writing an ADR after the fact
+  to look thorough.
 - ❌ **Hidden decisions** — changing behavior without an ADR.
 - ❌ **Ambiguity** — "we might consider possibly" (make a decision!).
-- ❌ **Too long** — 500-line ADRs are unread. Split into multiple ADRs.
+- ❌ **Too long** — 500-line ADRs are unread. Split into multiple
+  ADRs.
 - ❌ **Editing Accepted ADRs** — use a new superseding ADR instead.
+- ❌ **ADR for a runtime improvement** — see §3.3.
 
 ---
 
@@ -366,10 +485,10 @@ ADRs and `CHANGELOG.md` serve different purposes:
 | **ROADMAP** | **What** is planned | Future |
 | **PR description** | **How** the change was implemented | One PR |
 
-### When a decision affects users
+### 9.1 When a decision affects users
 
-If an ADR changes user-visible behavior (e.g. a rename, a breaking change),
-**both** documents must be updated:
+If an ADR changes user-visible behavior (e.g. a rename, a breaking
+change), **both** documents must be updated:
 
 1. **ADR** — the full rationale.
 2. **CHANGELOG** — a one-line entry referencing the ADR.
@@ -381,10 +500,58 @@ Example in `CHANGELOG.md`:
 - Renamed `scripts/hotfix.sh` → `scripts/release-patch.sh` ([ADR-0006](docs/adr/0006-rename-hotfix-to-release-patch.md))
 ```
 
-### When a decision is internal only
+### 9.2 When a decision is internal only
 
-If an ADR affects only internal tooling (e.g. CI config refactor), only
-the ADR is needed. The CHANGELOG may reference it as a "Chore".
+If an ADR affects only internal tooling (e.g. CI config refactor),
+only the ADR is needed. The CHANGELOG may reference it as a
+"Chore".
+
+### 9.3 Runtime Improvements vs ADRs
+
+Not every change that "feels important" needs an ADR. The v1.1.0
+release is a good example:
+
+| Change | ADR? | Where documented |
+|---|:---:|---|
+| **MEM-1** — Dynamic memory limit per profile | ❌ | `docs/SECURITY.md` §5.30.1 + `CHANGELOG.md` |
+| **MEM-2** — Extended `shellQuote` charset | ❌ | `docs/SECURITY.md` §5.30.2 + `CHANGELOG.md` |
+| **MEM-3** — `MONITORING_UI_PORT` in metrics handler | ❌ | `docs/SECURITY.md` §5.30.3 + `CHANGELOG.md` |
+| **`offline.html` CSP fix** | ❌ | `CHANGELOG.md` §Fixed → Critical |
+
+**Rule of thumb**:
+
+- If the change **modifies** an existing decision's **value** →
+  no ADR.
+- If the change **alters** the decision's **structure** → new ADR.
+- If the change **reverses** the decision → new superseding ADR.
+
+**Why MEM-1 does not need an ADR**:
+
+- The architecture is unchanged: Go runtime manages memory,
+  `debug.SetMemoryLimit` sets the soft limit.
+- MEM-1 modifies the **value** of that limit (from a fixed 80 MB
+  to per-profile).
+- The rationale is fully captured in `docs/SECURITY.md` §5.30.1.
+
+**When it *would* need an ADR**:
+
+- Replacing `debug.SetMemoryLimit` with a custom memory manager.
+- Introducing hard limits via cgroups.
+- Delegating memory budgeting to a separate helper.
+
+Those would be architectural changes.
+
+### 9.4 Summary Table
+
+| Change type | ADR | SECURITY.md | CHANGELOG.md | ROADMAP.md |
+|---|:---:|:---:|:---:|:---:|
+| Architectural decision | ✅ | — | ✅ | — |
+| Process decision | ✅ | — | ✅ | — |
+| Runtime improvement | ❌ | ✅ | ✅ | — |
+| Audit Correction | ❌ | ✅ | ✅ | — |
+| Bug fix | ❌ | — | ✅ | — |
+| New feature (planned) | — | — | — | ✅ |
+| New feature (delivered) | — | — | ✅ | ✅ |
 
 ---
 
@@ -401,7 +568,8 @@ the ADR is needed. The CHANGELOG may reference it as a "Chore".
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | System architecture |
 | [`../SECURITY.md`](../SECURITY.md) | Security policy |
 | [`../ROADMAP.md`](../ROADMAP.md) | Future plans |
-| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Version history |
+| [`../UPGRADE.md`](../UPGRADE.md) | Version upgrade guide |
+| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Version history (v1.0.0 + v1.1.0) |
 
 ### 10.2 External References
 
@@ -412,8 +580,31 @@ the ADR is needed. The CHANGELOG may reference it as a "Chore".
 - [React RFCs](https://github.com/reactjs/rfcs)
 - [ThoughtWorks — Lightweight ADRs](https://www.thoughtworks.com/radar/techniques/lightweight-architecture-decision-records)
 
+### 10.3 v1.0.0 Cycle References
+
+The six ADRs added in the v1.0.0 cycle:
+
+| ADR | Introduced in | Rationale |
+|:-:|---|---|
+| 0001 | v1.0.0 | Two-branch model |
+| 0002 | v1.0.0 | Automated releases |
+| 0003 | v1.0.0 | Post-release sync |
+| 0004 | v1.0.0 | Unified PR template (superseded) |
+| 0005 | v1.0.0 | Release-specific PR template |
+| 0006 | v1.0.0 | Rename hotfix.sh → release-patch.sh |
+
+### 10.4 v1.1.0 Cycle References
+
+**No new ADRs were added.** The v1.1.0 changes were:
+
+- Runtime improvements (MEM-1/2/3) — see `docs/SECURITY.md` §5.30.
+- Critical fix (`offline.html` CSP) — see `CHANGELOG.md`.
+- Documentation updates — see `docs/UPGRADE.md` §3.0.
+
+None of these warranted an ADR (see §3.3 and §9.3).
+
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*

@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – post-fs-data.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -24,6 +24,27 @@
 #   • No background processes — Magisk does not wait for them
 #   • Safe on all devices (path checks + security guards)
 #   • Idempotent — safe to run multiple times
+#   • Protected log_msg — the filesystem may not be ready yet
+#
+# v1.1.0 additions:
+#   • Structured entry/exit log messages
+#   • Clearer comments on the self-contained design
+#   • Documented non-responsibilities (see note below)
+#   • All messages are English (global release)
+#
+# Non-responsibilities (deliberately NOT done here):
+#   • private_dns_mode reset is moved to service.sh because the
+#     `settings` service may not be ready during post-fs-data.
+#   • route_localnet restore is handled by uninstall.sh because
+#     it requires sysctl, which may not be available this early.
+#   • No firewall rule creation — only cleanup. Active rules are
+#     created later by main.go (startService) or service.sh.
+#
+# Coordination with v1.1.0:
+#   • This script does NOT use _MONITORING_UI_PORT — no port
+#     validation happens this early in boot. Port Guard is
+#     enforced by customize.sh (install time), main.go
+#     (startup), and functions.sh (runtime).
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -76,6 +97,13 @@ fi
 # ============================================================
 # [3] Protected log_msg
 # ============================================================
+#
+# At post-fs-data phase, the filesystem may not be fully ready:
+#   • /data/local/tmp may not exist yet (rare)
+#   • The log file may not be writable (very rare)
+#
+# Every write is guarded so a failure never blocks boot.
+# ============================================================
 log_msg() {
     if [ ! -d "/data/local/tmp" ]; then
         return 0
@@ -104,6 +132,12 @@ log_msg() {
 #   cleanup) could run. In that case, old rules (direct DNAT +
 #   RETURN without a chain) may still be present. We clean them
 #   best-effort.
+#
+# Non-actions:
+#   • No jump rules are created here.
+#   • No DNAT catch-all is created here.
+#   • This is cleanup-only; the active state is set later by
+#     main.go (startService) or service.sh.
 # ============================================================
 inline_firewall_cleanup() {
     # --- [1] nftables: delete the entire table ---
@@ -217,6 +251,15 @@ inline_firewall_cleanup() {
 # No background operators: Magisk does not wait for background
 # processes. Without them, we guarantee cleanup completes before
 # the script exits.
+#
+# Why we write STATUS_FILE = "OFF" here:
+#   The user explicitly disabled the module. Writing OFF is the
+#   correct representation of "user intent" per the STATUS_FILE
+#   contract (see docs/SECURITY.md — Audit Correction #18).
+#
+#   This is the ONLY legitimate place (alongside service.sh's
+#   disable path) where a script writes STATUS_FILE outside of
+#   main.go's startService/stopService.
 # ============================================================
 if [ -f "$MODDIR/disable" ]; then
     log_msg "Module '$MOD_NAME' is DISABLED. Starting emergency cleanup..."
@@ -257,8 +300,14 @@ if [ -f "$MODDIR/disable" ]; then
     fi
 
     log_msg "✅ Emergency cleanup complete"
+    log_msg "   Non-action: private_dns_mode reset (handled by service.sh)"
+    log_msg "   Non-action: route_localnet restore (handled by uninstall.sh)"
     # Note: resetting private_dns_mode is moved to service.sh
     # because the settings service may not be ready during post-fs-data.
+else
+    # Module is enabled — nothing to do in this phase.
+    # The active state is set up later by service.sh after boot.
+    :
 fi
 
 # ============================================================
