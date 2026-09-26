@@ -18,8 +18,26 @@ conventions, merge rules, and protection policies.
 >   • `Related Documentation` now includes `docs/UPGRADE.md`
 >     (added as a first-class reference in v1.1.0).
 >   • `Project Files` table extended with `docs/UPGRADE.md`.
+>   • **§6.3 (Tags protection) rewritten** — the previous version
+>     described the deprecated "Protected tags" UI (Classic
+>     Branch Protection). The current Rulesets UI requires
+>     different settings, and specifically requires
+>     `Repository admin` in the Bypass list when
+>     `Restrict creations` is enabled. See the "⚠️ Critical"
+>     callout in §6.3. The bug was discovered during the
+>     v1.1.0 release cycle (see PR #6).
+>   • §6.2 (`develop` protection) — added a note about the
+>     force-push restriction and the recommended merge-based
+>     sync alternative.
+>   • §7.3 (`release.yml` auto-sync) — added a note about the
+>     `continue-on-error: true` behavior and the manual
+>     fallback.
+>   • §8.4 (back-merge) — added a note that the same manual
+>     command works for both regular and hotfix releases.
+>   • §9.4 (common mistakes) — added a new row about the
+>     `Restrict creations` + Bypass pitfall.
 >   • No changes to the core branching strategy — the two-branch
->     model, naming rules, and protection policy are unchanged.
+>     model, naming rules, and workflow are unchanged.
 
 > **📖 Related documents**:
 > - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
@@ -502,17 +520,74 @@ push" allowlist so the post-release sync
 
 **Required status checks** (same as `main`).
 
+**Note on force-push**: `develop` does not allow force-push even
+for the owner. To sync `develop` with `main` after a release,
+use a regular `git merge` (see §8.4), not `--force`.
+
 ### 6.3 Tags
 
-Configure at **Settings → Tags → Protected tags**:
+> **⚠️ Important — this section was rewritten in v1.1.0.**
+>
+> The previous version of this document described the deprecated
+> "Protected tags" page (Classic Branch Protection). GitHub now
+> uses **Rulesets**, which behave differently — most notably
+> around the "Restrict creations" rule.
+
+Configure at **Settings → Rules → Rulesets** (not the legacy
+"Protected tags" page, which is deprecated).
+
+**Recommended Ruleset**:
 
 | Setting | Value |
 |---|---|
-| **Tag name pattern** | `v*` |
-| Restrict who can create | Maintainer only |
-| Restrict who can delete | ❌ Nobody |
+| **Name** | `Protect release tags` |
+| **Enforcement status** | Active |
+| **Target tags** | `v*` (pattern match) |
+| **Restrict creations** | ✅ (requires Bypass — see below) |
+| **Restrict updates** | ✅ |
+| **Restrict deletions** | ✅ |
+| **Block force pushes** | ✅ |
+| **Bypass list** | **`Repository admin`** ⚠️ MANDATORY |
 
-**Why**: prevents accidental deletion of release tags.
+> **⚠️ Critical requirement**:
+>
+> If `Restrict creations` is enabled, the `Repository admin`
+> role **MUST** be present in the Bypass list.
+>
+> Without this entry, the rule blocks **all** tag creation —
+> including by the repository owner. This was discovered
+> during the v1.1.0 release cycle (see PR #6). Attempting to
+> push a tag or create one via the GitHub Releases UI will
+> fail with:
+>
+> ```text
+> remote: error: GH013: Repository rule violations found
+> remote: - Cannot create ref due to creations being restricted.
+> ```
+>
+> **Fix**: Add `Repository admin` to the Bypass list in the
+> Ruleset.
+
+**Why**: prevents accidental deletion or modification of release
+tags while allowing maintainers to create new tags without
+friction.
+
+**Alternative** (simpler, less strict): disable `Restrict
+creations` and keep only `Restrict updates` + `Restrict
+deletions`. This allows any user with push access to create tags,
+but tags remain immutable once created.
+
+**Verify**:
+
+```bash
+# On GitHub: Settings → Rules → Rulesets
+# Expected:
+#   Target: v*
+#   Restrict creations: ✅
+#   Restrict updates: ✅
+#   Restrict deletions: ✅
+#   Bypass list: Repository admin  ← MUST be present
+```
 
 ### 6.4 Repository Settings
 
@@ -577,6 +652,21 @@ For PATCH releases:
 
 Same pipeline, but with 3 safety rules enforced (see
 [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)).
+
+**Note on auto-sync**: If the auto-sync step fails (e.g. due to
+branch protection on `develop`), the release still succeeds — the
+sync has `continue-on-error: true`. In that case, sync manually:
+
+```bash
+git checkout develop
+git pull origin develop
+git merge origin/main --no-edit -m "chore: sync develop with main"
+git push origin develop
+```
+
+Or, to allow the bot to sync automatically in future releases, add
+`Repository admin` or `github-actions[bot]` to the Bypass list of
+the Ruleset that protects `develop`.
 
 Full process: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
 
@@ -669,6 +759,10 @@ next `release/*` PR will reintroduce the bug.
 For **regular releases** (`release/*`), `release.yml` performs this
 automatically. For **hotfixes** (`hotfix/*`), it is manual because
 GitHub Actions cannot distinguish a hotfix tag from a regular tag.
+
+**Note**: If `release.yml`'s auto-sync fails (e.g. due to
+protected-branch rules on `develop`), the same manual command
+above works for both regular and hotfix releases.
 
 ### 8.5 PATCH-Release Script
 
@@ -777,6 +871,7 @@ make sync
 | Forget to back-merge hotfixes | Run `make sync` after PATCH releases |
 | Use `merge commits` | Squash merge only |
 | Use the default template for releases | Use `?template=release.md` |
+| Enable `Restrict creations` without a Bypass entry | Add `Repository admin` to the Bypass list (see §6.3) |
 
 ---
 
@@ -837,6 +932,8 @@ make sync
 - [Git Flow (Vincent Driessen)](https://nvie.com/posts/a-successful-git-branching-model/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Semantic Versioning](https://semver.org/)
+- [GitHub Rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets)
+- [GitHub Rulesets — Bypass list](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository#granting-bypass-permissions-for-your-ruleset)
 - [GitHub Branch Protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
 - [Michael Nygard — Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
 
