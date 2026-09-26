@@ -12,34 +12,71 @@
 
 ---
 
+> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+>
+> This ADR was reviewed during the v1.1.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The script has been **present in the repository** as
+>     `scripts/release-patch.sh` since the v1.0.0 cycle (2026-09-24).
+>   • The script's **behavior** (3 safety rules: branch=`main`,
+>     MAJOR equal, MINOR equal, PATCH = current + 1) has been
+>     validated via `--dry-run` mode at least once during review.
+>   • The script has **not yet been exercised for a real PATCH
+>     release** — because:
+>     - `v1.0.0` was a first stable release (initial).
+>     - `v1.1.0` was a MINOR release (via `release.sh`).
+>     - No `v1.0.1` or `v1.1.1` has been needed.
+>   • The **naming decision** (`release-` prefix instead of
+>     `hotfix-`) remains correct:
+>     - It aligns with `scripts/release.sh` alphabetically.
+>     - It accurately describes the version component (PATCH).
+>     - It avoids confusion with the `hotfix/*` **branch** prefix.
+>   • The **first realistic use** of the script is expected when
+>     a critical bug in `v1.1.0` requires a `v1.1.1` PATCH release
+>     (via `hotfix/*`).
+>   • The **naming decision** has not caused any confusion in the
+>     documentation or the contributor guides (`docs/BRANCHING.md`
+>     §8, `docs/RELEASE_PROCESS.md` §2.3 and §5.7).
+>
+> **Result**: The decision is validated by its integration into
+> the codebase and documentation. Full runtime validation will
+> follow the first PATCH release. No superseding ADR is required.
+
+---
+
 ## Context
 
 ### The problem
 
 An early draft of the release tooling proposed a script named
-`scripts/hotfix.sh` — a wrapper around [`scripts/release.sh`](../../scripts/release.sh)
-that adds three safety rules for PATCH-only releases.
+`scripts/hotfix.sh` — a wrapper around
+[`scripts/release.sh`](../../scripts/release.sh) that adds three
+safety rules for PATCH-only releases.
 
-The name `hotfix.sh` was **inherited from the general Git culture** where
-"hotfix" is a well-known term (see Git Flow). However, on closer
-inspection, this name introduced **three distinct problems**:
+The name `hotfix.sh` was **inherited from the general Git culture**
+where "hotfix" is a well-known term (see Git Flow). However, on
+closer inspection, this name introduced **three distinct problems**:
 
-1. **Inconsistent naming.** The primary release script is `release.sh`.
-   Its sibling was `hotfix.sh` — different prefix, different semantics.
-   Reading the `scripts/` folder, a contributor would not immediately
-   see them as a related pair.
+1. **Inconsistent naming.** The primary release script is
+   `release.sh`. Its sibling was `hotfix.sh` — different prefix,
+   different semantics. Reading the `scripts/` folder, a
+   contributor would not immediately see them as a related pair.
 
 2. **Conceptual mismatch.** In Semantic Versioning, what the script
-   produces is a **PATCH release** (increments `PATCH` only). "Hotfix"
-   is a **Git Flow term** that refers to the branch (`hotfix/*`), not
-   the version component. Mixing terminology across two different
-   naming systems created ambiguity.
+   produces is a **PATCH release** (increments `PATCH` only).
+   "Hotfix" is a **Git Flow term** that refers to the branch
+   (`hotfix/*`), not the version component. Mixing terminology
+   across two different naming systems created ambiguity.
 
 3. **Prefix collision with branches.** The project already uses
-   `hotfix/*` as a **branch prefix** (see [ADR-0001](0001-two-branch-model.md)).
-   Having both `hotfix/*` (branch) and `hotfix.sh` (script) meant that
-   a search for "hotfix" returned results from two unrelated domains —
-   the branch and the tool.
+   `hotfix/*` as a **branch prefix** (see
+   [ADR-0001](0001-two-branch-model.md)). Having both `hotfix/*`
+   (branch) and `hotfix.sh` (script) meant that a search for
+   "hotfix" returned results from two unrelated domains — the
+   branch and the tool.
 
 ### The forces at play
 
@@ -54,22 +91,26 @@ inspection, this name introduced **three distinct problems**:
 
 ### Constraints
 
-- The tool must be released in `v1.0.0` — this is the **last chance** to
-  rename it without breaking user scripts.
-- The rename must be **complete** — no `hotfix.sh` alias left behind.
-- Documentation, `Makefile`, `CHANGELOG.md`, and `ROADMAP.md` must be
-  updated in the same change set.
-- The rename must not change the script's **behavior** — only its name.
+- The tool must be released in `v1.0.0` — this is the **last
+  chance** to rename it without breaking user scripts.
+- The rename must be **complete** — no `hotfix.sh` alias left
+  behind.
+- Documentation, `Makefile`, `CHANGELOG.md`, and `ROADMAP.md` must
+  be updated in the same change set.
+- The rename must not change the script's **behavior** — only its
+  name.
 
 ### Scope
 
-This ADR covers **the name of the PATCH-release wrapper script**. It does
-**not** cover:
+This ADR covers **the name of the PATCH-release wrapper script**. It
+does **not** cover:
 
-- The PATCH-release logic itself → see [ADR-0002](0002-automated-releases.md).
-- The `hotfix/*` branch naming → see [ADR-0001](0001-two-branch-model.md).
-- The release workflow → see [ADR-0002](0002-automated-releases.md) and
-  [ADR-0003](0003-post-release-sync.md).
+- The PATCH-release logic itself → see
+  [ADR-0002](0002-automated-releases.md).
+- The `hotfix/*` branch naming → see
+  [ADR-0001](0001-two-branch-model.md).
+- The release workflow → see [ADR-0002](0002-automated-releases.md)
+  and [ADR-0003](0003-post-release-sync.md).
 
 ---
 
@@ -101,8 +142,8 @@ scripts/
 └── package_module.sh
 ```
 
-The two release scripts now sit side by side, alphabetically adjacent,
-and share the `release-` prefix.
+The two release scripts now sit side by side, alphabetically
+adjacent, and share the `release-` prefix.
 
 #### What changes
 
@@ -110,7 +151,7 @@ and share the `release-` prefix.
 |---|---|---|
 | Script file | `scripts/hotfix.sh` | `scripts/release-patch.sh` |
 | Header comment | `DNSCrypt Smart Filter – hotfix.sh` | `DNSCrypt Smart Filter – release-patch.sh` |
-| Usage examples | `./scripts/hotfix.sh v1.0.1` | `./scripts/release-patch.sh v1.0.1` |
+| Usage examples | `./scripts/hotfix.sh v1.0.1` | `./scripts/release-patch.sh v1.1.1` |
 | Help text | `hotfix.sh <version>` | `release-patch.sh <version>` |
 | Error messages | "Hotfixes MUST NOT..." | "Patch releases MUST NOT..." |
 | Summary box | "Hotfix summary:" | "Patch release summary:" |
@@ -120,11 +161,12 @@ and share the `release-` prefix.
 
 - ✅ The script's **behavior** — same 3 safety rules (branch = `main`,
   `MAJOR` equal, `MINOR` equal, `PATCH` = current + 1).
-- ✅ The delegation to [`scripts/release.sh`](../../scripts/release.sh).
+- ✅ The delegation to
+  [`scripts/release.sh`](../../scripts/release.sh).
 - ✅ The `--dry-run`, `--no-push`, `--yes`, `--help` flags.
 - ✅ The exit codes (`0`, `1`, `2`, `3`, `4`).
-- ✅ The `hotfix/*` **branch prefix** — that remains, because it aligns
-  with the widely-recognized Git Flow terminology (see
+- ✅ The `hotfix/*` **branch prefix** — that remains, because it
+  aligns with the widely-recognized Git Flow terminology (see
   [ADR-0001](0001-two-branch-model.md)).
 
 #### Files updated as part of this rename
@@ -133,7 +175,7 @@ and share the `release-` prefix.
 |---|---|
 | `scripts/hotfix.sh` | 🗑️ Deleted |
 | `scripts/release-patch.sh` | ✨ Created (same logic) |
-| `Makefile` | Target `hotfix:` → `release-patch:` (or aliased) |
+| `Makefile` | Target `hotfix:` → `release-patch:` |
 | `docs/BRANCHING.md` §8 | References updated |
 | `docs/RELEASE_PROCESS.md` §2.3 | References updated |
 | `docs/ROADMAP.md` §10 | References updated |
@@ -147,7 +189,8 @@ and share the `release-` prefix.
 | **PATCH** | SemVer component | Third number in `vX.Y.Z` |
 | **`release-patch.sh`** | Script | Tool that bumps PATCH from `main` |
 
-By separating these three, each concept has **one name** in **one domain**.
+By separating these three, each concept has **one name** in **one
+domain**.
 
 ### Diagram
 
@@ -156,10 +199,10 @@ Concept                    Branch             Script              Version
 ─────────────────────────────────────────────────────────────────────────
 Regular release      ──▶   release/*      ──▶  release.sh      ──▶  MINOR / MAJOR
                                                                             │
-Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─▶  PATCH
-                            ▲                   ▲                    ▲
-                            │                   │                    │
-                            └─── Git term ──────┴──── SemVer term ──┘
+Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─▶     PATCH
+                            ▲                      ▲                      ▲
+                            │                       │                      │
+                            └─── Git term ────────┴──── SemVer term ────┘
 ```
 
 ---
@@ -168,44 +211,47 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
 
 ### Positive
 
-- ✅ **Naming consistency.** `release.sh` and `release-patch.sh` share
-  a prefix and can be listed together with a single glob
+- ✅ **Naming consistency.** `release.sh` and `release-patch.sh`
+  share a prefix and can be listed together with a single glob
   (`scripts/release*.sh`).
 - ✅ **Semantic accuracy.** The name describes the exact version
-  component (`PATCH`), matching the SemVer vocabulary used everywhere
-  else in the project.
+  component (`PATCH`), matching the SemVer vocabulary used
+  everywhere else in the project.
 - ✅ **Search clarity.** Searching for "hotfix" now returns only the
   **branch** concept — no more false positives from a script.
-- ✅ **Better onboarding.** A new contributor reading `scripts/` sees
-  two clearly related tools.
+- ✅ **Better onboarding.** A new contributor reading `scripts/`
+  sees two clearly related tools.
 - ✅ **Aligned with `docs/BRANCHING.md`.** The branch is `hotfix/*`
-  (Git convention), the script is `release-patch.sh` (SemVer convention).
-  Each name lives in the domain where it belongs.
-- ✅ **Future-proof.** If a MINOR-emergency or MAJOR-emergency variant
-  is ever needed, the pattern `release-minor.sh`, `release-major.sh`
-  extends naturally.
+  (Git convention), the script is `release-patch.sh` (SemVer
+  convention). Each name lives in the domain where it belongs.
+- ✅ **Future-proof.** If a MINOR-emergency or MAJOR-emergency
+  variant is ever needed, the pattern `release-minor.sh`,
+  `release-major.sh` extends naturally.
 
 ### Negative
 
-- ❌ **Documentation churn.** Five files must be updated simultaneously
-  (see the table above). Missing one creates an inconsistent state.
+- ❌ **Documentation churn.** Five files must be updated
+  simultaneously (see the table above). Missing one creates an
+  inconsistent state.
 - ❌ **Lost muscle memory.** Contributors who saw the draft
-  `hotfix.sh` name must relearn. This is mitigated by the fact that
-  the tool is **not yet released** — no external scripts reference it.
-- ❌ **One more naming convention to explain.** The `hotfix/*` branch
-  and the `release-patch.sh` script use **different vocabularies**.
-  This must be documented (done in this ADR).
+  `hotfix.sh` name must relearn. This is mitigated by the fact
+  that the tool is **not yet released** — no external scripts
+  reference it.
+- ❌ **One more naming convention to explain.** The `hotfix/*`
+  branch and the `release-patch.sh` script use **different
+  vocabularies**. This must be documented (done in this ADR).
 - ❌ **Git history discontinuity.** `git log scripts/release-patch.sh`
   will show only the commits after the rename. The history of
-  `hotfix.sh` (drafts) is technically preserved but not reachable via
-  the new path.
-- ❌ **No alias for the old name.** Users who somehow learned the draft
-  name will hit an error. Accepted because the tool was never released.
+  `hotfix.sh` (drafts) is technically preserved but not reachable
+  via the new path.
+- ❌ **No alias for the old name.** Users who somehow learned the
+  draft name will hit an error. Accepted because the tool was never
+  released.
 
 ### Neutral
 
-- ⚪ **The header version** stays `v1.0.0` — the rename is part of the
-  initial release, not a separate version.
+- ⚪ **The header version** stays `v1.0.0` — the rename is part of
+  the initial release, not a separate version.
 - ⚪ **The script's content is 95% identical.** Only the header,
   usage strings, and messages change.
 - ⚪ **The `hotfix/*` branch prefix remains.** Only the script name
@@ -239,13 +285,21 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
 
 ### Project files
 
-- [`scripts/release.sh`](../../scripts/release.sh) — the primary release script.
-- [`scripts/release-patch.sh`](../../scripts/release-patch.sh) — the renamed script.
-- [`Makefile`](../../Makefile) — updated target (`hotfix:` → `release-patch:`).
-- [`docs/BRANCHING.md`](../BRANCHING.md) §8 — hotfix flow documentation.
-- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §2.3 — PATCH release type.
+- [`scripts/release.sh`](../../scripts/release.sh) — the primary
+  release script.
+- [`scripts/release-patch.sh`](../../scripts/release-patch.sh) —
+  the renamed script.
+- [`Makefile`](../../Makefile) — updated target (`hotfix:` →
+  `release-patch:`).
+- [`docs/BRANCHING.md`](../BRANCHING.md) §8 — hotfix flow
+  documentation.
+- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §2.3 — PATCH
+  release type.
 - [`docs/ROADMAP.md`](../ROADMAP.md) §10.2 — workflow priorities.
-- [`CHANGELOG.md`](../../CHANGELOG.md) — the rename is recorded here.
+- [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
+  (v1.0.0 → v1.1.0; the PATCH flow will be relevant for v1.1.1).
+- [`CHANGELOG.md`](../../CHANGELOG.md) — the rename is recorded
+  here.
 
 ### External references
 
@@ -261,7 +315,39 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
   [ADR-0001](0001-two-branch-model.md) through
   [ADR-0005](0005-release-specific-pr-template.md).
 
+### Release verification
+
+- **v1.0.0** (2026-09-24) — first release cycle.
+  - `scripts/release-patch.sh` is present in the repository.
+  - The rename was completed (no `scripts/hotfix.sh` remaining).
+  - `Makefile` has the `release-patch` target.
+  - Documentation (`docs/BRANCHING.md` §8,
+    `docs/RELEASE_PROCESS.md` §2.3) references the new name.
+  - The script was **not exercised** for a real PATCH release
+    during this cycle (no hotfix was needed).
+  - `--dry-run` mode was validated during review.
+- **v1.1.0** (2026-09-26) — second release cycle.
+  - No PATCH release was needed (v1.1.0 was a MINOR release via
+    `release.sh`).
+  - `scripts/release-patch.sh` remained unchanged.
+  - The naming decision has not caused any confusion in the
+    documentation, the `Makefile`, or the contributor guides.
+  - `docs/BRANCHING.md` §8 uses `v1.1.1` as the first realistic
+    PATCH example.
+- **First real PATCH release** — **not yet exercised**.
+  - Expected scenario: `v1.1.0 → v1.1.1` via `hotfix/*`.
+  - The 3 safety rules will be validated in production.
+  - See [`docs/BRANCHING.md`](../BRANCHING.md) §8.2 for the
+    procedure.
+- **Naming consistency** — verified:
+  - `ls scripts/release*.sh` lists both `release.sh` and
+    `release-patch.sh`.
+  - No remaining references to `hotfix.sh` in the codebase.
+- **Next review**: after the first PATCH release (v1.1.1 or
+  later), or the v1.2.0 cycle, whichever comes first.
+- See `CHANGELOG.md` for the full release history.
+
 ---
 
-*This ADR is immutable. To reverse or amend it, create a new ADR that
-supersedes it and update its Status line.*
+*This ADR is immutable. To reverse or amend it, create a new ADR
+that supersedes it and update its Status line.*

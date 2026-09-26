@@ -2,12 +2,25 @@
 
 Complete reference for the HTTP API used to control the module programmatically.
 
-**Version**: v1.0.0
+**Version**: v1.1.0
 **Base URL (WebUI)**: `http://127.0.0.1:9090`
 **Base URL (Dashboard)**: `http://127.0.0.1:9091`
-**Last updated**: 2026-09-24
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `runtime_info` now returns two additional fields:
+>     `profile_key` (string) and `memory_limit_mb` (int). See §6.1.7
+>     for the full schema.
+>   • `metricsProxyHandler` now builds the upstream monitoring_ui
+>     URL using the `MONITORING_UI_PORT` constant instead of the
+>     hardcoded string `"8080"`. The observable behavior is
+>     unchanged. See §6.1.14.
+>   • Added §2.1 — Memory limits per profile (v1.1.0).
+>   • No breaking changes. All v1.0.0 clients continue to work.
+>     The two new fields are additive.
 
 ---
 
@@ -58,62 +71,80 @@ Complete reference for the HTTP API used to control the module programmatically.
 
 `readConfPort()` validates the range `[1, 65535]`. Values outside the range fall back to the default (9090 / 9091).
 
+`MONITORING_UI_PORT` is declared as a Go constant in `main.go`
+and reused in every place that needs the reserved port
+including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
+
 ### 1.3 Endpoint Map
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  Public (no auth)                                       │
-│    GET  /healthz                 Liveness check         │
-│    GET  /readyz                  Readiness (localhost)  │
-│    GET  /sw.js                   Service Worker         │
-│    GET  /manifest.json           PWA manifest           │
-│    GET  /icon-192.svg            PWA icon (SVG)         │
-│    GET  /icon-512.svg            PWA icon (maskable)    │
-│    GET  /icon-192.png            PWA icon (PNG)         │
-│    GET  /icon-512.png            PWA icon (PNG maskable)│
-│    GET  /apple-touch-icon.png    iOS icon               │
-│    GET  /favicon-32x32.png       Modern favicon         │
-│    GET  /favicon-16x16.png       Legacy favicon         │
-│    GET  /favicon.ico             IE + bookmarks         │
-│    GET  /offline.html            Offline fallback       │
-│    GET  /                        index.html             │
-│                                                         │
-│  Auth required (GET)                                    │
-│    GET  /api?action=status       Service status         │
-│    GET  /api?action=get_profile  Current profile        │
-│    GET  /api?action=get_custom_rules  Rules             │
-│    GET  /api?action=get_rules_state   Hash state        │
-│    GET  /api?action=stats        Blocked count          │
-│    GET  /api?action=resources    RAM usage              │
-│    GET  /api?action=logs         Recent logs            │
-│    GET  /api?action=list_logs    Log files list         │
-│    GET  /api?action=read_log     Read log file          │
-│    GET  /api?action=get_progress Progress               │
-│    GET  /api?action=check_old_modules  Old modules      │
-│    GET  /api?action=runtime_info Build info + ports     │
-│    GET  /api/runtime_info        Build info (path)      │
-│    GET  /api/download_log        Download log file      │
-│    GET  /api/metrics             Metrics (Dashboard)    │
-│    GET  /events                  SSE stream             │
-│                                                         │
-│  Auth required (POST)                                   │
-│    POST /api/auth/login          Login (POST-only)      │
-│    POST /api/auth/logout         Logout (POST-only)     │
-│    POST /api/update_profile      Update blocklist       │
-│    POST /api/save_allowlist      Save allowlist         │
-│    POST /api/save_denylist       Save denylist          │
-│    POST /api/save_custom_rules   Save both              │
-│    POST /api/append_denylist     Append to denylist     │
-│    POST /api/clear_log_file      Clear one log          │
-│    POST /api/clear_logs          Clear main log         │
-│    POST /api/remove_module       Remove old module      │
-│    POST /api/toggle_service      Toggle on/off          │
-│    POST /api/restart_service     Restart DNS            │
-│    POST /api/ensure_running_service  Ensure DNS running │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Public (no auth)                                            │
+│    GET  /healthz                 Liveness check              │
+│    GET  /readyz                  Readiness (localhost)       │
+│    GET  /sw.js                   Service Worker              │
+│    GET  /manifest.json           PWA manifest                │
+│    GET  /icon-192.svg            PWA icon (SVG)              │
+│    GET  /icon-512.svg            PWA icon (maskable)         │
+│    GET  /icon-192.png            PWA icon (PNG)              │
+│    GET  /icon-512.png            PWA icon (PNG maskable)     │
+│    GET  /apple-touch-icon.png    iOS icon                    │
+│    GET  /favicon-32x32.png       Modern favicon              │
+│    GET  /favicon-16x16.png       Legacy favicon              │
+│    GET  /favicon.ico             IE + bookmarks              │
+│    GET  /offline.html            Offline fallback            │
+│    GET  /                        index.html                  │
+│                                                              │
+│  Auth required (GET)                                         │
+│    GET  /api?action=status       Service status              │
+│    GET  /api?action=get_profile  Current profile             │
+│    GET  /api?action=get_custom_rules  Rules                  │
+│    GET  /api?action=get_rules_state   Hash state             │
+│    GET  /api?action=stats        Blocked count               │
+│    GET  /api?action=resources    RAM usage                   │
+│    GET  /api?action=logs         Recent logs                 │
+│    GET  /api?action=list_logs    Log files list              │
+│    GET  /api?action=read_log     Read log file               │
+│    GET  /api?action=get_progress Progress                    │
+│    GET  /api?action=check_old_modules  Old modules           │
+│    GET  /api?action=runtime_info Build info + ports + memory │
+│    GET  /api/runtime_info        Build info (path)           │
+│    GET  /api/download_log        Download log file           │
+│    GET  /api/metrics             Metrics (Dashboard)         │
+│    GET  /events                  SSE stream                  │
+│                                                              │
+│  Auth required (POST)                                        │
+│    POST /api/auth/login          Login (POST-only)           │
+│    POST /api/auth/logout         Logout (POST-only)          │
+│    POST /api/update_profile      Update blocklist            │
+│    POST /api/save_allowlist      Save allowlist              │
+│    POST /api/save_denylist       Save denylist               │
+│    POST /api/save_custom_rules   Save both                   │
+│    POST /api/append_denylist     Append to denylist          │
+│    POST /api/clear_log_file      Clear one log               │
+│    POST /api/clear_logs          Clear main log              │
+│    POST /api/remove_module       Remove old module           │
+│    POST /api/toggle_service      Toggle on/off               │
+│    POST /api/restart_service     Restart DNS                 │
+│    POST /api/ensure_running_service  Ensure DNS running      │
+└─────────────────────────────────────────────────────┘
 ```
 
-### 1.4 What is New in v1.0.0
+### 1.4 What is New in v1.1.0
+
+| Section | Change | Reference |
+|---|---|---|
+| **§2.1** | Memory limits per profile (new table) | MEM-1 |
+| **§6.1.7** | `runtime_info` returns `profile_key` + `memory_limit_mb` | MEM-1 |
+| **§6.1.14** | `metricsProxyHandler` uses `MONITORING_UI_PORT` constant | MEM-3 |
+| **§11** | Changelog entry for v1.1.0 | — |
+
+Architectural note: the API structure is unchanged — v1.1.0 is
+additive. All v1.0.0 clients continue to work without changes.
+
+---
+
+### 1.5 What was New in v1.0.0
 
 | Section | Change | Reference |
 |---|---|---|
@@ -128,23 +159,53 @@ Complete reference for the HTTP API used to control the module programmatically.
 | **§6.1.14** | `/api/metrics` JSON schema (instead of Prometheus text) | Fix #1 |
 | **§7** | Exact path matching (`hasEndpoint`) | Fix #12 |
 
-Architectural note: the API structure is unchanged — only additional security constraints + performance improvements.
-
 ---
 
 ## 2. Authentication
 
-### 2.1 Schemes
+### 2.1 Memory Limits per Profile (v1.1.0)
+
+The Go runtime soft memory limit is set dynamically by `main.go`
+based on the active blocklist profile. This affects the memory
+reported by `runtime_info.memory_limit_mb` (§6.1.7).
+
+| Profile | `memory_limit_mb` | `profile_key` | Typical device |
+|---|---:|:---:|---|
+| Light | 80 | `light` | 1 GB RAM |
+| Normal | 100 | `normal` | 2 GB RAM |
+| PRO | 120 | `pro` | 3 GB RAM (default) |
+| PRO++ | 160 | `proplus` | 4 GB RAM |
+| Ultimate | 220 | `ultimate` | 6 GB+ RAM |
+
+**Semantics**:
+- `debug.SetMemoryLimit` is a **soft** limit — the Go runtime
+  runs GC more aggressively as usage approaches it, but it does
+  **not** kill the process (no OOM).
+- The limit is recomputed at startup (`main()`) and on every
+  profile change (`POST /api/update_profile`).
+- The value is **read-only** from the API — you cannot change it
+  via an endpoint. Change the profile instead.
+
+**Example**:
+
+```bash
+# Current limit for the active profile
+curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq '.memory_limit_mb'
+# → 120  (if profile is "pro")
+```
+
+### 2.2 Schemes
 
 | Scheme | Header/Cookie | Priority | Rate Limited |
 |---|---|:---:|:---:|
 | Bearer | `Authorization: Bearer <token>` | 1 | No |
 | Cookie | `Cookie: dnscrypt_session=<token>` | 2 | No |
-| Basic | `Authorization: Basic <base64>` | 3 | Yes (v1.0.0) |
+| Basic | `Authorization: Basic <base64>` | 3 | Yes |
 
-Basic Auth is now rate-limited (it previously allowed unlimited brute force).
+Basic Auth is rate-limited (5 attempts / 15 min) since v1.0.0 — previously unlimited.
 
-### 2.2 Credentials Source
+### 2.3 Credentials Source
 
 Credentials are read exclusively from the `[monitoring_ui]` section of `dnscrypt-proxy.toml`.
 
@@ -172,13 +233,13 @@ Section header with comment is supported:
 
 The pattern is now extracted between `[` and `]` (first occurrence).
 
-Auth cache (v1.0.0 — Fix NEW-6):
+Auth cache (Fix NEW-6):
 
 - `getMonitoringAuth()` caches credentials for **60 seconds**.
 - Changing credentials in TOML takes effect within ≤ 60 seconds.
 - For immediate effect: restart the WebUI.
 
-### 2.3 Login — POST-only (v1.0.0 — Fix NEW-1)
+### 2.4 Login — POST-only (Fix NEW-1)
 
 `/api/auth/login` accepts **POST only**.
 
@@ -223,12 +284,17 @@ Set-Cookie: dnscrypt_session=<token>; Path=/; Max-Age=86400; HttpOnly; Secure; S
     "name": "HaGeZi PRO",
     "entries": 250000,
     "is_empty": false,
-    "last_update": "2026-09-24 10:30:00"
+    "last_update": "2026-09-26 10:30:00",
+    "memory_limit_mb": 120
   }
 }
 ```
 
 There is no `token` field in the response. Authentication relies solely on the HttpOnly cookie.
+
+> **v1.1.0 note**: the `profile` object in the response now also
+> contains `memory_limit_mb` (added in v1.1.0). Clients that
+> ignore unknown fields are unaffected.
 
 **Response (405 — Method Not Allowed):**
 
@@ -286,7 +352,7 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 # → Allow: POST
 ```
 
-### 2.4 Cookie Properties
+### 2.5 Cookie Properties
 
 | Property | Value | Note |
 |---|---|---|
@@ -308,7 +374,7 @@ SameSite details:
 - Supports PWA shortcuts.
 - Protects against CSRF (cross-site POST forbidden).
 
-### 2.5 Logout — POST-only (v1.0.0 — Fix NEW-1)
+### 2.6 Logout — POST-only (Fix NEW-1)
 
 `/api/auth/logout` accepts **POST only**.
 
@@ -338,43 +404,43 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 }
 ```
 
-### 2.6 Authentication Flow Diagram
+### 2.7 Authentication Flow Diagram
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│  User                                                   │
-│  POST /api/auth/login                                   │
-│  {"username":"admin","password":"..."}                  │
-└────────────────────────┬────────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  User                                                  │
+│  POST /api/auth/login                                  │
+│  {"username":"admin","password":"..."}                 │
+└────────────────────┬───────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  main.go — handleAPI                                    │
-│  if hasEndpoint(path, "auth/login") {                   │
-│      if r.Method != POST → 405 + Allow: POST            │
-│      handleLogin(w, r)                                  │
-│  }                                                      │
-└────────────────────────┬────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│  main.go — handleAPI                                       │
+│  if hasEndpoint(path, "auth/login") {                      │
+│      if r.Method != POST → 405 + Allow: POST              │
+│      handleLogin(w, r)                                     │
+│  }                                                         │
+└────────────────────┬──────────────────────────────┘
                          │
                          ▼
-┌─────────────────────────────────────────────────────────┐
-│  handleLogin()                                          │
-│  1. ip := getClientIP(r)  ← IPv6-safe                   │
-│  2. if isLockedOut(ip) → 429                            │
-│  3. read credentials from JSON body                     │
-│  4. subtle.ConstantTimeCompare                          │
-│  5. if fail → recordLoginAttempt(ip, false)             │
-│  6. if success → createSession + Set-Cookie             │
-│  7. response: {status, message, profile}                │
-│     (no token — cookie-only)                            │
-└─────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│  handleLogin()                                              │
+│  1. ip := getClientIP(r)  ← IPv6-safe                      │
+│  2. if isLockedOut(ip) → 429                               │
+│  3. read credentials from JSON body                         │
+│  4. subtle.ConstantTimeCompare                              │
+│  5. if fail → recordLoginAttempt(ip, false)                │
+│  6. if success → createSession + Set-Cookie                │
+│  7. response: {status, message, profile}                    │
+│     (no token — cookie-only)                                │
+└────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 3. Rate Limiting
 
-### 3.1 Limits (v1.0.0)
+### 3.1 Limits (v1.1.0)
 
 | Endpoint | Limit | Window | Enforcement |
 |---|---|---|---|
@@ -391,7 +457,7 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 - Failed Basic Auth attempts are recorded in `loginAttempts`.
 - `X-Forwarded-For` is not used (localhost-only).
 
-### 3.3 Basic Auth Rate Limiting (v1.0.0 — Fix #8)
+### 3.3 Basic Auth Rate Limiting (Fix #8)
 
 Before:
 
@@ -414,7 +480,7 @@ func checkAuth(r *http.Request) bool {
     if ok {
         ip := getClientIP(r)
 
-        // v1.0.0: rate limiting
+        // rate limiting
         if isLockedOut(ip) {
             return false
         }
@@ -463,7 +529,7 @@ func getClientIP(r *http.Request) string {
 // IPv6 "[::1]:12345"     → "::1"       ✅
 ```
 
-### 3.5 Auth Cache (60 s) — v1.0.0 — Fix NEW-6
+### 3.5 Auth Cache (60 s) — Fix NEW-6
 
 `getMonitoringAuth()` caches credentials for **60 seconds**.
 
@@ -542,7 +608,7 @@ Content-Type: application/json
 }
 ```
 
-### 4.5 Not Found (v1.0.0 — Fix #12)
+### 4.5 Not Found (Fix #12)
 
 ```json
 {
@@ -577,7 +643,7 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 | 400 | error — bad input | missing param |
 | 401 | error — unauthorized | session expired |
 | 403 | error — forbidden | path traversal / `/readyz` from LAN |
-| **404** | **error — path/action not found** | **`?action=foo`** |
+| 404 | error — path/action not found | `?action=foo` |
 | 405 | error — method not allowed | GET on POST endpoint / Login GET |
 | 409 | conflict — hash mismatch | concurrent edit |
 | 413 | error — file too large | POST > 5 MB |
@@ -598,15 +664,15 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 ### 5.2 Not Found vs 405 Table
 
 ```text
-┌─────────────────────────────────┬──────┬─────────────┐
+┌────────────────────────────┬─────┬───────────┐
 │  Scenario                       │ Code │  Fix        │
-├─────────────────────────────────┼──────┼─────────────┤
+├────────────────────────────┼─────┼───────────┤
 │  ?action=foo (unknown)          │ 404  │ Fix #12     │
 │  POST /api/save_allowlist_evil  │ 404  │ Fix #12     │
 │  GET /api/auth/login            │ 405  │ Fix NEW-1   │
 │  GET /api?action=toggle         │ 405  │ Fix #13     │
 │  /readyz from LAN               │ 403  │ Fix NEW-4   │
-└─────────────────────────────────┴──────┴─────────────┘
+└────────────────────────────┴─────┴───────────┘
 ```
 
 ---
@@ -642,9 +708,14 @@ This endpoint is read-only. It does not write STATUS_FILE.
   "name": "HaGeZi PRO",
   "entries": 250000,
   "is_empty": false,
-  "last_update": "2026-09-24 10:30:00"
+  "last_update": "2026-09-26 10:30:00",
+  "memory_limit_mb": 120
 }
 ```
+
+> **v1.1.0**: `memory_limit_mb` is a new field that mirrors the
+> active profile's soft memory limit (§2.1). It is additive —
+> clients that only need `key` / `name` / `entries` are unaffected.
 
 #### 6.1.3 `GET /api?action=get_custom_rules`
 
@@ -689,18 +760,18 @@ This endpoint is read-only. It does not write STATUS_FILE.
 }
 ```
 
-#### 6.1.7 `GET /api/runtime_info` — includes ports (PORT-2)
+#### 6.1.7 `GET /api/runtime_info` — includes ports + profile + memory
 
 Alternative: `GET /api?action=runtime_info` (path-based).
 
-**Response (v1.0.0):**
+**Response (v1.1.0):**
 
 ```json
 {
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "commit": "a1b2c3d",
   "build_time": "1726987200",
-  "build_time_human": "2026-09-24T10:00:00Z",
+  "build_time_human": "2026-09-26T10:00:00Z",
   "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
   "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
   "status_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status",
@@ -709,14 +780,30 @@ Alternative: `GET /api?action=runtime_info` (path-based).
   "log_file": "/data/local/tmp/dnscrypt_main.log",
   "bind_addr": "127.0.0.1",
   "webui_port": "9090",
-  "dashboard_port": "9091"
+  "dashboard_port": "9091",
+  "profile_key": "pro",
+  "memory_limit_mb": 120
 }
 ```
 
-New fields (PORT-2):
+Field groups:
 
-- `webui_port` — actual WebUI port (from `webui.conf`).
-- `dashboard_port` — actual Dashboard port.
+| Group | Fields | Version |
+|---|---|---|
+| **Build info** | `version`, `commit`, `build_time`, `build_time_human`, `project_url` | v1.0.0 |
+| **Runtime paths** | `run_dir`, `status_file`, `pid_file`, `progress_file`, `log_file` | v1.0.0 |
+| **Network** | `bind_addr` | v1.0.0 |
+| **Dynamic ports** (PORT-2) | `webui_port`, `dashboard_port` | v1.0.0 |
+| **Memory profile** (MEM-1) | `profile_key`, `memory_limit_mb` | **v1.1.0** |
+
+**`profile_key`** — one of: `light`, `normal`, `pro`, `proplus`, `ultimate`.
+
+**`memory_limit_mb`** — the Go runtime soft limit for the active profile. See §2.1 for the mapping.
+
+**Why these fields exist**:
+- **Observability**: a user reporting a GC or performance issue can paste the JSON output.
+- **Verification**: the WebUI/Dashboard System Info panel displays them.
+- **Shell equivalent**: `functions.sh:get_profile_memory_hint()`.
 
 Benefits:
 
@@ -734,7 +821,7 @@ Last 300 lines from the log.
 
 ```json
 {
-  "logs": "[2026-09-24T10:30:00Z] 🚀 Starting DNSCrypt WebUI...\n[...]"
+  "logs": "[2026-09-26T10:30:00Z] 🚀 Starting DNSCrypt WebUI...\n[...]"
 }
 ```
 
@@ -846,7 +933,7 @@ Content-Length: 45312
 Cache-Control: no-cache, no-store, must-revalidate
 ```
 
-#### 6.1.14 `GET /api/metrics` — v1.0.0
+#### 6.1.14 `GET /api/metrics` — JSON (Dashboard)
 
 Dashboard-only endpoint (port 9091).
 
@@ -854,13 +941,29 @@ Before v1.0.0: returned Prometheus text with `Content-Type: application/json` �
 
 After v1.0.0: `parsePrometheus()` → `buildDashboardJSON()` → `Content-Type: application/json`.
 
+**v1.1.0 change (MEM-3)**: The upstream URL used by
+`metricsProxyHandler` is now built from the `MONITORING_UI_PORT`
+Go constant instead of the hardcoded string `"8080"`. Behavior
+is unchanged:
+
+```go
+// Before v1.1.0:
+"http://127.0.0.1:8080/api/metrics"
+
+// After v1.1.0:
+"http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+```
+
+The observable API contract is identical. The change only
+removes one hardcoded reference to the reserved port.
+
 **Flow:**
 
 ```text
 Dashboard (9091)
   → GET /api/metrics (main.go)
     → metricsProxyHandler
-      → GET http://127.0.0.1:8080/api/metrics  ← dnscrypt-proxy 2.1.18 JSON
+      → GET http://127.0.0.1:<MONITORING_UI_PORT>/api/metrics  ← v1.1.0
         → monitoring_ui (dnscrypt-proxy)
           → returns JSON or Prometheus text
       → JSON response passed through OR parsePrometheus() + buildDashboardJSON()
@@ -883,7 +986,7 @@ Content-Type: application/json; charset=utf-8
 Cache-Control: no-cache, no-store, must-revalidate
 
 {
-  "generated_at": "2026-09-24T10:30:00Z",
+  "generated_at": "2026-09-26T10:30:00Z",
   "total_queries": 15234,
   "blocked_queries": 1523,
   "queries_per_second": 0,
@@ -994,11 +1097,11 @@ curl -sI http://127.0.0.1:9091/api/metrics | grep Content-Type
 
 #### 6.2.1 `POST /api/auth/login`
 
-*(see §2.3)*
+*(see §2.4)*
 
 #### 6.2.2 `POST /api/auth/logout`
 
-*(see §2.5)*
+*(see §2.6)*
 
 #### 6.2.3 `POST /api/update_profile`
 
@@ -1024,7 +1127,12 @@ profile=pro
 ```
 *Timeout: 310 s for the HTTP request.*
 
-RACE-1 (v1.0.0): if `updateProfile` is running and `allowlist` is saved at the same time, `rebuildMu` serializes the rebuilds — may appear slower but is safe.
+RACE-1: if `updateProfile` is running and `allowlist` is saved at the same time, `rebuildMu` serializes the rebuilds — may appear slower but is safe.
+
+**v1.1.0 (MEM-1)**: After a successful rebuild, the handler
+applies the new profile's memory limit via `applyMemoryLimit()`.
+The new limit is reflected in subsequent `runtime_info` calls
+(§6.1.7).
 
 #### 6.2.4 `POST /api/save_allowlist`
 
@@ -1280,7 +1388,7 @@ This endpoint relies on `STATUS_FILE` as "user intent":
 
 ---
 
-## 7. Path Matching — v1.0.0
+## 7. Path Matching
 
 ### 7.1 `hasEndpoint()` Function
 
@@ -1502,7 +1610,7 @@ ok
 
 **Public** — does not require auth.
 
-### 9.2 `GET /readyz` — localhost-only (v1.0.0 — Fix NEW-4)
+### 9.2 `GET /readyz` — localhost-only (Fix NEW-4)
 
 Readiness check. Verifies dependencies.
 
@@ -1516,7 +1624,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "ok",
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "status": "ready"
 }
 ```
@@ -1529,7 +1637,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "not_running",
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "status": "unhealthy"
 }
 ```
@@ -1674,6 +1782,19 @@ curl -i "http://127.0.0.1:9090/api?action=foo"
 # HTTP/1.1 404 Not Found
 ```
 
+**v1.1.0 — Runtime info with profile + memory:**
+
+```bash
+# Full runtime_info
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq
+
+# Only the two new fields
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq '{profile_key, memory_limit_mb}'
+# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+```
+
 ### 10.2 Python
 
 ```python
@@ -1717,10 +1838,12 @@ print(f"Total queries: {metrics['total_queries']}")
 print(f"Blocked: {metrics['blocked_queries']}")
 print(f"Cache hit ratio: {metrics['cache_stats']['cache_hit_ratio']:.2%}")
 
-# Runtime info (PORT-2)
+# Runtime info (PORT-2 + MEM-1)
 info = s.get(f"{BASE}/api?action=runtime_info").json()
 print(f"WebUI port: {info['webui_port']}")
 print(f"Dashboard port: {info['dashboard_port']}")
+print(f"Profile: {info['profile_key']}")
+print(f"Memory limit: {info['memory_limit_mb']} MB")
 ```
 
 ### 10.3 Go
@@ -1778,13 +1901,15 @@ func main() {
     json.NewDecoder(resp4.Body).Decode(&metrics)
     fmt.Printf("Total queries: %v\n", metrics["total_queries"])
 
-    // Runtime info (PORT-2)
+    // Runtime info (PORT-2 + MEM-1)
     resp5, _ := client.Get(base + "/api?action=runtime_info")
     defer resp5.Body.Close()
     var info map[string]interface{}
     json.NewDecoder(resp5.Body).Decode(&info)
     fmt.Printf("WebUI port: %v\n", info["webui_port"])
     fmt.Printf("Dashboard port: %v\n", info["dashboard_port"])
+    fmt.Printf("Profile: %v\n", info["profile_key"])
+    fmt.Printf("Memory limit: %v MB\n", info["memory_limit_mb"])
 }
 ```
 
@@ -1837,7 +1962,7 @@ async function getMetrics() {
   return resp.json();
 }
 
-// Runtime info — PORT-2
+// Runtime info — PORT-2 + MEM-1
 async function getRuntimeInfo() {
   const resp = await fetch(`${BASE}/api?action=runtime_info`, {
     credentials: 'same-origin',
@@ -1885,6 +2010,52 @@ curl -i "http://192.168.1.5:9091/readyz"
 ---
 
 ## 11. Changelog
+
+### v1.1.0 (2026-09-26)
+
+**Polish release — no breaking changes. All changes are additive.**
+
+Added:
+
+- **§2.1** — Memory limits per profile table (MEM-1).
+- **§6.1.7** — `runtime_info` returns `profile_key` and
+  `memory_limit_mb`.
+- **§6.1.2** — `get_profile` returns `memory_limit_mb`.
+- **§6.1.14** — note that `metricsProxyHandler` uses the
+  `MONITORING_UI_PORT` constant (MEM-3).
+
+Changed (internal only — same API surface):
+
+- `metricsProxyHandler` builds the upstream URL from the Go
+  constant `MONITORING_UI_PORT` instead of the hardcoded
+  string `"8080"`.
+- `updateProfile` calls `applyMemoryLimit()` after a
+  successful profile change (affects the value returned by
+  `runtime_info.memory_limit_mb`).
+- `main()` calls `applyMemoryLimit()` once at startup instead
+  of using a hardcoded `debug.SetMemoryLimit(80 MB)`.
+
+Deprecated:
+
+- None.
+
+Removed:
+
+- None.
+
+Fixed:
+
+- No API-level fixes. (The MEM-1 / MEM-2 / MEM-3 changes close
+  edge cases; they are not audit corrections. See
+  docs/SECURITY.md §17.)
+
+Client compatibility:
+
+- **v1.0.0 clients**: unaffected. All new fields are additive.
+- **v1.1.0 clients**: can rely on `profile_key` and
+  `memory_limit_mb` being present.
+- **Order of fields**: not guaranteed. Use a JSON parser, not
+  string indexing.
 
 ### v1.0.0 (2026-09-24)
 
@@ -1941,6 +2112,7 @@ Documentation:
 - W3C — Server-Sent Events
 - MDN EventSource — https://developer.mozilla.org/en-US/docs/Web/API/EventSource
 - Prometheus Text Format — https://prometheus.io/docs/instrumenting/exposition_formats/
+- Go runtime/debug — SetMemoryLimit — https://pkg.go.dev/runtime/debug#SetMemoryLimit
 
 ### 12.2 Project Documentation
 
@@ -1981,11 +2153,24 @@ Documentation:
 | `rebuildMu` (RACE-1) | — | [SECURITY.md](SECURITY.md) |
 | `runtime_info` (PORT-2) | — | [SECURITY.md](SECURITY.md) |
 
+### 12.4 v1.1.0 References
+
+| Change | ID | Reference |
+|---|:---:|---|
+| Dynamic memory limit | MEM-1 | [SECURITY.md](SECURITY.md) §5.30.1, §14.22 |
+| Extended shellQuote | MEM-2 | [SECURITY.md](SECURITY.md) §5.30.2 |
+| MONITORING_UI_PORT in metrics handler | MEM-3 | [SECURITY.md](SECURITY.md) §5.30.3, §14.24 |
+
+> **Note**: MEM-1 / MEM-2 / MEM-3 are **not** audit corrections.
+> They are runtime improvements documented in SECURITY.md §17.1.
+> The Audit Corrections Registry remains at #33 (last entry from
+> v1.0.0). The next audit correction will be #34.
+
 **Last Audit Correction**: #33 (v1.0.0)
-**Next expected**: #34 (v1.1.x)
+**Next expected**: #34 (v1.2.x)
 
 ---
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh

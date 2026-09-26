@@ -2,10 +2,27 @@
 
 > Comprehensive diagnostic guide: from symptoms to solutions.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • Added §4.12 (Memory limit issues) — covers the dynamic
+>     per-profile soft memory limit introduced in v1.1.0.
+>   • Added §5.14 (Profile key problems) — for issues where the
+>     active profile does not match the user's expectation.
+>   • Added §6.10 (GC thrashing symptoms) — how to recognize
+>     the "WebUI is slow / unresponsive" pattern that MEM-1
+>     resolves.
+>   • Added §15.13 (Memory diagnostics helper) — one-shot
+>     script to dump the memory state.
+>   • Updated §16.2 (Issue template) with two new fields:
+>     `profile_key` and `memory_limit_mb`.
+>   • All `v1.0.0` references in examples updated to `v1.1.0`.
+>   • No structural changes to the diagnostic tree — all
+>     v1.0.0 sections remain valid.
 
 ---
 
@@ -47,7 +64,8 @@ Problem?
 │   ├── § 4.8 (Dashboard shows no data) ← Fix #1
 │   ├── § 4.9 (/readyz rejected from LAN) ← NEW-4
 │   ├── § 4.10 (Invalid port ignored) ← NEW-3
-│   └── § 4.11 (Broken Dashboard links) ← PORT-2
+│   ├── § 4.11 (Broken Dashboard links) ← PORT-2
+│   └── § 4.12 (Memory limit issues) ← MEM-1 (v1.1.0)
 │
 ├── Cannot log in
 │   └── § 5 (Authentication)
@@ -56,11 +74,13 @@ Problem?
 │   ├── § 5.10 (404 for unknown action) ← Fix #12
 │   ├── § 5.11 (Login GET rejected) ← NEW-1
 │   ├── § 5.12 (Basic Auth locked) ← Fix #8
-│   └── § 5.13 (Credentials change delay) ← NEW-6
+│   ├── § 5.13 (Credentials change delay) ← NEW-6
+│   └── § 5.14 (Profile key problems) ← MEM-1 (v1.1.0)
 │
 ├── DNS not working at all
 │   └── § 6 (DNS)
 │   └── § 6.9 (Watchdog does not restart)
+│   └── § 6.10 (GC thrashing symptoms) ← MEM-1 (v1.1.0)
 │
 ├── Some sites are not blocked
 │   └── § 7 (Blocklist)
@@ -112,8 +132,12 @@ su -c "ss -tulnp | grep -E '9090|9091|5354|8080'"
 # STATUS_FILE (user intent)
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
 
-# runtime_info (PORT-2)
-su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
+# runtime_info (PORT-2 + MEM-1)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port, profile_key, memory_limit_mb}'"
+
+# Memory state (v1.1.0)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'"
 ```
 
 ---
@@ -155,7 +179,12 @@ iptables -t nat -L OUTPUT -n 2>/dev/null | head -20
 iptables -t nat -L DNSCRYPT_OUT -n 2>/dev/null | head -20
 ip6tables -t nat -L DNSCRYPT_OUT6 -n 2>/dev/null | head -20
 
-# 6. Logs (last 50)
+# 6. Memory profile (v1.1.0)
+echo ""
+echo "=== Memory Profile (v1.1.0) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+
+# 7. Logs (last 50)
 echo ""
 echo "=== Logs ==="
 tail -50 /data/local/tmp/dnscrypt_main.log
@@ -177,6 +206,8 @@ tail -50 /data/local/tmp/dnscrypt_main.log
 | Firewall | `iptables -t nat -L DNSCRYPT_OUT -n` |
 | Dashboard | `curl -s http://127.0.0.1:9091/api/metrics` |
 | Runtime Info | `curl -s http://127.0.0.1:9090/api?action=runtime_info` |
+| **Profile (v1.1.0)** | **`curl -s .../runtime_info \| jq -r .profile_key`** |
+| **Memory limit (v1.1.0)** | **`curl -s .../runtime_info \| jq .memory_limit_mb`** |
 | Logs | `tail -50 dnscrypt_main.log` |
 
 ---
@@ -216,7 +247,7 @@ su -c "which unzip sed tr date grep head cut"
 **Solution**:
 ```bash
 # 1. verify ZIP
-unzip -t /sdcard/dnscrypt-webui-1.0.0-module.zip
+unzip -t /sdcard/dnscrypt-webui-1.1.0-module.zip
 
 # 2. verify space
 df -h /data
@@ -230,7 +261,7 @@ df -h /data
 - Download a fresh ZIP.
 - Verify SHA256:
   ```bash
-  sha256sum -c dnscrypt-webui-1.0.0-module.zip.sha256
+  sha256sum -c dnscrypt-webui-1.1.0-module.zip.sha256
   ```
 
 ### 3.6 "DNS binary missing for <arch>"
@@ -319,7 +350,7 @@ su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/"
 
 ### 4.5 "404 Not Found" on /icon-192.svg
 
-**Solution**: confirm version `v1.0.0`.
+**Solution**: confirm version `v1.1.0`.
 
 ```bash
 su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
@@ -332,7 +363,7 @@ su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
 - Dashboard at `http://127.0.0.1:9091` opens.
 - But the Metrics tables are empty.
 
-**Solution**: update to `v1.0.0`. `/api/metrics` now returns proper JSON.
+**Solution**: update to `v1.1.0` (or v1.0.0). `/api/metrics` now returns proper JSON.
 
 **Verify**:
 ```bash
@@ -394,7 +425,7 @@ su -c "curl -s -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics" | head -5
 
 # After the fix: JSON:
 # {
-#   "generated_at": "2026-09-24T10:30:00Z",
+#   "generated_at": "2026-09-26T10:30:00Z",
 #   "total_queries": 15234,
 #   ...
 # }
@@ -417,7 +448,7 @@ su -c "curl -s -u \"user:pass\" http://127.0.0.1:8080/api/metrics | head -10"
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - Now `metricsProxyHandler` contains:
   ```go
   func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -473,7 +504,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 - Result: **403 Forbidden** with `{"error": "readyz is localhost-only"}`.
 
 **Is this a bug?**
-- No — intentional in v1.0.0.
+- No — intentional since v1.0.0.
 - ✅ Reason: prevents reconnaissance on LAN.
 - ✅ `/healthz` remains public (standard, lightweight, no details).
 
@@ -540,7 +571,7 @@ func readConfPort(key, defaultPort string) string {
 ```
 
 **Solution**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - Now `readConfPort`:
   ```go
   func readConfPort(key, defaultPort string) string {
@@ -600,7 +631,7 @@ su -c "sed -i 's/^PORT=.*/PORT=9090/' /data/adb/modules/dnscrypt-proxy-webui/pro
 ```
 
 **Solution**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - Now:
   - `runtime_info` returns `webui_port` + `dashboard_port`.
   - The frontend updates the links dynamically.
@@ -623,6 +654,112 @@ grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html uses dy
 - ⚠️ PWA shortcuts (manifest.json) remain static (documented limitation).
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #33.
+
+### 4.12 Memory limit issues (v1.1.0 — MEM-1)
+
+**Symptom (A)** — You switched to the `ultimate` profile, but the
+WebUI is still laggy or freezes occasionally:
+
+- Dashboard loads slowly.
+- SSE progress updates stutter.
+- `runtime_info.memory_limit_mb` shows an unexpected value.
+
+**Symptom (B)** — You are on a low-RAM device (1 GB) and the
+WebUI feels heavier than before the upgrade:
+
+- `dumpsys meminfo` or `top` shows the WebUI process around
+  80–110 MB RSS after upgrade (was ~25 MB before).
+- Battery consumption increased slightly.
+
+**Symptom (C)** — You manually edited `selected_profile.txt`
+and the change did not take effect:
+
+- `runtime_info.profile_key` still shows the old profile.
+
+**Cause (A) and (C)**: Before v1.1.0, `main.go` set a **hardcoded**
+soft memory limit of 80 MB:
+
+```go
+debug.SetMemoryLimit(80 * 1024 * 1024)  // ← same value for every profile
+```
+
+On `ultimate`, actual usage approaches 200 MB. With an 80 MB soft
+limit, the Go runtime runs GC continuously ("GC thrashing").
+This manifests as a slow/unresponsive WebUI — not a crash.
+
+Additionally, changing `selected_profile.txt` outside the WebUI
+had no effect until the next full restart, because the limit was
+set once at startup.
+
+**Cause (B)**: This is expected behavior. `ultimate` sets the
+soft limit to 220 MB, giving the runtime more headroom. The
+WebUI process can now use up to ~220 MB under load without GC
+pressure. On a 1 GB device this is still safe, but you may want
+to use a lighter profile.
+
+**Solution**:
+
+**For (A)** — Update to `v1.1.0`. The limit is now computed per profile:
+
+```go
+MEMORY_LIMIT_LIGHT     = 80 MB
+MEMORY_LIMIT_NORMAL    = 100 MB
+MEMORY_LIMIT_PRO       = 120 MB
+MEMORY_LIMIT_PROPLUS   = 160 MB
+MEMORY_LIMIT_ULTIMATE  = 220 MB
+```
+
+**For (B)** — If the `ultimate` profile is too heavy for your
+device, switch to a lighter one:
+
+```bash
+# Option 1: From the WebUI
+#   Select "PRO" and press Apply.
+
+# Option 2: From the terminal
+su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+sleep 5
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
+# Expected: 120
+```
+
+**For (C)** — If you changed `selected_profile.txt` directly, restart
+the WebUI so the new profile is picked up:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+The `applyMemoryLimit()` call runs at startup and reads the file
+fresh. Changing the file while the WebUI is running does NOT
+trigger a re-read — that is by design (avoids race conditions
+with the WebUI's own profile-update flow).
+
+**How to verify the limit**:
+
+```bash
+# 1. runtime_info
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '{profile_key, memory_limit_mb}'
+# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+
+# 2. Startup log line
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+# Expected: 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+```
+
+**Expected values per profile**:
+
+| `profile_key` | `memory_limit_mb` |
+|:---:|:---:|
+| `light` | 80 |
+| `normal` | 100 |
+| `pro` | 120 |
+| `proplus` | 160 |
+| `ultimate` | 220 |
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.1, §14.22; [ARCHITECTURE.md](ARCHITECTURE.md) §3.9, §4.9.1, §11.22.
 
 ---
 
@@ -658,7 +795,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
 ### 5.4 Session expires quickly
 
-**Solution**: v1.0.0 relies on `HttpOnly cookie` — session lasts 24h.
+**Solution**: v1.1.0 relies on `HttpOnly cookie` — session lasts 24h.
 
 ### 5.5 "Session Expired" modal frequently
 
@@ -692,7 +829,7 @@ ip := strings.Split(r.RemoteAddr, ":")[0]
 // RemoteAddr = "[::1]:12345" → ip = "["  ← wrong!
 ```
 
-**Solution**: update to `v1.0.0`.
+**Solution**: update to `v1.1.0` (or v1.0.0).
 
 **Verify**:
 ```bash
@@ -708,7 +845,7 @@ grep -A5 'func getClientIP' proxy/main.go | grep -q 'net.SplitHostPort' && echo 
 **Cause (before v1.0.0)**:
 `getMonitoringAuth` read the first line containing `username=` regardless of the section.
 
-**Solution**: update to `v1.0.0`.
+**Solution**: update to `v1.1.0` (or v1.0.0).
 
 **Verify**:
 ```bash
@@ -792,7 +929,7 @@ fi
 ```
 
 **Is this a bug?**
-- No — intentional in v1.0.0.
+- No — intentional since v1.0.0.
 - ✅ Reason: prevents a CSRF vector:
   ```html
   <!-- worked before v1.0.0! -->
@@ -845,7 +982,7 @@ curl -i -X POST http://127.0.0.1:9090/api/auth/login \
 - After 5 failed attempts, even the **correct password** is rejected.
 
 **Is this a bug?**
-- No — intentional in v1.0.0.
+- No — intentional since v1.0.0.
 - ✅ Reason: prevents brute force on LAN.
 
 **How does it work?**
@@ -891,7 +1028,7 @@ done
 - After ~60 seconds, the new credentials work.
 
 **Is this a bug?**
-- No — intentional in v1.0.0.
+- No — intentional since v1.0.0.
 - ✅ Reason: `getMonitoringAuth()` caches credentials for 60 seconds.
 
 **How does it work?**
@@ -945,6 +1082,115 @@ curl -u "new_user:new_pass" http://127.0.0.1:9090/api?action=status
 ```
 
 **Reference**: [SECURITY.md](SECURITY.md).
+
+### 5.14 Profile key problems (v1.1.0 — MEM-1)
+
+**Symptom (A)** — The WebUI shows a different profile than
+expected:
+
+- You switched to `ultimate` in the WebUI, but `runtime_info`
+  shows `profile_key: "pro"`.
+- Or the blocklist file size suggests `pro` while the label says
+  `ultimate`.
+
+**Symptom (B)** — `memory_limit_mb` does not match the profile
+you think is active:
+
+- `profile_key` = `pro` but `memory_limit_mb` = 80.
+- Or `profile_key` = `ultimate` but `memory_limit_mb` = 120.
+
+**Symptom (C)** — After manually editing `selected_profile.txt`,
+the WebUI still uses the old profile.
+
+**Cause (A)** — The active profile is determined by
+`proxy/selected_profile.txt`, not by the WebUI's dropdown state.
+If the file contains an unknown value (e.g. a typo), `main.go`
+falls back to `"pro"`:
+
+```go
+func readSelectedProfile() string {
+    data, err := os.ReadFile(SELECTED_FILE)
+    if err != nil {
+        return "pro"
+    }
+    key := strings.TrimSpace(string(data))
+    if _, ok := profiles[key]; !ok {
+        return "pro"
+    }
+    return key
+}
+```
+
+**Cause (B)** — The memory limit is set at startup and on every
+profile change. If the two values disagree, either:
+- The WebUI has not been restarted since a manual edit of
+  `selected_profile.txt` (see cause C), or
+- The startup log shows an error (check
+  `/data/local/tmp/dnscrypt_main.log`).
+
+**Cause (C)** — By design. `selected_profile.txt` is read once at
+startup (in `main()`) and again after each successful
+`POST /api/update_profile`. Direct file edits are not monitored
+(no inotify — that would add a dependency and CPU overhead on
+Android). You must restart the WebUI:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+**Solution**:
+
+**Verify the file content**:
+
+```bash
+# What does the file actually say?
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+# Expected: one of: light, normal, pro, proplus, ultimate
+```
+
+**Verify the runtime value**:
+
+```bash
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '{profile_key, memory_limit_mb}'
+```
+
+**Expected pairs**:
+
+| `selected_profile.txt` | `profile_key` | `memory_limit_mb` |
+|---|---|---|
+| `light` | `light` | 80 |
+| `normal` | `normal` | 100 |
+| `pro` | `pro` | 120 |
+| `proplus` | `proplus` | 160 |
+| `ultimate` | `ultimate` | 220 |
+
+**If they do not match**:
+
+1. Fix `selected_profile.txt` to a known value.
+2. Restart the WebUI:
+   ```bash
+   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+   ```
+3. Wait ~5 s.
+4. Re-check `runtime_info`.
+
+**If `selected_profile.txt` contains a typo** (e.g. `prot` or
+`Ultimate` with capital U):
+
+- The value is case-sensitive and must match the exact keys.
+- `main.go` falls back to `"pro"` for unknown keys.
+- Fix the file and restart.
+
+**If the file is missing**:
+
+```bash
+# Recreate it with the default
+su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.1; [ARCHITECTURE.md](ARCHITECTURE.md) §4.9.1.
 
 ---
 
@@ -1058,7 +1304,7 @@ su -c "settings delete global private_dns_mode"
 - On crash: `getStatusUncached` wrote `STATUS_FILE = "OFF"`.
 - Watchdog reads "OFF" → ignores restart.
 
-**Solution**: update to `v1.0.0`.
+**Solution**: update to `v1.1.0` (or v1.0.0).
 
 **Verify after update**:
 ```bash
@@ -1081,6 +1327,112 @@ grep -A5 'func getStatusUncached' proxy/main.go | grep -q 'atomicWriteFile' && e
 ```
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #18.
+
+### 6.10 GC thrashing symptoms (v1.1.0 — MEM-1)
+
+**Symptom** — The WebUI is running but feels slow or unresponsive
+after switching to a heavy profile:
+
+- The Dashboard takes 10+ seconds to load (normally 1–2 s).
+- Pressing buttons in the WebUI has a 2–5 second delay.
+- SSE progress updates stutter (progress bar jumps by 20% at a
+  time instead of 5%).
+- `top` or `dumpsys` shows high CPU on the WebUI process
+  (50–80%) even at idle.
+- `runtime_info` shows a profile that expects high memory
+  (e.g. `ultimate`) but the process is memory-constrained.
+- Battery drains faster than usual.
+
+**Distinguishing feature** — Unlike a crash, the WebUI **keeps
+responding**, just slowly. It is not stuck; it is CPU-starved.
+
+**Cause** — Before v1.1.0, the soft memory limit was hardcoded
+to 80 MB regardless of profile. On `ultimate`, the actual
+working set approaches 200 MB. The Go runtime reacted to the
+80 MB limit by running GC continuously, consuming CPU that
+should have been spent serving requests.
+
+**Diagnostic**:
+
+**Step 1 — Confirm the limit is the v1.0.0 hardcoded value**:
+
+```bash
+# Check the actual limit reported by runtime_info
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '.memory_limit_mb'
+```
+
+- If you are running v1.0.0 (or older), the value will be `80`
+  no matter which profile is active.
+- If you are running v1.1.0, it should match the profile
+  (see §4.12).
+
+**Step 2 — Confirm CPU is the bottleneck (not RAM)**:
+
+```bash
+# Get the WebUI PID
+PID=$(su -c "pgrep -x dnscrypt-webui" | head -1)
+
+# Sample CPU usage over 5 s
+su -c "top -b -n 5 -d 1 -p $PID | tail -5"
+```
+
+If CPU usage is > 30% while idle, you are likely experiencing
+GC thrashing.
+
+**Step 3 — Check for GC log lines**:
+
+```bash
+su -c "grep -i 'gc\|memory' /data/local/tmp/dnscrypt_main.log | tail -20"
+```
+
+If you see repeated `memory limit adjusted` lines from the
+WebUI's own logging (v1.1.0), that is fine. If you see nothing
+and are on v1.0.0, this confirms the hardcoded limit.
+
+**Solution**:
+
+**Option 1 — Update to v1.1.0** (recommended):
+
+The per-profile limit resolves this without any manual work:
+
+- Switch to `ultimate`: limit becomes 220 MB.
+- GC runs only when needed.
+- CPU is freed for serving requests.
+
+**Option 2 — If you cannot update, use a lighter profile**:
+
+```bash
+# Change to "pro" (120 MB effective on v1.1.0, ~80 MB on v1.0.0)
+su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+This will not change the v1.0.0 soft limit (still 80 MB), but
+a lighter profile generates less garbage and reduces GC pressure.
+
+**Option 3 — Verify on v1.1.0**:
+
+```bash
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '{profile_key, memory_limit_mb}'
+
+# Expected if profile is "ultimate":
+# {"profile_key": "ultimate", "memory_limit_mb": 220}
+
+# Re-sample CPU
+PID=$(su -c "pgrep -x dnscrypt-webui" | head -1)
+su -c "top -b -n 5 -d 1 -p $PID | tail -5"
+# Expected: idle CPU < 5%
+```
+
+**Related sections**:
+- §4.12 — Memory limit issues (overview)
+- §5.14 — Profile key problems
+- §8.5 — Continuous auth I/O (related performance)
+- §15.13 — Memory diagnostics helper (v1.1.0)
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.1; [ARCHITECTURE.md](ARCHITECTURE.md) §10.1, §11.22.
 
 ---
 
@@ -1113,7 +1465,7 @@ su -c "tail -100 /data/local/tmp/dnscrypt_main.log"
 
 ### 7.3 "Custom Rules are not applied"
 
-**Solution**: ensure `v1.0.0+`.
+**Solution**: ensure `v1.1.0` (or `v1.0.0+`).
 
 ### 7.4 "Allowlist does not exclude the domain"
 
@@ -1175,7 +1527,7 @@ Two functions call `rebuildBlocklist`:
 **Without a lock**: interleaved reads → inconsistent `BLOCKLIST`.
 
 **Solution**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - Now `rebuildBlocklist`:
   ```go
   var rebuildMu sync.Mutex
@@ -1231,8 +1583,11 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 **Loop**:
 ```bash
 su -c "cat /proc/\$(cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.pid)/status | grep VmRSS"
-# Expected: < 20 MB
+# Expected: < 20 MB for the DNS engine (dnscrypt-proxy)
 ```
+
+**Note**: The WebUI process (`dnscrypt-webui`) has its own memory
+profile. See §4.12 and §6.10 for the v1.1.0 dynamic memory limit.
 
 ### 8.3 Watchdog consumes CPU
 
@@ -1258,7 +1613,7 @@ su -c "nano /data/adb/modules/dnscrypt-proxy-webui/proxy/watchdog.sh"
 - ~5–10 ms per request (on Android).
 - 100 req/s → ~1 MB/s I/O.
 
-**Solution**: update to `v1.0.0`.
+**Solution**: update to `v1.1.0` (or v1.0.0).
 
 Now:
 - Auth cache (60 s TTL).
@@ -1519,32 +1874,9 @@ If `MODDIR = "/tmp/evil;rm -rf/"`:
 - No practical vector today.
 
 **Solution**:
-- Update to `v1.0.0`.
-- Now:
-  ```go
-  func shellQuote(s string) string {
-      for _, r := range s {
-          if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
-              r == '\\' || r == '!' || r == '&' || r == '|' || r == ';' ||
-              r == '(' || r == ')' || r == '<' || r == '>' || r == '*' ||
-              r == '?' || r == '[' || r == ']' || r == '#' || r == '~' {
-              return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-          }
-      }
-      return s
-  }
-
-  cmd := fmt.Sprintf(". %s/functions.sh; is_port_open %d udp", shellQuote(MODDIR), port)
-  ```
-
-**Security table**:
-
-| Input | Before | After |
-|-------|:---:|:---:|
-| `/data/adb/modules/dnscrypt-proxy-webui` | ✅ works | ✅ works |
-| `/tmp/foo bar` | ❌ fails | ✅ works |
-| `/tmp/$HOME` | ⚠️ expansion | ✅ literal |
-| `/tmp/evil;rm -rf/` | injection | ✅ literal |
+- Update to `v1.1.0` (or v1.0.0).
+- v1.0.0 extended `shellQuote` covers 20 shell metacharacters.
+- v1.1.0 extends it further to 24 (`{`, `}`, `\n`, `\t` added).
 
 **Verify**:
 ```bash
@@ -1552,9 +1884,13 @@ If `MODDIR = "/tmp/evil;rm -rf/"`:
 grep -q 'func shellQuote' proxy/main.go && echo "✅ shellQuote present"
 USAGE=$(grep -c 'shellQuote(MODDIR)' proxy/main.go)
 [ "$USAGE" -ge 3 ] && echo "✅ shellQuote used $USAGE times"
+
+# 2. v1.1.0 extended charset
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
 ```
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #31.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #31 + §5.30.2.
 
 ---
 
@@ -1578,7 +1914,7 @@ su -c "cat /data/local/tmp/dnscrypt_credentials.txt"
 
 ### 12.3 "Settings lost"
 
-**Solution**: keep a backup before upgrade (should be automatic in v1.0.0).
+**Solution**: keep a backup before upgrade (should be automatic in v1.1.0 / v1.0.0).
 
 ### 12.4 "Old modules detected"
 
@@ -1631,7 +1967,7 @@ grep -n '/system/bin/sh' proxy/main.go
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - Now `runShell` uses:
   ```go
   func getSystemShell() string {
@@ -1730,7 +2066,7 @@ su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.0.0`.
+- Update to `v1.1.0` (or v1.0.0).
 - New `customize.sh`:
   ```bash
   # [8b] Backup before extraction
@@ -1812,11 +2148,19 @@ su -c "svc wifi disable && svc wifi enable"
 
 ### 13.3 "Backup directory remaining"
 
-**Solution**:
+> **v1.1.0 note**: `uninstall.sh` no longer creates a backup
+> directory. Any legacy backup directory from v1.0.0 is removed
+> automatically when `uninstall.sh` v1.1.0 runs.
+
+If you still see a backup directory from an older install:
+
 ```bash
 su -c "ls -la /data/local/tmp/dnscrypt_backup_uninstall/"
-su -c "rm -rf /data/local/tmp/dnscrypt_backup_uninstall/"  # if certain
+# Remove it (safe — this is a legacy artifact from v1.0.0)
+su -c "rm -rf /data/local/tmp/dnscrypt_backup_uninstall/"
 ```
+
+**Reference**: [uninstall.sh](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/proxy/uninstall.sh) — §[9] Legacy backup cleanup.
 
 ---
 
@@ -1886,6 +2230,23 @@ sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check
 sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --short
 ```
 
+**v1.1.0 note**: `status.sh` now also reports the active profile and
+the expected memory limit:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh" | grep -A3 "Profile"
+# ─── Profile & Memory ───
+#   Profile:       PRO
+#   Memory limit:  120 MB (pro)
+#   Managed by:    main.go (Go runtime soft limit)
+```
+
+The `--check` mode output was extended with two fields:
+
+```
+v1.1.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | RUNDIR=...
+```
+
 ### 15.2 action.sh
 
 ```bash
@@ -1893,6 +2254,33 @@ sh /data/adb/modules/dnscrypt-proxy-webui/action.sh
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --check
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --status
+```
+
+**v1.1.0 note**: `action.sh --check` prints four sections:
+
+```
+─── Service Status ───
+  🟢 WebUI    : Running on port 9090
+  🟢 DNS      : Running on 5354/UDP
+  🐕 Watchdog : Running (PID: 12345)
+
+─── Runtime ───
+  📁 run/     : /data/adb/modules/dnscrypt-proxy-webui/proxy/run
+  📄 Intent   : ON (user intent)
+  🏷️  Version  : v1.1.0
+  📚 functions: ✅ loaded
+
+─── Configuration ───
+  🌐 WebUI port    : 9090
+  📊 Dashboard port: 9091
+  🔄 Auto-DNS      : enabled
+  🔄 Auto-WebUI    : enabled
+  🔌 BIND_ADDR     : 127.0.0.1
+
+─── Profile & Memory ───
+  📋 Profile       : pro
+  🧠 Memory limit  : 120 MB (pro)
+  ℹ️  Managed by    : main.go (Go runtime soft limit)
 ```
 
 ### 15.3 Firewall Diagnostics
@@ -1936,11 +2324,14 @@ su -c "curl -s http://127.0.0.1:8080/api/metrics | head -5"
 ### 15.5 Runtime Info Diagnostics
 
 ```bash
-# Actual ports
+# All fields
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq"
+
+# Ports only (PORT-2)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port, bind_addr}'"
 
-# Full info
-su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq"
+# Profile + memory (v1.1.0 — MEM-1)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
 ```
 
 ### 15.6 dnsleaktest
@@ -2055,6 +2446,99 @@ su -c "curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'"
 # Expected: "8081"
 ```
 
+### 15.13 Memory Diagnostics Helper (v1.1.0 — MEM-1)
+
+**Purpose**: one-shot script to dump the memory state of the
+WebUI process for bug reports or verification.
+
+```bash
+#!/system/bin/sh
+# memory-diagnostics.sh — v1.1.0
+# Collects: profile_key, memory_limit_mb, RSS, CPU sample, log tail.
+
+echo "=== 1. runtime_info (v1.1.0 fields) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info \
+    | jq '{profile_key, memory_limit_mb, version}'
+
+echo ""
+echo "=== 2. selected_profile.txt (raw) ==="
+cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
+
+echo ""
+echo "=== 3. WebUI process RSS ==="
+PID=$(pgrep -x dnscrypt-webui | head -1)
+if [ -n "$PID" ]; then
+    grep VmRSS /proc/$PID/status
+else
+    echo "WebUI process not running"
+fi
+
+echo ""
+echo "=== 4. CPU sample (5 s) ==="
+if [ -n "$PID" ]; then
+    top -b -n 5 -d 1 -p $PID | tail -5
+fi
+
+echo ""
+echo "=== 5. GC / memory log lines ==="
+grep -iE 'memory|gc' /data/local/tmp/dnscrypt_main.log | tail -10
+
+echo ""
+echo "=== 6. Expected values ==="
+echo "light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)"
+```
+
+**Usage**:
+
+```bash
+# Save the script
+su -c "cat > /data/local/tmp/memory-diagnostics.sh << 'EOF'
+...paste script here...
+EOF
+chmod +x /data/local/tmp/memory-diagnostics.sh"
+
+# Run it
+su -c "sh /data/local/tmp/memory-diagnostics.sh"
+```
+
+**Sample output** (on a healthy pro profile):
+
+```
+=== 1. runtime_info (v1.1.0 fields) ===
+{
+  "profile_key": "pro",
+  "memory_limit_mb": 120,
+  "version": "v1.1.0"
+}
+
+=== 2. selected_profile.txt (raw) ===
+pro
+
+=== 3. WebUI process RSS ===
+VmRSS:     18234 kB
+
+=== 4. CPU sample (5 s) ===
+  PID USER         PR  NI VIRT  RES  SHR S[%CPU] %MEM     TIME+ ARGS
+ 5678 u0_a123      20   0 1.2G  18M  12M S  0.5   0.9  0:12.34 dnscrypt-webui
+
+=== 5. GC / memory log lines ===
+2026-09-26 10:00:00 - 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+2026-09-26 10:05:00 - memory limit adjusted: 80 MB → 120 MB (profile=pro, previous runtime value=120 MB)
+
+=== 6. Expected values ===
+light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
+```
+
+**Interpretation**:
+
+| Field | Healthy | Suspicious |
+|---|---|---|
+| `profile_key` | matches `selected_profile.txt` | mismatch → see §5.14 |
+| `memory_limit_mb` | matches expected for profile | mismatch → see §4.12 |
+| `VmRSS` | < 50 MB on light, < 200 MB on ultimate | > 200 MB → check for leak |
+| CPU idle | < 5% | > 20% → see §6.10 (GC thrashing) |
+| Log line | reported once at startup | repeated "adjusted" lines → check for rapid profile changes |
+
 ---
 
 ## 16. When All Else Fails
@@ -2070,15 +2554,23 @@ su -c "curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'"
 - [ ] Checked Dashboard: §4.8.
 - [ ] Checked RACE-1 if BLOCKLIST is inconsistent: §7.7.
 - [ ] Checked PORT-2 if links are broken: §4.11.
+- [ ] **v1.1.0**: Checked memory limit if WebUI is slow: §4.12, §6.10, §15.13.
+- [ ] **v1.1.0**: Checked profile key if it does not match: §5.14.
 
 ### 16.2 Issue Template
 
 ```markdown
 ## Environment
-- Module: v1.0.0
+- Module: v1.1.0
 - Android: 14
 - Device: Pixel 6
 - Root: Magisk 27.0
+
+## Profile & Memory (v1.1.0)
+- Active profile (from selected_profile.txt):
+- profile_key (from runtime_info):
+- memory_limit_mb (from runtime_info):
+- Expected limit for this profile:
 
 ## Problem
 [Clear description]
@@ -2103,6 +2595,12 @@ $ curl -s http://127.0.0.1:9091/api/metrics | head -10
 $ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 ```
 
+## Memory Diagnostics
+```text
+$ sh /data/local/tmp/memory-diagnostics.sh
+[paste output here]
+```
+
 ## Status File
 ```text
 $ cat proxy/run/dnscrypt.status
@@ -2110,7 +2608,7 @@ ON
 ```
 
 ## Logs
-[excerpt]
+[excerpt — include the "dynamic memory limit" line if present]
 
 ## Tried
 - [x] status.sh
@@ -2121,6 +2619,8 @@ ON
 - [x] §4.8 (Dashboard check)
 - [x] §7.7 (RACE-1 check)
 - [x] §4.11 (PORT-2 check)
+- [x] §4.12 (Memory limit check)
+- [x] §5.14 (Profile key check)
 ```
 
 ### 16.3 Where to Ask
@@ -2135,6 +2635,7 @@ ON
 - Always attach logs.
 - Be specific (not "DNS does not work").
 - Mention what you tried.
+- **v1.1.0**: if the issue relates to slowness or RAM, always include `profile_key` and `memory_limit_mb`.
 
 ---
 
@@ -2163,9 +2664,10 @@ ON
 - [iptables Manual](https://ipset.netfilter.org/iptables.man.html)
 - [Netfilter iptables Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 
 ---
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh

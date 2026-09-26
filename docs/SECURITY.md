@@ -2,11 +2,36 @@
 
 Vulnerability disclosure policy + threat model + applied protections.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 **Contact**: [GitHub Private Vulnerability Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new)
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • **No new audit corrections** — v1.1.0 is a documentation +
+>     polish release. The Audit Corrections Registry remains at
+>     #33 (the last entry from v1.0.0).
+>   • Three runtime improvements are documented in this file
+>     because they affect the security posture even though they
+>     are not new audit corrections:
+>       1. Dynamic memory limit per profile (main.go) — replaces
+>          the previous hardcoded 80 MB limit. Prevents GC
+>          pressure on the `ultimate` profile without weakening
+>          the DoS protection on lighter profiles.
+>       2. Extended `shellQuote()` character set — adds `{`, `}`,
+>          `\n`, `\t` to the escape list. Defense-in-depth; no
+>          known exploitable path existed before.
+>       3. `MONITORING_UI_PORT` constant used in the metrics
+>          handler — replaces the last hardcoded "8080" string.
+>          Single point of truth for the reserved port.
+>   • §14 Security Checklist gained three new verification
+>     sections: §14.22 (memory limit), §14.23 (shellQuote
+>     extension), §14.24 (MONITORING_UI_PORT).
+>   • §16 Changelog gained a v1.1.0 entry.
+>   • §17 Audit Corrections Registry header now notes that
+>     v1.1.0 does not extend the registry.
 
 ---
 
@@ -61,7 +86,7 @@ Instead, use **GitHub Private Vulnerability Reporting**:
 3. ...
 
 ## Affected Version
-v1.0.0 (or any version)
+v1.1.0 (or any version)
 
 ## Environment
 - Android version:
@@ -106,6 +131,7 @@ v1.0.0 (or any version)
 | User intent integrity | `STATUS_FILE` semantics |
 | BLOCKLIST integrity | `rebuildMu` mutex (v1.0.0) |
 | Dynamic ports integrity | `runtime_info` ports (PORT-2) |
+| Memory limit integrity | Dynamic per-profile limit (v1.1.0) |
 
 ### 2.2 What We Do Not Protect
 
@@ -128,6 +154,7 @@ v1.0.0 (or any version)
 | Internet MITM | intercept DNS | query leakage |
 | Advanced user | edit TOML manually | self-DoS |
 | LAN attacker | reconnaissance via `/readyz` | targeting (fixed by NEW-4) |
+| Resource-exhaustion attacker | trigger GC pressure via profile change | DoS on low-RAM devices (mitigated by v1.1.0 dynamic limits) |
 
 ### 3.2 Applied Protections
 
@@ -149,16 +176,21 @@ v1.0.0 (or any version)
 - IPv6-safe rate limiting — supports `[::1]`
 - Port Guard 8080 — reject monitoring_ui conflict
 - Section-restricted TOML — read from `[monitoring_ui]` only
-- **Exact endpoint matching** — no prefix matching
-- **Section header with comment** — `[monitoring_ui] # comment`
-- **Per-port cache** — no cross-port mixing
-- **Preserve user settings on upgrade** — backup/restore
-- **Login POST-only** — closes CSRF vector on `/api/auth/login`
-- **`/readyz` localhost-only** — prevents info leakage
-- **`shellQuote()`** — shell injection protection
-- **`readConfPort` range check** — reject values outside `[1, 65535]`
-- **`rebuildMu` mutex** — prevents BLOCKLIST race
-- **`sync.Once`** — thread-safe caching of shell detection
+- Exact endpoint matching — no prefix matching
+- Section header with comment — `[monitoring_ui] # comment`
+- Per-port cache — no cross-port mixing
+- Preserve user settings on upgrade — backup/restore
+- Login POST-only — closes CSRF vector on `/api/auth/login`
+- `/readyz` localhost-only — prevents info leakage
+- `shellQuote()` — shell injection protection (extended in v1.1.0)
+- `readConfPort` range check — reject values outside `[1, 65535]`
+- `rebuildMu` mutex — prevents BLOCKLIST race
+- `sync.Once` — thread-safe caching of shell detection
+- **v1.1.0**: Dynamic per-profile memory limit — prevents GC
+  pressure on heavy profiles while keeping DoS protection on
+  light profiles
+- **v1.1.0**: `MONITORING_UI_PORT` single source of truth in
+  metrics handler — removes the last hardcoded reserved port
 
 ---
 
@@ -167,56 +199,58 @@ v1.0.0 (or any version)
 ### 4.1 Trust Boundaries
 
 ```text
-┌─────────────────────────────────────────────────┐
-│  Untrusted Zone                                 │
-│  ┌──────────────────────────────────────────┐   │
-│  │  User Apps (Chrome, Games)               │   │
-│  └────────────────┬─────────────────────────┘   │
-│                   │ :53 DNS                     │
-│  ┌────────────────▼─────────────────────────┐   │
-│  │  Trust Boundary 1: Firewall              │   │
-│  │  (iptables IPv4 / ip6tables IPv6)        │   │
-│  │  ┌────────────────────────────────────┐  │   │
-│  │  │  OUTPUT (nat) — clean              │  │   │
-│  │  │    ├─ jump DNSCRYPT_OUT            │  │   │
-│  │  │    └─ jump DNSCRYPT_OUT6           │  │   │
-│  │  │                                    │  │   │
-│  │  │  DNSCRYPT_OUT (custom chain)       │  │   │
-│  │  │    ├─ RETURN (loopback + bootstrap)│  │   │
+┌────────────────────────────────────────────┐
+│  Untrusted Zone                                    │
+│  ┌──────────────────────────────────────┐   │
+│  │  User Apps (Chrome, Games)                  │   │
+│  └──────────────┬───────────────────────┘   │
+│                   │ :53 DNS                        │
+│  ┌─────────────▼───────────────────────┐   │
+│  │  Trust Boundary 1: Firewall                │   │
+│  │  (iptables IPv4 / ip6tables IPv6)          │   │
+│  │  ┌────────────────────────────────┐  │   │
+│  │  │  OUTPUT (nat) — clean               │  │   │
+│  │  │    ├─ jump DNSCRYPT_OUT             │  │   │
+│  │  │    └─ jump DNSCRYPT_OUT6            │  │   │
+│  │  │                                     │  │   │
+│  │  │  DNSCRYPT_OUT (custom chain)        │  │   │
+│  │  │    ├─ RETURN (loopback + bootstrap) │  │   │
 │  │  │    └─ DNAT → 127.0.0.1:5354        │  │   │
-│  │  │                                    │  │   │
-│  │  │  DNSCRYPT_OUT6 (custom chain)      │  │   │
-│  │  │    ├─ RETURN (IPv6 loopback)       │  │   │
+│  │  │                                     │  │   │
+│  │  │  DNSCRYPT_OUT6 (custom chain)       │  │   │
+│  │  │    ├─ RETURN (IPv6 loopback)        │  │   │
 │  │  │    └─ DNAT → [::1]:5354            │  │   │
-│  │  └────────────────────────────────────┘  │   │
-│  └────────────────┬─────────────────────────┘   │
-│                   │ 127.0.0.1:5354              │
-│  ┌────────────────▼─────────────────────────┐   │
-│  │  Trusted Zone (WebUI)                    │   │
-│  │  ┌────────────────────────────────────┐  │   │
-│  │  │  main.go :9090, :9091              │  │   │
-│  │  │  + Auth, Rate limit, CSP           │  │   │
-│  │  │  + CSRF (POST-only)                │  │   │
-│  │  │  + Cookie-only sessions            │  │   │
-│  │  │  + STATUS_FILE = "user intent"     │  │   │
-│  │  │  + hasEndpoint (exact match)       │  │   │
-│  │  │  + Basic Auth rate limit           │  │   │
-│  │  │  + Login POST-only (NEW-1)         │  │   │
-│  │  │  + /readyz localhost-only (NEW-4)  │  │   │
-│  │  │  + shellQuote (NEW-5)              │  │   │
-│  │  │  + readConfPort range (NEW-3)      │  │   │
-│  │  │  + auth cache 60s (NEW-6)          │  │   │
-│  │  │  + rebuildMu mutex (RACE-1)        │  │   │
-│  │  │  + runtime_info ports (PORT-2)     │  │   │
-│  │  └────────────────────────────────────┘  │   │
-│  └──────────────────────────────────────────┘   │
-│                   │ exec                        │
-│  ┌────────────────▼─────────────────────────┐   │
-│  │  Trust Boundary 2: Shell Scripts (root)  │   │
-│  │  + getSystemShell() fallback (Fix #2)    │   │
-│  │  + shellQuote() for dynamic paths        │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+│  │  └────────────────────────────────┘  │   │
+│  └──────────────┬──────────────────────┘   │
+│                   │ 127.0.0.1:5354               │
+│  ┌─────────────▼──────────────────────┐   │
+│  │  Trusted Zone (WebUI)                     │   │
+│  │  ┌───────────────────────────────┐  │    │
+│  │  │  main.go :9090, :9091              │  │    │
+│  │  │  + Auth, Rate limit, CSP           │  │    │
+│  │  │  + CSRF (POST-only)                │  │    │
+│  │  │  + Cookie-only sessions            │  │    │
+│  │  │  + STATUS_FILE = "user intent"     │  │    │
+│  │  │  + hasEndpoint (exact match)       │  │    │
+│  │  │  + Basic Auth rate limit           │  │    │
+│  │  │  + Login POST-only (NEW-1)         │  │    │
+│  │  │  + /readyz localhost-only (NEW-4)  │  │    │
+│  │  │  + shellQuote (NEW-5, ext. v1.1.0) │  │    │
+│  │  │  + readConfPort range (NEW-3)      │  │    │
+│  │  │  + auth cache 60s (NEW-6)          │  │    │
+│  │  │  + rebuildMu mutex (RACE-1)        │  │    │
+│  │  │  + runtime_info ports (PORT-2)     │  │    │
+│  │  │  + MEM-1 memory limit (v1.1.0)     │  │    │
+│  │  │  + MEM-3 monitoring port (v1.1.0)  │  │    │
+│  │  └───────────────────────────────┘  │    │
+│  └────────────────────────────────────┘    │
+│                   │ exec                          │
+│  ┌─────────────▼─────────────────────┐     │
+│  │  Trust Boundary 2: Shell Scripts (root)  │     │
+│  │  + getSystemShell() fallback (Fix #2)    │     │
+│  │  + shellQuote() for dynamic paths        │     │
+│  └───────────────────────────────────┘      │
+└────────────────────────────────────────────┘
 ```
 
 ### 4.2 Assets
@@ -234,6 +268,7 @@ v1.0.0 (or any version)
 | Firewall chains | kernel memory | Medium |
 | Auth cache | memory (60 s TTL) | Medium |
 | Rebuild mutex | memory | Low |
+| **Memory limit state** | **memory (per-profile)** | **Low (v1.1.0)** |
 
 ---
 
@@ -298,7 +333,7 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
   - `runShell` is limited to fixed commands
   - Path whitelist
   - `limitedBuffer` captures stderr
-  - **`shellQuote()`** — v1.0.0
+  - **`shellQuote()`** — v1.0.0, extended in v1.1.0
 
 ### 5.6 Brute Force
 
@@ -316,6 +351,22 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
   - `MaxBytesReader(5 MB)`
   - `io.LimitReader(50 MB)` for downloads
   - `limitedBuffer` (2048 bytes) for stderr capture
+
+- **v1.1.0 addition — GC pressure as a DoS vector**:
+  - Prior to v1.1.0, `debug.SetMemoryLimit(80 MB)` was hardcoded.
+    On the `ultimate` profile, this caused GC thrashing: the
+    runtime spent significant CPU on garbage collection instead
+    of serving requests. On low-RAM devices, this could make
+    the WebUI unresponsive during peak DNS activity.
+  - v1.1.0 replaces the hardcoded value with a per-profile
+    limit set by `memoryLimitForProfile()`:
+    light=80 MB, normal=100, pro=120, proplus=160, ultimate=220.
+  - The limit is applied at startup (`main()`) and on every
+    profile change (`updateProfile`). The state is exposed via
+    `runtime_info.memory_limit_mb` for observability.
+  - This is a defense-in-depth measure: it does not fix a
+    vulnerability, but it removes a self-inflicted DoS surface
+    that could be triggered by the legitimate `ultimate` profile.
 
 ### 5.8 Timing Attacks
 
@@ -584,6 +635,14 @@ func getClientIP(r *http.Request) string {
 **Rule**:
 Any change to the reserved port list must be applied across 7 files (`main.go` + 6 shell scripts).
 
+**v1.1.0 addition**:
+The `metricsProxyHandler` in `main.go` no longer contains the
+hardcoded string `"http://127.0.0.1:8080/api/metrics"`. It now
+builds the URL using the `MONITORING_UI_PORT` constant. This
+closes the last hardcoded reference to the reserved port and
+reduces the number of files that must be updated if the port
+ever changes (see §5.30 below).
+
 <a name="517"></a>
 ### 5.17 TOML Parsing — Section Injection (Audit Correction #21)
 
@@ -722,13 +781,13 @@ func checkAuth(r *http.Request) bool {
 **Contract**:
 
 ```text
-┌──────────────────────────────────────────────────┐
-│  Any endpoint protected by checkAuth enforces:   │
+┌───────────────────────────────────────────┐
+│  Any endpoint protected by checkAuth enforces:    │
 │    • Rate limiting (5 attempts / 15 min)          │
 │    • Lockout per IP                               │
 │    • Success resets the counter                   │
 │    • IPv6-safe (getClientIP)                      │
-└──────────────────────────────────────────────────┘
+└───────────────────────────────────────────┘
 ```
 
 <a name="519"></a>
@@ -1229,7 +1288,7 @@ If `MODDIR` contained:
 - However, defense-in-depth is required.
 - No practical vector today (but incorrect in principle).
 
-**Solution**:
+**Solution (v1.0.0)**:
 
 ```go
 // After v1.0.0:
@@ -1259,6 +1318,15 @@ cmd := fmt.Sprintf(". %s/functions.sh; is_port_open %d udp", shellQuote(MODDIR),
 | `/tmp/foo bar` | ❌ | ✅ |
 | `/tmp/$HOME` | ⚠️ expansion | ✅ literal |
 | `/tmp/evil;rm -rf/` | injection | ✅ literal |
+
+**v1.1.0 extension** (see §5.28 below for the extended version):
+
+- The v1.0.0 character set above is missing three classes that
+  could matter in edge cases:
+  - `{`, `}` — brace expansion in shells (e.g. `a{b,c}` → `ab ac`).
+  - `\n`, `\t` — whitespace that word-splitting treats as a
+    separator when the string is embedded in a shell command.
+- The extended `shellQuote` in v1.1.0 includes all four.
 
 <a name="527"></a>
 ### 5.27 Auth Cache (60 s) (Fix NEW-6 / Audit #32)
@@ -1547,6 +1615,182 @@ updateBackToHomeLinks();  // ← fallback before runtime_info
 
 **Note**: this fix has no separate Audit Correction number — it is part of v1.0.0 with reference to `#529`.
 
+<a name="530"></a>
+### 5.30 v1.1.0 — Security-Relevant Runtime Changes
+
+**v1.1.0 does not add new audit corrections.** It is a
+documentation + polish release. However, three runtime changes
+have a security-relevant dimension and are documented here for
+completeness.
+
+#### 5.30.1 Dynamic Memory Limit per Profile (MEM-1)
+
+**Background**:
+
+```go
+// Before v1.1.0 (main.go, top of main()):
+debug.SetMemoryLimit(80 * 1024 * 1024)  // ← hardcoded 80 MB
+```
+
+**Problem**:
+- The `ultimate` blocklist profile requires substantially more
+  than 80 MB of working memory during `rebuildBlocklist` and
+  while serving concurrent requests.
+- `debug.SetMemoryLimit` is a **soft** limit: when actual usage
+  approaches it, the Go runtime runs GC more aggressively.
+- With 80 MB hardcoded, the `ultimate` profile triggered
+  continuous GC cycles. On low-RAM devices this looked like an
+  application freeze — a self-inflicted DoS surface.
+
+**Solution**:
+
+```go
+// After v1.1.0:
+const (
+    MEMORY_LIMIT_LIGHT     = 80 * 1024 * 1024
+    MEMORY_LIMIT_NORMAL    = 100 * 1024 * 1024
+    MEMORY_LIMIT_PRO       = 120 * 1024 * 1024
+    MEMORY_LIMIT_PROPLUS   = 160 * 1024 * 1024
+    MEMORY_LIMIT_ULTIMATE  = 220 * 1024 * 1024
+    MEMORY_LIMIT_DEFAULT   = 80 * 1024 * 1024
+)
+
+func memoryLimitForProfile(key string) int64 {
+    switch strings.ToLower(strings.TrimSpace(key)) {
+    case "light":    return MEMORY_LIMIT_LIGHT
+    case "normal":   return MEMORY_LIMIT_NORMAL
+    case "pro":      return MEMORY_LIMIT_PRO
+    case "proplus":  return MEMORY_LIMIT_PROPLUS
+    case "ultimate": return MEMORY_LIMIT_ULTIMATE
+    default:         return MEMORY_LIMIT_DEFAULT
+    }
+}
+
+func applyMemoryLimit(key string) {
+    memLimitMu.Lock()
+    defer memLimitMu.Unlock()
+
+    limit := memoryLimitForProfile(key)
+    if limit == currentMemLimit && key == currentProfile {
+        return
+    }
+    old := debug.SetMemoryLimit(limit)
+    currentMemLimit = limit
+    currentProfile = key
+    logWithLevel("info", ...)
+}
+```
+
+Called from:
+- `main()` at startup (after `readSelectedProfile()`).
+- `updateProfile()` after `atomicWriteFile(SELECTED_FILE)`.
+
+**Impact**:
+
+| Profile | Before v1.1.0 | After v1.1.0 |
+|---------|:---:|:---:|
+| light | 80 MB | 80 MB |
+| normal | 80 MB | 100 MB |
+| pro | 80 MB | 120 MB |
+| proplus | 80 MB | 160 MB |
+| ultimate | 80 MB (GC thrashing) | 220 MB |
+
+**Observability**:
+- `runtime_info` now exposes `memory_limit_mb` and
+  `profile_key`. These are shown in both the WebUI and
+  Dashboard System Info panels.
+- The startup log line reports the effective limit:
+  `🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB`.
+
+**Security rationale**:
+- Removes a self-inflicted DoS surface (GC thrashing) that a
+  user could trigger by selecting the legitimate `ultimate`
+  profile.
+- The limit remains **soft** — it is not an enforced cap. An
+  attacker who could already reach the process memory (e.g.
+  via a separate bug) is not newly empowered; they were
+  already inside the trust boundary.
+
+#### 5.30.2 Extended `shellQuote` Character Set (MEM-2)
+
+**Background**:
+
+The v1.0.0 `shellQuote` escaped 20 shell-significant characters:
+` `, `"`, `'`, `$`, `` ` ``, `\`, `!`, `&`, `|`, `;`, `(`, `)`,
+`<`, `>`, `*`, `?`, `[`, `]`, `#`, `~`.
+
+Four characters were not escaped:
+- `{`, `}` — brace expansion in POSIX-compatible shells.
+- `\n`, `\t` — whitespace that word-splitting treats as a
+  separator.
+
+**Problem**:
+- A path containing `{` or `}` would be brace-expanded by the
+  shell before being passed to the actual command. Example:
+  `shellQuote("a{b,c}")` returned `a{b,c}` unchanged, and the
+  shell then expanded it to two arguments `ab ac`.
+- A path containing a literal newline or tab would be
+  word-split into separate arguments.
+
+**Practical impact today**:
+- `MODDIR` is derived from `os.Executable()`. A normal user
+  cannot make it contain `{` or `\n`.
+- Therefore no known exploitable path exists.
+
+**Solution**:
+
+```go
+// After v1.1.0:
+func shellQuote(s string) string {
+    for _, r := range s {
+        if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
+            r == '\\' || r == '!' || r == '&' || r == '|' || r == ';' ||
+            r == '(' || r == ')' || r == '<' || r == '>' || r == '*' ||
+            r == '?' || r == '[' || r == ']' || r == '#' || r == '~' ||
+            r == '{' || r == '}' || r == '\n' || r == '\t' {
+            return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+        }
+    }
+    return s
+}
+```
+
+**Security rationale**:
+- Defense-in-depth. No known exploit existed before.
+- Closes a class of input rather than a specific case.
+
+#### 5.30.3 `MONITORING_UI_PORT` in Metrics Handler (MEM-3)
+
+**Background**:
+
+```go
+// Before v1.1.0 (metricsProxyHandler):
+req, err := http.NewRequestWithContext(r.Context(), "GET",
+    "http://127.0.0.1:8080/api/metrics", nil)
+//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ hardcoded "8080"
+```
+
+**Problem**:
+- The reserved port 8080 was hardcoded in one more place, even
+  though the constant `MONITORING_UI_PORT` already existed.
+- If the reserved port ever changes, this instance would be
+  missed during the update.
+
+**Solution**:
+
+```go
+// After v1.1.0:
+monitoringURL := "http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+
+req, err := http.NewRequestWithContext(r.Context(), "GET", monitoringURL, nil)
+```
+
+**Security rationale**:
+- Single source of truth for the reserved port.
+- Reduces the number of files to audit if the port ever changes.
+- Aligns with the same pattern already used in
+  `getWebUIPort()` and `getDashboardPort()`.
+
 ---
 
 ## 6. Security Headers
@@ -1806,7 +2050,7 @@ func readConfPort(key, defaultPort string) string {
 - `filepath.Clean()` before file operations.
 - `net.ParseIP()` for IP validation.
 - `url.QueryEscape()` in JS.
-- **`shellQuote()`**.
+- **`shellQuote()`** — extended in v1.1.0.
 
 ### 9.4 Endpoint Matching
 
@@ -1854,6 +2098,8 @@ func readConfPort(key, defaultPort string) string {
 - Firewall cleanup operations.
 - STATUS_FILE transitions.
 - **Auth cache hits/misses** (debug level).
+- **v1.1.0**: memory limit transitions (info level).
+  Example: `memory limit adjusted: 80 MB → 120 MB (profile=pro)`
 
 ### 11.2 What We Do Not Log
 
@@ -1909,18 +2155,18 @@ func readConfPort(key, defaultPort string) string {
 | Secure=false on LAN | Necessary to avoid breaking login |
 | PWA dual-origin limitation | Service Worker bound to origin |
 | `manifest.json` shortcuts static | Evaluated before JS |
+| **Soft memory limit is not a hard cap** | **Go runtime design (v1.1.0)** |
 
 ### 13.2 Known Issues (will be fixed)
 
 | Issue | Proposed fix | Version |
 |---|---|---|
-| CSP `'unsafe-inline'` | Convert onclick → addEventListener | v1.1 |
-| `pgrep -x` on Android 5.x | fallback | v1.1 |
-| awk with `]` in comment | improve parser | v1.1 |
-| CodeQL triggers include `web/` | update `paths-ignore` | v1.1 |
-| Dashboard does not show `bind_addr` | add endpoint | v1.1 |
-| PWA dual-origin (9090 vs 9091) | unify on one port | v1.1 |
-| `manifest.json` shortcuts do not read `runtime_info` | unify on one port | v1.1 |
+| CSP `'unsafe-inline'` | Convert onclick → addEventListener | v1.2 |
+| `pgrep -x` on Android 5.x | fallback | v1.2 |
+| awk with `]` in comment | improve parser | v1.2 |
+| PWA dual-origin (9090 vs 9091) | unify on one port | v1.2 |
+| `manifest.json` shortcuts do not read `runtime_info` | unify on one port | v1.2 |
+| Maskable icon reuses `icon-512.png` | ship dedicated maskable SVG | v1.2 |
 
 ### 13.3 Compensating Controls
 
@@ -1942,14 +2188,17 @@ func readConfPort(key, defaultPort string) string {
 - Section header with comment (Fix #10).
 - Per-port cache (Fix #11).
 - Preserve settings on upgrade (Fix #3).
-- **Login POST-only** (NEW-1).
-- **`/readyz` localhost-only** (NEW-4).
-- **`shellQuote()` injection protection** (NEW-5).
-- **`readConfPort` range check** (NEW-3).
-- **`rebuildMu` mutex** (RACE-1).
-- **`runtime_info` dynamic ports** (PORT-2).
-- **`sync.Once` for shell detection** (Fix #2).
-- **Auth cache (60 s)** (NEW-6).
+- Login POST-only (NEW-1).
+- `/readyz` localhost-only (NEW-4).
+- `shellQuote()` injection protection (NEW-5, extended v1.1.0).
+- `readConfPort` range check (NEW-3).
+- `rebuildMu` mutex (RACE-1).
+- `runtime_info` dynamic ports (PORT-2).
+- `sync.Once` for shell detection (Fix #2).
+- Auth cache (60 s) (NEW-6).
+- **v1.1.0**: Dynamic per-profile memory limit (MEM-1).
+- **v1.1.0**: Extended `shellQuote` charset (MEM-2).
+- **v1.1.0**: `MONITORING_UI_PORT` in metrics handler (MEM-3).
 
 ---
 
@@ -1977,12 +2226,16 @@ func readConfPort(key, defaultPort string) string {
 - [ ] JSON conversion from Prometheus works.
 - [ ] 404 for unknown action.
 - [ ] Section header with comment supported.
-- [ ] **Login POST-only enforced**.
-- [ ] **`/readyz` restricted to localhost**.
-- [ ] **`shellQuote` applied to all dynamic paths**.
-- [ ] **`readConfPort` range check active**.
-- [ ] **`rebuildMu` mutex present on `rebuildBlocklist`**.
-- [ ] **`runtime_info` returns correct ports**.
+- [ ] Login POST-only enforced.
+- [ ] `/readyz` restricted to localhost.
+- [ ] `shellQuote` applied to all dynamic paths.
+- [ ] `readConfPort` range check active.
+- [ ] `rebuildMu` mutex present on `rebuildBlocklist`.
+- [ ] `runtime_info` returns correct ports.
+- [ ] **v1.1.0**: `memory_limit_mb` + `profile_key` returned by `runtime_info`.
+- [ ] **v1.1.0**: Memory limit applies correctly on startup.
+- [ ] **v1.1.0**: Memory limit re-applies on profile change.
+- [ ] **v1.1.0**: `MONITORING_UI_PORT` used in `metricsProxyHandler`.
 
 ### 14.2 Runtime
 
@@ -2003,6 +2256,8 @@ func readConfPort(key, defaultPort string) string {
 - [ ] Auth cache (60 s) reduces I/O.
 - [ ] `runtime_info` returns correct ports.
 - [ ] Login POST-only enforced.
+- [ ] **v1.1.0**: Memory limit matches active profile.
+- [ ] **v1.1.0**: Startup log reports the effective memory limit.
 
 ### 14.3 User
 
@@ -2293,6 +2548,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://192.168.1.5:9091/readyz
 - [ ] `shellQuote` present in main.go.
 - [ ] Used in 3+ places (isPortOpen, startService, stopService, SIGTERM).
 - [ ] No `. " + MODDIR + "` without shellQuote.
+- [ ] **v1.1.0**: extended character set includes `{`, `}`, `\n`, `\t`.
 
 **Verify**:
 
@@ -2301,6 +2557,11 @@ curl -s -o /dev/null -w "%{http_code}\n" http://192.168.1.5:9091/readyz
 grep -q 'func shellQuote' proxy/main.go && echo "✅ shellQuote present"
 USAGE=$(grep -c 'shellQuote(MODDIR)' proxy/main.go)
 [ "$USAGE" -ge 3 ] && echo "✅ shellQuote used $USAGE times"
+
+# 2. v1.1.0 extended charset
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\t'" && echo "✅ tab"
 ```
 
 ### 14.19 `readConfPort` Range Audit
@@ -2353,6 +2614,60 @@ curl -s "http://127.0.0.1:8081/api?action=runtime_info" | jq
 # Expected: {..., "webui_port": "8081", "dashboard_port": "9091"}
 ```
 
+### 14.22 v1.1.0 — Dynamic Memory Limit Audit (MEM-1)
+
+- [ ] `memoryLimitForProfile` declared in main.go.
+- [ ] `applyMemoryLimit` declared in main.go.
+- [ ] All 5 profile constants defined.
+- [ ] No hardcoded `debug.SetMemoryLimit(80 * 1024 * 1024)` remains.
+- [ ] `applyMemoryLimit` called from `main()`.
+- [ ] `applyMemoryLimit` called from `updateProfile`.
+
+**Verify**:
+
+```bash
+# 1. static audit
+grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ function"
+grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅ apply"
+
+# 2. all profile constants
+for c in LIGHT NORMAL PRO PROPLUS ULTIMATE DEFAULT; do
+  grep -q "MEMORY_LIMIT_$c" proxy/main.go && echo "✅ MEMORY_LIMIT_$c"
+done
+
+# 3. no hardcoded limit
+! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ no hardcoded 80MB"
+
+# 4. called from main() and updateProfile()
+grep -c 'applyMemoryLimit(' proxy/main.go
+# Expected: >= 3 (definition + 2 call sites)
+```
+
+### 14.23 v1.1.0 — Extended `shellQuote` Audit (MEM-2)
+
+See §14.18 for the verify block. This section exists as a
+cross-reference so that a reviewer scanning for v1.1.0 items
+finds the check under both labels.
+
+### 14.24 v1.1.0 — `MONITORING_UI_PORT` in Metrics Handler (MEM-3)
+
+- [ ] No hardcoded `"http://127.0.0.1:8080/api/metrics"` remains.
+- [ ] `metricsProxyHandler` uses `MONITORING_UI_PORT`.
+
+**Verify**:
+
+```bash
+# 1. no hardcoded URL
+! grep -q '"http://127.0.0.1:8080/api/metrics"' proxy/main.go && echo "✅ no hardcoded URL"
+
+# 2. constant used in handler
+grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ constant used"
+
+# 3. Integration — verify the proxy still works
+curl -s -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics | jq '.total_queries'
+# Expected: a number
+```
+
 ---
 
 ## 15. Acknowledgments
@@ -2366,6 +2681,54 @@ Thanks to everyone who has contributed to the security of the project:
 ---
 
 ## 16. Changelog — Security Changes
+
+### v1.1.0 (2026-09-26)
+
+**Polish release — no new audit corrections.**
+
+This release consolidates three runtime improvements that
+affect the security posture but do not warrant new audit
+correction numbers:
+
+**Runtime improvements**:
+
+- **MEM-1 — Dynamic memory limit per profile (main.go)**
+  Replaces the hardcoded `debug.SetMemoryLimit(80 MB)` with a
+  per-profile limit computed by `memoryLimitForProfile()`:
+  light=80, normal=100, pro=120, proplus=160, ultimate=220.
+  Prevents GC thrashing on heavy profiles without weakening
+  DoS protection on light profiles. Exposed via
+  `runtime_info.memory_limit_mb`.
+
+- **MEM-2 — Extended `shellQuote` character set (main.go)**
+  Adds `{`, `}`, `\n`, `\t` to the escape list. Defense in
+  depth; no known exploitable path existed before.
+
+- **MEM-3 — `MONITORING_UI_PORT` in metrics handler (main.go)**
+  Removes the last hardcoded `"8080"` string from
+  `metricsProxyHandler`. Single source of truth for the
+  reserved port.
+
+**Documentation updates**:
+
+- §5.30 (new) — documents MEM-1 / MEM-2 / MEM-3 in the Attack
+  Vectors section.
+- §14.22 (new) — memory limit audit.
+- §14.23 (new) — extended shellQuote audit (cross-reference).
+- §14.24 (new) — MONITORING_UI_PORT audit.
+- §2.1 — added memory limit integrity to protected assets.
+- §3.2 — added dynamic per-profile memory limit to applied
+  protections.
+- §11.1 — added memory limit transition logging.
+- §13.3 — added MEM-1 / MEM-2 / MEM-3 to compensating controls.
+
+**No changes to**:
+- §1–4 (Reporting, Scope, Threat Model, Assets)
+- §5.1–5.29 (all prior attack vectors)
+- §6–13 (Headers, Auth, Sessions, Input, Crypto, Logging,
+  Supply Chain, Known Limitations)
+- §15 (Acknowledgments)
+- §17 (Audit Corrections Registry remains at #33)
 
 ### v1.0.0 (2026-09-24)
 
@@ -2408,13 +2771,22 @@ Thanks to everyone who has contributed to the security of the project:
 - §14.16-14.21: 6 new audit sections.
 
 **Known issues remaining**:
-- CSP `'unsafe-inline'` — scheduled for v1.1.
-- CodeQL triggers `web/` — scheduled for v1.1.
-- PWA dual-origin — scheduled for v1.1.
+- CSP `'unsafe-inline'` — scheduled for v1.2.
+- CodeQL triggers `web/` — scheduled for v1.2.
+- PWA dual-origin — scheduled for v1.2.
 
 ---
 
 ## 17. Audit Corrections Registry
+
+> **v1.1.0 note**: This release does **not** extend the registry.
+> The last audit correction is #33, from v1.0.0. v1.1.0 is a
+> documentation + polish release that consolidates three
+> runtime improvements (MEM-1, MEM-2, MEM-3) without assigning
+> them audit correction numbers — they close edge cases, not
+> new vulnerabilities.
+>
+> New audit corrections will resume at **#34** in v1.2.x.
 
 | # | Description | Version | Section |
 |:-:|---|---|---|
@@ -2448,8 +2820,20 @@ Thanks to everyone who has contributed to the security of the project:
 | #32 | `rebuildMu` mutex (RACE-1) | v1.0.0 | §5.28 |
 | #33 | `runtime_info` dynamic ports (PORT-2) | v1.0.0 | §5.29 |
 
-**Last Audit Correction**: #33
-**Next expected**: #34 (v1.1.x)
+**Last Audit Correction**: #33 (v1.0.0)
+**Next expected**: #34 (v1.2.x)
+
+### 17.1 v1.1.0 Runtime Improvements (Not Audit Corrections)
+
+| ID | Change | Rationale |
+|:-:|---|---|
+| MEM-1 | Dynamic memory limit per profile | Closes a self-inflicted DoS surface (GC thrashing on `ultimate`) |
+| MEM-2 | Extended `shellQuote` charset (`{`, `}`, `\n`, `\t`) | Defense in depth; no known exploit existed |
+| MEM-3 | `MONITORING_UI_PORT` in metrics handler | Single source of truth; removes last hardcoded reserved port |
+
+These are documented in §5.30 for completeness but are not
+assigned audit correction numbers because they do not fix a
+known exploitable vulnerability.
 
 ---
 
@@ -2466,9 +2850,10 @@ Thanks to everyone who has contributed to the security of the project:
 - [Netfilter iptables Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [RFC 7282 — On Consensus and Humming in the IETF (State vs Intent)](https://datatracker.ietf.org/doc/html/rfc7282)
+- [Go runtime/debug.SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 
 ---
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh

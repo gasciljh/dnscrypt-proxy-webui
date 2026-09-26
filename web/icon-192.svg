@@ -1,14 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
      DNSCrypt Smart Filter — PWA Icon (192×192)
-     Version: v1.0.0
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
      Small SVG icon for modern browsers (PWA, favicon fallback).
      Rendered at 192×192 in web/manifest.json → icons[1].
-     Design: blue gradient background, shield, "DNS" text,
-             green status dot at bottom center.
+
+     Design:
+       • Blue gradient background with rounded corners (rx=42)
+       • Shield shape
+       • "DNS" text
+       • Green status dot at bottom center
+
+     Purpose in manifest.json:
+       • Declared as `"purpose": "any"` — this SVG is served to
+         browsers that support SVG icons and prefer vector.
+
+     Not maskable:
+       • This SVG has rounded corners (rx=42) and content close
+         to the edges, which makes it unsuitable for the
+         `maskable` purpose. The maskable PNG is generated from
+         icon-512.svg (see that file for details).
+
+     v1.1.0 note:
+       • Version bumped from v1.0.0 to v1.1.0 to match the
+         module release. No design changes were made.
+       • Clarified the purpose (any, not maskable) and the
+         rounded-corner behavior. Previous header was silent
+         on both points.
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>

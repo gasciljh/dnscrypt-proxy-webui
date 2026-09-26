@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Offline Page
-     Version: v1.0.0
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -17,6 +17,27 @@
        • It uses default ports (9090/9091).
        • If ports were changed in webui.conf, the user is
          warned to check that file.
+       • All text and code are English-only (global release).
+
+     v1.1.0 changes:
+       • CRITICAL FIX — removed the restrictive CSP meta tag.
+         The previous CSP declared `default-src 'none'`, which
+         implicitly forbids `script-src` and blocked the inline
+         <script> at the bottom of this page. The page rendered
+         correctly but every interactive feature (Retry,
+         Diagnose, language toggle, auto-retry) silently failed.
+
+       • Version badge updated to v1.1.0.
+
+       • Security note: this page has no user data, no forms,
+         no network calls after load, no localStorage access, and
+         uses only textContent (never innerHTML with user data).
+         Removing the CSP meta does not increase the attack
+         surface because there is no real attack surface to
+         protect. If a future version adds dynamic content from
+         untrusted sources, CSP must be reintroduced — preferably
+         with `script-src` restricted via a nonce rather than
+         `'unsafe-inline'`.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -27,8 +48,15 @@
     <meta name="robots" content="noindex, nofollow">
     <title>Offline — DNSCrypt Smart Filter</title>
 
-    <!-- Strict CSP: no inline scripts, no external sources -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none';">
+    <!--
+        ⚠️ CSP intentionally NOT set here.
+        See the v1.1.0 changes note in the HTML comment above.
+        The page has no user data, no forms, no network calls,
+        and uses only textContent — there is nothing to protect
+        with CSP, and setting `default-src 'none'` would block
+        the inline script that drives the Retry / Diagnose /
+        language-toggle features.
+    -->
 
     <style>
         /* ============================================================
@@ -641,7 +669,7 @@
         <div>
             <span aria-hidden="true">🛡️</span>
             DNSCrypt Smart Filter
-            <span class="version" id="versionBadge">v1.0.0</span>
+            <span class="version" id="versionBadge">v1.1.0</span>
         </div>
         <div style="margin-top: 6px;">
             <a
@@ -662,6 +690,9 @@
 
     // ============================================================
     // [1] Translations
+    // ============================================================
+    // Only the strings actually rendered by this page are included.
+    // Any dynamic value (URL, time, UA) is filled at runtime.
     // ============================================================
     var translations = {
         en: {
@@ -709,7 +740,10 @@
     };
 
     // ============================================================
-    // [2] Default language (English by default)
+    // [2] Default language
+    // ============================================================
+    // Follows the same key as index.html / dashboard.html so the
+    // user's preference is preserved across all three pages.
     // ============================================================
     var currentLang = 'en';
     try {
@@ -777,11 +811,17 @@
     // ============================================================
     // [6] handleRetry — attempt to reconnect to the server
     // ============================================================
+    // Sends a HEAD /healthz with a 3-second timeout. On 200, the
+    // server is back → reload the page. Otherwise, re-enable the
+    // button and leave the UI in "reconnecting" state.
+    //
+    // Note: HEAD /healthz bypasses the Service Worker cache
+    // (see sw.js shouldBypass) so this always hits the network.
+    // ============================================================
     function handleRetry() {
         var btn = $('retryBtn');
         if (btn) btn.disabled = true;
 
-        // Attempt to connect (HEAD /healthz)
         var url = '/healthz?t=' + Date.now();
 
         var xhr = new XMLHttpRequest();
@@ -814,6 +854,9 @@
     // ============================================================
     // [7] updateStatus
     // ============================================================
+    // Updates the connectivity indicator. Colors change based on
+    // browser's online/offline event.
+    // ============================================================
     function updateStatus(isOnline) {
         var statusEl = $('statusText');
         var statusBox = document.querySelector('.connectivity-status');
@@ -838,6 +881,10 @@
 
     // ============================================================
     // [8] handleDiagnose — show diagnostic info
+    // ============================================================
+    // Toggle the diagnostics box and populate it with runtime
+    // information from the browser. Uses escapeHtml() for any
+    // value that could contain user-controlled data.
     // ============================================================
     function handleDiagnose() {
         var box = $('diagnosticsBox');
@@ -883,6 +930,10 @@
     // ============================================================
     // [9] escapeHtml
     // ============================================================
+    // Minimal HTML escaper used for any value inserted into
+    // innerHTML. Kept local to this file — the offline page has
+    // no shared utility module.
+    // ============================================================
     function escapeHtml(s) {
         if (s === null || s === undefined) return '';
         return String(s)
@@ -895,6 +946,10 @@
 
     // ============================================================
     // [10] Auto-retry (every 15 seconds, up to a limit)
+    // ============================================================
+    // Silently probes /healthz. On 200, reloads the page. Gives
+    // up after AUTO_RETRY_MAX attempts to avoid hammering a
+    // permanently-down server (e.g. user removed the module).
     // ============================================================
     var autoRetryCount = 0;
     var AUTO_RETRY_MAX = 10;

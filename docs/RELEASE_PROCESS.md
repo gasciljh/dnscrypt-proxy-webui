@@ -1,16 +1,32 @@
 # Release Process — DNSCrypt Smart Filter
 
-Step-by-step guide to publishing a new release: from version bump to post-release verification.
+Step-by-step guide to publishing a new release: from version bump
+to post-release verification.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `Last updated` reflects the v1.1.0 release date.
+>   • Release examples updated from `v1.1.0` (now the current
+>     release) to `v1.2.0` (the next planned stable release).
+>   • PATCH-release examples updated from `v1.0.1` to `v1.1.1` —
+>     the first realistic PATCH release from `v1.1.0`.
+>   • `versionCode` table extended with `v1.1.0`, `v1.1.1`, and
+>     `v1.2.0` for easy reference during the current cycle.
+>   • `Related documents` box now includes `docs/UPGRADE.md`.
+>   • `§12.1 Related Documentation` extended with
+>     `docs/UPGRADE.md`.
+>   • No structural changes to the release pipeline.
 
 > **📖 Related documents**:
 > - Git branching strategy → [`docs/BRANCHING.md`](BRANCHING.md)
 > - Architecture Decision Records → [`docs/adr/README.md`](adr/README.md)
 > - Contribution guide → [`docs/CONTRIBUTING.md`](CONTRIBUTING.md)
+> - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 
 ---
 
@@ -35,7 +51,8 @@ Step-by-step guide to publishing a new release: from version bump to post-releas
 
 ### 1.1 Goal
 
-Publish a **signed, reproducible, verifiable** release that users can download and install with confidence.
+Publish a **signed, reproducible, verifiable** release that users can
+download and install with confidence.
 
 ### 1.2 What a Release Includes
 
@@ -90,7 +107,8 @@ Release is live ✅
 
 Before releasing, ensure:
 
-- ✅ You are on `develop` or a `release/*` branch (see [`docs/BRANCHING.md`](BRANCHING.md)).
+- ✅ You are on `develop` or a `release/*` branch (see
+  [`docs/BRANCHING.md`](BRANCHING.md)).
 - ✅ Working tree is clean (`git status`).
 - ✅ `CHANGELOG.md` has an entry for the new version.
 - ✅ CI is green on the current branch.
@@ -107,7 +125,8 @@ Before releasing, ensure:
 
 ### 1.5 Architecture Decisions
 
-The decisions that shaped the release process are documented as **ADRs**:
+The decisions that shaped the release process are documented as
+**ADRs**:
 
 | ADR | Decision |
 |---|---|
@@ -117,6 +136,25 @@ The decisions that shaped the release process are documented as **ADRs**:
 | [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md) | Rename `hotfix.sh` → `release-patch.sh` |
 
 Full index: [`docs/adr/README.md`](adr/README.md).
+
+### 1.6 v1.1.0 Reference
+
+The v1.1.0 release (2026-09-26) serves as the most recent concrete
+example of this process. Key facts:
+
+| Aspect | Value |
+|---|---|
+| Version | `v1.1.0` |
+| `versionCode` | `1010000` |
+| Type | MINOR (features) |
+| Branch | `release/v1.1.0` → `main` |
+| Audit Corrections | None (registry remains at #33) |
+| Runtime improvements | MEM-1, MEM-2, MEM-3 |
+
+**Upgrade guide**: [`docs/UPGRADE.md`](UPGRADE.md) §3.0 — full
+`v1.0.0 → v1.1.0` upgrade path.
+
+**Next planned release**: `v1.2.0` (see `docs/ROADMAP.md` §3).
 
 ---
 
@@ -131,20 +169,21 @@ Full index: [`docs/adr/README.md`](adr/README.md).
 | **When** | After a successful stabilization period. |
 | **Branch** | `release/*` or directly from `develop`. |
 | **Script** | `scripts/release.sh` |
-| **Tag** | `v1.1.0` (no suffix). |
+| **Tag** | `v1.2.0` (no suffix). |
 | **GitHub Release** | Marked as **latest**. |
 | **Cadence** | Every 4-8 weeks. |
 
 ### 2.2 Prerelease
 
-**Format**: `vMAJOR.MINOR.PATCH-<label>` (e.g. `v1.1.0-beta1`, `v2.0.0-rc1`)
+**Format**: `vMAJOR.MINOR.PATCH-<label>` (e.g. `v1.2.0-beta1`,
+`v2.0.0-rc1`)
 
 | Aspect | Value |
 |---|---|
 | **When** | For beta testing before a stable release. |
 | **Branch** | `develop`. |
 | **Script** | `scripts/release.sh` |
-| **Tag** | `v1.1.0-beta1`. |
+| **Tag** | `v1.2.0-beta1`. |
 | **GitHub Release** | Marked as **pre-release**. |
 | **Cadence** | As needed. |
 
@@ -152,14 +191,14 @@ Full index: [`docs/adr/README.md`](adr/README.md).
 
 ### 2.3 Hotfix (PATCH Release)
 
-**Format**: `vMAJOR.MINOR.PATCH+1` (e.g. `v1.0.1` after `v1.0.0`)
+**Format**: `vMAJOR.MINOR.PATCH+1` (e.g. `v1.1.1` after `v1.1.0`)
 
 | Aspect | Value |
 |---|---|
 | **When** | Critical bug in a released version. |
 | **Branch** | `hotfix/*` (from `main`). |
 | **Script** | `scripts/release-patch.sh` ← **enforces 3 safety rules** |
-| **Tag** | `v1.0.1`. |
+| **Tag** | `v1.1.1`. |
 | **GitHub Release** | Marked as **latest**. |
 | **Cadence** | Immediate. |
 
@@ -167,19 +206,30 @@ Full index: [`docs/adr/README.md`](adr/README.md).
 
 1. **Branch must be `main`** — refuses to run from `develop`.
 2. **`MAJOR` and `MINOR` must not change** — rejects non-PATCH bumps.
-3. **`PATCH` must be exactly `current + 1`** — rejects skipping versions.
+3. **`PATCH` must be exactly `current + 1`** — rejects skipping
+   versions.
 
 **Full rationale**: [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md).
 
-See [`docs/BRANCHING.md`](BRANCHING.md) §8 for the full hotfix workflow.
+See [`docs/BRANCHING.md`](BRANCHING.md) §8 for the full hotfix
+workflow.
 
 ### 2.4 Comparison
 
 | Type | Example | `versionCode` | Script | Latest? | Requires `release/*`? |
 |---|---|:---:|:---:|:---:|:---:|
-| Stable | `v1.1.0` | `1010000` | `release.sh` | ✅ | ⚠️ Recommended |
-| Prerelease | `v1.1.0-beta1` | `1010000` | `release.sh` | ❌ | ❌ (from `develop`) |
-| Hotfix (PATCH) | `v1.0.1` | `1000001` | `release-patch.sh` | ✅ | ❌ (from `main`) |
+| Stable | `v1.2.0` | `1020000` | `release.sh` | ✅ | ⚠️ Recommended |
+| Prerelease | `v1.2.0-beta1` | `1020000` | `release.sh` | ❌ | ❌ (from `develop`) |
+| Hotfix (PATCH) | `v1.1.1` | `1010001` | `release-patch.sh` | ✅ | ❌ (from `main`) |
+
+### 2.5 Current and Next Versions
+
+| Version | Status | Notes |
+|---|---|---|
+| `v1.0.0` | Released (2026-09-24) | First stable release |
+| **`v1.1.0`** | **Released (2026-09-26)** | **Current — polish + MEM-1/2/3** |
+| `v1.1.1` | Planned (PATCH) | If a hotfix is needed |
+| `v1.2.0` | Planned (MINOR) | Next feature release |
 
 ---
 
@@ -187,7 +237,8 @@ See [`docs/BRANCHING.md`](BRANCHING.md) §8 for the full hotfix workflow.
 
 ### 3.1 SemVer
 
-The project follows [Semantic Versioning 2.0.0](https://semver.org/):
+The project follows
+[Semantic Versioning 2.0.0](https://semver.org/):
 
 ```text
 v<MAJOR>.<MINOR>.<PATCH>[-<prerelease>]
@@ -212,19 +263,23 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 
 | Version | versionCode | Notes |
 |---|:---:|---|
-| `v1.0.0` | `1000000` | Current release |
-| `v1.0.1` | `1000001` | Hotfix |
-| `v1.1.0` | `1010000` | New feature |
-| `v1.1.0-beta1` | `1010000` | Same code (prerelease) |
+| `v1.0.0` | `1000000` | First stable |
+| `v1.0.1` | `1000001` | First hotfix |
+| `v1.1.0` | `1010000` | Current |
+| `v1.1.1` | `1010001` | Next PATCH (if needed) |
+| `v1.2.0` | `1020000` | Next MINOR |
+| `v1.2.0-beta1` | `1020000` | Same code (prerelease) |
 | `v2.0.0` | `2000000` | Breaking change |
 | `v10.5.3` | `10050300` | Double-digit MAJOR |
 
 ### 3.3 Why Two Version Schemes?
 
 - **SemVer** (`v1.1.0`) — for GitHub Releases, docs, humans.
-- **versionCode** (`1010000`) — for Magisk/KernelSU/APatch to detect updates.
+- **versionCode** (`1010000`) — for Magisk/KernelSU/APatch to detect
+  updates.
 
-**Rule**: `versionCode` must **strictly increase** with each release. Never reuse.
+**Rule**: `versionCode` must **strictly increase** with each release.
+Never reuse.
 
 ### 3.4 Sanity Checks
 
@@ -232,19 +287,20 @@ Run these before tagging:
 
 ```bash
 # 1. Format is valid
-echo "v1.1.0" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$' && echo "✅ valid"
+echo "v1.2.0" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$' && echo "✅ valid"
 
 # 2. versionCode is greater than previous
 grep '^versionCode=' module.prop
 
 # 3. Version is not already tagged
-git tag --list "v1.1.0"
+git tag --list "v1.2.0"
 
 # 4. VERSION matches the intended release
 cat VERSION
 ```
 
-`scripts/release.sh` (and `scripts/release-patch.sh`) perform all four automatically.
+`scripts/release.sh` (and `scripts/release-patch.sh`) perform all
+four automatically.
 
 ---
 
@@ -257,7 +313,7 @@ Every release updates **4 files**:
 Single-line file, LF-only.
 
 ```text
-v1.1.0
+v1.2.0
 ```
 
 **Purpose**: Single Source of Truth for the module version.
@@ -269,8 +325,8 @@ Magisk module definition.
 ```text
 id=dnscrypt-proxy-webui
 name=DNSCrypt Proxy (Smart Filter)
-version=v1.1.0
-versionCode=1010000
+version=v1.2.0
+versionCode=1020000
 author=gasciljh
 description=...
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json
@@ -284,23 +340,24 @@ Auto-update metadata.
 
 ```json
 {
-  "version": "v1.1.0",
-  "versionCode": 1010000,
-  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/dnscrypt-webui-1.1.0-module.zip",
+  "version": "v1.2.0",
+  "versionCode": 1020000,
+  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/dnscrypt-webui-1.2.0-module.zip",
   "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md"
 }
 ```
 
 **Updated fields**: `version`, `versionCode`, `zipUrl`.
 
-**Note**: `zipUrl` uses the tag as-is (`v1.1.0` in the URL path). Magisk resolves the redirect.
+**Note**: `zipUrl` uses the tag as-is (`v1.2.0` in the URL path).
+Magisk resolves the redirect.
 
 ### 4.4 `CHANGELOG.md`
 
 Human-readable history.
 
 ```markdown
-## [v1.1.0] - 2026-XX-XX
+## [v1.2.0] - 2026-XX-XX
 
 ### Added
 - ...
@@ -349,7 +406,7 @@ git pull origin develop
 $EDITOR CHANGELOG.md
 
 # 3. Run the script (interactive)
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 
 # 4. Confirm at the prompt
 # → Script commits, tags, pushes
@@ -360,35 +417,36 @@ $EDITOR CHANGELOG.md
 
 ```text
 ✓ Checked environment (git, sed, awk, jq)
-✓ Validated version: v1.1.0
-✓ versionCode = 1010000
+✓ Validated version: v1.2.0
+✓ versionCode = 1020000
 ✓ On branch: develop
 ✓ Working tree is clean
-✓ Tag v1.1.0 is available
-✓ CHANGELOG.md contains [1.1.0] or [Unreleased]
+✓ Tag v1.2.0 is available
+✓ CHANGELOG.md contains [1.2.0] or [Unreleased]
 ✓ Updated VERSION
 ✓ Updated module.prop
 ✓ Updated update.json
-✓ Commit created: release: v1.1.0
-✓ Tag created: v1.1.0
+✓ Commit created: release: v1.2.0
+✓ Tag created: v1.2.0
 ✓ Pushed branch: develop
-✓ Pushed tag: v1.1.0
+✓ Pushed tag: v1.2.0
 ```
 
 ### 5.3 Dry-Run (Preview)
 
 ```bash
-./scripts/release.sh v1.1.0 --dry-run
+./scripts/release.sh v1.2.0 --dry-run
 ```
 
 **What it does**: prints what would happen, changes nothing.
 
-**When to use**: before committing to a release, to double-check `versionCode` and branch state.
+**When to use**: before committing to a release, to double-check
+`versionCode` and branch state.
 
 ### 5.4 Local-Only (No Push)
 
 ```bash
-./scripts/release.sh v1.1.0 --no-push
+./scripts/release.sh v1.2.0 --no-push
 ```
 
 **What it does**: creates the commit + tag locally, but does not push.
@@ -398,33 +456,34 @@ $EDITOR CHANGELOG.md
 ```bash
 # Review the change
 git show HEAD
-git tag -l v1.1.0
+git tag -l v1.2.0
 
 # Push manually when ready
 git push origin develop
-git push origin v1.1.0
+git push origin v1.2.0
 ```
 
 ### 5.5 Non-Interactive (CI/Scripts)
 
 ```bash
-./scripts/release.sh v1.1.0 --yes
+./scripts/release.sh v1.2.0 --yes
 ```
 
 **What it does**: skips all confirmation prompts.
 
-**When to use**: in automation scripts (rare — usually you want the confirmation).
+**When to use**: in automation scripts (rare — usually you want the
+confirmation).
 
 ### 5.6 Prerelease
 
 ```bash
-./scripts/release.sh v1.1.0-beta1
+./scripts/release.sh v1.2.0-beta1
 ```
 
 **Result**:
-- `VERSION` = `v1.1.0-beta1`
-- `versionCode` = `1010000` (prerelease suffix ignored)
-- Tag = `v1.1.0-beta1`
+- `VERSION` = `v1.2.0-beta1`
+- `versionCode` = `1020000` (prerelease suffix ignored)
+- Tag = `v1.2.0-beta1`
 - GitHub Release marked as **pre-release**
 
 ### 5.7 Using release-patch.sh
@@ -437,7 +496,7 @@ git checkout main
 git pull origin main
 
 # 2. Run the script (interactive)
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 
 # 3. Confirm at the prompt
 # → Script enforces 3 safety rules
@@ -445,11 +504,13 @@ git pull origin main
 # → Reminds you to back-merge main → develop
 ```
 
-**Safety rules** (from [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)):
+**Safety rules** (from
+[ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)):
 
 1. **Branch must be `main`** — refuses to run from `develop`.
 2. **`MAJOR` and `MINOR` must not change** — rejects non-PATCH bumps.
-3. **`PATCH` must be exactly `current + 1`** — rejects skipping versions.
+3. **`PATCH` must be exactly `current + 1`** — rejects skipping
+   versions.
 
 **Relationship to `release.sh`**:
 
@@ -461,7 +522,8 @@ scripts/release.sh                 ← Full release logic
 scripts/release-patch.sh           ← Wraps with 3 PATCH-only rules
 ```
 
-`release-patch.sh` does **not** duplicate logic — it delegates to `release.sh`.
+`release-patch.sh` does **not** duplicate logic — it delegates to
+`release.sh`.
 
 **Post-release**: run `make sync` to back-merge `main → develop`.
 
@@ -516,11 +578,11 @@ git checkout develop
 git pull origin develop
 
 # 2. Update VERSION
-echo "v1.1.0" > VERSION
+echo "v1.2.0" > VERSION
 
 # 3. Update module.prop
-sed -i 's/^version=.*/version=v1.1.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1010000/' module.prop
+sed -i 's/^version=.*/version=v1.2.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
 
 # 4. Update update.json (manual edit)
 $EDITOR update.json
@@ -534,17 +596,18 @@ jq '.version, .versionCode' update.json
 
 # 7. Commit
 git add VERSION module.prop update.json CHANGELOG.md
-git commit -m "release: v1.1.0"
+git commit -m "release: v1.2.0"
 
 # 8. Tag
-git tag -a v1.1.0 -m "Release v1.1.0"
+git tag -a v1.2.0 -m "Release v1.2.0"
 
 # 9. Push
 git push origin develop
-git push origin v1.1.0
+git push origin v1.2.0
 ```
 
-**Warning**: manual process is error-prone. Prefer `release.sh` (or `release-patch.sh` for PATCH releases).
+**Warning**: manual process is error-prone. Prefer `release.sh` (or
+`release-patch.sh` for PATCH releases).
 
 ---
 
@@ -586,8 +649,8 @@ on:
 
 ```text
 dist/
-├── dnscrypt-webui-1.1.0-module.zip
-└── dnscrypt-webui-1.1.0-module.zip.sha256
+├── dnscrypt-webui-1.2.0-module.zip
+└── dnscrypt-webui-1.2.0-module.zip.sha256
 
 proxy/build/
 ├── dnscrypt-webui-arm64
@@ -609,9 +672,12 @@ git merge origin/main --ff-only   # or fallback to regular merge
 git push origin develop
 ```
 
-**Effect**: `develop` is now identical to `main` at the release commit.
+**Effect**: `develop` is now identical to `main` at the release
+commit.
 
-**Safety**: If the merge fails (conflict), the step **does not fail** the release — it prints a warning and exits with `0`. Manual resolution is required if this happens.
+**Safety**: If the merge fails (conflict), the step **does not fail**
+the release — it prints a warning and exits with `0`. Manual
+resolution is required if this happens.
 
 **Full rationale**: [ADR-0003](adr/0003-post-release-sync.md).
 
@@ -630,9 +696,9 @@ If any step fails:
 gh run rerun <run-id>
 
 # Option B: delete tag + retry
-git push origin :refs/tags/v1.1.0
-git tag -d v1.1.0
-./scripts/release.sh v1.1.0
+git push origin :refs/tags/v1.2.0
+git tag -d v1.2.0
+./scripts/release.sh v1.2.0
 ```
 
 **To debug**:
@@ -676,7 +742,7 @@ Download the ZIP to a device and verify:
 
 ```bash
 # 1. Check SHA-256
-sha256sum -c dnscrypt-webui-1.1.0-module.zip.sha256
+sha256sum -c dnscrypt-webui-1.2.0-module.zip.sha256
 
 # 2. Install via Magisk Manager
 
@@ -696,11 +762,15 @@ curl -s -I http://127.0.0.1:9091/api/metrics | grep Content-Type
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'
 # → {"webui_port": "9090", "dashboard_port": "9091"}
 
-# 7. Verify firewall has no orphans
+# 7. Verify memory limit (MEM-1, v1.1.0)
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+# → {"profile_key": "pro", "memory_limit_mb": 120}
+
+# 8. Verify firewall has no orphans
 su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 # → 0
 
-# 8. Verify Login POST-only (NEW-1)
+# 9. Verify Login POST-only (NEW-1)
 curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 # → 405 Method Not Allowed
 ```
@@ -709,16 +779,16 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 
 ```bash
 # Download signature + certificate
-curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/dnscrypt-webui-1.1.0-module.zip.sig
-curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/dnscrypt-webui-1.1.0-module.zip.pem
+curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/dnscrypt-webui-1.2.0-module.zip.sig
+curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/dnscrypt-webui-1.2.0-module.zip.pem
 
 # Verify (requires cosign)
 cosign verify-blob \
-    --signature dnscrypt-webui-1.1.0-module.zip.sig \
-    --certificate dnscrypt-webui-1.1.0-module.zip.pem \
+    --signature dnscrypt-webui-1.2.0-module.zip.sig \
+    --certificate dnscrypt-webui-1.2.0-module.zip.pem \
     --certificate-identity-regexp "https://github.com/gasciljh/dnscrypt-proxy-webui/.*" \
     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    dnscrypt-webui-1.1.0-module.zip
+    dnscrypt-webui-1.2.0-module.zip
 ```
 
 **Expected**: `Verified OK`.
@@ -727,7 +797,7 @@ cosign verify-blob \
 
 ```bash
 # Download SBOM
-curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/sbom.spdx.json
+curl -LO https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/sbom.spdx.json
 
 # Inspect
 jq '.packages | length' sbom.spdx.json
@@ -744,9 +814,9 @@ curl -s https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/upd
 
 ```json
 {
-  "version": "v1.1.0",
-  "versionCode": 1010000,
-  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/dnscrypt-webui-1.1.0-module.zip",
+  "version": "v1.2.0",
+  "versionCode": 1020000,
+  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/dnscrypt-webui-1.2.0-module.zip",
   "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md"
 }
 ```
@@ -772,16 +842,16 @@ curl -s https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/upd
 
 ```bash
 # Local
-git tag -d v1.1.0
+git tag -d v1.2.0
 
 # Remote
-git push origin :refs/tags/v1.1.0
+git push origin :refs/tags/v1.2.0
 ```
 
 **Then delete the GitHub Release** (if created):
 
 ```bash
-gh release delete v1.1.0 --yes
+gh release delete v1.2.0 --yes
 ```
 
 ### 9.3 Amend a Release
@@ -792,11 +862,11 @@ If the release is published but has a minor issue:
 
 ```bash
 # Regular release:
-./scripts/release.sh v1.1.1
+./scripts/release.sh v1.2.1
 
 # Or PATCH-only release from main:
 git checkout main
-./scripts/release-patch.sh v1.1.1
+./scripts/release-patch.sh v1.2.1
 ```
 
 **Option B — Force-update the tag** (dangerous):
@@ -806,14 +876,15 @@ git checkout main
 git commit --amend
 
 # Force-update the tag
-git tag -f v1.1.0 -m "Release v1.1.0"
+git tag -f v1.2.0 -m "Release v1.2.0"
 
 # Force-push
-git push origin :refs/tags/v1.1.0
-git push origin v1.1.0
+git push origin :refs/tags/v1.2.0
+git push origin v1.2.0
 ```
 
-**Warning**: force-updating a tag breaks everyone who already downloaded the release.
+**Warning**: force-updating a tag breaks everyone who already
+downloaded the release.
 
 ### 9.4 Revert a Release
 
@@ -826,17 +897,17 @@ git revert <release-commit-sha>
 
 # 2. Or manually reset
 git revert --no-commit <release-commit-sha>
-git commit -m "revert: rollback v1.1.0"
+git commit -m "revert: rollback v1.2.0"
 
 # 3. Publish a PATCH release from main
 git checkout main
-git checkout -b hotfix/v1.1.1-revert
+git checkout -b hotfix/v1.2.1-revert
 # ... cherry-pick the revert ...
-git commit -m "fix: revert v1.1.0 regression"
-git push -u origin hotfix/v1.1.1-revert
+git commit -m "fix: revert v1.2.0 regression"
+git push -u origin hotfix/v1.2.1-revert
 
 # 4. Merge + prepare PATCH release
-./scripts/release-patch.sh v1.1.1
+./scripts/release-patch.sh v1.2.1
 ```
 
 ### 9.5 Emergency Contacts
@@ -878,7 +949,8 @@ git push origin develop
 
 ### 10.2 What if Sync Fails?
 
-The sync step has `continue-on-error: true` — the release is **not** failed.
+The sync step has `continue-on-error: true` — the release is **not**
+failed.
 
 **Common causes**:
 
@@ -890,8 +962,9 @@ The sync step has `continue-on-error: true` — the release is **not** failed.
 
 ### 10.3 Manual Sync (PATCH Releases)
 
-For PATCH releases (`hotfix/*` branches), the sync is **manual** because
-GitHub Actions cannot distinguish a hotfix tag from a regular tag.
+For PATCH releases (`hotfix/*` branches), the sync is **manual**
+because GitHub Actions cannot distinguish a hotfix tag from a regular
+tag.
 
 **Use the `make sync` target**:
 
@@ -908,8 +981,8 @@ git merge origin/main --no-edit
 git push origin develop
 ```
 
-**Why this matters**: without syncing, `develop` will be missing the hotfix,
-and the next `release/*` PR will reintroduce the bug.
+**Why this matters**: without syncing, `develop` will be missing the
+hotfix, and the next `release/*` PR will reintroduce the bug.
 
 ### 10.4 Verify Sync
 
@@ -922,6 +995,18 @@ git rev-parse origin/develop
 git log --oneline -1 origin/main
 git log --oneline -1 origin/develop
 ```
+
+### 10.5 v1.1.0 Sync Note
+
+For the v1.1.0 release:
+
+- **Automatic** via `release.yml` (since it went through
+  `release/v1.1.0` → `main`).
+- No manual `make sync` was needed.
+
+For a **PATCH release from v1.1.0** (e.g. `v1.1.1` via `hotfix/*`):
+
+- **Manual** `make sync` **is** required after the release publishes.
 
 ---
 
@@ -937,39 +1022,40 @@ git pull origin develop
 # 2. Update CHANGELOG
 $EDITOR CHANGELOG.md
 git add CHANGELOG.md
-git commit -m "docs(changelog): prepare v1.1.0"
+git commit -m "docs(changelog): prepare v1.2.0"
 
 # 3. Preview
-./scripts/release.sh v1.1.0 --dry-run
+./scripts/release.sh v1.2.0 --dry-run
 
 # 4. Execute
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 
 # 5. Wait (~5 min) → Release is live ✅
 ```
 
-**Alternative flow with a `release/*` branch** (stabilization window):
+**Alternative flow with a `release/*` branch** (stabilization
+window):
 
 ```bash
 # 1. Create release branch
 git checkout develop
-git checkout -b release/v1.1.0
+git checkout -b release/v1.2.0
 
 # 2. Prepare version bump locally
-./scripts/release.sh v1.1.0 --no-push
+./scripts/release.sh v1.2.0 --no-push
 
 # 3. Update CHANGELOG
 $EDITOR CHANGELOG.md
 git add -A
-git commit -m "release: v1.1.0"
+git commit -m "release: v1.2.0"
 
 # 4. Push and open PR against main
-git push -u origin release/v1.1.0
+git push -u origin release/v1.2.0
 # → Open PR using ?template=release.md
 
 # 5. After merge → tag + publish
 git checkout main && git pull
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 ```
 
 ### 11.2 PATCH Release Flow (Hotfix)
@@ -978,20 +1064,20 @@ git checkout main && git pull
 # 1. Create hotfix branch from main
 git checkout main
 git pull origin main
-git checkout -b hotfix/v1.0.1-critical
+git checkout -b hotfix/v1.1.1-critical
 
 # 2. Fix
 # ...
 
 # 3. Commit + push
 git commit -m "fix(critical): patch login bypass"
-git push -u origin hotfix/v1.0.1-critical
+git push -u origin hotfix/v1.1.1-critical
 
 # 4. Open PR against main using ?template=release.md
 # 5. Merge
 
 # 6. Prepare PATCH release
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 
 # 7. Back-merge
 make sync
@@ -1000,29 +1086,29 @@ make sync
 ### 11.3 Manual Release (Emergency)
 
 ```bash
-echo "v1.1.0" > VERSION
-sed -i 's/^version=.*/version=v1.1.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1010000/' module.prop
+echo "v1.2.0" > VERSION
+sed -i 's/^version=.*/version=v1.2.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
 $EDITOR update.json
 $EDITOR CHANGELOG.md
-git add -A && git commit -m "release: v1.1.0"
-git tag -a v1.1.0 -m "Release v1.1.0"
+git add -A && git commit -m "release: v1.2.0"
+git tag -a v1.2.0 -m "Release v1.2.0"
 git push origin develop
-git push origin v1.1.0
+git push origin v1.2.0
 ```
 
 ### 11.4 Rollback
 
 ```bash
 # Delete tag
-git push origin :refs/tags/v1.1.0
-git tag -d v1.1.0
+git push origin :refs/tags/v1.2.0
+git tag -d v1.2.0
 
 # Delete release
-gh release delete v1.1.0 --yes
+gh release delete v1.2.0 --yes
 
 # Retry
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 ```
 
 ### 11.5 Version Reference
@@ -1035,10 +1121,18 @@ gh release delete v1.1.0 --yes
 | Hotfix (PATCH) | — | — | +1 |
 | Prerelease | — | +1 | → 0 (with `-betaN`) |
 
+**Current cycle reference**:
+
+| From | To | Type | `versionCode` |
+|---|---|---|:---:|
+| `v1.0.0` | `v1.1.0` | MINOR | `1010000` |
+| `v1.1.0` | `v1.1.1` | PATCH | `1010001` |
+| `v1.1.1` | `v1.2.0` | MINOR | `1020000` |
+
 ### 11.6 Files Checklist
 
-- [ ] `VERSION` → `v1.1.0`
-- [ ] `module.prop` → `version=v1.1.0`, `versionCode=1010000`
+- [ ] `VERSION` → `v1.2.0`
+- [ ] `module.prop` → `version=v1.2.0`, `versionCode=1020000`
 - [ ] `update.json` → 3 fields
 - [ ] `CHANGELOG.md` → new section
 
@@ -1087,7 +1181,7 @@ gh release delete v1.1.0 --yes
 | [`docs/ROADMAP.md`](ROADMAP.md) | Future plans |
 | [`docs/GLOSSARY.md`](GLOSSARY.md) | Terms and abbreviations |
 | [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 + v1.1.0) |
 | [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community guidelines |
 
 ### 12.2 ADRs Referenced
@@ -1130,6 +1224,6 @@ gh release delete v1.1.0 --yes
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*

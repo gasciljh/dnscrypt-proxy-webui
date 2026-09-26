@@ -3,7 +3,7 @@
 System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.1.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
@@ -14,12 +14,18 @@ System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-pr
 > - Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
 > - Release process → [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md)
 > - Architecture Decisions → [`docs/adr/README.md`](docs/adr/README.md)
+> - Version history → [`CHANGELOG.md`](CHANGELOG.md)
+>
+> **🎯 Current version**: **v1.1.0** — Dynamic per-profile memory limits,
+> extended `shellQuote` charset, and `MONITORING_UI_PORT` constant.
+> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.1.0 changelog.
 
 ---
 
 ## Overview
 
-DNSCrypt Smart Filter is a Magisk / KernelSU / APatch module that turns an Android device into a filtered, encrypted DNS resolver.
+DNSCrypt Smart Filter is a Magisk / KernelSU / APatch module that turns an
+Android device into a filtered, encrypted DNS resolver.
 
 - Local DNS engine on `127.0.0.1:5354` (DNSCrypt / DoH)
 - Transparent redirection of port 53 traffic to the local engine
@@ -28,6 +34,8 @@ DNSCrypt Smart Filter is a Magisk / KernelSU / APatch module that turns an Andro
 - Bilingual WebUI (English / Arabic)
 - Separate monitoring Dashboard with JSON metrics
 - Installable PWA with offline fallback
+- **v1.1.0**: Dynamic Go runtime memory limit per blocklist profile
+  (light=80 MB → ultimate=220 MB) — prevents GC thrashing on heavy profiles
 
 Works at the system level — no per-app configuration, no VPN.
 
@@ -35,14 +43,32 @@ Works at the system level — no per-app configuration, no VPN.
 
 ## Requirements
 
-- Android 5.0+ (API 21)
-- Root: Magisk 20.4+ / KernelSU 0.9+ / APatch
-- Kernel 3.10+
-- 1 GB RAM (2 GB recommended)
-- ~20 MB free storage
-- Architectures: `arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`
+### Mandatory
 
-Incompatible with:
+| Requirement | Minimum |
+|---|---|
+| Android | 5.0 (API 21) |
+| Root | Magisk 20.4+ / KernelSU 0.9+ / APatch |
+| Kernel | 3.10+ |
+| RAM | 1 GB |
+| Storage | ~20 MB free |
+| Architecture | `arm64-v8a` / `armeabi-v7a` / `x86_64` / `x86` |
+
+### Recommended by Profile (v1.1.0)
+
+The Go runtime soft memory limit is computed per profile by `main.go`.
+Choosing a profile that matches your device RAM avoids GC pressure
+while keeping DNS filtering effective.
+
+| Device RAM | Recommended profile | WebUI soft limit | Filtered entries |
+|---|:---:|---:|---:|
+| 1 GB | Light | 80 MB | ~40,000 |
+| 2 GB | Normal | 100 MB | ~120,000 |
+| 3 GB | **PRO** (default) | 120 MB | ~250,000 |
+| 4 GB | PRO++ | 160 MB | ~350,000 |
+| 6 GB+ | Ultimate | 220 MB | ~500,000 |
+
+### Incompatible with
 
 - AdAway (port conflict)
 - VPN apps (routing conflict)
@@ -52,14 +78,22 @@ Incompatible with:
 
 ## Installation
 
-1. Download `dnscrypt-webui-1.0.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
+1. Download `dnscrypt-webui-1.1.0-module.zip` from
+   [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
 2. Install via Magisk Manager / KernelSU Manager / APatch.
-3. Save the credentials shown on-screen (also stored at `/data/local/tmp/dnscrypt_credentials.txt`).
+3. Save the credentials shown on-screen (also stored at
+   `/data/local/tmp/dnscrypt_credentials.txt`).
 4. Reboot.
 5. Open `http://127.0.0.1:9090` and log in.
 6. Select a blocklist profile and press **Apply**.
 
-User settings are preserved across upgrades. The installer backs up the following files before extraction and restores them afterwards:
+The installer (`customize.sh`) prints the expected memory limit for your
+active profile during installation (v1.1.0). This is informational only —
+`main.go` remains the authority for the actual
+`debug.SetMemoryLimit()` value at runtime.
+
+User settings are preserved across upgrades. The installer backs up the
+following 5 files before extraction and restores them afterwards:
 
 - `webui.conf`
 - `dnscrypt-proxy.toml`
@@ -78,19 +112,21 @@ User settings are preserved across upgrades. The installer backs up the followin
 | 8080 | monitoring_ui (internal) | fixed |
 | 5354 | DNS engine (internal) | fixed |
 
-Port `8080` is reserved. `main.go` refuses to start if `PORT` or `DASHBOARD_PORT` conflicts with it. Port values outside `[1, 65535]` fall back to defaults.
+Port `8080` is reserved. `main.go` refuses to start if `PORT` or
+`DASHBOARD_PORT` conflicts with it. Port values outside `[1, 65535]`
+fall back to defaults (v1.0.0 `readConfPort` range check).
 
 ---
 
 ## Blocklist Profiles
 
-| Profile | Source | Approximate entries |
-|---|---|---:|
-| Light | HaGeZi Light | ~40,000 |
-| Normal | HaGeZi Normal | ~120,000 |
-| PRO | HaGeZi PRO | ~250,000 |
-| PRO++ | HaGeZi PRO++ | ~350,000 |
-| Ultimate | HaGeZi Ultimate | ~500,000 |
+| Profile | Source | Approximate entries | WebUI soft limit (v1.1.0) |
+|---|---|---:|---:|
+| Light | HaGeZi Light | ~40,000 | 80 MB |
+| Normal | HaGeZi Normal | ~120,000 | 100 MB |
+| PRO | HaGeZi PRO | ~250,000 | 120 MB |
+| PRO++ | HaGeZi PRO++ | ~350,000 | 160 MB |
+| Ultimate | HaGeZi Ultimate | ~500,000 | 220 MB |
 
 Source: [HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists).
 
@@ -117,7 +153,7 @@ Components:
 
 | Component | Language | Role |
 |---|---|---|
-| `proxy/main.go` | Go | HTTP server, auth, blocklist rebuild, metrics proxy |
+| `proxy/main.go` | Go | HTTP server, auth, blocklist rebuild, metrics proxy, dynamic memory limit (v1.1.0) |
 | `proxy/*.sh` | Shell (BusyBox) | Install, service lifecycle, watchdog, firewall |
 | `web/` | HTML / CSS / JS | WebUI, Dashboard, PWA |
 | `scripts/` | Bash | Build, packaging, DNS binaries fetcher, release automation |
@@ -141,7 +177,7 @@ dnscrypt-proxy-webui/
 ├── README.md                        # Overview (EN)
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.0.0)
+├── VERSION                          # Single source of truth (v1.1.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
@@ -202,7 +238,7 @@ dnscrypt-proxy-webui/
 │   ├── index.html                   # Main UI (FSM + SW Update)
 │   ├── manifest.json                # PWA manifest
 │   ├── offline.html                 # Offline fallback page
-│   └── sw.js                        # Service Worker (v1.0.0)
+│   └── sw.js                        # Service Worker (v1.1.0)
 │
 └── docs/                            # Documentation (23 files)
     ├── adr/                         # Architecture Decision Records (7 files)
@@ -243,13 +279,13 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
 # JSON status
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
 
-# One-line status
+# One-line status (includes profile + memory hint in v1.1.0)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
 
 # Restart WebUI
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
-# Comprehensive check (DNS + WebUI + config)
+# Comprehensive check (DNS + WebUI + profile + memory hint)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --check"
 ```
 
@@ -273,9 +309,12 @@ Rules:
 - No spaces around `=`
 - No trailing comments on the same line
 - `PORT` and `DASHBOARD_PORT` must differ
-- `BIND_ADDR=0.0.0.0` requires credentials set in `dnscrypt-proxy.toml` → `[monitoring_ui]`
+- `BIND_ADDR=0.0.0.0` requires credentials set in
+  `dnscrypt-proxy.toml` → `[monitoring_ui]`
 
-`proxy/dnscrypt-proxy.toml` controls the DNS engine itself (listen addresses, resolver selection, cache, blocklists, monitoring UI). Credentials for the internal monitoring UI live in `[monitoring_ui]`.
+`proxy/dnscrypt-proxy.toml` controls the DNS engine itself (listen
+addresses, resolver selection, cache, blocklists, monitoring UI).
+Credentials for the internal monitoring UI live in `[monitoring_ui]`.
 
 ---
 
@@ -288,9 +327,9 @@ All endpoints on `http://127.0.0.1:9090` unless noted.
 | GET | `/healthz` | No | Liveness check |
 | GET | `/readyz` | Localhost only | Readiness check |
 | GET | `/api?action=status` | Yes | Service status (ON / OFF) |
-| GET | `/api?action=get_profile` | Yes | Current profile + entry count |
+| GET | `/api?action=get_profile` | Yes | Current profile + entry count + `memory_limit_mb` (v1.1.0) |
 | GET | `/api?action=get_custom_rules` | Yes | Allowlist + Denylist content |
-| GET | `/api?action=runtime_info` | Yes | Build info + actual ports |
+| GET | `/api?action=runtime_info` | Yes | Build info + ports + `profile_key` + `memory_limit_mb` (v1.1.0) |
 | GET | `/api?action=logs` | Yes | Last log lines |
 | GET | `/api?action=list_logs` | Yes | List diagnostic files |
 | GET | `/events` | Yes | SSE stream |
@@ -311,21 +350,47 @@ Full reference: [`docs/API.md`](docs/API.md).
 
 Applied protections:
 
+**Authentication**
+
 - BIND_ADDR defaults to `127.0.0.1`; public binds require credentials
 - Login POST-only (CSRF protection)
 - Basic Auth rate limiting (5 attempts / 15 minutes)
 - Constant-time password comparison (`subtle.ConstantTimeCompare`)
 - HttpOnly session cookies with `SameSite=Lax`
 - CSRF-GET protection on state-changing endpoints
-- Strict CSP, `X-Frame-Options`, `nosniff`, COOP, CORP
+
+**Headers**
+
+- Strict CSP, `X-Frame-Options: DENY`, `nosniff`, COOP, CORP
+
+**Input validation**
+
 - `MaxBytesReader` (5 MB) on all POST bodies
 - `/readyz` restricted to localhost
 - `shellQuote()` on all dynamic shell paths
 - `readConfPort()` range check (1–65535)
+
+**Firewall**
+
 - Custom iptables / ip6tables chains (no orphan rules)
+- nftables support via `dnscrypt_filter` table
+- IPv4/IPv6 separation (no cross-protocol contamination)
+
+**State & concurrency**
+
 - STATUS_FILE represents user intent (not process state)
-- `rebuildMu` mutex serializes blocklist rebuilds
+- `rebuildMu` mutex serializes blocklist rebuilds (RACE-1)
 - Auth cache (60 s) reduces file I/O
+
+**v1.1.0 additions**
+
+- **MEM-1** — Dynamic per-profile memory limit
+  (`debug.SetMemoryLimit`) prevents GC thrashing on heavy profiles
+  while keeping DoS protection on light ones
+- **MEM-2** — Extended `shellQuote()` charset (`{`, `}`, `\n`, `\t`)
+  for defense-in-depth
+- **MEM-3** — `MONITORING_UI_PORT` constant used in `metricsProxyHandler`
+  (removes the last hardcoded `"8080"` reference)
 
 Report vulnerabilities privately: [`SECURITY.md`](SECURITY.md).
 
@@ -333,14 +398,51 @@ Report vulnerabilities privately: [`SECURITY.md`](SECURITY.md).
 
 ## Performance
 
+### Baseline (all profiles)
+
 | Metric | Value |
 |---|---|
-| RAM (idle) | ~15 MB |
-| RAM (peak) | ~25 MB |
+| RAM (WebUI idle) | ~15 MB |
+| RAM (WebUI peak) | ~25 MB |
 | Battery | ~1–2% / day |
 | DNS latency (cached) | ~1–5 ms |
 | Service startup | ~2–5 s |
+| `rebuildBlocklist` (100K entries) | ~200 ms |
 | `rebuildBlocklist` (500K entries) | ~1 s |
+
+### RAM by Profile (v1.1.0 — MEM-1)
+
+The WebUI process sets a per-profile **soft** memory limit via
+`debug.SetMemoryLimit`. This is a **soft** limit: the Go runtime
+prefers running GC more aggressively over OOMing. Setting it too low
+causes CPU waste (GC overhead); too high wastes RAM.
+
+| Profile | Soft limit | WebUI RSS (idle) | WebUI RSS (peak) |
+|---|---:|---:|---:|
+| Light | 80 MB | ~15 MB | ~25 MB |
+| Normal | 100 MB | ~15 MB | ~30 MB |
+| PRO | 120 MB | ~15 MB | ~35 MB |
+| PRO++ | 160 MB | ~15 MB | ~45 MB |
+| Ultimate | 220 MB | ~15 MB | ~60 MB |
+
+**Note**: "WebUI RSS" is the actual resident memory of the WebUI
+process. The "soft limit" is the ceiling at which the Go runtime
+starts running GC more aggressively — it is not the RSS.
+
+The limit is recomputed:
+
+- At startup (in `main()`)
+- After every profile change (in `updateProfile()`)
+
+**Observability**:
+
+```bash
+# Effective limit for the active profile
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+
+# Active profile key
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
+```
 
 ---
 
@@ -355,14 +457,16 @@ cd dnscrypt-proxy-webui
 git checkout develop
 
 # 3. Common commands
-make version         # show current version
+make version         # show current version (v1.1.0)
 make build           # build all 4 architectures
 make package         # build + package
 make clean           # clean build outputs
 make help            # show available targets
 ```
 
-**Branching**: This project uses `main` (stable releases) + `develop` (integration). Never commit to `main` directly — open a PR against `develop`.
+**Branching**: This project uses `main` (stable releases) + `develop`
+(integration). Never commit to `main` directly — open a PR against
+`develop`.
 
 **Workflow guides**:
 
@@ -388,7 +492,8 @@ cd proxy
 
 Output: `proxy/build/dnscrypt-webui-{arm64,arm,amd64,386}`.
 
-Reproducible builds via `SOURCE_DATE_EPOCH` (extracted from the last commit).
+Reproducible builds via `SOURCE_DATE_EPOCH` (extracted from the last
+commit).
 
 ---
 
@@ -404,16 +509,19 @@ Releases are automated through two scripts:
 **Stable release** (from `develop`):
 
 ```bash
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 ```
 
 **PATCH release** (from `main`):
 
 ```bash
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 ```
 
-The scripts update version files, create a signed tag, and push to `origin`. GitHub Actions then builds the module, generates SBOM + Cosign signature, publishes the release, and auto-syncs `main → develop`.
+The scripts update version files, create a signed tag, and push to
+`origin`. GitHub Actions then builds the module, generates SBOM +
+Cosign signature, publishes the release, and auto-syncs
+`main → develop`.
 
 **PATCH releases** require a **manual back-merge** after publication:
 
@@ -454,7 +562,7 @@ Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Future plans |
 | [`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md) | Contributors |
 | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community guidelines |
-| [`CHANGELOG.md`](CHANGELOG.md) | Version history |
+| [`CHANGELOG.md`](CHANGELOG.md) | Version history (including v1.1.0) |
 
 ---
 
@@ -467,7 +575,8 @@ Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 - **Architecture decisions** → [`docs/adr/README.md`](docs/adr/README.md)
 - **Security reports** → [`SECURITY.md`](SECURITY.md)
 
-This project follows the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
+This project follows the
+[Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
 
 ---
 
@@ -482,6 +591,7 @@ This project follows the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
 - [shfmt](https://github.com/mvdan/sh) — shell formatting
 - [golangci-lint](https://github.com/golangci/golangci-lint) — Go linting
 - [Cosign](https://github.com/sigstore/cosign) — artifact signing
+- [Go runtime/debug](https://pkg.go.dev/runtime/debug#SetMemoryLimit) — for `SetMemoryLimit` (v1.1.0)
 
 ---
 
@@ -489,7 +599,8 @@ This project follows the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
 
 MIT — see [`LICENSE`](LICENSE).
 
-The Code of Conduct is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The Code of Conduct is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 

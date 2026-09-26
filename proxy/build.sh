@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – build.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -50,6 +50,18 @@
 #   • -trimpath normalizes file paths.
 #   • -buildid= removes random build IDs.
 #   • Result: same commit → same SHA-256.
+#
+# v1.1.0 notes:
+#   • The Go runtime soft memory limit is now set dynamically by
+#     main.go at startup based on the active blocklist profile
+#     (light → 80MB, ultimate → 220MB). This does NOT affect the
+#     build system — the memory limit is a runtime concern.
+#   • No new build flags are required for v1.1.0.
+#   • The module remains dependency-free (Go stdlib only), which
+#     keeps the build reproducible and small.
+#   • BuildVersion injected via -X main.BuildVersion is read by
+#     main.go and used to populate the runtime_info endpoint.
+#     The value comes from VERSION (not hardcoded here).
 #
 # Examples:
 #   ./build.sh --clean --parallel
@@ -470,6 +482,18 @@ fi
 # ------------------------------------------------------------
 # [19] Full LDFLAGS
 # ------------------------------------------------------------
+# BuildVersion is injected into main.go via -X. main.go reads it
+# at startup and exposes it via /api?action=runtime_info. The
+# value comes from VERSION (Single Source of Truth), not hardcoded.
+#
+# Other injected variables:
+#   • BuildCommit  → short git hash (+ -dirty suffix if applicable)
+#   • BuildTime    → SOURCE_DATE_EPOCH (for reproducible builds)
+#   • ProjectURL   → canonical repository URL
+#
+# -buildid= removes the random build ID that Go would otherwise
+# generate, ensuring byte-identical output for the same inputs.
+# ============================================================
 LDFLAGS="${LDFLAGS_BASE}"
 LDFLAGS="${LDFLAGS} -X main.BuildVersion=${SCRIPT_VERSION}"
 LDFLAGS="${LDFLAGS} -X main.BuildCommit=${BUILD_COMMIT}"

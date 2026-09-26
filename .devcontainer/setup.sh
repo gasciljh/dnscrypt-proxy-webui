@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – devcontainer setup
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -16,22 +16,84 @@
 #   • Final check — verifies each tool installed correctly
 #
 # Tools installed:
-#   • Go 1.22 (from devcontainer feature)
+#   • Go 1.22               (from devcontainer feature)
 #   • make, git, curl, jq, zip, unzip
-#   • shellcheck (Shell linting)
-#   • shfmt (Shell formatting)
-#   • golangci-lint v2.5.0 (Go linting)
-#   • staticcheck (Go static analysis)
-#   • gosec (Go security)
-#   • actionlint (GitHub Actions linting)
+#   • shellcheck            (Shell linting)
+#   • shfmt                 (Shell formatting)
+#   • golangci-lint v2.5.0  (Go linting)
+#   • staticcheck           (Go static analysis)
+#   • gosec                 (Go security)
+#   • actionlint            (GitHub Actions linting)
 #   • python3 + pip
-#   • detect-secrets (secret scanning)
-#   • pre-commit (Git hooks)
-#   • yamllint (YAML linting)
-#   • markdownlint (Markdown linting)
+#   • detect-secrets        (secret scanning)
+#   • pre-commit            (Git hooks)
+#   • yamllint              (YAML linting)
+#   • markdownlint          (Markdown linting)
 #
 # Expected duration:
 #   ~2–4 minutes (depending on network speed)
+#
+# Tool install chain (7 phases):
+#   ┌───┬───────────────────────────────────────┐
+#   │ #  │ Phase                                       │
+#   ├───┼───────────────────────────────────────┤
+#   │ 1  │ apt update                                  │
+#   │ 2  │ Basic tools (via apt)                       │
+#   │ 3  │ Shell tools (shellcheck, shfmt)             │
+#   │ 4  │ Go tools (golangci-lint, staticcheck, ...)  │
+#   │ 5  │ Python tools (pip, pre-commit, yamllint,..) │
+#   │ 6  │ Android NDK check (optional)                │
+#   │ 7  │ Project setup (permissions, pre-commit)     │
+#   └───┴───────────────────────────────────────┘
+#
+#   Each phase prints a header (─────) so the log is scannable.
+#   Every tool install is wrapped in a `command -v` check, so
+#   re-running the script only installs what is missing.
+#
+# golangci-lint v2 — path note:
+#   golangci-lint changed its module path between v1 and v2:
+#     • v1:  github.com/golangci/golangci-lint/cmd/golangci-lint
+#     • v2:  github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+#
+#   This script installs v2 (the current major), using the v2
+#   module path. The install flow is:
+#     1. Detect existing golangci-lint.
+#     2. If version starts with "v2.", keep it.
+#     3. Otherwise remove the old binary and reinstall.
+#     4. Install via `go install .../v2/cmd/...@v2.5.0`.
+#     5. Fallback to install.sh from the v2 branch if go install
+#        fails (e.g. proxy issues on CI).
+#     6. Symlink into /usr/local/bin for compatibility.
+#
+#   The version check uses `grep -qE '^v?2\.'` on the output of
+#   `golangci-lint --version` — the v2 release line prints a
+#   leading "v2." (with the "v" prefix). This is deliberate: it
+#   rejects both v1 (e.g. "1.55.0") and unversioned builds.
+#
+# Idempotency behavior:
+#   The script is safe to run multiple times. For each tool:
+#     • If already installed at the correct version → skip.
+#     • If installed at a wrong/old version → reinstall.
+#     • If not installed → install.
+#     • If install fails → warn and continue (except golangci-lint,
+#       which is considered critical — but even then, a warning is
+#       logged and the script continues to the final verification).
+#
+#   The script does NOT fail the devcontainer on individual tool
+#   failures. A partial toolchain is still usable — the missing
+#   tool will show as ✗ in the final table, and the developer can
+#   re-run `bash .devcontainer/setup.sh` after fixing the network.
+#
+# v1.1.0 additions:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added a "Tool install chain" table summarizing the 7 phases.
+#   • Added a "golangci-lint v2 — path note" section explaining
+#     the module path change between v1 and v2, the version check
+#     regex, and the fallback install path.
+#   • Added an "Idempotency behavior" section documenting what
+#     happens when the script is re-run with partial state.
+#   • Confirmed all log messages and comments are English.
 # ============================================================
 
 set -euo pipefail
@@ -58,7 +120,7 @@ log_info()  { echo -e "  ${DIM}·${NC} $1"; }
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  🔧 DNSCrypt Smart Filter – DevContainer Setup           ║${NC}"
-echo -e "${BOLD}║  ${DIM}v1.0.0${NC}                                                 ${BOLD}║${NC}"
+echo -e "${BOLD}║  ${DIM}v1.1.0${NC}                                                 ${BOLD}║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════${NC}${BOLD}╝${NC}"
 echo ""
 
@@ -180,6 +242,11 @@ if ! echo "$PATH" | grep -q "$GOBIN"; then
 fi
 
 # --- golangci-lint (v2.5.0) ---
+#
+# See the "golangci-lint v2 — path note" in the header for the
+# rationale behind the version check regex and the v2 module
+# path. Do not downgrade to v1 without updating the check regex.
+# ============================================================
 GOLANGCI_VERSION="v2.5.0"
 GOLANGCI_INSTALLED=0
 

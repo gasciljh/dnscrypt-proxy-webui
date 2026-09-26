@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – main.go
-// Version: v1.0.0
+// Version: v1.1.0
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -68,6 +68,7 @@
 //   • serviceMutex   — sync.Mutex    — service lifecycle (TryLock)
 //   • portCacheMu    — sync.Mutex    — per-port cache (Fix #11)
 //   • systemShellOnce— sync.Once     — platform shell detection (Fix #2)
+//   • memLimitMu     — sync.Mutex    — dynamic memory limit (v1.1.0)
 //
 // Security (v1.0.0):
 //   • Login POST-only (Fix NEW-1)
@@ -83,8 +84,13 @@
 //   • STATUS_FILE = user intent
 //   • Constant-time password comparison
 //
+// v1.1.0 additions:
+//   • Dynamic memory limit per profile (light/normal/pro/proplus/ultimate)
+//   • Extended shellQuote chars ({, }, \n, \t)
+//   • MONITORING_UI_PORT constant used everywhere (no more hardcoded "8080")
+//
 // Build variables (injected via -ldflags at build time):
-//   • BuildVersion   — module version (v1.0.0)
+//   • BuildVersion   — module version (v1.1.0)
 //   • BuildCommit    — short git commit hash
 //   • BuildTime      — SOURCE_DATE_EPOCH (Unix timestamp)
 //   • ProjectURL     — repository URL
@@ -92,7 +98,7 @@
 
 package main
 
-// DNSCrypt Smart Filter — v1.0.0
+// DNSCrypt Smart Filter — v1.1.0
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 
@@ -137,7 +143,7 @@ var (
 // ============================================================
 // [1] Constants
 // ============================================================
-var USER_AGENT = "DNSCrypt-SmartFilter/dev"
+var USER_AGENT = "DNSCrypt-SmartFilter/v1.1.0"
 
 // ============================================================
 // [2] Global paths
@@ -221,6 +227,14 @@ const (
 	PORT_CACHE_TTL = 5 * time.Second
 
 	AUTH_CACHE_TTL = 60 * time.Second
+
+	// v1.1.0 — dynamic memory limits per profile (bytes)
+	MEMORY_LIMIT_LIGHT     = 80 * 1024 * 1024   // 80 MB
+	MEMORY_LIMIT_NORMAL    = 100 * 1024 * 1024  // 100 MB
+	MEMORY_LIMIT_PRO       = 120 * 1024 * 1024  // 120 MB
+	MEMORY_LIMIT_PROPLUS   = 160 * 1024 * 1024  // 160 MB
+	MEMORY_LIMIT_ULTIMATE  = 220 * 1024 * 1024  // 220 MB
+	MEMORY_LIMIT_DEFAULT   = 80 * 1024 * 1024   // 80 MB (fallback)
 
 	DENY_MARKER_START  = "# === CUSTOM_DENYLIST_START ==="
 	DENY_MARKER_END    = "# === CUSTOM_DENYLIST_END ==="
@@ -547,6 +561,11 @@ var (
 	authCacheUser string
 	authCachePass string
 	authCacheTime time.Time
+
+	// v1.1.0 — dynamic memory limit tracking
+	memLimitMu      sync.Mutex
+	currentMemLimit int64 = MEMORY_LIMIT_DEFAULT
+	currentProfile  string = "pro"
 )
 
 type portCacheEntry struct {
@@ -642,6 +661,76 @@ func loadLogLevel() string {
 	default:
 		return "info"
 	}
+}
+
+// ============================================================
+// [9d] v1.1.0 — readSelectedProfile + memory limit helpers
+// ============================================================
+//
+// readSelectedProfile returns the active blocklist profile key
+// (light/normal/pro/proplus/ultimate), or "pro" as fallback.
+//
+// This is used to compute the dynamic memory limit at startup
+// and after every profile change.
+// ============================================================
+func readSelectedProfile() string {
+	data, err := os.ReadFile(SELECTED_FILE)
+	if err != nil {
+		return "pro"
+	}
+	key := strings.TrimSpace(string(data))
+	if key == "" {
+		return "pro"
+	}
+	if _, ok := profiles[key]; !ok {
+		return "pro"
+	}
+	return key
+}
+
+// memoryLimitForProfile returns the soft memory limit for a
+// given profile key. See MEMORY_LIMIT_* constants.
+func memoryLimitForProfile(key string) int64 {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "light":
+		return MEMORY_LIMIT_LIGHT
+	case "normal":
+		return MEMORY_LIMIT_NORMAL
+	case "pro":
+		return MEMORY_LIMIT_PRO
+	case "proplus":
+		return MEMORY_LIMIT_PROPLUS
+	case "ultimate":
+		return MEMORY_LIMIT_ULTIMATE
+	default:
+		return MEMORY_LIMIT_DEFAULT
+	}
+}
+
+// applyMemoryLimit sets the Go runtime soft memory limit based
+// on the active profile. The old limit is returned via the
+// runtime, and we log the transition.
+//
+// Note: debug.SetMemoryLimit is a SOFT limit — the runtime will
+// prefer to run GC more aggressively rather than OOM. Setting
+// it too low causes GC overhead; setting it too high wastes RAM.
+// Hence the per-profile values.
+func applyMemoryLimit(key string) {
+	memLimitMu.Lock()
+	defer memLimitMu.Unlock()
+
+	limit := memoryLimitForProfile(key)
+	if limit == currentMemLimit && key == currentProfile {
+		return
+	}
+
+	old := debug.SetMemoryLimit(limit)
+	currentMemLimit = limit
+	currentProfile = key
+
+	logWithLevel("info", fmt.Sprintf(
+		"memory limit adjusted: %d MB → %d MB (profile=%s, previous runtime value=%d MB)",
+		old/(1024*1024), limit/(1024*1024), key, old/(1024*1024)))
 }
 
 // ============================================================
@@ -830,12 +919,20 @@ func getSystemShell() string {
 	return systemShellPath
 }
 
+// shellQuote wraps s in single quotes if it contains any shell
+// metacharacter, escaping embedded single quotes via the
+// standard '\'' sequence.
+//
+// v1.1.0: extended to cover {, }, \n, \t in addition to the
+// original set. This protects against brace expansion and
+// whitespace-based word splitting.
 func shellQuote(s string) string {
 	for _, r := range s {
 		if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
 			r == '\\' || r == '!' || r == '&' || r == '|' || r == ';' ||
 			r == '(' || r == ')' || r == '<' || r == '>' || r == '*' ||
-			r == '?' || r == '[' || r == ']' || r == '#' || r == '~' {
+			r == '?' || r == '[' || r == ']' || r == '#' || r == '~' ||
+			r == '{' || r == '}' || r == '\n' || r == '\t' {
 			return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 		}
 	}
@@ -2131,6 +2228,7 @@ func buildProfileResponse() map[string]interface{} {
 		"entries":     entries,
 		"is_empty":    entries == 0,
 		"last_update": lastUpdateCopy,
+		"memory_limit_mb": memoryLimitForProfile(key) / (1024 * 1024),
 	}
 }
 
@@ -2227,6 +2325,9 @@ func updateProfile(key string) map[string]interface{} {
 
 	atomicWriteFile(SELECTED_FILE, []byte(key), 0666)
 
+	// v1.1.0 — adjust memory limit based on the new profile
+	applyMemoryLimit(key)
+
 	writeProgress(95, "Restarting DNSCrypt engine...")
 	time.Sleep(500 * time.Millisecond)
 
@@ -2253,10 +2354,11 @@ func updateProfile(key string) map[string]interface{} {
 	debug.FreeOSMemory()
 
 	return map[string]interface{}{
-		"status":      "ok",
-		"message":     fmt.Sprintf("Blocklist updated to %s", profile.Name),
-		"entries":     entries,
-		"last_update": lastUpdateCopy,
+		"status":          "ok",
+		"message":         fmt.Sprintf("Blocklist updated to %s", profile.Name),
+		"entries":         entries,
+		"last_update":     lastUpdateCopy,
+		"memory_limit_mb": memoryLimitForProfile(key) / (1024 * 1024),
 	}
 }
 
@@ -2641,6 +2743,10 @@ func buildRuntimeInfo() map[string]interface{} {
 
 		"webui_port":     getWebUIPort(),
 		"dashboard_port": getDashboardPort(),
+
+		// v1.1.0 — expose dynamic memory limit state
+		"memory_limit_mb": memoryLimitForProfile(currentProfile) / (1024 * 1024),
+		"profile_key":     currentProfile,
 	}
 
 	if ts, err := strconv.ParseInt(BuildTime, 10, 64); err == nil && ts > 0 {
@@ -3391,7 +3497,12 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(r.Context(), "GET", "http://127.0.0.1:8080/api/metrics", nil)
+	// v1.1.0 — use the MONITORING_UI_PORT constant instead of
+	// a hardcoded "8080". This keeps the reserved-port definition
+	// in a single place.
+	monitoringURL := "http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+
+	req, err := http.NewRequestWithContext(r.Context(), "GET", monitoringURL, nil)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create proxy request"})
@@ -3448,7 +3559,11 @@ func main() {
 
 	initPaths()
 
-	debug.SetMemoryLimit(80 * 1024 * 1024)
+	// v1.1.0 — dynamic memory limit based on the active profile
+	// (replaces the previous hardcoded debug.SetMemoryLimit(80MB))
+	initialProfile := readSelectedProfile()
+	applyMemoryLimit(initialProfile)
+
 	signal.Ignore(syscall.SIGPIPE)
 
 	serverPort = getWebUIPort()
@@ -3519,6 +3634,10 @@ func main() {
 	logEvent("🆕 v1.0.0: rebuildMu (RACE-1) + runtime_info ports (PORT-2)")
 	logEvent("✅ v1.0.0: metricsProxyHandler → /api/metrics (JSON pass-through)")
 	logEvent("🎨 Asset Serving: 11 static files (SVG + PNG + ICO + offline.html)")
+	logEvent(fmt.Sprintf("🧠 v1.1.0: dynamic memory limit — profile=%s, limit=%d MB",
+		currentProfile, currentMemLimit/(1024*1024)))
+	logEvent("🧠 v1.1.0: shellQuote extended ({, }, \\n, \\t)")
+	logEvent("🧠 v1.1.0: MONITORING_UI_PORT constant used in metricsProxyHandler")
 
 	if isExposedBind(bindAddr) {
 		logWithLevel("warn", "🔓 BIND_ADDR="+bindAddr+" — SERVICE IS EXPOSED TO NETWORK")

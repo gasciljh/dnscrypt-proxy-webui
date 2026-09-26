@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Issue Templates Configuration
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,17 +12,39 @@
 # Reference:
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
 # ============================================================
+# v1.1.0 additions:
+#   • Added three new contact links covering the workflow docs
+#     added during the v1.0.0 cycle:
+#       - docs/BRANCHING.md        (Git workflow)
+#       - docs/RELEASE_PROCESS.md  (Release process)
+#       - docs/adr/README.md       (Architecture Decision Records)
+#     These are essential for contributors who want to submit
+#     PRs but are unsure about branch/PR policy.
+#   • Reordered contact links so the most commonly-needed ones
+#     appear first (FAQ → Troubleshooting → Discussions →
+#     Security → Install → Workflow → ADRs → Compatibility →
+#     Changelog → Roadmap).
+#   • Expanded the documentation for each field so a future
+#     maintainer can understand the intent without cross-checking
+#     multiple GitHub pages.
+# ============================================================
 
 # ============================================================
 # [1] Prevent empty Issues
 # ============================================================
-# Disabling "Open a blank issue" forces the user to choose a template,
-# which automatically ensures the required information is collected
-# (version, device, logs, etc.).
+# Disabling "Open a blank issue" forces the user to choose a
+# template, which automatically ensures the required information
+# is collected (version, device, logs, etc.).
 #
 # When to enable this?
 #   • Yes: projects that need structured information (like ours).
+#     A blank issue would bypass the preflight checks and
+#     environment fields, making bug reports much harder to act on.
 #   • No: flexible projects that allow full freedom.
+#
+# Our choice: false (strict) — the project receives bug reports
+# from a wide range of devices/ROMs/kernels, and unstructured
+# reports would slow down triage significantly.
 # ============================================================
 blank_issues_enabled: false
 
@@ -30,35 +52,50 @@ blank_issues_enabled: false
 # [2] Quick contact links
 # ============================================================
 # Appear below "New Issue" — guide the user to the correct channel.
+#
+# Ordering rationale:
+#   Links are listed in decreasing order of how often they are
+#   needed by first-time visitors:
+#     1. FAQ                 — before asking anything
+#     2. Troubleshooting     — before opening a bug
+#     3. Discussions         — general questions
+#     4. Security            — private vulnerability reports
+#     5. Install             — installation questions
+#     6. Branching           — before opening a PR
+#     7. Release Process     — how releases are cut
+#     8. ADRs                — architectural decisions
+#     9. Compatibility       — "will it work on my device?"
+#    10. Changelog           — "what's new?"
+#    11. Roadmap             — "will feature X be added?"
 # ============================================================
 contact_links:
 
   # ------------------------------------------------------------
-  # [2.1] General discussions (questions, ideas, discussions)
-  # ------------------------------------------------------------
-  - name: 💬 Questions and Discussions
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
-    about: |
-      Ask questions, share ideas, or discuss the project with the community.
-      Suitable for: general questions, usage tips, initial suggestions.
-
-  # ------------------------------------------------------------
-  # [2.2] FAQ (Frequently Asked Questions)
+  # [2.1] FAQ (Frequently Asked Questions)
   # ------------------------------------------------------------
   - name: ❓ Frequently Asked Questions (FAQ)
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md
     about: |
-      Common questions with detailed answers.
+      Common questions with detailed answers (90+ entries).
       Suitable for: "How do I do X?" — the answer may already be here.
 
   # ------------------------------------------------------------
-  # [2.3] Troubleshooting guide
+  # [2.2] Troubleshooting guide
   # ------------------------------------------------------------
   - name: 🆘 Troubleshooting guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md
     about: |
       Comprehensive diagnostic guide with multiple sections (DNS, WebUI, Firewall, ...).
       Suitable for: "X does not work" — start here before opening an Issue.
+
+  # ------------------------------------------------------------
+  # [2.3] General discussions (questions, ideas, discussions)
+  # ------------------------------------------------------------
+  - name: 💬 Questions and Discussions
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
+    about: |
+      Ask questions, share ideas, or discuss the project with the community.
+      Suitable for: general questions, usage tips, initial suggestions.
 
   # ------------------------------------------------------------
   # [2.4] Security reports (Private Vulnerability Reporting)
@@ -80,7 +117,34 @@ contact_links:
       Suitable for: installation issues, system requirements, initial setup.
 
   # ------------------------------------------------------------
-  # [2.6] Compatibility matrix
+  # [2.6] Git branching strategy (v1.1.0 — new link)
+  # ------------------------------------------------------------
+  - name: 🌿 Git branching & PR guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BRANCHING.md
+    about: |
+      Branch types, naming rules, PR target rules, and protection policy.
+      Suitable for: before opening a PR — explains which base branch to use.
+
+  # ------------------------------------------------------------
+  # [2.7] Release process guide (v1.1.0 — new link)
+  # ------------------------------------------------------------
+  - name: 🚀 Release process guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/RELEASE_PROCESS.md
+    about: |
+      How releases are prepared, tagged, published, and synced.
+      Suitable for: understanding release.sh / release-patch.sh and the CI pipeline.
+
+  # ------------------------------------------------------------
+  # [2.8] Architecture Decision Records (v1.1.0 — new link)
+  # ------------------------------------------------------------
+  - name: 📐 Architecture Decision Records
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md
+    about: |
+      The "why" behind major architectural and process decisions.
+      Suitable for: understanding why the project works the way it does.
+
+  # ------------------------------------------------------------
+  # [2.9] Compatibility matrix
   # ------------------------------------------------------------
   - name: ✅ Compatibility matrix
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/COMPATIBILITY.md
@@ -89,19 +153,19 @@ contact_links:
       Suitable for: "Will it work on my device?" — the answer is here.
 
   # ------------------------------------------------------------
-  # [2.7] Changelog
+  # [2.10] Changelog
   # ------------------------------------------------------------
   - name: 📋 Changelog
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md
     about: |
       All notable changes, sorted by version.
-      Suitable for: "What is new in v1.0.0?" — the answer is here.
+      Suitable for: "What is new in v1.1.0?" — the answer is here.
 
   # ------------------------------------------------------------
-  # [2.8] Roadmap
+  # [2.11] Roadmap
   # ------------------------------------------------------------
   - name: 🗺️ Project roadmap
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md
     about: |
-      What is coming in v1.1.0, v1.2.0, v2.0.0?
+      What is coming in v1.2.0, v1.3.0, v2.0.0?
       Suitable for: "Will feature X be added?" — check first.

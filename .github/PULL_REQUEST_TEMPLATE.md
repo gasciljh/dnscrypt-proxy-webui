@@ -1,12 +1,23 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Pull Request Template
-     Version: v1.0.0
+     Version: v1.1.0
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
      This template appears automatically when a new PR is opened.
      Fill every section — delete what does not apply.
      Reference: docs/CONTRIBUTING.md#6 and docs/BRANCHING.md
+     ============================================================
+     v1.1.0 additions:
+       • New MEM-1 / MEM-2 / MEM-3 grep verifications for the
+         v1.1.0 changes in main.go (dynamic memory limit, extended
+         shellQuote, MONITORING_UI_PORT usage in metrics handler).
+       • runtime_info now exposes memory_limit_mb and profile_key —
+         added a verification for those fields.
+       • Header, version, and reminder sections updated to v1.1.0.
+       • The Audit Corrections Registry below remains at #13–#33
+         (the v1.0.0 record). v1.1.0 does not add new audit
+         corrections — it is a polish release.
      ============================================================ -->
 
 > ## 🚨 Before You Start
@@ -116,9 +127,9 @@ Closes #
   Fill this section only if the PR fixes an architectural or security issue.
   See docs/SECURITY.md and docs/ARCHITECTURE.md.
 
-  ┌─────────────────────────────────────────────────────────┐
-  │  Audit Corrections Registry (up to v1.0.0)              │
-  ├─────────────────────────────────────────────────────────┤
+  ┌─────────────────────────────────────────────────┐
+  │  Audit Corrections Registry (v1.0.0)                    │
+  ├─────────────────────────────────────────────────┤
   │  #13     CSRF-GET → POST-only                v1.0.0     │
   │  #14     pgrep -x (no false positives)       v1.0.0     │
   │  #15-a   Remove token from login response    v1.0.0     │
@@ -141,7 +152,14 @@ Closes #
   │  #31     shellQuote injection protection     v1.0.0     │
   │  #32     rebuildMu mutex (RACE-1)            v1.0.0     │
   │  #33     runtime_info dynamic ports          v1.0.0     │
-  └─────────────────────────────────────────────────────────┘
+  └─────────────────────────────────────────────────┘
+
+  ⚠️ v1.1.0 does NOT add new audit corrections. It is a
+     documentation + polish release. The registry above remains
+     the authoritative record through v1.0.0.
+
+  If your PR fixes a new security/architecture issue, this PR
+  should be the FIRST to add a new entry (starting at #34).
 
   Example:
     Number: #34
@@ -233,6 +251,84 @@ Closes #
   grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo "✅"
   ```
 
+### 🆕 v1.1.0 additions
+
+<!--
+  Run these if the PR touches main.go, functions.sh, service.sh,
+  action.sh, status.sh, or watchdog.sh. All are grep-based.
+
+  v1.1.0 introduced three runtime features that must be verified
+  by any PR that could affect them:
+    • MEM-1 — dynamic memory limit per profile
+    • MEM-2 — extended shellQuote character set
+    • MEM-3 — MONITORING_UI_PORT constant used everywhere
+-->
+
+- [ ] **MEM-1 — Dynamic memory limit (main.go)**
+  ```bash
+  grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅"
+  grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅"
+  grep -q 'MEMORY_LIMIT_ULTIMATE' proxy/main.go && echo "✅"
+  # Verify main() no longer uses the hardcoded 80MB call
+  ! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ no hardcoded limit"
+  # Verify updateProfile applies the new limit
+  grep -A3 'atomicWriteFile(SELECTED_FILE' proxy/main.go | grep -q 'applyMemoryLimit' || \
+    grep -B2 -A2 'applyMemoryLimit(key)' proxy/main.go | grep -q 'SELECTED_FILE' && echo "✅"
+  ```
+
+- [ ] **MEM-2 — Extended shellQuote (main.go)**
+  ```bash
+  # The v1.1.0 shellQuote must include {, }, \n, \t
+  grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
+  grep -A5 'func shellQuote' proxy/main.go | grep -q "'}'" && echo "✅ braces"
+  grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
+  grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\t'" && echo "✅ tab"
+  ```
+
+- [ ] **MEM-3 — MONITORING_UI_PORT used in metrics handler (main.go)**
+  ```bash
+  # Verify the constant is defined and used in the metrics proxy
+  grep -q 'MONITORING_UI_PORT = "8080"' proxy/main.go && echo "✅ const"
+  grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ used"
+  # Verify no hardcoded ":8080/api/metrics" remains in the handler
+  ! grep -q '"http://127.0.0.1:8080/api/metrics"' proxy/main.go && echo "✅ no hardcoded URL"
+  ```
+
+- [ ] **v1.1.0 — runtime_info new fields (main.go + web/*.html)**
+  ```bash
+  # Backend
+  grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ backend memory_limit_mb"
+  grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"profile_key"' && echo "✅ backend profile_key"
+  # Frontend — English + Arabic keys
+  grep -q "riMemoryLimit" web/index.html && echo "✅ index.html"
+  grep -q "riMemoryLimit" web/dashboard.html && echo "✅ dashboard.html"
+  ```
+
+- [ ] **v1.1.0 — shell-level memory hint helpers**
+  ```bash
+  # functions.sh must expose the read-only memory hint
+  grep -q 'func get_profile_memory_hint' proxy/functions.sh 2>/dev/null || \
+    grep -q 'get_profile_memory_hint()' proxy/functions.sh && echo "✅ functions.sh"
+  # service.sh / action.sh / status.sh / watchdog.sh should each
+  # provide an inline fallback for environments without functions.sh
+  grep -q '_inline_get_profile_memory_hint' proxy/service.sh && echo "✅ service.sh fallback"
+  grep -q '_inline_get_profile_memory_hint' proxy/action.sh && echo "✅ action.sh fallback"
+  grep -q '_inline_get_profile_memory_hint' proxy/status.sh && echo "✅ status.sh fallback"
+  grep -q '_wd_get_profile_memory_hint' proxy/watchdog.sh && echo "✅ watchdog.sh fallback"
+  ```
+
+- [ ] **v1.1.0 — version bump sanity**
+  ```bash
+  # VERSION, module.prop, and web/*.html should all agree
+  V=$(cat VERSION)
+  echo "VERSION: $V"
+  grep -q "^version=$V" module.prop && echo "✅ module.prop"
+  grep -q "\"version\": \"${V#v}\"" web/manifest.json && echo "✅ manifest.json"
+  grep -q "CACHE_VERSION = '$V'" web/sw.js && echo "✅ sw.js"
+  grep -q "var VERSION = '$V'" web/index.html && echo "✅ index.html"
+  grep -q "var VERSION = '$V'" web/dashboard.html && echo "✅ dashboard.html"
+  ```
+
 ### Custom tests (as applicable)
 
 - [ ] Added new static verification steps (grep-based) for new security fixes
@@ -258,7 +354,7 @@ Closes #
 - [ ] Tested in both Arabic and English
 - [ ] Tested PWA install / reload
 - [ ] Tested SSE live updates
-- [ ] 🆕 Tested dynamic links (with custom PORT / DASHBOARD_PORT)
+- [ ] Tested dynamic links (with custom PORT / DASHBOARD_PORT)
 
 **If the change is in shell scripts:**
 - [ ] Confirmed no new `shellcheck` warnings
@@ -291,12 +387,12 @@ Closes #
 - [ ] Tested login / logout / session expiry
 - [ ] Tested rate limiting (5 attempts / 15 minutes)
 - [ ] Tested from IPv4 and IPv6 (`[::1]`)
-- [ ] 🆕 Tested Login POST-only:
+- [ ] Tested Login POST-only:
   ```bash
   curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
   # Expected: 405 Method Not Allowed + Allow: POST
   ```
-- [ ] 🆕 Tested Basic Auth rate limit:
+- [ ] Tested Basic Auth rate limit:
   ```bash
   for i in 1 2 3 4 5 6; do
     curl -u "wrong:wrong" http://127.0.0.1:9090/api?action=status \
@@ -305,22 +401,27 @@ Closes #
   # Expected: 401 × 5 then 401 (locked)
   ```
 
-**🆕 If the change is in `rebuildBlocklist` or `updateProfile` (RACE-1):**
+**If the change is in `rebuildBlocklist` or `updateProfile` (RACE-1):**
 - [ ] Confirmed `rebuildMu.Lock()` present + `defer rebuildMu.Unlock()`
 - [ ] Tested concurrency manually (update + save simultaneously)
 - [ ] Confirmed no deadlock (30 s timeout is enough)
 
-**🆕 If the change is in `buildRuntimeInfo` or `runtime_info` (PORT-2):**
+**If the change is in `buildRuntimeInfo` or `runtime_info` (PORT-2 + v1.1.0):**
 - [ ] Confirmed `webui_port` + `dashboard_port` present in JSON response:
   ```bash
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
   # Expected: contains "webui_port" and "dashboard_port"
   ```
+- [ ] Confirmed `memory_limit_mb` + `profile_key` present:
+  ```bash
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb, .profile_key'
+  # Expected: a number, and a profile key string
+  ```
 - [ ] Tested with custom ports (PORT=8081, DASHBOARD_PORT=8082)
 - [ ] Confirmed `index.html` uses `data.dashboard_port`
 - [ ] Confirmed `dashboard.html` uses `data.webui_port`
 
-**🆕 If the change is in `/api/metrics` or `parsePrometheus` (Fix #1):**
+**If the change is in `/api/metrics` or `parsePrometheus` (Fix #1 + MEM-3):**
 - [ ] Confirmed Content-Type:
   ```bash
   curl -s -I "http://127.0.0.1:9091/api/metrics" | grep Content-Type
@@ -332,6 +433,24 @@ Closes #
   # Expected: {total_queries, blocked_queries, cache_stats, ...}
   ```
 - [ ] Tested Dashboard in browser (no "Cannot fetch data")
+
+**If the change is in the memory limit logic (v1.1.0 MEM-1):**
+- [ ] Confirmed the limit adjusts when profile changes:
+  ```bash
+  # Start with light
+  echo "light" > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+  sleep 5
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+  # Expected: 80
+
+  # Switch to ultimate
+  echo "ultimate" > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+  sleep 5
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+  # Expected: 220
+  ```
 
 ---
 
@@ -350,7 +469,7 @@ Closes #
 - [ ] Applied `MaxBytesReader` on new POST bodies (if applicable)
 - [ ] Used `atomicWriteFile` / `atomicWriteStream` for writes (if applicable)
 
-### 🆕 Authentication and endpoints (v1.0.0)
+### Authentication and endpoints
 
 - [ ] Verified `checkAuth(r)` on every new endpoint (if applicable)
 - [ ] Used `hasEndpoint(path, name)` instead of `strings.Contains` / `strings.HasSuffix`
@@ -358,24 +477,32 @@ Closes #
 - [ ] Made `/api/auth/login` and `/api/auth/logout` POST-only (if applicable)
 - [ ] If a new rate limit was added, registered attempts in `loginAttempts`
 
-### 🆕 Input Validation (v1.0.0)
+### Input Validation
 
 - [ ] If adding a port read, used `readConfPort` (with range check 1–65535)
 - [ ] If using a dynamic shell command, used `shellQuote()`
 - [ ] If adding a new health endpoint, considered `isLocalRequest` (local-only)
 
-### Firewall (v1.0.0)
+### Firewall
 
 - [ ] Did not pollute `OUTPUT` / `INPUT` / `FORWARD` with dynamic rules
 - [ ] Used `DNSCRYPT_OUT` / `DNSCRYPT_OUT6` for the firewall
 - [ ] Confirmed `--wait` on every `iptables` / `ip6tables` invocation
 - [ ] Tested `_legacy_cleanup_*` after upgrade from an older version
 
-### 🆕 Concurrency (RACE-1)
+### Concurrency (RACE-1)
 
 - [ ] Any operation modifying `ALLOWLIST` / `DENYLIST` / `BLOCKLIST` calls `rebuildBlocklist`
 - [ ] `rebuildBlocklist` is protected by `rebuildMu.Lock()` + `defer Unlock()`
 - [ ] No nested deadlock (never calls a function that locks the same mutex)
+
+### Memory (v1.1.0)
+
+- [ ] If adding a new profile, updated `MEMORY_LIMIT_*` in main.go
+- [ ] If adding a new profile, updated the inline fallback in all four shell scripts
+  (`service.sh`, `action.sh`, `status.sh`, `watchdog.sh`)
+- [ ] If adding a new profile, updated `webui.conf` template in `customize.sh`
+- [ ] If adding a new profile, updated `web/index.html` `<select id="profileSelect">`
 
 ### For security fixes
 
@@ -403,9 +530,11 @@ Closes #
 - [ ] Updated `docs/TROUBLESHOOTING.md` (if a common issue)
 - [ ] Updated `docs/FAQ.md` (if a common question)
 - [ ] Updated `docs/BRANCHING.md` or `docs/RELEASE_PROCESS.md` (if a workflow change)
-- [ ] 🆕 Added or updated an ADR in `docs/adr/` (if a non-trivial decision)
-- [ ] 🆕 If reversing an ADR, created a new one that supersedes it (never edit the old)
+- [ ] Added or updated an ADR in `docs/adr/` (if a non-trivial decision)
+- [ ] If reversing an ADR, created a new one that supersedes it (never edit the old)
 - [ ] Added / updated code comments (Go docstrings, shell comments)
+- [ ] **v1.1.0** — if a new field was added to `runtime_info`, updated both
+      `web/index.html` and `web/dashboard.html` translation tables (en + ar)
 
 ---
 
@@ -440,7 +569,7 @@ Closes #
 - [ ] Names are clear (`userCount` not `uc`)
 - [ ] Comments on exported functions
 - [ ] Every error is handled (`if err != nil`) correctly
-- [ ] 🆕 Used `defer unlock()` on every mutex (no forgotten unlock)
+- [ ] Used `defer unlock()` on every mutex (no forgotten unlock)
 
 ### Build verification
 
@@ -461,7 +590,7 @@ Closes #
 - [ ] No binary files uploaded without justification
 - [ ] No `.DS_Store` or `Thumbs.db` files
 - [ ] Reviewed `git diff` before pushing (no unintended changes)
-- [ ] 🆕 Confirmed no leftover `*.tmp_*` from `atomicWriteFile`
+- [ ] Confirmed no leftover `*.tmp_*` from `atomicWriteFile`
 
 ---
 
@@ -508,20 +637,20 @@ Closes #
 <!-- ============================================================
      ⚠️ Final reminder:
 
-     ┌────────────────────────────────────────────────────────┐
-     │  🎯 Branch policy reminder                             │
-     ├────────────────────────────────────────────────────────┤
-     │  feature/*, fix/*, docs/*, chore/*, refactor/*, test/* │
+     ┌────────────────────────────────────────────────┐
+     │  🎯 Branch policy reminder                              │
+     ├────────────────────────────────────────────────┤
+     │  feature/*, fix/*, docs/*, chore/*, refactor/*, test/*  │
      │      → PR base: develop                                │
      │      → Template: this one (default)                    │
-     │                                                        │
-     │  release/*, hotfix/*                                   │
+     │                                                         │
+     │  release/*, hotfix/*                                    │
      │      → PR base: main                                   │
      │      → Template: ?template=release.md                  │
-     │                                                        │
-     │  Never open a PR directly against main for features.   │
-     │  Read docs/BRANCHING.md for the full explanation.      │
-     └────────────────────────────────────────────────────────┘
+     │                                                         │
+     │  Never open a PR directly against main for features.    │
+     │  Read docs/BRANCHING.md for the full explanation.       │
+     └────────────────────────────────────────────────┘
 
      • Ensure the PR references an Issue (if one exists)
      • Review the diff one last time before pushing
@@ -530,10 +659,16 @@ Closes #
 
      🎯 Quick verification commands (before pushing):
 
-       make build       # Go build for all 4 architectures
-       bash -n proxy/*.sh scripts/*.sh   # shell syntax check
-       gofmt -l proxy/  # Go format check
+       make build                          # Go build for all 4 architectures
+       bash -n proxy/*.sh scripts/*.sh     # shell syntax check
+       gofmt -l proxy/                     # Go format check
        shellcheck --severity=warning proxy/*.sh scripts/*.sh
+
+     🎯 v1.1.0 extra checks (if main.go changed):
+
+       grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1"
+       grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2"
+       grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
 
      📖 Documentation references:
 
@@ -543,8 +678,8 @@ Closes #
        docs/CONTRIBUTING.md     - Contribution guide
        docs/SECURITY.md         - Security policy
 
-     Current version: v1.0.0
-     Last updated: 2026-09-24
+     Current version: v1.1.0
+     Last updated: 2026-09-26
 
      🎉 Thanks for your contribution! Every PR improves the project.
      ============================================================ -->

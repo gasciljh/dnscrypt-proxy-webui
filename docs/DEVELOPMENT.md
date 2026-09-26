@@ -1,16 +1,40 @@
 # Development Guide — DNSCrypt Smart Filter
 
-> Developer guide: environment setup, building, and releasing.
+> Developer guide: environment setup, building, debugging, and releasing.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `Last updated` reflects the v1.1.0 release date.
+>   • `§1.2 Architectural Principles` gained 3 entries: MEM-1
+>     (dynamic memory limit), MEM-2 (extended shellQuote),
+>     MEM-3 (MONITORING_UI_PORT constant).
+>   • `§5.4 Commit Examples` gained 3 examples for MEM-1/2/3.
+>   • `§8.10` (new) — v1.1.0 Memory Limit Debugging — static
+>     audit and runtime checks for `memoryLimitForProfile` /
+>     `applyMemoryLimit`.
+>   • `§8.11` (new) — Testing all profiles — one-shot script
+>     to verify all 5 profiles return the correct limit.
+>   • `§9 Make Targets` extended with `release`,
+>     `release-patch`, and `sync` targets (introduced in the
+>     v1.0.0 cycle, now documented here).
+>   • `§10 v1.0.0 Contributor Notes` renamed to `§10 v1.1.0
+>     Contributor Notes`, with a new Golden Rule #21 (memory
+>     observability) and updated examples.
+>   • Release examples updated from `v1.1.0` to `v1.2.0`
+>     (stable) and `v1.1.1` (PATCH).
+>   • `Related documents` box now includes `docs/UPGRADE.md`.
+>   • `§10.12 Full References` extended with `docs/UPGRADE.md`.
 
 > **📖 Branching, Release & Decisions**:
 > - Git workflow → [`docs/BRANCHING.md`](BRANCHING.md)
 > - Publishing a release → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
 > - Architecture Decision Records → [`docs/adr/README.md`](adr/README.md)
+> - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 
 ---
 
@@ -25,7 +49,7 @@
 7. [CI/CD](#7-cicd)
 8. [Debugging](#8-debugging)
 9. [Make Targets](#9-make-targets)
-10. [v1.0.0 — Contributor Notes](#10-v100--contributor-notes)
+10. [v1.1.0 — Contributor Notes](#10-v110--contributor-notes)
 
 ---
 
@@ -69,6 +93,9 @@
 - **Dynamic Ports** — `runtime_info` returns actual ports (PORT-2).
 - **Auth Cache** — 60 s TTL to reduce I/O (NEW-6).
 - **Decision Transparency** — architectural decisions documented as ADRs.
+- **Dynamic Memory Limit (v1.1.0 — MEM-1)** — `memoryLimitForProfile()` sets the Go soft memory limit per blocklist profile. Prevents GC thrashing on heavy profiles.
+- **Extended `shellQuote` Charset (v1.1.0 — MEM-2)** — covers `{`, `}`, `\n`, `\t` in addition to the 20-char set.
+- **Reserved Port Constant (v1.1.0 — MEM-3)** — `MONITORING_UI_PORT` used in the metrics handler, no hardcoded `"8080"`.
 
 ### 1.3 Architecture Decisions
 
@@ -82,6 +109,8 @@ The decisions that shaped this project are documented as **ADRs**:
 | [ADR-0004](adr/0004-unified-pr-template.md) | Unified PR template (⚠️ Superseded) |
 | [ADR-0005](adr/0005-release-specific-pr-template.md) | Release-specific PR template |
 | [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md) | Rename `hotfix.sh` → `release-patch.sh` |
+
+**Current ADR count**: 6 (5 accepted + 1 superseded).
 
 Full index: [`docs/adr/README.md`](adr/README.md).
 
@@ -109,7 +138,8 @@ git branch --show-current
 # Expected: develop
 ```
 
-**Important**: Always work on `develop`, never on `main`. See [`docs/BRANCHING.md`](BRANCHING.md) for details.
+**Important**: Always work on `develop`, never on `main`. See
+[`docs/BRANCHING.md`](BRANCHING.md) for details.
 
 ### 2.2 Linux (Ubuntu / Debian)
 
@@ -231,7 +261,8 @@ code .
 # 3. Wait ~2-4 minutes
 ```
 
-All tools are installed automatically via `.devcontainer/setup.sh` (including golangci-lint v2.5.0).
+All tools are installed automatically via
+`.devcontainer/setup.sh` (including golangci-lint v2.5.0).
 
 ---
 
@@ -277,14 +308,14 @@ proxy/build/
 - `-buildid=` to remove random signatures.
 - **Result**: same commit → same SHA-256.
 
-### 3.5 Build with v1.0.0
+### 3.5 Build with v1.1.0
 
-Before building, verify the v1.0.0 fixes are present:
+Before building, verify the v1.0.0 + v1.1.0 fixes are present:
 
 ```bash
 cd proxy
 
-# 1. v1.0.0 fixes present
+# --- v1.0.0 fixes ---
 grep -c 'func getSystemShell' main.go            # Expected: 1
 grep -c 'func parsePrometheus' main.go           # Expected: 1
 grep -c 'func buildDashboardJSON' main.go        # Expected: 1
@@ -292,20 +323,33 @@ grep -c 'func hasEndpoint' main.go               # Expected: 1
 grep -c 'func shellQuote' main.go                # Expected: 1
 grep -c 'func readConfPort' main.go              # Expected: 1
 
-# 2. No hardcoded shell path
+# --- v1.0.0 — no hardcoded shell path ---
 ! grep -q 'exec.CommandContext(ctx, "/system/bin/sh"' main.go
 # Expected: success (no result)
 
-# 3. RACE-1 (rebuildMu)
+# --- v1.0.0 — RACE-1 ---
 grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' main.go && echo "✅ RACE-1"
 
-# 4. PORT-2 (runtime_info ports)
+# --- v1.0.0 — PORT-2 ---
 grep -A30 'func buildRuntimeInfo' main.go | grep -q '"webui_port"' && echo "✅ PORT-2"
 
-# 5. Build
+# --- v1.1.0 — MEM-1 ---
+grep -q 'func memoryLimitForProfile' main.go && echo "✅ MEM-1"
+grep -q 'func applyMemoryLimit' main.go && echo "✅ MEM-1 (apply)"
+grep -q 'MEMORY_LIMIT_ULTIMATE' main.go && echo "✅ MEM-1 (constants)"
+! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' main.go && echo "✅ MEM-1 (no hardcoded)"
+
+# --- v1.1.0 — MEM-2 ---
+grep -A5 'func shellQuote' main.go | grep -q "'{'" && echo "✅ MEM-2 (braces)"
+grep -A8 'func shellQuote' main.go | grep -q "r == '\\\\n'" && echo "✅ MEM-2 (newline)"
+
+# --- v1.1.0 — MEM-3 ---
+grep -A5 'func metricsProxyHandler' main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
+
+# --- Build ---
 ./build.sh --clean --parallel
 
-# 6. Verify checksums
+# --- Verify checksums ---
 cat build/checksums.txt
 ```
 
@@ -330,7 +374,7 @@ dnscrypt-proxy-webui/
 ├── README.md                        # Overview (EN)
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.0.0)
+├── VERSION                          # Single source of truth (v1.1.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
@@ -344,7 +388,7 @@ dnscrypt-proxy-webui/
 │   │   └── feature_request.yml      # Feature request template
 │   │
 │   ├── PULL_REQUEST_TEMPLATE.md     # Default PR template
-│   ├── PULL_REQUEST_TEMPLATE/       # Additional templates
+│   ├── PULL_REQUEST_TEMPLATE/       # Additional PR templates
 │   │   └── release.md               # Release-specific PR template
 │   │
 │   ├── CODEOWNERS                   # Auto-assign reviewers
@@ -356,7 +400,7 @@ dnscrypt-proxy-webui/
 │   └── setup.sh                     # Auto-install dev tools
 │
 ├── scripts/                         # Build & release tools
-│   ├── fetch_dns_binaries.sh        # Level 4 DNS binaries fetcher
+│   ├── fetch_dns_binaries.sh        # DNS binaries fetcher (Level 4)
 │   ├── generate-icons.sh            # PNG/ICO icon generator
 │   ├── package_module.sh            # Build Magisk ZIP
 │   ├── release.sh                   # Stable / Prerelease automation
@@ -370,7 +414,7 @@ dnscrypt-proxy-webui/
 │   ├── dnscrypt-proxy.version       # DNS binary version (2.1.18)
 │   ├── functions.sh                 # Shared shell library
 │   ├── go.mod                       # Go module definition
-│   ├── main.go                      # HTTP server (~3550 lines)
+│   ├── main.go                      # HTTP server
 │   ├── post-fs-data.sh              # Early boot cleanup
 │   ├── service.sh                   # Boot service + Watchdog launcher
 │   ├── status.sh                    # Status display (4 modes)
@@ -391,18 +435,10 @@ dnscrypt-proxy-webui/
 │   ├── index.html                   # Main UI (FSM + SW Update)
 │   ├── manifest.json                # PWA manifest
 │   ├── offline.html                 # Offline fallback page
-│   └── sw.js                        # Service Worker (v1.0.0)
+│   └── sw.js                        # Service Worker (v1.1.0)
 │
 └── docs/                            # Documentation (23 files)
     ├── adr/                         # Architecture Decision Records (7 files)
-    │   ├── README.md                # ADR index + template + methodology
-    │   ├── 0001-two-branch-model.md
-    │   ├── 0002-automated-releases.md
-    │   ├── 0003-post-release-sync.md
-    │   ├── 0004-unified-pr-template.md          (⚠️ Superseded)
-    │   ├── 0005-release-specific-pr-template.md
-    │   └── 0006-rename-hotfix-to-release-patch.md
-    │
     ├── API.md                       # HTTP API reference
     ├── ARCHITECTURE.md              # System architecture
     ├── BRANCHING.md                 # Git branching strategy
@@ -410,7 +446,7 @@ dnscrypt-proxy-webui/
     ├── CONTRIBUTING.md              # Contribution guide
     ├── DEVELOPMENT.md               # This file
     ├── DNS_BINARIES.md              # DNS binaries management
-    ├── FAQ.md                       # 90+ common questions
+    ├── FAQ.md                       # Common questions
     ├── GLOSSARY.md                  # Terms & abbreviations
     ├── HALL_OF_FAME.md              # Contributors recognition
     ├── INSTALL.md                   # Installation guide
@@ -431,39 +467,40 @@ dnscrypt-proxy-webui/
 | `web/index.html` | ~135 KB | Main UI |
 | `web/dashboard.html` | ~78 KB | Monitoring dashboard |
 
-### 4.3 v1.0.0 File Changes
+### 4.3 v1.0.0 / v1.1.0 File Changes
 
 | File | What changed |
 |---|---|
-| `proxy/main.go` | +14 modifications (Fix #1, #2, #5, #6, #7, #8, #10, #11, #12 + NEW-1..NEW-6 + RACE-1 + PORT-2) |
-| `proxy/customize.sh` | + backup/restore in `[8b]`/`[9c]` |
-| `proxy/functions.sh` | + `fuser` PID parsing fix |
-| `proxy/watchdog.sh` | + section header with comment + DNS backoff |
-| `web/index.html` | + PORT-2 dynamic links |
-| `web/dashboard.html` | + PORT-2 dynamic links |
-| `web/offline.html` | + ports info box |
-| `web/manifest.json` | + version + port notes |
-| `web/sw.js` | + PNG icons in precache |
-| `.pre-commit-config.yaml` | golangci-lint v2 |
-| `.gitignore` | `proxy/run/*` instead of `proxy/run/` |
-| `.gitattributes` | `merge=union` for `CHANGELOG.md` + `VERSION` |
-| `.github/workflows/ci.yml` | + `develop` in triggers |
-| `.github/workflows/codeql.yml` | + `develop` in triggers |
-| `.github/workflows/release.yml` | + `Sync main → develop` step |
-| `scripts/release.sh` | 🆕 New file |
-| `scripts/release-patch.sh` | 🆕 New file |
-| `.github/PULL_REQUEST_TEMPLATE.md` | + `🎯 Target Branch` section |
-| `.github/PULL_REQUEST_TEMPLATE/release.md` | 🆕 New file |
-| `.github/CODEOWNERS` | + `docs/adr/`, `release-patch.sh`, `PULL_REQUEST_TEMPLATE/` |
-| `docs/BRANCHING.md` | 🆕 New file |
-| `docs/RELEASE_PROCESS.md` | 🆕 New file |
-| `docs/adr/README.md` | 🆕 New file |
-| `docs/adr/0001-two-branch-model.md` | 🆕 New ADR |
-| `docs/adr/0002-automated-releases.md` | 🆕 New ADR |
-| `docs/adr/0003-post-release-sync.md` | 🆕 New ADR |
-| `docs/adr/0004-unified-pr-template.md` | 🆕 New ADR (⚠️ Superseded) |
-| `docs/adr/0005-release-specific-pr-template.md` | 🆕 New ADR |
-| `docs/adr/0006-rename-hotfix-to-release-patch.md` | 🆕 New ADR |
+| `proxy/main.go` | v1.0.0: Fix #1, #2, #5, #6, #7, #8, #10, #11, #12 + NEW-1..NEW-6 + RACE-1 + PORT-2. v1.1.0: MEM-1, MEM-2, MEM-3 |
+| `proxy/customize.sh` | v1.0.0: backup/restore. v1.1.0: Port collision fix + memory hint |
+| `proxy/functions.sh` | v1.0.0: `fuser` PID parsing. v1.1.0: `get_profile_memory_hint()` + `SELECTED_PROFILE_FILE` |
+| `proxy/watchdog.sh` | v1.0.0: section header with comment + DNS backoff. v1.1.0: profile + memory hint at startup |
+| `proxy/service.sh` | v1.1.0: profile + memory hint at boot |
+| `proxy/action.sh` | v1.1.0: `--check` reports profile + memory |
+| `proxy/status.sh` | v1.1.0: `--check`, `--json`, default output extended |
+| `web/index.html` | v1.0.0: PORT-2 dynamic links. v1.1.0: profile + memory in System Info |
+| `web/dashboard.html` | v1.0.0: PORT-2 dynamic links. v1.1.0: profile + memory in System Info |
+| `web/offline.html` | v1.1.0: **CRITICAL** — removed restrictive CSP meta |
+| `web/manifest.json` | v1.0.0: version + port notes. v1.1.0: x-note-memory, x-note-runtime-info, x-note-icon-source |
+| `web/sw.js` | v1.0.0: PNG icons in precache. v1.1.0: CACHE_VERSION bump + comment cleanup |
+| `web/icon-192.svg` | v1.1.0: header clarified (purpose: any, not maskable) |
+| `web/icon-512.svg` | v1.1.0: header corrected (source for 4 PNGs, not all) |
+| `.pre-commit-config.yaml` | v1.0.0: golangci-lint v2. v1.1.0: + shellcheck-py hook |
+| `.gitignore` | v1.0.0: `proxy/run/*`. v1.1.0: removed 2 no-op negations |
+| `.gitattributes` | v1.0.0: `merge=union` for CHANGELOG + VERSION |
+| `.github/workflows/ci.yml` | v1.0.0: + `develop` in triggers |
+| `.github/workflows/codeql.yml` | v1.0.0: + `develop` in triggers |
+| `.github/workflows/release.yml` | v1.0.0: + `Sync main → develop` step |
+| `scripts/release.sh` | 🆕 v1.0.0 |
+| `scripts/release-patch.sh` | 🆕 v1.0.0 (renamed from draft `hotfix.sh`) |
+| `.github/PULL_REQUEST_TEMPLATE.md` | v1.0.0: + Target Branch section |
+| `.github/PULL_REQUEST_TEMPLATE/release.md` | 🆕 v1.0.0 |
+| `.github/CODEOWNERS` | v1.0.0: + `docs/adr/`, `release-patch.sh`, `PULL_REQUEST_TEMPLATE/` |
+| `docs/BRANCHING.md` | 🆕 v1.0.0 |
+| `docs/RELEASE_PROCESS.md` | 🆕 v1.0.0 |
+| `docs/UPGRADE.md` | 🆕 v1.1.0 (with §3.0 v1.0.0 → v1.1.0 guide) |
+| `docs/adr/README.md` | 🆕 v1.0.0 |
+| `docs/adr/0001` → `0006` | 🆕 v1.0.0 (ADR-0004 superseded by ADR-0005) |
 
 ---
 
@@ -476,7 +513,8 @@ git checkout develop
 git pull origin develop
 ```
 
-**Rule**: Always branch from `develop`, never from `main`. See [`docs/BRANCHING.md`](BRANCHING.md) §4.
+**Rule**: Always branch from `develop`, never from `main`. See
+[`docs/BRANCHING.md`](BRANCHING.md) §4.
 
 ### 5.2 Create a New Branch
 
@@ -510,7 +548,7 @@ git add proxy/main.go
 git commit -m "feat(proxy): add new endpoint"
 ```
 
-**v1.0.0 commit patterns**:
+**v1.0.0 / v1.1.0 commit patterns**:
 
 ```bash
 # Architectural fix (Audit Correction)
@@ -577,12 +615,53 @@ history + server logs.
 
 Audit Correction #28
 Refs: docs/SECURITY.md"
+
+# v1.1.0 — MEM-1 (Dynamic memory limit)
+git commit -m "feat(proxy): add dynamic memory limit per profile
+
+debug.SetMemoryLimit was hardcoded to 80MB for all profiles. On
+'ultimate', actual working set approaches 200MB → GC thrashing.
+
+Added memoryLimitForProfile() + applyMemoryLimit():
+  light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
+
+Applied at startup and on every profile change. Exposed via
+runtime_info.memory_limit_mb.
+
+Refs: docs/SECURITY.md §5.30.1
+Refs: docs/ARCHITECTURE.md §3.9, §4.9.1"
+
+# v1.1.0 — MEM-2 (Extended shellQuote charset)
+git commit -m "security(shell): extend shellQuote character set
+
+shellQuote() escaped 20 shell metacharacters. Added {, }, \\n, \\t
+for brace expansion and word-splitting defense-in-depth.
+
+No known exploit existed — this is defense-in-depth.
+
+Refs: docs/SECURITY.md §5.30.2"
+
+# v1.1.0 — MEM-3 (MONITORING_UI_PORT in metrics handler)
+git commit -m "refactor(proxy): use MONITORING_UI_PORT constant in metrics handler
+
+metricsProxyHandler contained a hardcoded 'http://127.0.0.1:8080/api/metrics'.
+
+Now uses the MONITORING_UI_PORT constant — single source of truth
+for the reserved port.
+
+Behavior is unchanged.
+
+Refs: docs/SECURITY.md §5.30.3"
 ```
 
 **Rule**: Any security/architectural fix must:
-1. Mention `Audit Correction #XX` in the footer.
+1. Mention `Audit Correction #XX` in the footer (v1.0.0 fixes).
 2. Reference `docs/SECURITY.md#...`.
 3. Explain **why** (not just what).
+
+**Rule for v1.1.0 runtime improvements**: MEM-1 / MEM-2 / MEM-3 are
+**not** audit corrections. Use `Refs: docs/SECURITY.md §5.30.N`
+instead.
 
 ### 5.5 Push and Open a PR
 
@@ -591,7 +670,8 @@ git push -u origin feature/my-feature
 # Then open a Pull Request on GitHub — TARGET: develop
 ```
 
-**⚠️ Critical**: Select `develop` as the **base branch** for your PR. Opening a PR against `main` for a feature will be closed.
+**⚠️ Critical**: Select `develop` as the **base branch** for your PR.
+Opening a PR against `main` for a feature will be closed.
 
 **See** [`.github/PULL_REQUEST_TEMPLATE.md`](../.github/PULL_REQUEST_TEMPLATE.md).
 
@@ -604,11 +684,13 @@ git branch -d feature/my-feature
 git push origin --delete feature/my-feature
 ```
 
-**Note**: GitHub can auto-delete the remote branch if `Settings → General → Automatically delete head branches` is enabled.
+**Note**: GitHub can auto-delete the remote branch if
+`Settings → General → Automatically delete head branches` is enabled.
 
 ### 5.7 Architecture Decisions
 
-For **non-trivial** architectural or process decisions, document them as an **ADR**:
+For **non-trivial** architectural or process decisions, document them
+as an **ADR**:
 
 | When | Action |
 |---|---|
@@ -630,7 +712,8 @@ For **non-trivial** architectural or process decisions, document them as an **AD
 
 ### 6.1 Overview
 
-Releases are triggered by pushing a version tag. Two scripts are available:
+Releases are triggered by pushing a version tag. Two scripts are
+available:
 
 | Script | Use for | Branch | Bump |
 |---|---|---|---|
@@ -640,13 +723,13 @@ Releases are triggered by pushing a version tag. Two scripts are available:
 **Stable release** (from `develop`):
 
 ```bash
-./scripts/release.sh v1.1.0
+./scripts/release.sh v1.2.0
 ```
 
 **PATCH-only release** (from `main`):
 
 ```bash
-./scripts/release-patch.sh v1.0.1
+./scripts/release-patch.sh v1.1.1
 ```
 
 Both scripts:
@@ -668,9 +751,10 @@ Both scripts:
 ```text
 v<MAJOR>.<MINOR>.<PATCH>[-prerelease]
 
-v1.0.0        ← current stable
-v1.0.1        ← next patch (hotfix)
-v1.1.0        ← next minor (feature)
+v1.0.0        ← first stable release
+v1.1.0        ← second stable (current)
+v1.1.1        ← next patch (hotfix)
+v1.2.0        ← next minor (feature)
 v2.0.0        ← next major (breaking)
 ```
 
@@ -685,6 +769,8 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.0.0 | 1000000 |
 | v1.0.1 | 1000001 |
 | v1.1.0 | 1010000 |
+| v1.1.1 | 1010001 |
+| v1.2.0 | 1020000 |
 | v2.0.0 | 2000000 |
 
 **Constraint**: `PATCH` ≤ 99, `HOTFIX` ≤ 99.
@@ -707,10 +793,11 @@ make sync   # back-merge main → develop
 
 ### 6.5 Release PR Template
 
-PRs targeting `main` (from `release/*` or `hotfix/*`) use the release-specific template:
+PRs targeting `main` (from `release/*` or `hotfix/*`) use the
+release-specific template:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.1.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.2.0?template=release.md
 ```
 
 **Full decision**: [ADR-0005](adr/0005-release-specific-pr-template.md).
@@ -725,11 +812,11 @@ git checkout develop
 git pull origin develop
 
 # 2. Update VERSION
-echo "v1.1.0" > VERSION
+echo "v1.2.0" > VERSION
 
 # 3. Update module.prop
-sed -i 's/^version=.*/version=v1.1.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1010000/' module.prop
+sed -i 's/^version=.*/version=v1.2.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
 
 # 4. Update update.json
 $EDITOR update.json
@@ -739,10 +826,10 @@ $EDITOR CHANGELOG.md
 
 # 6. Commit + tag + push
 git add VERSION module.prop update.json CHANGELOG.md
-git commit -m "release: v1.1.0"
-git tag -a v1.1.0 -m "Release v1.1.0"
+git commit -m "release: v1.2.0"
+git tag -a v1.2.0 -m "Release v1.2.0"
 git push origin develop
-git push origin v1.1.0
+git push origin v1.2.0
 ```
 
 ### 6.7 Full Details
@@ -754,6 +841,14 @@ See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for:
 - Post-release verification (Cosign, SBOM, SHA256).
 - Rollback procedures.
 - Back-merge after hotfixes.
+
+### 6.8 Upgrade Guide
+
+See [`docs/UPGRADE.md`](UPGRADE.md) for:
+- The `v1.0.0 → v1.1.0` upgrade path (§3.0).
+- Settings preservation across upgrades.
+- Rollback procedures.
+- Emergency recovery.
 
 ---
 
@@ -854,7 +949,7 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
 ```
 
 **If Go build fails on Linux**:
-- Ensure you're on `v1.0.0` (has `getSystemShell` fallback).
+- Ensure you're on `v1.0.0+` (has `getSystemShell` fallback).
 - Verify: `grep -q 'func getSystemShell' proxy/main.go`.
 - Verify `runShell`: `grep -n 'getSystemShell()' proxy/main.go`.
 
@@ -975,7 +1070,7 @@ curl http://127.0.0.1:9090/readyz
 # Metrics
 curl -s http://127.0.0.1:9091/api/metrics | jq
 
-# runtime_info (PORT-2)
+# runtime_info (PORT-2 + MEM-1)
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 ```
 
@@ -1106,6 +1201,113 @@ su -c "curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'"
 # Expected: "8081"
 ```
 
+### 8.10 v1.1.0 Memory Limit Debugging (MEM-1)
+
+#### Static Audit
+
+```bash
+# 1. Function presence
+grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1 function"
+grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅ MEM-1 apply"
+
+# 2. All 5 profile constants + default
+for c in LIGHT NORMAL PRO PROPLUS ULTIMATE DEFAULT; do
+    grep -q "MEMORY_LIMIT_$c" proxy/main.go && echo "✅ MEMORY_LIMIT_$c"
+done
+
+# 3. No hardcoded 80MB limit remains
+! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ no hardcoded"
+
+# 4. Called from main() and updateProfile()
+grep -c 'applyMemoryLimit(' proxy/main.go
+# Expected: >= 3 (definition + 2 call sites)
+```
+
+#### Runtime Checks
+
+```bash
+# 1. Effective limit for the active profile
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
+# Expected: 80 / 100 / 120 / 160 / 220
+
+# 2. Active profile key
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'"
+# Expected: light / normal / pro / proplus / ultimate
+
+# 3. Startup log line
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+# Expected: 🧠 v1.1.0: dynamic memory limit — profile=<key>, limit=<N> MB
+
+# 4. Profile file vs runtime (must match)
+diff <(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt") \
+     <(su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'")
+# Expected: no diff
+```
+
+#### GC Thrashing Symptoms (pre-v1.1.0)
+
+If you suspect the memory limit is causing slowness:
+
+```bash
+# 1. Get the WebUI PID
+PID=$(su -c "pgrep -x dnscrypt-webui" | head -1)
+
+# 2. Sample CPU usage over 5 s
+su -c "top -b -n 5 -d 1 -p $PID | tail -5"
+
+# If CPU usage is > 30% while idle → GC thrashing
+# Solution: check the active profile matches the device RAM tier
+# (see docs/COMPATIBILITY.md §5.4)
+```
+
+### 8.11 Testing All Profiles (v1.1.0)
+
+One-shot verification script for all 5 profiles:
+
+```bash
+#!/system/bin/sh
+# test-all-profiles.sh — v1.1.0
+# Verifies that each profile sets the correct memory_limit_mb.
+
+PROFILES="light normal pro proplus ultimate"
+
+echo "Testing all 5 profiles..."
+echo ""
+
+for P in $PROFILES; do
+    echo "=== Profile: $P ==="
+
+    # Set the profile
+    su -c "echo '$P' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+    su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+    sleep 5
+
+    # Query runtime_info
+    RESULT=$(su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -c '{profile_key, memory_limit_mb}'")
+    echo "  Result: $RESULT"
+
+    # Log line
+    su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1" | sed 's/^/  /'
+
+    echo ""
+done
+
+echo "Done. Expected limits:"
+echo "  light    → 80"
+echo "  normal   → 100"
+echo "  pro      → 120"
+echo "  proplus  → 160"
+echo "  ultimate → 220"
+```
+
+**To use**:
+
+```bash
+nano /sdcard/test-all-profiles.sh
+# paste the script above
+su -c "sh /sdcard/test-all-profiles.sh"
+```
+
 ---
 
 ## 9. Make Targets
@@ -1118,7 +1320,7 @@ su -c "curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'"
 | `make help` | Show help |
 | `make version` | Show current version |
 | `make build` | Build all 4 architectures |
-| `make package` | Build all architectures |
+| `make package` | Build all 4 architectures (same as build) |
 | `make clean` | Remove `proxy/build/` and `dist/` |
 | `make release VERSION=vX.Y.Z` | Stable / Prerelease release |
 | `make release-patch VERSION=vX.Y.Z` | PATCH-only release |
@@ -1129,14 +1331,14 @@ su -c "curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'"
 ```bash
 # Show version
 make version
-# Expected: v1.0.0
+# Expected: v1.1.0
 
 # Show help
 make help
 # Expected:
 #   DNSCrypt Smart Filter
 #
-#     VERSION: v1.0.0
+#     VERSION: v1.1.0
 #
 #     make build                          - Build all architectures
 #     make package                        - Build + ZIP
@@ -1157,18 +1359,44 @@ make package
 make clean
 
 # Stable release
-make release VERSION=v1.1.0
+make release VERSION=v1.2.0
 
 # PATCH release
-make release-patch VERSION=v1.0.1
+make release-patch VERSION=v1.1.1
 
 # Sync after PATCH release
 make sync
 ```
 
+### 9.3 Target Behavior Details
+
+**`make release`** — requires `VERSION=...` on the command line. Fails with a helpful message if omitted:
+
+```text
+❌ No version specified.
+
+   Usage: make release VERSION=v1.2.0
+   Current file VERSION: v1.1.0
+
+   See docs/RELEASE_PROCESS.md for details.
+```
+
+**`make release-patch`** — same guard. Reminds you to be on `main` and to run `make sync` afterwards.
+
+**`make sync`** — fetches `origin/main` and `origin/develop`, then fast-forwards `develop` (or falls back to a regular merge), and pushes to `origin`.
+
+### 9.4 Where to Add New Targets
+
+If you add a new target:
+
+1. Add it to `Makefile` with a `## comment` if it should appear in `make help`.
+2. Update the "Available Targets" table above.
+3. Update the `help:` target's output in `Makefile`.
+4. Add it to `.PHONY` if it is not a file.
+
 ---
 
-## 10. v1.0.0 — Contributor Notes
+## 10. v1.1.0 — Contributor Notes
 
 ### 10.1 Branch Policy Reminder
 
@@ -1203,17 +1431,28 @@ make sync
 12. ✅ Update `CHANGELOG.md`.
 13. ✅ Target `develop` in your PR.
 14. ✅ Consider an ADR for non-trivial decisions.
+15. ✅ **(v1.1.0)** If adding a new blocklist profile: update
+    `MEMORY_LIMIT_*`, `memoryLimitForProfile()`, the 5 inline
+    fallbacks (`functions.sh`, `service.sh`, `action.sh`,
+    `status.sh`, `watchdog.sh`), and the profile table in
+    `customize.sh`.
+16. ✅ **(v1.1.0)** If adding a `runtime_info` field: update
+    `buildRuntimeInfo()`, `web/index.html`, and
+    `web/dashboard.html` (with `en` + `ar` translations).
+17. ✅ **(v1.1.0)** Never hardcode `"8080"` — always use
+    `MONITORING_UI_PORT`.
 
 ### 10.3 When Fixing a Bug
 
 1. ✅ Verify the fix with `make build`.
-2. ✅ Add `Audit Correction #XX` in commit footer.
+2. ✅ Add `Audit Correction #XX` in commit footer (if v1.0.0 fix).
 3. ✅ Update `docs/SECURITY.md` (if security-related).
 4. ✅ Update `docs/TROUBLESHOOTING.md` (if a common issue).
 5. ✅ Add HTML anchor `<a name="XXX"></a>` (if you created a new section).
 6. ✅ If the fix is concurrency-related → add `defer rebuildMu.Unlock()` and verify.
 7. ✅ If the fix is port-related → verify `runtime_info` output.
-8. ✅ **Target `develop` in your PR**.
+8. ✅ If the fix is memory-limit-related (v1.1.0) → test all 5 profiles.
+9. ✅ **Target `develop` in your PR**.
 
 ### 10.4 When Editing Shell Scripts
 
@@ -1223,6 +1462,8 @@ make sync
 4. ✅ Use `fuser -n tcp` with `tr ' ' '\n' | grep -E '^[0-9]+$' | head -1`.
 5. ✅ Use `in_section` boolean when parsing TOML.
 6. ✅ Test on both Android + Linux (via devcontainer).
+7. ✅ **(v1.1.0)** For profile-related scripts, use the
+   `get_profile_memory_hint()` helper (or its inline fallback).
 
 ### 10.5 When Editing Concurrency
 
@@ -1230,6 +1471,8 @@ make sync
 2. ✅ Use `defer unlock()` always.
 3. ✅ Avoid deadlock (do not call a function that locks the same mutex).
 4. ✅ Verify with `go run -race main.go`.
+5. ✅ **(v1.1.0)** `currentMemLimit` and `currentProfile` are only
+   accessed while holding `memLimitMu`.
 
 ### 10.6 When Editing Frontend
 
@@ -1238,6 +1481,8 @@ make sync
 3. ✅ Fallback to 9090/9091 before `runtime_info` loads.
 4. ✅ Use `escapeHtml()` for all user input.
 5. ✅ Use `textContent` instead of `innerHTML` where possible.
+6. ✅ **(v1.1.0)** Display `profile_key` + `memory_limit_mb` in the
+   System Info panel (with `"unknown"` fallback for older servers).
 
 ### 10.7 When Publishing a Release
 
@@ -1288,12 +1533,17 @@ make sync
 > **19.** Document non-trivial decisions as ADRs — reversals require a new ADR (see `docs/adr/README.md`).
 >
 > **20.** Use `release-patch.sh` for PATCH-only releases — never `release.sh` directly from `main` (see [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)).
+>
+> **21.** **(v1.1.0)** Never hardcode the memory limit — always use
+> `memoryLimitForProfile(key)` and expose the effective value via
+> `runtime_info.memory_limit_mb`.
 
 ### 10.9 Reference Map
 
 | Topic | File |
 |---------|------|
-| v1.0.0 fixes | `CHANGELOG.md` |
+| v1.0.0 fixes | `CHANGELOG.md` §[v1.0.0] |
+| v1.1.0 features | `CHANGELOG.md` §[v1.1.0] |
 | Branch workflow | `docs/BRANCHING.md` |
 | Release process | `docs/RELEASE_PROCESS.md` |
 | ADR system | `docs/adr/README.md` |
@@ -1314,6 +1564,10 @@ make sync
 | Contribution guide | `docs/CONTRIBUTING.md` |
 | Commit convention | `docs/CONTRIBUTING.md` §5 |
 | PR process | `docs/CONTRIBUTING.md` §6 |
+| **v1.1.0 Memory limit (MEM-1)** | **`docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9** |
+| **v1.1.0 shellQuote (MEM-2)** | **`docs/SECURITY.md` §5.30.2** |
+| **v1.1.0 Monitoring port (MEM-3)** | **`docs/SECURITY.md` §5.30.3** |
+| **v1.0.0 → v1.1.0 upgrade** | **`docs/UPGRADE.md` §3.0** |
 | Release scripts | `scripts/release.sh`, `scripts/release-patch.sh` |
 
 ### 10.10 Script Comparison
@@ -1354,7 +1608,7 @@ make sync
 | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting |
 | [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries (Level 4) |
-| [`docs/UPGRADE.md`](UPGRADE.md) | Upgrade guide |
+| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide |
 | [`docs/FAQ.md`](FAQ.md) | Common questions |
 | [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary |
 | [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
@@ -1376,10 +1630,12 @@ make sync
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [GitHub Flow](https://docs.github.com/en/get-started/quickstart/github-flow)
 - [Michael Nygard — Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [docs/ARCHITECTURE.md](ARCHITECTURE.md) — Full architecture
 - [docs/SECURITY.md](SECURITY.md) — Audit Corrections
 - [docs/BRANCHING.md](BRANCHING.md) — Branching strategy
 - [docs/RELEASE_PROCESS.md](RELEASE_PROCESS.md) — Release process
+- [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide
 - [docs/adr/README.md](adr/README.md) — ADR system
 - [docs/CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guide
 - [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
@@ -1388,8 +1644,8 @@ make sync
 
 <div align="center">
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh
 
 </div>

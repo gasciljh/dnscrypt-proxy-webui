@@ -1,11 +1,23 @@
 # Contributor Covenant Code of Conduct
 
 **Project**: DNSCrypt Smart Filter
-**Version**: v1.0.0
+**Version**: v1.1.0
 **License**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
-**Last updated**: 2026-09-24
+**Last updated**: 2026-09-26
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • `Last updated` reflects the v1.1.0 release date.
+>   • FAQ Q7 extended with the v1.1.0 **Memory Architect** badge.
+>   • FAQ Q11 added — "What's new in v1.1.0 from a community
+>     perspective?".
+>   • `Related Documents` table extended with `CHANGELOG.md`
+>     (already linked in the FAQ, now surfaced at the top level).
+>   • Core Contributor Covenant text (Pledge / Standards / Scope /
+>     Enforcement / Reporting) is **unchanged** — this is a
+>     standard document.
 
 ---
 
@@ -211,8 +223,9 @@ This Code of Conduct is adapted from:
 
 ### Project Information
 
-- Project version: `v1.0.0`
+- Project version: `v1.1.0`
 - First release: `2026-09-24`
+- Latest release: `2026-09-26` (v1.1.0)
 - Maintainer: [@gasciljh](https://github.com/gasciljh)
 - License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
@@ -228,9 +241,11 @@ This Code of Conduct is adapted from:
 | [SECURITY.md](SECURITY.md) | Root security policy summary |
 | [docs/HALL_OF_FAME.md](docs/HALL_OF_FAME.md) | Contributors recognition |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [CHANGELOG.md](CHANGELOG.md) | Version history (including v1.1.0) |
 | [LICENSE](LICENSE) | Project license (MIT) |
 | [README.md](README.md) | Project overview |
+| [docs/BRANCHING.md](docs/BRANCHING.md) | Git branching strategy |
+| [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) | Release process |
 | [GitHub Community Guidelines](https://docs.github.com/en/site-policy/github-terms/github-community-guidelines) | GitHub platform rules |
 
 ---
@@ -277,6 +292,7 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details:
 | Recognition | [HALL_OF_FAME.md](docs/HALL_OF_FAME.md) honors contributors |
 | Bilingual support | Arabic + English templates where applicable |
 | Newcomer protection | [docs/FAQ.md](docs/FAQ.md) with common questions |
+| **Memory research (v1.1.0)** | **Memory Architect badge for contributors who test dynamic memory limits across RAM tiers** |
 
 ### Q8: Does the Code conflict with my local laws?
 
@@ -287,10 +303,35 @@ No. The Code provides additional protection above the legal minimum. If a confli
 The Arabic version of the Contributor Covenant is available at:
 https://www.contributor-covenant.org/ar/version/2/1/code_of_conduct/
 
+**Note (v1.1.0)**: Although the project is released as a global English
+edition, the **project's own WebUI** remains bilingual (English / Arabic)
+for the benefit of Arabic-speaking users. The Code of Conduct itself is
+English-only for legal clarity, in line with the Contributor Covenant's
+recommendation.
+
 ### Q10: How do I report a violation in another project using Contributor Covenant?
 
 - GitHub Support: [Report abuse](https://github.com/contact/report-abuse)
 - Contributor Covenant Team: via their official website
+
+### Q11: What's new in v1.1.0 from a community perspective?
+
+**Short answer**: Nothing that changes the Code of Conduct itself. The
+v1.1.0 release is a technical + documentation release. From a community
+perspective, the following additions are relevant:
+
+| Change | Impact on the community |
+|---|---|
+| **MEM-1 — Dynamic memory limit** | Users on low-RAM devices can now use `ultimate` without GC thrashing. This lowers the barrier for older devices. |
+| **Memory Architect badge** | New recognition path in `docs/HALL_OF_FAME.md` for contributors who test memory behavior across device tiers. |
+| **Expanded `docs/TROUBLESHOOTING.md`** | New diagnostics sections (§4.12, §5.14, §6.10, §15.13) make it easier for users to self-diagnose memory issues. |
+| **`docs/UPGRADE.md` §3.0** | Full v1.0.0 → v1.1.0 upgrade guide. Users can now read exactly what changes. |
+| **All documentation in English** | The project is now a global English edition. This aligns with the Contributor Covenant's canonical language. |
+
+**Nothing was removed.** All v1.0.0 community features (bilingual WebUI,
+HALL_OF_FAME recognition, contribution guide) remain in place.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full v1.1.0 changelog.
 
 ---
 
@@ -318,7 +359,7 @@ The project's own code and documentation are licensed under the [MIT License](LI
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Maintainer: [@gasciljh](https://github.com/gasciljh)*
 *Author: gasciljh*

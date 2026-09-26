@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – package_module.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -18,6 +18,34 @@
 #     • module.prop
 #
 #   Total: 32 required files, verified after packaging.
+#
+# Web file list (13 files) vs SW precache (11 files):
+#   The ZIP ships 13 web files:
+#     • index.html, dashboard.html          ← HTML (2)
+#     • manifest.json, sw.js                ← PWA core (2)
+#     • icon-192.svg, icon-512.svg          ← SVG sources (2)
+#     • icon-192.png, icon-512.png          ← PNG icons (2)
+#     • apple-touch-icon.png                ← iOS icon (1)
+#     • favicon-32x32.png, favicon-16x16.png,
+#       favicon.ico                         ← Favicons (3)
+#     • offline.html                        ← Offline fallback (1)
+#
+#   The Service Worker precaches 11 of these (sw.js itself is
+#   never cached, and index.html / dashboard.html are served
+#   network-first as navigations, not precached by URL).
+#   See web/sw.js §[2] for the exact PRECACHE_ASSETS list.
+#
+# Icon source mapping (verified against generate-icons.sh):
+#   • icon-192.png         ← from icon-192.svg
+#   • icon-512.png         ← from icon-512.svg
+#   • apple-touch-icon.png ← from icon-512.svg
+#   • favicon-32x32.png    ← from icon-512.svg
+#   • favicon-16x16.png    ← from icon-512.svg
+#   • favicon.ico          ← from favicon-16.png + favicon-32.png
+#
+#   If you regenerate the SVGs, run:
+#     ./scripts/generate-icons.sh --force
+#   before packaging.
 #
 # Features:
 #   • Auto-detects BUILD_DIR (proxy/build or ./build)
@@ -48,9 +76,29 @@
 #   • dnscrypt-webui-<version>-module.zip.sha256
 #
 # Examples:
-#   ./scripts/package_module.sh --version v1.0.0
-#   ./scripts/package_module.sh --version v1.0.0 --skip-dns-fetch
-#   ./scripts/package_module.sh --version v1.0.0 --verbose
+#   ./scripts/package_module.sh --version v1.1.0
+#   ./scripts/package_module.sh --version v1.1.0 --skip-dns-fetch
+#   ./scripts/package_module.sh --version v1.1.0 --verbose
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes in this script since v1.0.0).
+#   • Added an explicit note distinguishing the 13 web files in
+#     the ZIP from the 11 files precached by sw.js. Both numbers
+#     are correct; they count different things.
+#   • Added an icon source mapping table, matching the
+#     corrections made to icon-512.svg and generate-icons.sh.
+#   • Documented that the packaged module includes the v1.1.0
+#     memory limit behavior implemented in main.go, but that
+#     behavior is a runtime concern — this script does not need
+#     to know about it.
+#
+# Reproducibility:
+#   • SOURCE_DATE_EPOCH is applied via `touch -d` to every file
+#     in the staging directory before ZIP creation.
+#   • `zip -X` excludes extra file attributes.
+#   • `find | LC_ALL=C sort` guarantees deterministic file order.
+#   • Result: same source + same EPOCH → same ZIP SHA-256.
 # ============================================================
 
 set -euo pipefail
@@ -139,8 +187,8 @@ Options:
   --help, -h             Show this help
 
 Examples:
-  ./scripts/package_module.sh --version v1.0.0
-  ./scripts/package_module.sh --version v1.0.0 --skip-dns-fetch
+  ./scripts/package_module.sh --version v1.1.0
+  ./scripts/package_module.sh --version v1.1.0 --skip-dns-fetch
 HELP_EOF
             exit 0
             ;;
@@ -260,6 +308,9 @@ log_ok "Required tools available"
 # ------------------------------------------------------------
 # [13] Check web files (13 files)
 # ------------------------------------------------------------
+# See the header for the exact breakdown. Every file here must
+# exist before packaging, otherwise the ZIP would be incomplete.
+# ============================================================
 WEB_FILES_REQUIRED=(
     "index.html"
     "dashboard.html"
@@ -587,6 +638,13 @@ log_ok "checksum: ${SHA256_HASH:0:16}..."
 # ------------------------------------------------------------
 # [21] Final summary
 # ------------------------------------------------------------
+# Icon breakdown (matches the mapping documented in the header):
+#   • 3 PNGs from icon-512.svg (512, 180, 32)
+#   • 1 PNG from icon-192.svg (192)
+#   • 1 PNG for favicon-16
+#   • 1 ICO (multi-size, from favicon-16 + favicon-32)
+#   • 2 SVG sources (icon-192, icon-512)
+# ============================================================
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  ${GREEN}✅ Package created successfully${NC}                          ${BOLD}║${NC}"
@@ -601,13 +659,21 @@ echo -e "  ${BOLD}SHA-256:${NC}        ${SHA256_HASH}"
 echo -e "  ${BOLD}Checksum:${NC}       ${CHECKSUM_FILE}"
 echo ""
 echo -e "  ${BOLD}web/ contents:${NC}"
-echo -e "    ${DIM}• HTML:${NC}     2 files"
-echo -e "    ${DIM}• Manifest:${NC} 1 file"
-echo -e "    ${DIM}• SW:${NC}       1 file"
-echo -e "    ${DIM}• SVG:${NC}      ${SVG_COUNT} file(s)"
-echo -e "    ${DIM}• PNG:${NC}      ${PNG_COUNT} file(s)"
-echo -e "    ${DIM}• ICO:${NC}      ${ICO_COUNT} file(s)"
-echo -e "    ${DIM}• Offline:${NC}  1 file"
+echo -e "    ${DIM}• HTML:${NC}       2 files (index, dashboard)"
+echo -e "    ${DIM}• Manifest:${NC}   1 file"
+echo -e "    ${DIM}• SW:${NC}         1 file"
+echo -e "    ${DIM}• SVG:${NC}        ${SVG_COUNT} file(s) — icon-192, icon-512"
+echo -e "    ${DIM}• PNG:${NC}        ${PNG_COUNT} file(s)"
+echo -e "    ${DIM}• ICO:${NC}        ${ICO_COUNT} file(s)"
+echo -e "    ${DIM}• Offline:${NC}    1 file"
+echo ""
+echo -e "  ${BOLD}Icon sources (see header for the full mapping):${NC}"
+echo -e "    ${DIM}• icon-192.png         ← icon-192.svg${NC}"
+echo -e "    ${DIM}• icon-512.png         ← icon-512.svg${NC}"
+echo -e "    ${DIM}• apple-touch-icon.png ← icon-512.svg${NC}"
+echo -e "    ${DIM}• favicon-32x32.png    ← icon-512.svg${NC}"
+echo -e "    ${DIM}• favicon-16x16.png    ← icon-512.svg${NC}"
+echo -e "    ${DIM}• favicon.ico          ← favicon-16 + favicon-32${NC}"
 echo ""
 
 if [ "$VERBOSE" = "1" ]; then

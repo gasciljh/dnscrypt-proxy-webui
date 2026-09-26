@@ -12,19 +12,42 @@
 
 ---
 
+> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+>
+> This ADR was reviewed during the v1.1.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The two-branch model (`main` + `develop`) has been in continuous
+>     operation since 2026-09-24.
+>   • Two releases have been published through this model:
+>     `v1.0.0` (2026-09-24) and `v1.1.0` (2026-09-26).
+>   • Both releases passed through the documented flow:
+>     `release/*` → PR against `main` → tag → `release.yml` →
+>     auto-sync `main → develop`.
+>   • No branch-protection bypasses were needed.
+>   • No contributor PRs were rejected due to branch-policy
+>     confusion during this period.
+>
+> **Result**: The decision is validated by real-world usage. No
+> superseding ADR is required.
+
+---
+
 ## Context
 
 ### The problem
 
-At the project's inception, all commits were pushed directly to `main`.
-While simple, this created three recurring problems:
+At the project's inception, all commits were pushed directly to
+`main`. While simple, this created three recurring problems:
 
-1. **Unstable `main`**: any incomplete feature or experimental change
-   could reach users immediately.
+1. **Unstable `main`**: any incomplete feature or experimental
+   change could reach users immediately.
 2. **Slow iteration**: contributors hesitated to push work-in-progress
    because it would pollute the released branch.
-3. **No integration point**: features could not be tested together before
-   a release — each was either ready or blocked entirely.
+3. **No integration point**: features could not be tested together
+   before a release — each was either ready or blocked entirely.
 
 ### The forces at play
 
@@ -40,15 +63,16 @@ While simple, this created three recurring problems:
 
 - The project is **maintained by a single author** today.
 - It is **open to contributions** and should scale to a small team.
-- It uses **GitHub Actions** for CI, which is free for public repos but
-  should not be wasted on redundant runs.
+- It uses **GitHub Actions** for CI, which is free for public repos
+  but should not be wasted on redundant runs.
 - The **release automation** (`release.yml`) must remain simple.
 
 ### Scope
 
 This ADR covers **branch structure only**. It does **not** cover:
 
-- Branch protection rules → see [`docs/BRANCHING.md`](../BRANCHING.md) §6.
+- Branch protection rules → see
+  [`docs/BRANCHING.md`](../BRANCHING.md) §6.
 - Release automation → see [ADR-0002](0002-automated-releases.md).
 - Post-release syncing → see [ADR-0003](0003-post-release-sync.md).
 - PR templates → see [ADR-0004](0004-unified-pr-template.md) and
@@ -58,36 +82,41 @@ This ADR covers **branch structure only**. It does **not** cover:
 
 ## Decision
 
-> **We will adopt a two-branch model: `main` (stable releases only) and
-> `develop` (integration branch).**
+> **We will adopt a two-branch model: `main` (stable releases only)
+> and `develop` (integration branch).**
 
 ### Specifics
 
-1. **`main`** is **permanent** and represents the latest released version.
+1. **`main`** is **permanent** and represents the latest released
+   version.
    - Direct pushes are forbidden (enforced by branch protection).
    - Only `release/*` and `hotfix/*` branches may merge into `main`.
    - Every commit on `main` is tagged (`vX.Y.Z`) and released.
 
-2. **`develop`** is **permanent** and represents the integration state.
-   - Short-lived branches (`feature/*`, `fix/*`, `docs/*`, `chore/*`,
-     `refactor/*`, `test/*`) branch **from** `develop` and merge **back into**
-     `develop` via pull requests.
-   - Direct pushes are allowed for the maintainer (relaxed protection).
-   - It should always build successfully — a broken `develop` blocks
-     all work.
+2. **`develop`** is **permanent** and represents the integration
+   state.
+   - Short-lived branches (`feature/*`, `fix/*`, `docs/*`,
+     `chore/*`, `refactor/*`, `test/*`) branch **from** `develop`
+     and merge **back into** `develop` via pull requests.
+   - Direct pushes are allowed for the maintainer (relaxed
+     protection).
+   - It should always build successfully — a broken `develop`
+     blocks all work.
 
-3. **Short-lived branches** are created for every unit of work and deleted
-   after merge.
+3. **Short-lived branches** are created for every unit of work and
+   deleted after merge.
    - One branch = one purpose.
    - Max lifetime: ~2 weeks (rebase if longer).
 
 4. **`main` accepts PRs only from**:
    - `release/*` — regular releases.
    - `hotfix/*` — emergency PATCH releases.
-   - Never directly from `develop`, `feature/*`, or any other branch.
+   - Never directly from `develop`, `feature/*`, or any other
+     branch.
 
-5. **After each release**, `main` is automatically synced back into `develop`
-   to prevent drift (see [ADR-0003](0003-post-release-sync.md)).
+5. **After each release**, `main` is automatically synced back into
+   `develop` to prevent drift (see
+   [ADR-0003](0003-post-release-sync.md)).
 
 ### Diagram
 
@@ -97,10 +126,8 @@ main ─────●──────────────────●
        [release/*]        [release/*]     [hotfix/*]
           │                  │               │
 develop ──●──●──●──●──●──●───●──●──●──●──●───●──── (integration)
-            ↑  ↑  ↑       ↑
-        [feat]│  │    [fix]
-            [docs]│
-              [chore]
+           ↑         ↑         ↑         ↑
+        [feat]    [docs]    [chore]    [fix]
 ```
 
 ---
@@ -109,43 +136,48 @@ develop ──●──●──●──●──●──●───●──
 
 ### Positive
 
-- ✅ **`main` is always deployable.** Every commit is a tagged release.
-- ✅ **Features develop in isolation.** A broken feature cannot affect
-  `develop`'s other work.
-- ✅ **Integration testing is possible.** Features meet on `develop`
-  before reaching users.
-- ✅ **Clear onboarding.** New contributors have one obvious starting
-  point (`develop`).
-- ✅ **Scales to a small team.** The model is standard enough that any
-  developer familiar with GitHub Flow can contribute immediately.
-- ✅ **CI is efficient.** Only PRs and merges to `main` / `develop` trigger
-  the full build matrix; feature pushes to their own branch run a
-  lighter check.
+- ✅ **`main` is always deployable.** Every commit is a tagged
+  release.
+- ✅ **Features develop in isolation.** A broken feature cannot
+  affect `develop`'s other work.
+- ✅ **Integration testing is possible.** Features meet on
+  `develop` before reaching users.
+- ✅ **Clear onboarding.** New contributors have one obvious
+  starting point (`develop`).
+- ✅ **Scales to a small team.** The model is standard enough that
+  any developer familiar with GitHub Flow can contribute
+  immediately.
+- ✅ **CI is efficient.** Only PRs and merges to `main` / `develop`
+  trigger the full build matrix; feature pushes to their own
+  branch run a lighter check.
 
 ### Negative
 
-- ❌ **Two branches to maintain.** The project must keep `develop` in sync
-  with `main` after every release — otherwise, the next release PR will
-  contain stale commits. This is mitigated by
+- ❌ **Two branches to maintain.** The project must keep `develop`
+  in sync with `main` after every release — otherwise, the next
+  release PR will contain stale commits. This is mitigated by
   [ADR-0003](0003-post-release-sync.md).
-- ❌ **Slightly more process.** Contributors must learn the branch rules.
-  This is mitigated by `docs/BRANCHING.md` and the PR template
-  ([ADR-0005](0005-release-specific-pr-template.md)).
-- ❌ **Merge overhead.** Fast-forward merges from `develop` to `main` are
-  rare; most releases require a merge commit or a squash. This is
-  acceptable because releases are infrequent (monthly at most).
-- ❌ **Branch protection setup is manual.** GitHub does not version
-  branch rules in the repository — they must be configured via
-  Settings. Documented in `docs/BRANCHING.md` §6.
+- ❌ **Slightly more process.** Contributors must learn the branch
+  rules. This is mitigated by `docs/BRANCHING.md` and the PR
+  template ([ADR-0005](0005-release-specific-pr-template.md)).
+- ❌ **Merge overhead.** Fast-forward merges from `develop` to
+  `main` are rare; most releases require a merge commit or a
+  squash. This is acceptable because releases are infrequent
+  (monthly at most).
+- ❌ **Branch protection setup is manual.** GitHub does not
+  version branch rules in the repository — they must be
+  configured via Settings. Documented in `docs/BRANCHING.md` §6.
 
 ### Neutral
 
-- ⚪ **One additional branch in the remote.** Storage cost is negligible.
+- ⚪ **One additional branch in the remote.** Storage cost is
+  negligible.
 - ⚪ **`git clone` fetches `main` by default** — contributors must
-  explicitly `git checkout develop`. Documented in `docs/DEVELOPMENT.md`
-  §2.1.
-- ⚪ **Commit history** stays linear on each branch, but the graph becomes
-  a two-lane highway. This is the standard shape of GitHub Flow.
+  explicitly `git checkout develop`. Documented in
+  `docs/DEVELOPMENT.md` §2.1.
+- ⚪ **Commit history** stays linear on each branch, but the graph
+  becomes a two-lane highway. This is the standard shape of
+  GitHub Flow.
 
 ---
 
@@ -177,12 +209,20 @@ develop ──●──●──●──●──●──●───●──
 
 ### Project files
 
-- [`docs/BRANCHING.md`](../BRANCHING.md) — the full operational specification of this decision.
-- [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md) — contributor guide referencing this model.
-- [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) — daily workflow for developers.
-- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) — runs on PRs targeting `main` and `develop`.
-- [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) — same triggers for SAST.
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — publishes releases from tags on `main`.
+- [`docs/BRANCHING.md`](../BRANCHING.md) — the full operational
+  specification of this decision.
+- [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md) — contributor guide
+  referencing this model.
+- [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) — daily workflow for
+  developers.
+- [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
+  (v1.0.0 → v1.1.0 uses this branching model).
+- [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
+  runs on PRs targeting `main` and `develop`.
+- [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) —
+  same triggers for SAST.
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
+  publishes releases from tags on `main`.
 
 ### External references
 
@@ -197,7 +237,13 @@ develop ──●──●──●──●──●──●───●──
 - Original proposal: see commit history for `docs/BRANCHING.md` and
   `docs/adr/README.md`.
 
+### Release verification
+
+- v1.0.0 (2026-09-24) — first release using this model.
+- v1.1.0 (2026-09-26) — second release; model validated.
+- See `CHANGELOG.md` for the full release history.
+
 ---
 
-*This ADR is immutable. To reverse or amend it, create a new ADR that
-supersedes it and update its Status line.*
+*This ADR is immutable. To reverse or amend it, create a new ADR
+that supersedes it and update its Status line.*

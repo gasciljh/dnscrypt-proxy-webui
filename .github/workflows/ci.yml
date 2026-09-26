@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -8,12 +8,12 @@
 #   Continuous Integration — builds the WebUI binaries for all
 #   4 supported architectures on every push/PR to main or develop.
 #
-# Steps:
+# Steps (per architecture):
 #   • Checkout source
 #   • Setup Go 1.22
 #   • Setup Android NDK r26b
-#   • Cross-compile for 4 architectures (arm64, arm, amd64, 386)
-#   • Upload each binary as an artifact
+#   • Cross-compile for the target architecture
+#   • Upload the produced binary as an artifact
 #
 # Branch strategy:
 #   • main    → stable releases (protected)
@@ -22,6 +22,67 @@
 # Paths ignored:
 #   • Markdown files (**/*.md)
 #   • docs/** directory
+#
+#   Rationale: documentation-only changes should not consume CI
+#   minutes or block PRs. CodeQL runs on ALL changes (including
+#   docs) — see codeql.yml — so documentation PRs still get a
+#   security review.
+#
+# ⚠️ Action versions:
+#   The `uses:` lines below reference actions/checkout@v7,
+#   actions/setup-go@v7, and actions/upload-artifact@v7, matching
+#   the repository's 2026 timeline.
+#
+#   If any of these action versions do not exist in your GitHub
+#   environment, the workflow will fail at the "Set up job" phase
+#   with a "reference not found" error. In that case, check the
+#   current versions at:
+#     • https://github.com/actions/checkout/releases
+#     • https://github.com/actions/setup-go/releases
+#     • https://github.com/actions/upload-artifact/releases
+#   and update the `uses:` lines accordingly.
+#
+#   Dependabot (.github/dependabot.yml) tracks the github-actions
+#   ecosystem on a weekly schedule and will open PRs automatically
+#   for future updates.
+#
+# Trigger matrix:
+#   ┌───────────────┬─────────┬───────────────────┐
+#   │ Event            │ Branch   │ Notes                │
+#   ├───────────────┼─────────┼───────────────────┤
+#   │ push             │ main     │ full build           │
+#   │ push             │ develop  │ full build           │
+#   │ pull_request     │ main     │ full build           │
+#   │ pull_request     │ develop  │ full build           │
+#   │ workflow_dispatch│ any      │ manual (see below)   │
+#   └───────────────┴─────────┴───────────────────┘
+#
+#   workflow_dispatch allows running the workflow manually from
+#   the Actions tab — useful for:
+#     • Verifying the workflow after a config change
+#     • Rebuilding after a transient CI failure
+#     • Testing a branch that is not main/develop
+#
+# Job matrix:
+#   Four architectures are built in parallel:
+#     • arm64  → arm64-v8a    (most modern Android devices)
+#     • arm    → armeabi-v7a  (older 32-bit ARM devices)
+#     • amd64  → x86_64       (emulators, x86 tablets)
+#     • 386    → x86          (legacy 32-bit x86)
+#
+#   fail-fast is disabled: if one architecture fails, the others
+#   still complete. This makes it easier to see the full picture
+#   when a single architecture has a build issue.
+#
+# Concurrency:
+#   Only one CI run per branch is allowed at a time. When a new
+#   push arrives while a run is in progress, the older run is
+#   cancelled. This is intentional: superseded commits do not
+#   need CI results.
+#
+#   Note: the group key is `ci-${{ github.ref }}` — a push to
+#   main does NOT cancel a PR build for a feature branch, since
+#   they have different refs.
 # ============================================================
 
 name: CI

@@ -1,42 +1,121 @@
 # ============================================================
 # DNSCrypt Smart Filter – Release Workflow
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Purpose:
-#   Publishes a signed GitHub Release when a version tag is pushed.
-#   Can also be triggered manually via workflow_dispatch.
+#   Publishes a signed GitHub Release when a version tag is
+#   pushed. Can also be triggered manually via workflow_dispatch.
 #
-# Triggers:
-#   • Push of a tag matching v<MAJOR>.<MINOR>.<PATCH>
-#   • Push of a tag matching v<MAJOR>.<MINOR>.<PATCH>-<prerelease>
-#   • Manual dispatch
+# Release trigger:
+#   Two paths lead to a release:
 #
-# Steps:
-#   • Checkout source (with full history for tag resolution)
-#   • Setup Go 1.22
-#   • Setup Android NDK r26b
-#   • Determine version (from tag or VERSION file)
-#   • Install packaging tools
-#   • Build WebUI binaries for 4 architectures
-#   • Verify the produced binaries (ELF + PIE)
-#   • Package the Magisk module ZIP
-#   • Upload artifacts as a workflow backup
-#   • Create the GitHub Release
-#   • Sync main → develop (post-release synchronization)
+#   1. Tag push (automated, preferred)
+#        Tag pattern: v<MAJOR>.<MINOR>.<PATCH>
+#                     v<MAJOR>.<MINOR>.<PATCH>-<prerelease>
+#        Created by:  scripts/release.sh
+#                     scripts/release-patch.sh
 #
-# Branch strategy:
-#   • main    → stable releases (protected)
-#   • develop → integration branch (features merged here first)
+#   2. workflow_dispatch (manual, emergency)
+#        Triggered from: Actions → Release → Run workflow
+#        Version source: VERSION file (not a tag)
+#        Use when: fixing a broken release without a new commit
 #
-# Artifacts published on the release:
-#   • dist/dnscrypt-webui-<version>-module.zip
-#   • dist/dnscrypt-webui-<version>-module.zip.sha256
-#   • proxy/build/dnscrypt-webui-arm64
-#   • proxy/build/dnscrypt-webui-arm
-#   • proxy/build/dnscrypt-webui-amd64
-#   • proxy/build/dnscrypt-webui-386
+# Pipeline steps (11 + 1):
+#   ┌───┬───────────────────────────┬────────────┐
+#   │ #  │ Step                           │ Duration    │
+#   ├───┼───────────────────────────┼────────────┤
+#   │  1 │ Checkout (fetch-depth: 0)      │ ~5 s        │
+#   │  2 │ Setup Go 1.22                  │ ~10 s       │
+#   │  3 │ Setup Android NDK r26b         │ ~30 s       │
+#   │  4 │ Determine version              │ ~2 s        │
+#   │  5 │ Install packaging tools        │ ~15 s       │
+#   │  6 │ Build WebUI binaries (4 arch)  │ ~60 s       │
+#   │  7 │ Verify binaries (ELF + PIE)    │ ~5 s        │
+#   │  8 │ Package Magisk module          │ ~30 s       │
+#   │  9 │ Upload artifacts (backup)      │ ~20 s       │
+#   │ 10 │ Create GitHub Release          │ ~10 s       │
+#   │ 11 │ Sync main → develop           │ ~15 s       │
+#   └───┴───────────────────────────┴────────────┘
+#
+#   Total: ~3–5 minutes (excluding runner setup).
+#
+# Artifacts produced:
+#   Attached to the GitHub Release (6 files):
+#     • dnscrypt-webui-<ver>-module.zip         (~12 MB)
+#     • dnscrypt-webui-<ver>-module.zip.sha256  (~100 B)
+#     • dnscrypt-webui-arm64                    (~8 MB)
+#     • dnscrypt-webui-arm                      (~7 MB)
+#     • dnscrypt-webui-amd64                    (~7.5 MB)
+#     • dnscrypt-webui-386                      (~7 MB)
+#
+#   Also uploaded as a workflow artifact (backup, 30-day retention):
+#     • dist/            (the ZIP + .sha256)
+#     • proxy/build/     (the 4 binaries)
+#
+# Sync main → develop (step 11):
+#   After the release is published, this workflow syncs main into
+#   develop so the two branches do not drift apart.
+#
+#   Why this matters:
+#     • Releases land on main first (via release/* or hotfix/*).
+#     • Without a sync, develop lags behind main after every
+#       release, and the next release/* PR would reintroduce
+#       stale commits.
+#
+#   Behavior:
+#     • Tries fast-forward merge first (preserves linear history).
+#     • Falls back to a regular merge with a chore commit if
+#       fast-forward is not possible.
+#     • On conflict: aborts, logs a warning, exits 0.
+#       Manual resolution required.
+#
+#   Safety:
+#     • `continue-on-error: true` — a failed sync NEVER fails
+#       the release. The release is already published at this
+#       point; the sync is a follow-up convenience.
+#     • `if: github.event_name == 'push'` — only runs on tag
+#       pushes, not on workflow_dispatch.
+#     • Uses GITHUB_TOKEN with `contents: write` (already
+#       granted at the top of the workflow).
+#
+#   See docs/adr/0003-post-release-sync.md for the full rationale.
+#
+# ⚠️ Action versions:
+#   This workflow references:
+#     • actions/checkout@v7
+#     • actions/setup-go@v7
+#     • actions/upload-artifact@v7
+#     • nttld/setup-ndk@v1
+#     • softprops/action-gh-release@v3
+#
+#   If any `uses:` line fails with "reference not found", see the
+#   note in ci.yml — the resolution is the same (check the
+#   action's releases page and update the version).
+#
+#   Dependabot tracks the github-actions ecosystem weekly and
+#   will open PRs for updates automatically.
+#
+# ⚠️ Permissions:
+#   `contents: write` is required for:
+#     • Creating the GitHub Release
+#     • Pushing to develop in the sync step
+#
+#   Do not downgrade to `contents: read` — the release creation
+#   step would fail with a 403.
+#
+# v1.1.0 changes:
+#   • Version bumped to v1.1.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added a "Pipeline steps" table with duration estimates.
+#   • Added a "Sync main → develop" section explaining the
+#     rationale and safety mechanisms, with a reference to
+#     ADR-0003.
+#   • Added a "Permissions" note explaining why contents: write
+#     is required.
+#   • Added an "Action versions" warning, consistent with
+#     ci.yml and codeql.yml.
 # ============================================================
 
 name: Release
@@ -173,6 +252,8 @@ jobs:
       #   • Does NOT fail the release on conflict.
       #   • Only runs when a tag was pushed (not workflow_dispatch).
       #   • Uses GITHUB_TOKEN with contents: write permission.
+      #
+      # See docs/adr/0003-post-release-sync.md for full details.
       # ============================================================
       - name: Sync main → develop
         if: github.event_name == 'push'

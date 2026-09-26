@@ -1,11 +1,24 @@
 # FAQ — Frequently Asked Questions
 
-> Quick answers to 90+ common questions.
+> Quick answers to 120+ common questions.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • Added a new section: "v1.1.0 Specific Questions" (Q111–Q120),
+>     covering the dynamic per-profile memory limit and the two
+>     new `runtime_info` fields.
+>   • Updated Q8 (What's new) to also describe v1.1.0.
+>   • Updated Q37 (Dashboard links), Q43 (performance), Q59 (auth
+>     cache), Q60 (`runtime_info`), Q78 (version verification), and
+>     Q88 (`runtime_info` example) for v1.1.0.
+>   • The v1.0.0-specific section (Q78–Q89) is preserved as-is, with
+>     the version numbers updated to reference the current release.
+>   • No questions were removed.
 
 ---
 
@@ -21,6 +34,7 @@
 - [Updates & Maintenance](#updates--maintenance)
 - [Problems & Solutions](#problems--solutions)
 - [v1.0.0 Specific Questions](#v100-specific-questions)
+- [v1.1.0 Specific Questions](#v110-specific-questions)
 - [For Developers](#for-developers)
 - [Contributing](#contributing)
 
@@ -44,6 +58,7 @@ A Magisk/KernelSU module that turns an Android device into a **system-wide encry
 | Auto-updated lists | ⚠️ | ✅ (5 sources) |
 | PWA | ❌ | ✅ |
 | Zero telemetry | ⚠️ | ✅ |
+| Dynamic memory limit | ❌ | ✅ (v1.1.0) |
 
 ### 3. How is it different from NextDNS / AdGuard DNS?
 
@@ -70,18 +85,37 @@ The project does not connect to any analytics server, does not collect statistic
 - DNSCrypt/DoH (for DNS encryption).
 - Blocklist sources (e.g. HaGeZi via jsDelivr, for downloading lists).
 
-### 8. What's new in v1.0.0?
+### 8. What's new in v1.1.0?
 
-**First stable release** — the project graduates from beta. All fixes accumulated during development (33 Audit Corrections) are consolidated into a single stable `v1.0.0`.
+**Polish release — documentation + three runtime improvements.**
 
-**No API-breaking changes** from the last pre-release. This is primarily a version renaming + documentation consolidation + comment/string internationalization release.
+**No breaking changes.** All v1.0.0 clients and configurations
+continue to work without modification.
 
-**Highlights**:
+**Runtime changes** (see Q111–Q120 for details):
 
-- **Security**: Login POST-only, `/readyz` localhost-only, `shellQuote()` injection protection, `readConfPort` range check, Basic Auth rate limiting, `rebuildMu` mutex, Auth cache (60 s), Custom iptables chains, STATUS_FILE = User Intent, exact endpoint matching, 33 Audit Corrections applied.
-- **Features**: Multi-level blocklists, custom rules editor with draft auto-save, content-hash conflict detection, SSE live updates, installable PWA with offline support, separate monitoring Dashboard with JSON metrics, bilingual WebUI (EN/AR) with full RTL, dynamic port links (PORT-2), Preserve settings on upgrade.
-- **Infrastructure**: Reproducible builds, signed releases (Cosign keyless), SBOM (SPDX + CycloneDX), GitHub Actions (CI, Release, CodeQL), 18 pre-commit hooks.
-- **Documentation**: 22 documentation files, bilingual README, full threat model, 90+ FAQ entries, comprehensive troubleshooting.
+- **Dynamic memory limit per profile (MEM-1)** —
+  `debug.SetMemoryLimit` is now computed from the active
+  profile instead of being hardcoded to 80 MB. Prevents GC
+  thrashing on the `ultimate` profile.
+- **Extended `shellQuote` (MEM-2)** — the escape list grew from
+  20 to 24 characters (`{`, `}`, `\n`, `\t` added).
+- **`MONITORING_UI_PORT` constant (MEM-3)** — the metrics
+  handler no longer contains the hardcoded string `"8080"`.
+
+**Two new fields in `runtime_info`**:
+
+- `profile_key` — the active blocklist profile.
+- `memory_limit_mb` — the Go runtime soft memory limit for
+  that profile.
+
+**Documentation updates**:
+
+- New section in this FAQ (Q111–Q120).
+- Updated `docs/SECURITY.md` with §5.30, §14.22–14.24.
+- Updated `docs/ARCHITECTURE.md` with §3.9, §4.9, §11.22.
+- Updated `docs/TROUBLESHOOTING.md` with §4.12, §5.14, §6.10,
+  §15.13.
 
 See [CHANGELOG.md](../CHANGELOG.md) for details.
 
@@ -125,7 +159,7 @@ Yes — it supports:
 
 See [`INSTALL.md`](INSTALL.md). In short:
 
-1. Download `dnscrypt-webui-1.0.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
+1. Download `dnscrypt-webui-1.1.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
 2. Install via Magisk Manager → Modules.
 3. Reboot.
 4. Open `http://127.0.0.1:9090` from a browser.
@@ -179,7 +213,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
 ⚠️ **Warning**: Do not use port 8080 (reserved for monitoring_ui). The system will refuse to start.
 
-⚠️ **v1.0.0 — Fix NEW-3**: Invalid values (`0`, `99999`, `-1`, `abc`) → automatic fallback to default.
+⚠️ **Fix NEW-3**: Invalid values (`0`, `99999`, `-1`, `abc`) → automatic fallback to default.
 
 ### 20. How do I temporarily stop protection?
 
@@ -303,12 +337,12 @@ A separate monitoring panel on `http://127.0.0.1:9091` that displays:
 
 **Before v1.0.0**: This was a known issue (Dashboard broken) due to Prometheus text → JSON conversion.
 
-**Now**: In v1.0.0, it works correctly. Verify:
+**Now**: In v1.1.0 (and v1.0.0), it works correctly. Verify:
 
 ```bash
 # 1. Version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.0.0
+# Expected: version=v1.1.0
 
 # 2. Binary updated
 su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui 2>/dev/null | grep -q 'buildDashboardJSON' && echo 'OK'"
@@ -318,7 +352,7 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" | head -5
 # Expected: JSON (not Prometheus text)
 ```
 
-If it still fails → see `TROUBLESHOOTING.md`.
+If it still fails → see `TROUBLESHOOTING.md` §4.8.
 
 ### 33. How do I view raw metrics (Prometheus text)?
 
@@ -393,6 +427,9 @@ Full schema in [`API.md`](API.md).
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
 ```
 
+**v1.1.0 addition**: The System Info panel in both WebUI and
+Dashboard also shows the active profile and memory limit. See Q117.
+
 ---
 
 ## Performance & Battery
@@ -410,6 +447,11 @@ In normal use:
 - Idle WebUI: ~15 MB
 - DNS Engine: ~5 MB
 - **Total**: ~20-25 MB only.
+
+**v1.1.0**: The WebUI now has a **dynamic soft memory limit**
+per profile. This is not the actual RSS usage; it is the ceiling
+at which the Go runtime starts GC more aggressively. See Q43 and
+Q111.
 
 ### 40. Does it slow down the internet?
 
@@ -442,7 +484,42 @@ Yes:
 
 **Impact**: Less CPU, faster response, less disk I/O.
 
-### 43. Does `rebuildMu` slow down rebuildBlocklist?
+### 43. What performance improvements came in v1.1.0?
+
+**v1.1.0 introduces MEM-1 — dynamic memory limit per profile.**
+
+**Before v1.1.0**: The Go runtime soft limit was hardcoded to
+80 MB. On the `ultimate` profile, actual working set approaches
+200 MB. This caused **GC thrashing** — the runtime spent CPU on
+garbage collection instead of serving requests. Symptom:
+WebUI becomes slow/unresponsive during heavy DNS activity.
+
+**After v1.1.0**: The limit is computed per profile:
+
+| Profile | Soft limit |
+|---|---:|
+| light | 80 MB |
+| normal | 100 MB |
+| pro | 120 MB |
+| proplus | 160 MB |
+| ultimate | 220 MB |
+
+**Impact**:
+- No more GC thrashing on `ultimate`.
+- CPU stays low even under load.
+- Memory remains bounded on lighter profiles.
+
+**How to verify the limit is active**:
+
+```bash
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
+# Expected: 120 for pro, 220 for ultimate, etc.
+```
+
+See Q111–Q120 for more details, and `TROUBLESHOOTING.md` §6.10
+for GC thrashing diagnostics.
+
+**Does `rebuildMu` slow down rebuildBlocklist?**
 
 No. `rebuildBlocklist` takes ~200 ms (100K) or ~1 s (500K). The coarse-grained lock adds no noticeable overhead.
 
@@ -523,11 +600,14 @@ Port `8080` is reserved for `monitoring_ui` (dnscrypt-proxy's internal interface
 - `main.go` refuses to start if `PORT=8080` or `DASHBOARD_PORT=8080`.
 - `customize.sh` automatically replaces any `8080` value in `webui.conf` with `9090` / `9091`.
 
+**v1.1.0**: The reserved port is now also enforced as a Go
+constant (`MONITORING_UI_PORT`) in `metricsProxyHandler`. See Q120.
+
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #20.
 
 ### 52. Do Custom Chains pollute the firewall?
 
-No. v1.0.0 uses Custom Chains (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`) instead of writing directly to OUTPUT:
+No. Since v1.0.0, the module uses Custom Chains (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`) instead of writing directly to OUTPUT:
 - Public `OUTPUT` contains only two static rules (jump rules).
 - All dynamic rules are inside the dedicated chains.
 - Cleanup = `-F` + `-X` (complete wipe in one shot).
@@ -563,7 +643,7 @@ Yes, **for API consumers**.
 
 ### 55. What is `hasEndpoint`?
 
-A new function in `main.go` that applies **exact path matching**:
+A function in `main.go` that applies **exact path matching**:
 
 ```go
 func hasEndpoint(path, name string) bool {
@@ -589,13 +669,7 @@ if hasEndpoint(r.URL.Path, "update_profile") {
 
 ### 56. What is `shellQuote`?
 
-A new function in `main.go` (Fix NEW-5) that wraps a path with safe quotes for use in `runShell`:
-
-```go
-func shellQuote(s string) string {
-    // Returns s with safe quoting
-}
-```
+A function in `main.go` (Fix NEW-5) that wraps a path with safe quotes for use in `runShell`.
 
 **Before**:
 ```go
@@ -611,7 +685,10 @@ cmd := fmt.Sprintf(". %s/functions.sh; ...", shellQuote(MODDIR))  // ✅ safe
 - ✅ Prevents shell injection.
 - ✅ Supports spaces in `MODDIR`.
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #31.
+**v1.1.0**: The character set was extended to 24 characters
+(`{`, `}`, `\n`, `\t` added). See Q115.
+
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #31 + §5.30.2.
 
 ### 57. What is the `readConfPort` range check?
 
@@ -678,7 +755,9 @@ const AUTH_CACHE_TTL = 60 * time.Second
 
 ### 60. What is `runtime_info` ports (PORT-2)?
 
-`buildRuntimeInfo` returns two new fields:
+`buildRuntimeInfo` returns several fields including:
+
+**v1.0.0 (PORT-2)**:
 
 ```json
 {
@@ -687,15 +766,25 @@ const AUTH_CACHE_TTL = 60 * time.Second
 }
 ```
 
+**v1.1.0 (MEM-1)** — two additional fields:
+
+```json
+{
+  "profile_key": "pro",
+  "memory_limit_mb": 120
+}
+```
+
 **Benefits**:
 - HTML/JS updates links dynamically.
 - Supports LAN access.
 - Supports IPv6 loopback.
 - No broken links when ports change.
+- System Info panel shows profile + memory limit.
 
 **Constraint**: PWA shortcuts (`manifest.json`) do not read `runtime_info` — they stay static (documented).
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1.
 
 ---
 
@@ -731,6 +820,9 @@ su -c "cp /sdcard/backup/* /data/adb/modules/dnscrypt-proxy-webui/proxy/"
   su -c "rm -rf /data/adb/modules/dnscrypt-proxy-webui"
   ```
 
+**v1.1.0 note**: `uninstall.sh` no longer creates a backup
+directory. Any legacy backup from v1.0.0 is removed automatically.
+
 ### 65. Are settings preserved on upgrade?
 
 **Yes** — since v1.0.0:
@@ -759,14 +851,13 @@ su -c "reboot"
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
 ```
 
-**Note**: Settings are preserved on rollback (v1.0.0).
+**Note**: Settings are preserved on rollback (since v1.0.0).
 
-**Rollback caveats**:
-- ⚠️ Dashboard will break (pre-v1.0.0).
-- ⚠️ Basic Auth will be unlimited.
-- ⚠️ Login GET will work (CSRF vector returns).
-- ⚠️ RACE-1 will return without mutex.
-- ⚠️ PORT-2 will return without dynamic ports.
+**Rollback caveats** (from v1.1.0 to v1.0.0):
+- ⚠️ Dynamic memory limit reverts to hardcoded 80 MB.
+- ⚠️ `runtime_info` will no longer include `profile_key` / `memory_limit_mb`.
+- ⚠️ System Info panel will not display profile / memory fields.
+- ⚠️ `shellQuote` reverts to the 20-character set.
 
 See [`UPGRADE.md`](UPGRADE.md) for details.
 
@@ -829,7 +920,7 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 
 - **Symptom**: The Dashboard (`:9091`) opens, but Metrics tables are empty.
 - **Cause (before v1.0.0)**: `metricsProxyHandler` returned Prometheus text with `Content-Type: application/json`.
-- **Solution**: Update to `v1.0.0`.
+- **Solution**: Update to `v1.1.0` (or v1.0.0).
 
 **Verify**:
 
@@ -844,7 +935,7 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" | jq '.total_queries'
 
 - **Symptom**: DNS Engine crashes; Watchdog runs but does nothing.
 - **Cause (before v1.0.0)**: WebUI called `getStatus` every 10 seconds, and `getStatusUncached` wrote `STATUS_FILE = "OFF"` on crash.
-- **Solution**: Update to `v1.0.0`.
+- **Solution**: Update to `v1.1.0` (or v1.0.0).
 
 **Verify**:
 
@@ -861,12 +952,12 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq .dns_eng
 
 - **Symptom**: After upgrading the module, `webui.conf` is reset.
 - **Cause (before v1.0.0)**: `unzip -o` extracted defaults over custom ones.
-- **Solution**: Update to `v1.0.0`.
+- **Solution**: Update to `v1.1.0` (or v1.0.0).
 
 **Immediate recovery**:
 
 ```bash
-# Find automatic backup
+# Find automatic backup (v1.0.0 only — v1.1.0 does not create backups)
 BACKUP=$(ls -dt /data/local/tmp/dnscrypt-upgrade-backup-* 2>/dev/null | head -1)
 su -c "cp $BACKUP/webui.conf /data/adb/modules/dnscrypt-proxy-webui/proxy/"
 su -c "cp $BACKUP/dnscrypt-proxy.toml /data/adb/modules/dnscrypt-proxy-webui/proxy/"
@@ -879,8 +970,8 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ### 74. Basic Auth is too restricted after upgrade. What do I do?
 
-- **Symptom**: After upgrading to v1.0.0, Basic Auth fails after 5 attempts.
-- **Cause**: Intentional — Basic Auth is now rate-limited.
+- **Symptom**: After upgrading to v1.1.0, Basic Auth fails after 5 attempts.
+- **Cause**: Intentional — Basic Auth is rate-limited.
 - **Solution**:
   - ✅ **Solution 1**: Use correct credentials (will not be locked).
   - ✅ **Solution 2**: Use Cookie auth (no rate limit).
@@ -935,7 +1026,7 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 - **Symptom**: Some sites remain blocked even after being added to the allowlist.
 - **Cause (before v1.0.0)**: `rebuildBlocklist` was not protected by a mutex → race condition with `updateProfile`.
-- **Solution**: Update to `v1.0.0` (adds `rebuildMu`).
+- **Solution**: Update to `v1.1.0` (or v1.0.0).
 
 **Verify**:
 
@@ -949,12 +1040,17 @@ grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1 pr
 
 ## v1.0.0 Specific Questions
 
+> **Note**: This section documents the v1.0.0 features and
+> verifications. It is preserved for historical reference and for
+> users upgrading from pre-v1.0.0 releases. Current version
+> verification is in the next section (v1.1.0).
+
 ### 78. How do I know a version contains v1.0.0?
 
 Verify:
 
-1. `VERSION` file = `v1.0.0`.
-2. `module.prop` → `version=v1.0.0`.
+1. `VERSION` file = `v1.0.0` (for v1.0.0) / `v1.1.0` (for v1.1.0).
+2. `module.prop` → `version=v1.0.0` / `version=v1.1.0`.
 3. `runtime_info` endpoint:
    ```bash
    curl -s http://127.0.0.1:9090/api/runtime_info | jq .version
@@ -1008,7 +1104,7 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 
 ### 79. Did the API change? What do I need to update?
 
-**Yes** — 3 changes for API consumers:
+**Yes** — 3 changes for API consumers (from pre-v1.0.0):
 
 | # | Change | Action | Reference |
 |:-:|---|---|---|
@@ -1020,7 +1116,7 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 
 ### 80. Did `runtime_info` change its format?
 
-**No**. **New fields** were added only:
+**v1.0.0**: **New fields** added only:
 
 ```json
 {
@@ -1029,15 +1125,27 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 }
 ```
 
-All old fields remain (`version`, `commit`, `run_dir`, ...).
+**v1.1.0**: **Two more fields** added:
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33.
+```json
+{
+  "profile_key": "pro",
+  "memory_limit_mb": 120
+}
+```
+
+All previous fields remain (`version`, `commit`, `run_dir`, ...).
+
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1.
 
 ### 81. Did `/api/metrics` change its format?
 
-**Yes** — `/api/metrics` now returns **JSON** instead of Prometheus text:
+**Yes** — `/api/metrics` now returns **JSON** instead of Prometheus text (since v1.0.0):
 - **Before**: Prometheus text with `Content-Type: application/json` (lies).
 - **After**: JSON schema with `Content-Type: application/json; charset=utf-8`.
+
+**v1.1.0**: The upstream URL is built from `MONITORING_UI_PORT`
+constant instead of the hardcoded string. Behavior is unchanged.
 
 **Details**: See [`API.md`](API.md).
 
@@ -1063,7 +1171,7 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 
 ### 83. Did `.gitignore` change?
 
-**Yes** — core fix:
+**Yes** — core fix (v1.0.0):
 - **Before**: `proxy/run/` (result: `.gitkeep` was not uploaded).
 - **After**: `proxy/run/*` + `!proxy/run/.gitkeep` (works correctly).
 
@@ -1071,7 +1179,7 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 
 ### 84. Are there new sections in SECURITY.md?
 
-**Yes** — 12 new sections:
+**Yes** — 12 new sections (v1.0.0):
 
 | Anchor | Topic |
 |---|---|
@@ -1088,11 +1196,17 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 | #528 | `rebuildMu` mutex (RACE-1) |
 | #529 | `runtime_info` ports (PORT-2) |
 
+**v1.1.0 adds**:
+
+| Anchor | Topic |
+|---|---|
+| #530 | v1.1.0 runtime changes (MEM-1, MEM-2, MEM-3) |
+
 **See** [`docs/SECURITY.md`](SECURITY.md) for full details.
 
 ### 85. What's new in `.pre-commit-config.yaml`?
 
-**Updated** to support v1.0.0 checks. See the file itself for the exact hook list.
+**Updated** to support v1.1.0 checks. See the file itself for the exact hook list.
 
 ### 86. What's new in the Makefile?
 
@@ -1116,11 +1230,317 @@ Use grep-based verification:
 
 ### 88. What is `runtime_info`?
 
-`runtime_info` is an API endpoint that returns build info + runtime paths + actual ports. See [`API.md`](API.md).
+`runtime_info` is an API endpoint that returns build info + runtime paths + actual ports.
+
+**v1.1.0 example**:
+
+```bash
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
+```
+
+```json
+{
+  "version": "v1.1.0",
+  "commit": "a1b2c3d",
+  "build_time": "1726987200",
+  "build_time_human": "2026-09-26T10:00:00Z",
+  "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+  "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
+  "status_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status",
+  "pid_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.pid",
+  "progress_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/update_progress.txt",
+  "log_file": "/data/local/tmp/dnscrypt_main.log",
+  "bind_addr": "127.0.0.1",
+  "webui_port": "9090",
+  "dashboard_port": "9091",
+  "profile_key": "pro",
+  "memory_limit_mb": 120
+}
+```
+
+See [`API.md`](API.md) §6.1.7 for full details.
 
 ### 89. What is the Auth cache?
 
 A 60-second in-memory cache for credentials, reducing file I/O on every HTTP request. See Q59.
+
+---
+
+## v1.1.0 Specific Questions
+
+> **Note**: This section covers the v1.1.0 changes: dynamic memory
+> limit per profile (MEM-1), extended `shellQuote` (MEM-2), and the
+> `MONITORING_UI_PORT` constant (MEM-3).
+
+### 111. What is the dynamic memory limit (MEM-1)?
+
+**Definition**: `main.go` sets the Go runtime soft memory limit
+dynamically based on the active blocklist profile.
+
+**Values**:
+
+| Profile | Soft limit |
+|---|---:|
+| light | 80 MB |
+| normal | 100 MB |
+| pro | 120 MB |
+| proplus | 160 MB |
+| ultimate | 220 MB |
+
+**Important semantics**:
+- `debug.SetMemoryLimit` is a **soft** limit.
+- The Go runtime does **not** kill the process when the limit is
+  reached — it runs GC more aggressively instead.
+- Setting it too low → CPU waste (GC thrashing).
+- Setting it too high → RAM waste.
+
+**Why per-profile?** Because different blocklist profiles have
+different working set sizes. A single value either wastes memory
+on light profiles or starves the heavy ones.
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.1;
+[ARCHITECTURE.md](ARCHITECTURE.md) §3.9, §11.22.
+
+### 112. Why did we add the dynamic memory limit?
+
+**Before v1.1.0**: The soft limit was hardcoded to 80 MB:
+
+```go
+debug.SetMemoryLimit(80 * 1024 * 1024)  // ← same for all profiles
+```
+
+**Problem**: The `ultimate` profile has a working set that
+approaches 200 MB. With an 80 MB soft limit, the runtime ran GC
+continuously — a condition called **GC thrashing**. On
+low-RAM devices, this manifested as a frozen or very slow WebUI.
+
+**After v1.1.0**: The limit is computed per profile. No more GC
+thrashing on `ultimate`, no wasted RAM on `light`.
+
+**Symptom before the fix**:
+- WebUI responds, but every action takes 2-5 seconds.
+- CPU on the WebUI process > 30% while idle.
+- Battery drains faster.
+
+**Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §6.10.
+
+### 113. How do I check the current memory limit?
+
+**Method 1 — Runtime Info endpoint**:
+
+```bash
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+# Expected: 80 for light, 120 for pro, 220 for ultimate
+```
+
+**Method 2 — Both fields**:
+
+```bash
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+```
+
+**Method 3 — Startup log**:
+
+```bash
+grep "dynamic memory limit" /data/local/tmp/dnscrypt_main.log | tail -1
+# Expected: 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+```
+
+**Method 4 — System Info panel**:
+
+Open the WebUI or Dashboard → "System Info" → look for the
+"Profile" and "Memory Limit" rows.
+
+### 114. When does the memory limit change?
+
+Two triggers:
+
+1. **Startup** — `main()` calls `applyMemoryLimit()` once, using
+   the profile read from `selected_profile.txt`.
+
+2. **Profile change** — after a successful
+   `POST /api/update_profile`, `updateProfile()` calls
+   `applyMemoryLimit()` with the new profile key.
+
+**What does NOT trigger a change**:
+
+- Editing `selected_profile.txt` directly while the WebUI is
+  running. You must restart the WebUI:
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+  ```
+- Changing `webui.conf` (unrelated to memory).
+- Restarting the DNS engine alone (does not affect the WebUI's
+  memory limit).
+
+**Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §5.14.
+
+### 115. What is the extended `shellQuote` (MEM-2)?
+
+**Before v1.1.0** (20 characters):
+`` ` ``, `"`, `'`, `$`, `` ` ``, `\`, `!`, `&`, `|`, `;`, `(`, `)`,
+`<`, `>`, `*`, `?`, `[`, `]`, `#`, `~`.
+
+**After v1.1.0** (24 characters — four added):
+
+| Added char | Reason |
+|---|---|
+| `{` | Brace expansion in shells |
+| `}` | Brace expansion |
+| `\n` | Word splitting in embedded strings |
+| `\t` | Word splitting |
+
+**Why this matters**: A path containing `{` could be
+brace-expanded by the shell before being passed to the actual
+command. A path containing a literal newline could be
+word-split.
+
+**Practical impact today**: `MODDIR` is derived from
+`os.Executable()`. A normal user cannot make it contain these
+characters. **No known exploit existed**. This is defense in
+depth.
+
+**Verify**:
+
+```bash
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\t'" && echo "✅ tab"
+```
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.2.
+
+### 116. What is `profile_key` in `runtime_info`?
+
+`profile_key` is a string identifying the active blocklist
+profile. It is one of:
+
+- `light`
+- `normal`
+- `pro` (default)
+- `proplus`
+- `ultimate`
+
+**Where it comes from**: `main.go` reads
+`proxy/selected_profile.txt` at startup via
+`readSelectedProfile()`. If the file is missing or contains an
+unknown value, the key defaults to `"pro"`.
+
+**Why it exists**:
+- **Observability** — a user reporting an issue can include it.
+- **Verification** — the System Info panel displays it.
+- **Consistency** — the UI can cross-check its own dropdown
+  against the server's authoritative value.
+
+**Example**:
+
+```bash
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
+# Expected: pro
+```
+
+**Reference**: [API.md](API.md) §6.1.7.
+
+### 117. What does the System Info panel now show?
+
+In v1.1.0, both the WebUI (`index.html`) and the Dashboard
+(`dashboard.html`) show two additional rows in the System Info
+panel:
+
+- **Profile**: `pro` (for example)
+- **Memory limit**: `120 MB` (for example)
+
+The rows were added to the existing list (version, commit, build
+time, ports, etc.). They are populated from the `runtime_info`
+response — no extra API call.
+
+**To see them**:
+
+1. Open the WebUI at `http://127.0.0.1:9090`.
+2. Scroll to "System Info".
+3. Expand the section.
+4. Look for the "Profile" and "Memory limit" rows.
+
+**Reference**: [ARCHITECTURE.md](ARCHITECTURE.md) §16.7.
+
+### 118. Does the memory limit affect the DNS engine?
+
+**No**. The memory limit applies only to the **WebUI process**
+(`dnscrypt-webui`), which is written in Go.
+
+The **DNS engine** (`dnscrypt-proxy`) is a **separate upstream
+binary** with its own memory management. It has its own
+`cache_size` setting in `dnscrypt-proxy.toml`. The WebUI limit
+has no effect on it.
+
+**Analogy**:
+
+| Process | Memory managed by |
+|---|---|
+| `dnscrypt-webui` | Go runtime (`debug.SetMemoryLimit`) — v1.1.0 |
+| `dnscrypt-proxy` | Upstream (its own settings) — unchanged |
+
+**To tune the DNS engine's cache**:
+
+```toml
+# dnscrypt-proxy.toml
+cache_size = 10240  # ← adjust here
+```
+
+### 119. Should I change the memory limit manually?
+
+**No.** The limit is computed automatically from the active
+profile. There is no configuration knob for it. To change the
+limit, change the profile:
+
+```bash
+# From the WebUI: select a profile → Apply
+# Or from the terminal:
+su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+**Why not configurable?** Because the correct value is a
+function of the profile, not a user preference. Making it
+configurable would invite users to set it too low (GC thrashing)
+or too high (RAM waste).
+
+**If you must override** (advanced): you would need to modify
+`main.go`, rebuild, and repackage. Not recommended.
+
+### 120. What is MEM-3 (`MONITORING_UI_PORT` in metrics handler)?
+
+**Definition**: The `metricsProxyHandler` function in `main.go`
+builds the URL for the upstream `monitoring_ui` endpoint using
+the Go constant `MONITORING_UI_PORT` instead of the hardcoded
+string `"8080"`.
+
+**Before v1.1.0**:
+
+```go
+req, err := http.NewRequestWithContext(r.Context(), "GET",
+    "http://127.0.0.1:8080/api/metrics", nil)
+//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ hardcoded
+```
+
+**After v1.1.0**:
+
+```go
+monitoringURL := "http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
+req, err := http.NewRequestWithContext(r.Context(), "GET", monitoringURL, nil)
+```
+
+**Why this matters**:
+- Single source of truth for the reserved port.
+- Reduces the number of places to update if the port ever changes.
+- Matches the pattern already used by `getWebUIPort()` and
+  `getDashboardPort()`.
+
+**Observable behavior**: unchanged. The API contract is
+identical. Clients see no difference.
+
+**Reference**: [SECURITY.md](SECURITY.md) §5.30.3.
 
 ---
 
@@ -1159,9 +1579,10 @@ cd proxy && go build -buildvcs=false -trimpath -o /tmp/test-main main.go
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ Fix #12"
 ```
 
-### 93. How do I verify v1.0.0 correctness?
+### 93. How do I verify v1.1.0 correctness?
 
 ```bash
+# v1.0.0 checks (see Q78 for full list)
 grep -q 'func buildDashboardJSON' proxy/main.go && echo "✅ Fix #1 (JSON)"
 grep -q 'func getSystemShell' proxy/main.go && echo "✅ Fix #2 (shell)"
 grep -q 'BACKUP_TMP' proxy/customize.sh && echo "✅ Fix #3 (settings preserved)"
@@ -1174,6 +1595,16 @@ grep -q 'func shellQuote' proxy/main.go && echo "✅ NEW-5 (quote)"
 grep -q 'AUTH_CACHE_TTL' proxy/main.go && echo "✅ NEW-6 (cache)"
 grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
 grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo "✅ PORT-2"
+
+# v1.1.0 checks
+grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1 (function)"
+grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅ MEM-1 (apply)"
+grep -q 'MEMORY_LIMIT_ULTIMATE' proxy/main.go && echo "✅ MEM-1 (constants)"
+! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ MEM-1 (no hardcoded)"
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2 (braces)"
+grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
+grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ MEM-1 (field)"
+grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"profile_key"' && echo "✅ MEM-1 (field)"
 ```
 
 ### 94. What are the new Make targets?
@@ -1243,6 +1674,9 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 # 3. Static audit (frontend)
 grep -q 'data.dashboard_port' web/index.html && echo "✅ index.html"
 grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
+
+# 4. v1.1.0 memory fields
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
 ```
 
 **Reference**: [SECURITY.md](SECURITY.md).
@@ -1272,7 +1706,11 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'
 # Expected: "8081"
 
-# 3. Restore original
+# 3. Memory fields (v1.1.0)
+curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+
+# 4. Restore original
 su -c "sed -i 's/^PORT=8081/PORT=9090/' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
@@ -1312,6 +1750,7 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 - 📊 Metrics Wizard
 - ⚙️ Concurrency Guardian
 - 🔌 Port Architect
+- 🧠 Memory Architect (v1.1.0)
 
 ### 105. How do I add a question to the FAQ?
 
@@ -1329,7 +1768,11 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 ### 106. How do I know the next Audit Correction number?
 
 - Last Audit Correction: **#33** (runtime_info ports).
-- Next expected: **#34** (v1.1.x).
+- Next expected: **#34** (v1.2.x).
+
+**Note**: v1.1.0 did not add audit corrections. It introduced
+three runtime improvements (MEM-1/2/3) that are documented
+separately in SECURITY.md §17.1.
 
 **See**: [`CHANGELOG.md`](../CHANGELOG.md).
 
@@ -1379,7 +1822,14 @@ grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
 - RACE-1: `rebuildMu` mutex (concurrency).
 - PORT-2: `runtime_info` ports (dynamic).
 
-**Full numbering**: Fix #1-#12 + NEW-1..NEW-6 + RACE-1 + PORT-2 = **20 fixes** in v1.0.0.
+**MEM-1** + **MEM-2** + **MEM-3**: v1.1.0 **runtime improvements**
+(not audit corrections):
+- MEM-1: Dynamic memory limit per profile.
+- MEM-2: Extended `shellQuote` character set.
+- MEM-3: `MONITORING_UI_PORT` in metrics handler.
+
+**Full numbering**: Fix #1-#12 + NEW-1..NEW-6 + RACE-1 + PORT-2 +
+MEM-1/2/3.
 
 ---
 
@@ -1404,6 +1854,6 @@ grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*

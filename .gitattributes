@@ -1,6 +1,6 @@
 # ============================================================
 # Git Attributes for DNSCrypt Smart Filter
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://git-scm.com/docs/gitattributes
@@ -11,15 +11,42 @@
 # Scope:
 #   Rules are defined only for file types that actually exist
 #   in this repository. No speculative or defensive patterns.
+#
+# v1.1.0 notes:
+#   • New files added during the v1.0.0 → v1.1.0 cycle are
+#     covered by existing patterns — no new patterns were
+#     needed:
+#       - docs/adr/0004-unified-pr-template.md
+#       - docs/adr/0005-release-specific-pr-template.md
+#       - docs/adr/0006-rename-hotfix-to-release-patch.md
+#         → covered by `*.md`
+#       - scripts/release-patch.sh → covered by `*.sh`
+#       - .github/PULL_REQUEST_TEMPLATE/release.md
+#         → covered by `*.md`
+#   • `merge=union` is used ONLY for `CHANGELOG.md` and
+#     `VERSION`. It is deliberately NOT used for files with
+#     ordered content (SECURITY.md, docs/adr/README.md, etc.).
+#   • The `export-ignore` list was reviewed — it excludes
+#     development-only files from `git archive` and release
+#     tarballs. The ADRs are included in `docs/` which is
+#     already export-ignored.
 # ============================================================
 
 # ============================================================
 # Default: normalize line endings to LF on commit
 # ============================================================
+# Applies to every file unless a more specific rule below
+# overrides it. LF is enforced because the module ships to
+# Android (Linux) and is developed on Linux / macOS / WSL.
+# ============================================================
 * text=auto eol=lf
 
 # ============================================================
 # Shell scripts: LF only
+# ============================================================
+# Applies to both proxy/*.sh and scripts/*.sh. Explicit list
+# is kept for the module-root shell scripts that get extracted
+# to /data/adb/modules/ (where CRLF would break execution).
 # ============================================================
 *.sh          text eol=lf
 *.bash        text eol=lf
@@ -34,6 +61,10 @@ watchdog.sh   text eol=lf
 
 # ============================================================
 # Go: LF only
+# ============================================================
+# Go 1.22 is the current toolchain (see proxy/go.mod). Go source
+# files use tabs for indentation (enforced by gofmt), but line
+# endings must be LF on every platform.
 # ============================================================
 *.go          text eol=lf
 
@@ -56,17 +87,28 @@ watchdog.sh   text eol=lf
 *.md          text eol=lf
 
 # ============================================================
-# module.prop: LF only (Magisk parser is sensitive)
+# module.prop: LF only
+# ============================================================
+# The Magisk parser is sensitive to line endings. A CRLF here
+# would cause `version=` and `versionCode=` to be read with a
+# trailing \r, breaking update detection.
 # ============================================================
 module.prop   text eol=lf
 
 # ============================================================
 # VERSION: LF only, single line
 # ============================================================
+# Single-line file. Read by release.sh, build.sh, Makefile,
+# and release.yml. Any trailing whitespace or CR would break
+# version parsing.
+# ============================================================
 VERSION       text eol=lf
 
 # ============================================================
 # Go mod: LF only, no formatting
+# ============================================================
+# go.mod and go.sum are formatted by the Go toolchain. Do not
+# run formatters on them.
 # ============================================================
 go.mod        text eol=lf
 go.sum        text eol=lf
@@ -74,10 +116,16 @@ go.sum        text eol=lf
 # ============================================================
 # Makefile: LF only (recipes require tabs)
 # ============================================================
+# The `SHELL` variable and recipe lines use tabs. Git must not
+# convert them. LF-only is mandatory.
+# ============================================================
 Makefile      text eol=lf
 
 # ============================================================
 # Binary files (no conversion)
+# ============================================================
+# Any file listed below is treated as binary by Git. Line
+# ending conversion, diff, and merge are disabled for them.
 # ============================================================
 *.png         binary
 *.jpg         binary
@@ -94,11 +142,18 @@ Makefile      text eol=lf
 # ============================================================
 # Built binaries (should not be committed)
 # ============================================================
+# Safety net — these patterns ensure that even if a developer
+# accidentally stages a binary, Git treats it as binary (no
+# diff, no CRLF conversion, no merge).
+# ============================================================
 dnscrypt-webui*  binary
 dnscrypt-proxy   binary
 
 # ============================================================
 # Runtime artifacts (proxy/run/)
+# ============================================================
+# Files created at runtime by main.go. Never committed, but
+# if they exist locally, Git treats them as binary.
 # ============================================================
 proxy/run/*.status         binary
 proxy/run/*.pid            binary
@@ -107,6 +162,8 @@ proxy/run/.bootstrap_cache binary
 
 # ============================================================
 # Diff behavior
+# ============================================================
+# Improves `git diff` output for common file types.
 # ============================================================
 *.md          diff=markdown
 *.go          diff=golang
@@ -118,6 +175,17 @@ checksums.txt -diff
 # ============================================================
 # Linguist (GitHub language detection)
 # ============================================================
+# Controls the language bar on the repository homepage.
+#   • docs/**          → documentation (not counted as code)
+#   • *.md, *.txt      → documentation
+#   • *.sh             → Shell
+#   • *.html           → HTML
+#   • web/sw.js        → JavaScript
+#   • .github/**       → not counted at all
+#
+# docs/adr/*.md is automatically covered by `docs/**` and
+# `*.md`. No explicit rule needed.
+# ============================================================
 docs/**       linguist-documentation
 *.md          linguist-documentation
 *.txt         linguist-documentation
@@ -128,7 +196,12 @@ web/sw.js     linguist-language=JavaScript
 .github/**    linguist-detectable=false
 
 # ============================================================
-# Merge Strategy
+# Merge Strategy — Binary files
+# ============================================================
+# Binary files cannot be merged with the default strategy.
+# Git falls back to "ours" and reports a conflict. This is
+# the correct behavior — the developer must regenerate the
+# file instead of merging bytes.
 # ============================================================
 *.zip         merge=binary
 *.gz          merge=binary
@@ -141,16 +214,43 @@ proxy/run/.bootstrap_cache merge=binary
 # ============================================================
 # Merge Strategy — Workflow files
 # ============================================================
-# CHANGELOG.md: append-only semantics — union merge prevents
-#               conflicts when multiple branches update it.
+# ⚠️ Use `merge=union` ONLY for files with append-only
+#    semantics. Do NOT apply it to ordered files.
+#
+# CHANGELOG.md:
+#   Append-only. When two branches add entries to different
+#   sections, both must be preserved. `union` concatenates
+#   them without conflict.
+#
+# VERSION:
+#   Single-line file. Two concurrent version bumps are rare,
+#   but `union` prevents a conflict if they happen (the
+#   result is a two-line VERSION, which a human resolves).
+#
+# ⚠️ Deliberately NOT union-merged:
+#   • SECURITY.md — Audit Corrections are ordered.
+#   • docs/SECURITY.md — same reason.
+#   • docs/adr/README.md — ADR index is ordered by number.
+#   • docs/BRANCHING.md — structured sections.
+# ============================================================
 CHANGELOG.md  -diff merge=union
 
-# VERSION: single-line file — union merge prevents conflicts
-#          during version bumps across branches.
 VERSION       merge=union
 
 # ============================================================
 # Export-ignore (not included in git archive)
+# ============================================================
+# Files listed below are excluded from `git archive` and from
+# the release tarballs generated by GitHub (which uses
+# `git archive` under the hood).
+#
+# ⚠️ Do NOT export-ignore anything under proxy/ or web/ —
+#    those directories ship with the module.
+#
+# The release pipeline uses scripts/package_module.sh, which
+# reads from the working tree (not from `git archive`), so
+# this list only affects the GitHub-generated source tarball
+# (the "Source code (zip)" link on the Releases page).
 # ============================================================
 .github/       export-ignore
 .gitignore     export-ignore

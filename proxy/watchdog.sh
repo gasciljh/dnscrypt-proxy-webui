@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – watchdog.sh
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -44,6 +44,21 @@
 #     2 — network/timeout failure
 #     3 — 429 rate-limited
 #     4 — other HTTP error
+#
+# v1.1.0 additions:
+#   • Logs the active profile + expected memory hint at startup
+#     (self-contained — does not depend on functions.sh)
+#   • Structured startup banner with profile context
+#   • All messages are English (global release)
+#
+# Coordination with main.go v1.1.0:
+#   • main.go adjusts the Go runtime soft memory limit based on
+#     the selected profile (light → 80MB, ultimate → 220MB).
+#   • This script only REPORTS the hint at startup; the actual
+#     limit is managed by main.go.
+#   • The watchdog does NOT need to know the memory limit to do
+#     its job — restarting services is orthogonal to how much
+#     memory the WebUI uses.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -91,6 +106,7 @@ LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 RUN_DIR="$MODDIR/proxy/run"
 STATUS_FILE="$RUN_DIR/dnscrypt.status"
 TOML_FILE="$MODDIR/proxy/dnscrypt-proxy.toml"
+SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 # Fallback if run/ is not writable
 if [ ! -d "$RUN_DIR" ] || [ ! -w "$RUN_DIR" ]; then
@@ -135,7 +151,7 @@ mv -f "${WATCHDOG_PID_FILE}.tmp" "$WATCHDOG_PID_FILE"
 
 log_msg "============================================"
 log_msg "Watchdog started (PID: $$)"
-log_msg "   Version: v1.0.0"
+log_msg "   Version: v1.1.0"
 log_msg "   MODDIR:  $MODDIR"
 log_msg "   PORT:    $PORT"
 log_msg "   Auto-DNS:   $AUTO_RESTART_DNS"
@@ -252,6 +268,40 @@ _wd_start_webui() {
 
     log_msg "ERROR: WebUI failed to bind within 35s"
     return 1
+}
+
+# --- Read profile memory hint (v1.1.0, self-contained) ---
+#
+# Returns a user-facing string describing the expected soft
+# memory limit for the active profile.
+#
+# ⚠️ This is a HINT only. main.go is the authority.
+#
+# Uses the same table as functions.sh:get_profile_memory_hint
+# and main.go:memoryLimitForProfile.
+# ============================================================
+_wd_get_profile_memory_hint() {
+    local profile="pro"
+
+    if [ -f "$SELECTED_PROFILE_FILE" ]; then
+        local p
+        p=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
+        case "$p" in
+            light|normal|pro|proplus|ultimate) profile="$p" ;;
+        esac
+    fi
+
+    local mb
+    case "$profile" in
+        light)    mb="80"  ;;
+        normal)   mb="100" ;;
+        pro)      mb="120" ;;
+        proplus)  mb="160" ;;
+        ultimate) mb="220" ;;
+        *)        mb="80"  ;;
+    esac
+
+    printf "%s MB (%s)" "$mb" "$profile"
 }
 
 # ============================================================
@@ -519,6 +569,13 @@ PREV_DESIRED=""
 # ============================================================
 log_msg "Entering main loop..."
 LOOP_COUNT=0
+
+# v1.1.0 — Log profile + memory hint once at the start of the loop
+# (self-contained, does not depend on functions.sh)
+{
+    _profile_hint=$(_wd_get_profile_memory_hint)
+    log_msg "Active profile: $_profile_hint"
+} 2>/dev/null
 
 while true; do
     LOOP_COUNT=$((LOOP_COUNT + 1))

@@ -1,11 +1,23 @@
 # ============================================================
 # DNSCrypt Smart Filter – Bug Report Template
-# Version: v1.0.0
+# Version: v1.1.0
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # GitHub Issue Forms (YAML-based) — the modern standard
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+# ============================================================
+# v1.1.0 additions:
+#   • The "Latest version" checkbox now references v1.1.0 (was
+#     v1.0.0 in the previous template).
+#   • Added a new optional diagnostic field for v1.1.0's dynamic
+#     memory limit (profile_key + memory_limit_mb from
+#     runtime_info). This makes it easier to diagnose
+#     profile-related performance or crash issues.
+#   • runtime_info placeholder updated to include the two new
+#     fields exposed by main.go v1.1.0.
+#   • status.sh --json example updated to include memory
+#     diagnostics where applicable.
 # ============================================================
 
 name: 🐛 Bug Report
@@ -29,7 +41,7 @@ body:
         - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
         - Checked [docs/TROUBLESHOOTING.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md)
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue)
-        - Are running the **latest version** of the module
+        - Are running the **latest version** of the module (v1.1.0)
 
         ---
 
@@ -49,7 +61,7 @@ body:
           required: true
         - label: I searched existing Issues and did not find the same problem
           required: true
-        - label: I am running the latest version of the module (v1.0.0)
+        - label: I am running the latest version of the module (v1.1.0)
           required: true
         - label: This is not a security vulnerability (otherwise I would use Private Reporting)
           required: true
@@ -64,7 +76,7 @@ body:
       description: A clear and concise description of the problem. What happened? What did you expect?
       placeholder: |
         Example:
-        After updating the module to v1.0.0, the WebUI stopped working.
+        After updating the module to v1.1.0, the WebUI stopped working.
         When opening http://127.0.0.1:9090, a blank page appears.
         I expected the main interface with the service status.
     validations:
@@ -79,7 +91,7 @@ body:
       label: 🔁 Steps to reproduce
       description: How can the problem be reproduced? Be as specific as possible.
       placeholder: |
-        1. Install the module v1.0.0 from Magisk
+        1. Install the module v1.1.0 from Magisk
         2. Reboot the device
         3. Open the WebUI from the Action button
         4. Click "Apply" for the PRO blocklist
@@ -149,8 +161,8 @@ body:
     id: module_version
     attributes:
       label: 🏷️ Module version
-      description: 'From `module.prop` or `status.sh` — example: v1.0.0'
-      placeholder: 'v1.0.0'
+      description: 'From `module.prop` or `status.sh` — example: v1.1.0'
+      placeholder: 'v1.1.0'
     validations:
       required: true
 
@@ -238,7 +250,44 @@ body:
       required: false
 
   # ============================================================
-  # [9] Logs (optional but very useful)
+  # [9] v1.1.0 — Memory limit diagnostics
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 🧠 v1.1.0 — Memory limit diagnostics
+
+        > **New in v1.1.0**: `main.go` adjusts the Go runtime soft memory
+        > limit based on the active blocklist profile. If your issue
+        > relates to **performance**, **RAM usage**, or **crashes**
+        > (especially with the `ultimate` profile), please fill in
+        > the two fields below.
+        >
+        > You can obtain both values with:
+        > ```bash
+        > curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+        > ```
+
+  - type: input
+    id: active_profile
+    attributes:
+      label: 📋 Active profile
+      description: 'From `runtime_info` → `profile_key` — one of: light, normal, pro, proplus, ultimate'
+      placeholder: 'pro'
+    validations:
+      required: false
+
+  - type: input
+    id: memory_limit_mb
+    attributes:
+      label: 🧠 Memory limit (MB)
+      description: 'From `runtime_info` → `memory_limit_mb` — expected values: 80 / 100 / 120 / 160 / 220'
+      placeholder: '120'
+    validations:
+      required: false
+
+  # ============================================================
+  # [10] Logs (optional but very useful)
   # ============================================================
   - type: markdown
     attributes:
@@ -255,8 +304,9 @@ body:
       description: 'Last 50 lines from `/data/local/tmp/dnscrypt_main.log`'
       placeholder: |
         ```
-        [2026-09-24T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.0.0
-        [2026-09-24T10:30:01Z] 📋 LOG_LEVEL=info
+        [2026-09-26T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.1.0
+        [2026-09-26T10:30:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+        [2026-09-26T10:30:01Z] 📋 LOG_LEVEL=info
         ...
         ```
       render: shell
@@ -271,9 +321,10 @@ body:
       placeholder: |
         ```json
         {
-          "version": "v1.0.0",
+          "version": "v1.1.0",
           "dns_engine": {"running": true, "port": 5354},
           "webui": {"running": true, "port": 9090},
+          "profile": {"key": "pro", "name": "PRO", "memory_limit_mb": 120},
           ...
         }
         ```
@@ -320,14 +371,16 @@ body:
     id: runtime_info
     attributes:
       label: 🧭 Runtime Info (`runtime_info`)
-      description: 'Run: `curl -s http://127.0.0.1:9090/api?action=runtime_info | jq` — useful for verifying PORT-2 fix'
+      description: 'Run: `curl -s http://127.0.0.1:9090/api?action=runtime_info | jq` — now includes profile_key + memory_limit_mb (v1.1.0)'
       placeholder: |
         ```json
         {
-          "version": "v1.0.0",
+          "version": "v1.1.0",
           "webui_port": "9090",
           "dashboard_port": "9091",
           "bind_addr": "127.0.0.1",
+          "profile_key": "pro",
+          "memory_limit_mb": 120,
           ...
         }
         ```
@@ -364,7 +417,7 @@ body:
       required: false
 
   # ============================================================
-  # [10] Additional context
+  # [11] Additional context
   # ============================================================
   - type: textarea
     id: additional
@@ -375,12 +428,13 @@ body:
         - Did the problem start after a specific update?
         - Are you using a VPN or AdAway alongside the module?
         - Did the problem occur after changing certain settings?
+        - Did the problem start after switching profiles (e.g. from pro to ultimate)?
         - Did you try any solutions? What worked and what did not?
     validations:
       required: false
 
   # ============================================================
-  # [11] Screenshots
+  # [12] Screenshots
   # ============================================================
   - type: textarea
     id: screenshots
@@ -392,7 +446,7 @@ body:
       required: false
 
   # ============================================================
-  # [12] Final confirmation
+  # [13] Final confirmation
   # ============================================================
   - type: checkboxes
     id: final_confirmation

@@ -12,17 +12,47 @@
 
 ---
 
+> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+>
+> This ADR was reviewed during the v1.1.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The **automatic** sync (via `release.yml`) has been verified
+>     twice: after `v1.0.0` and after `v1.1.0`.
+>   • In both cases, `develop` was fast-forwarded (or merged) to
+>     match `main` **without any manual intervention**.
+>   • The `continue-on-error: true` flag has never been triggered
+>     — no sync failures to date.
+>   • The **manual** back-merge path (`make sync`) has been
+>     prepared but not yet exercised for a real PATCH release.
+>     The next realistic scenario would be `v1.1.0 → v1.1.1`
+>     (via `hotfix/*`).
+>   • The `github-actions[bot]` identity is correctly configured
+>     in the repository's branch-protection allowlist (verified
+>     during the v1.1.0 release).
+>
+> **Result**: The decision is validated by real-world usage for
+> the **automatic** path. The **manual** path remains untested in
+> production (no PATCH releases have been cut yet). No
+> superseding ADR is required.
+
+---
+
 ## Context
 
 ### The problem
 
-With the two-branch model adopted in [ADR-0001](0001-two-branch-model.md),
-every release takes this shape:
+With the two-branch model adopted in
+[ADR-0001](0001-two-branch-model.md), every release takes this
+shape:
 
 1. `develop` accumulates features and fixes.
 2. A `release/*` branch (or `develop` directly) merges into `main`.
 3. A tag `vX.Y.Z` is created on `main`.
-4. [ADR-0002](0002-automated-releases.md)'s workflow publishes the release.
+4. [ADR-0002](0002-automated-releases.md)'s workflow publishes the
+   release.
 
 **But then:** `develop` is now **behind** `main`.
 
@@ -31,13 +61,13 @@ every release takes this shape:
 - Any PR-specific merge commits.
 - Any release-specific fixes.
 
-`develop` **does not** contain these commits — they were only made on
-`main`. This creates **branch divergence**.
+`develop` **does not** contain these commits — they were only made
+on `main`. This creates **branch divergence**.
 
 ### Why divergence matters
 
-Without a sync, the next release cycle starts from a `develop` that is
-missing the previous release's commits. Consequences:
+Without a sync, the next release cycle starts from a `develop` that
+is missing the previous release's commits. Consequences:
 
 | Scenario | Result without sync |
 |---|---|
@@ -46,9 +76,9 @@ missing the previous release's commits. Consequences:
 | `docs/BRANCHING.md` workflow breaks | The documented flow assumes `develop ≥ main` |
 | Release notes become inaccurate | `main` and `develop` diverge further every cycle |
 
-The drift compounds: **one missed sync per release**. After 6 months,
-`develop` can be **dozens of commits behind** `main`, making the next
-release PR merge painful.
+The drift compounds: **one missed sync per release**. After 6
+months, `develop` can be **dozens of commits behind** `main`, making
+the next release PR merge painful.
 
 ### The forces at play
 
@@ -72,20 +102,21 @@ release PR merge painful.
 
 ### Scope
 
-This ADR covers **how and when `develop` is synced with `main`**. It does
-**not** cover:
+This ADR covers **how and when `develop` is synced with `main`**. It
+does **not** cover:
 
 - Branch structure → see [ADR-0001](0001-two-branch-model.md).
 - Release automation → see [ADR-0002](0002-automated-releases.md).
-- PATCH-release flow → see [ADR-0006](0006-rename-hotfix-to-release-patch.md).
+- PATCH-release flow → see
+  [ADR-0006](0006-rename-hotfix-to-release-patch.md).
 
 ---
 
 ## Decision
 
 > **We will embed a "Sync `main` → `develop`" step at the end of
-> `.github/workflows/release.yml`, executed automatically after every
-> successful release.**
+> `.github/workflows/release.yml`, executed automatically after
+> every successful release.**
 
 ### Specifics
 
@@ -99,8 +130,8 @@ The sync is the **final step** of `release.yml`, after:
 4. Upload backup artifacts.
 5. Create GitHub Release.
 
-Only when the release is **publicly published** does the sync run. This
-ensures we never sync `develop` with a failed build.
+Only when the release is **publicly published** does the sync run.
+This ensures we never sync `develop` with a failed build.
 
 #### Behavior
 
@@ -187,45 +218,47 @@ Sync main → develop
 
 ### Positive
 
-- ✅ **Zero manual toil.** The maintainer never runs `git merge origin/main`
-  by hand after a release.
-- ✅ **No compound drift.** Every release leaves `develop` exactly one
-  commit ahead of `main` (or identical).
-- ✅ **Predictable next release.** The next `release/*` PR starts from
-  a synced `develop`.
-- ✅ **Contributor clarity.** New contributors branching from `develop`
-  get the latest released code.
-- ✅ **Failure isolation.** A bug in the sync step never affects the
-  published release.
+- ✅ **Zero manual toil.** The maintainer never runs
+  `git merge origin/main` by hand after a release.
+- ✅ **No compound drift.** Every release leaves `develop` exactly
+  one commit ahead of `main` (or identical).
+- ✅ **Predictable next release.** The next `release/*` PR starts
+  from a synced `develop`.
+- ✅ **Contributor clarity.** New contributors branching from
+  `develop` get the latest released code.
+- ✅ **Failure isolation.** A bug in the sync step never affects
+  the published release.
 - ✅ **Audit trail.** Sync commits are visible in the log with a
   descriptive message and the standard bot identity.
 
 ### Negative
 
-- ❌ **Adds ~15 seconds** to every release workflow — negligible but
-  non-zero.
-- ❌ **Requires `contents: write` on `GITHUB_TOKEN`.** The workflow
-  already has this for creating releases, so no new permission.
-- ❌ **Branch protection may block the bot.** If `develop` is protected
-  with "Restrict who can push", the sync fails silently (warning).
-  Mitigated by adding `github-actions[bot]` to the allowlist — see
-  `docs/BRANCHING.md` §6.
-- ❌ **Merge conflicts require manual resolution.** In the rare case
-  where `develop` and `main` have conflicting changes, the sync aborts
-  with a warning. The maintainer must resolve manually.
-- ❌ **The sync is invisible to the release.** Users see the release
-  succeed, but the sync runs after. If it fails, no signal reaches
-  the release page (only the Actions log).
+- ❌ **Adds ~15 seconds** to every release workflow — negligible
+  but non-zero.
+- ❌ **Requires `contents: write` on `GITHUB_TOKEN`.** The
+  workflow already has this for creating releases, so no new
+  permission.
+- ❌ **Branch protection may block the bot.** If `develop` is
+  protected with "Restrict who can push", the sync fails silently
+  (warning). Mitigated by adding `github-actions[bot]` to the
+  allowlist — see `docs/BRANCHING.md` §6.
+- ❌ **Merge conflicts require manual resolution.** In the rare
+  case where `develop` and `main` have conflicting changes, the
+  sync aborts with a warning. The maintainer must resolve
+  manually.
+- ❌ **The sync is invisible to the release.** Users see the
+  release succeed, but the sync runs after. If it fails, no
+  signal reaches the release page (only the Actions log).
 
 ### Neutral
 
-- ⚪ **Sync commit is created only when fast-forward is not possible.**
-  In the common case (no divergence), the sync is a fast-forward push
-  with no new commit.
+- ⚪ **Sync commit is created only when fast-forward is not
+  possible.** In the common case (no divergence), the sync is a
+  fast-forward push with no new commit.
 - ⚪ **`develop` gains a commit** in the divergent case — a
   `chore: sync develop with main` commit.
-- ⚪ **The workflow file grows** by ~25 lines — acceptable given the
-  benefit.
+- ⚪ **The workflow file grows** by ~25 lines — acceptable given
+  the benefit.
 
 ---
 
@@ -256,11 +289,18 @@ Sync main → develop
 
 ### Project files
 
-- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — the workflow containing the sync step.
-- [`docs/BRANCHING.md`](../BRANCHING.md) §8.4 — the back-merge requirement for PATCH releases.
-- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §10 — post-release sync documentation.
-- [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) §7.2 — the CI/CD overview including the sync.
-- [`Makefile`](../../Makefile) — the `make sync` target provides an equivalent manual command.
+- [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
+  the workflow containing the sync step.
+- [`docs/BRANCHING.md`](../BRANCHING.md) §8.4 — the back-merge
+  requirement for PATCH releases.
+- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §10 —
+  post-release sync documentation.
+- [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) §7.2 — the CI/CD
+  overview including the sync.
+- [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
+  (v1.0.0 → v1.1.0 used the automatic sync path).
+- [`Makefile`](../../Makefile) — the `make sync` target provides
+  an equivalent manual command.
 
 ### External references
 
@@ -271,11 +311,31 @@ Sync main → develop
 
 ### Discussion
 
-- Initial proposal: see commit history for `.github/workflows/release.yml`.
-- The decision to embed sync rather than create a separate workflow is
-  documented in `CHANGELOG.md` under "Not Included".
+- Initial proposal: see commit history for
+  `.github/workflows/release.yml`.
+- The decision to embed sync rather than create a separate workflow
+  is documented in `CHANGELOG.md` under "Not Included".
+
+### Release verification
+
+- **v1.0.0** (2026-09-24) — first release using the automatic sync.
+  - Sync result: **fast-forward merge succeeded**.
+  - `develop` matched `main` post-release.
+  - No manual intervention.
+- **v1.1.0** (2026-09-26) — second release; sync unchanged.
+  - Sync result: **fast-forward merge succeeded**.
+  - `develop` matched `main` post-release.
+  - No manual intervention.
+- **Manual sync path** (`make sync`) — **not yet exercised**.
+  - It will be needed if a PATCH release is cut via `hotfix/*`
+    (e.g. `v1.1.1`).
+  - See [`docs/BRANCHING.md`](../BRANCHING.md) §8.4 for the
+    procedure.
+- **`continue-on-error: true`** — never triggered (no sync
+  failures to date).
+- See `CHANGELOG.md` for the full release history.
 
 ---
 
-*This ADR is immutable. To reverse or amend it, create a new ADR that
-supersedes it and update its Status line.*
+*This ADR is immutable. To reverse or amend it, create a new ADR
+that supersedes it and update its Status line.*

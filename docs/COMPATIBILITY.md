@@ -2,10 +2,27 @@
 
 Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewalls.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • Added a new section §5.4 (Memory profile by device RAM)
+>     that maps the v1.1.0 dynamic memory limit to the SoC/RAM
+>     tier recommended for each profile.
+>   • §1.3 (What's New) extended with MEM-1 / MEM-2 / MEM-3.
+>   • §2.3 (Dashboard compatibility) updated with the two new
+>     `runtime_info` fields.
+>   • §6.4 (Firewall + v1.0.0) extended with v1.1.0 additions.
+>   • §7.2 (Root + compatibility) extended with the v1.1.0
+>     verification table.
+>   • §8.1 (Known issues) gained four v1.1.0 entries.
+>   • §8.3 (v1.1.0-specific issues) — new section.
+>   • §10.3 (v1.1.0 compatibility testing) — new verification
+>     checklist.
+>   • No changes to the core compatibility rules.
 
 ---
 
@@ -48,9 +65,24 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 | **Storage** | 20 MB | 30 MB+ |
 | **Architecture** | arm64 / arm / x86_64 / x86 | arm64 |
 
-### 1.3 What's New in v1.0.0
+### 1.3 What's New in v1.1.0
 
 **Compatibility-relevant changes**:
+
+| # | Change | Compatibility impact |
+|:-:|---|---|
+| **1** | **MEM-1: Dynamic memory limit per profile** | ✅ Improves performance on light profiles (less GC) and heavy profiles (no GC thrashing). See §5.4. |
+| **2** | **MEM-2: Extended `shellQuote` (24 chars)** | ⚪ No impact on user |
+| **3** | **MEM-3: `MONITORING_UI_PORT` constant** | ⚪ No impact on user |
+| **4** | **`runtime_info` new fields** (`profile_key`, `memory_limit_mb`) | ✅ Displayed in System Info panels |
+| **5** | **`get_profile` new field** (`memory_limit_mb`) | ✅ Additive — clients unaffected |
+| **6** | **Uninstall no longer creates backup** | ⚠️ Manual backup recommended (see §8.3) |
+
+**Base compatibility**: no change in system requirements.
+
+### 1.4 What Was New in v1.0.0
+
+**Compatibility-relevant changes** (for reference):
 
 | # | Change | Compatibility impact |
 |:-:|---|---|
@@ -62,15 +94,13 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 | **6** | Section header with comment | ✅ Broader TOML compatibility |
 | **7** | Per-port cache | ⚪ No impact |
 | **8** | Exact endpoint matching | ⚠️ 404 for unknown actions |
-| **9** | **Login POST-only** | ⚠️ **GET on `/api/auth/login` rejected (405)** |
-| **10** | **`/readyz` localhost-only** | ⚠️ **LAN requests rejected (403)** |
-| **11** | **`shellQuote()`** | ⚪ No impact on user |
-| **12** | **`readConfPort` range check** | ✅ Safe fallback for invalid values |
-| **13** | **`rebuildMu` mutex (RACE-1)** | ✅ BLOCKLIST always consistent |
-| **14** | **`runtime_info` dynamic ports (PORT-2)** | ✅ Dynamic links |
-| **15** | **Auth cache (60 s)** | ⚠️ Credential changes take effect after ≤ 60 s |
-
-**Base compatibility**: no change in system requirements.
+| **9** | Login POST-only | ⚠️ GET on `/api/auth/login` rejected (405) |
+| **10** | `/readyz` localhost-only | ⚠️ LAN requests rejected (403) |
+| **11** | `shellQuote()` | ⚪ No impact on user |
+| **12** | `readConfPort` range check | ✅ Safe fallback for invalid values |
+| **13** | `rebuildMu` mutex (RACE-1) | ✅ BLOCKLIST always consistent |
+| **14** | `runtime_info` dynamic ports (PORT-2) | ✅ Dynamic links |
+| **15** | Auth cache (60 s) | ⚠️ Credential changes take effect after ≤ 60 s |
 
 ---
 
@@ -99,7 +129,8 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 - ✅ Works smoothly.
 - ✅ Private DNS integration.
 - ✅ SELinux permissive with no issues.
-- ✅ **Dashboard works** (Fix #1).
+- ✅ Dashboard works (Fix #1).
+- ✅ Dynamic memory limit applies (v1.1.0).
 
 **Android 8-9**:
 - ✅ Works.
@@ -110,41 +141,64 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 - ⚠️ Doze mode stops services.
 - 💡 **Solution**: disable battery optimization.
 - ⚠️ iptables may differ.
-- ✅ **`getSystemShell()`**: works correctly on all versions.
+- ✅ `getSystemShell()`: works correctly on all versions.
 
 **Android 5**:
 - ⚠️ Requires kernel 3.10+.
 - ⚠️ May not support nftables.
-- 🆕 **`pgrep -x`**: may not work properly → fallback in code.
-- 🆕 **`sync.Once`**: requires Go 1.22+ (available in the build).
+- ⚠️ `pgrep -x`: may not work properly → fallback in code.
+- 🆕 `sync.Once`: requires Go 1.22+ (available in the build).
 
 ### 2.2 Dashboard Compatibility
 
-| Browser | SVG Icons | PNG Icons | JSON Metrics | Login POST |
-|---|:---:|:---:|:---:|:---:|
-| Chrome 90+ | ✅ | ✅ | ✅ | ✅ |
-| Chrome 88-89 | ✅ | ✅ | ✅ | ✅ |
-| Firefox 92+ | ✅ | ✅ | ✅ | ✅ |
-| Safari 15+ | ✅ | ✅ | ✅ | ✅ |
-| Samsung Internet 16+ | ✅ | ✅ | ✅ | ✅ |
-| **IE 11** | ❌ | ✅ | ❌ | ❌ |
+| Browser | SVG Icons | PNG Icons | JSON Metrics | Login POST | Profile/Memory |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Chrome 90+ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Chrome 88-89 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Firefox 92+ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Safari 15+ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Samsung Internet 16+ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **IE 11** | ❌ | ✅ | ❌ | ❌ | ❌ |
 
 **Reason**: v1.0.0 added PNG icons to precache, supporting older browsers.
 
 **Note**: Login POST-only requires `fetch()` or `XMLHttpRequest` — all modern browsers support it.
 
-### 2.3 Platform Support
+### 2.3 Dashboard — v1.1.0 Fields
 
-| Platform | `getSystemShell()` | `hasEndpoint()` | Dashboard JSON |
-|---|:---:|:---:|:---:|
-| Android | ✅ | ✅ | ✅ |
-| Linux (CI) | ✅ | ✅ | ✅ |
-| macOS (dev) | ✅ | ✅ | ✅ |
-| Termux | ⚠️ | ✅ | ✅ |
-| Windows (WSL2) | ✅ | ✅ | ✅ |
+The System Info panel in both `index.html` and `dashboard.html`
+now displays two additional rows populated from
+`runtime_info`:
 
-Before v1.0.0: Linux/macOS failed in `runShell` (path `/system/bin/sh` did not exist).
-After v1.0.0: `getSystemShell()` selects the right path automatically.
+| Row | Field | Type |
+|---|---|---|
+| **Profile** | `profile_key` | string |
+| **Memory limit** | `memory_limit_mb` | int |
+
+**Compatibility**:
+- ✅ All modern browsers (Chrome 88+, Firefox 92+, Safari 15+,
+  Samsung Internet 16+) render the new rows without any change.
+- ⚠️ IE 11: not supported (already excluded).
+- ✅ No new browser API is used — the fields are simple text
+  rendered from the existing JSON response.
+
+### 2.4 Platform Support
+
+| Platform | `getSystemShell()` | `hasEndpoint()` | Dashboard JSON | `memoryLimitForProfile` |
+|---|:---:|:---:|:---:|:---:|
+| Android | ✅ | ✅ | ✅ | ✅ |
+| Linux (CI) | ✅ | ✅ | ✅ | ✅ |
+| macOS (dev) | ✅ | ✅ | ✅ | ✅ |
+| Termux | ⚠️ | ✅ | ✅ | ✅ |
+| Windows (WSL2) | ✅ | ✅ | ✅ | ✅ |
+
+Before v1.0.0: Linux/macOS failed in `runShell` (path
+`/system/bin/sh` did not exist).
+After v1.0.0: `getSystemShell()` selects the right path
+automatically.
+
+**v1.1.0**: `memoryLimitForProfile` uses only the Go standard
+library (`runtime/debug`) — no platform-specific behavior.
 
 ---
 
@@ -193,14 +247,15 @@ Settings → Battery → App battery management → DNSCrypt
 
 ### 3.2 Setting Preservation (Fix #3)
 
-On all supported ROMs, v1.0.0 preserves:
+On all supported ROMs, since v1.0.0 the installer preserves:
 - `webui.conf`
 - `dnscrypt-proxy.toml`
 - `selected_profile.txt`
 - `allowlist.txt`
 - `denylist.txt`
 
-**Note**: On older ROMs (< Android 9), backup may fail if `/data/local/tmp/` is restricted. Check the log:
+**Note**: On older ROMs (< Android 9), backup may fail if
+`/data/local/tmp/` is restricted. Check the log:
 
 ```bash
 grep "Backed up\|Restored" /data/local/tmp/dnscrypt_install.log
@@ -211,6 +266,15 @@ grep "Backed up\|Restored" /data/local/tmp/dnscrypt_install.log
 ```bash
 su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 # Must display your custom value (not the default 9090)
+```
+
+**v1.1.0 addition**: The preserved `selected_profile.txt` drives
+the memory limit. If the file is missing after upgrade, `main.go`
+falls back to `"pro"` — verify it survived:
+
+```bash
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+# Expected: one of light / normal / pro / proplus / ultimate
 ```
 
 ---
@@ -233,15 +297,20 @@ su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 
 ### 4.1 Kernel Requirements
 
-| Feature | Minimum | In v1.0.0 |
+| Feature | Minimum | In v1.1.0 |
 |---|---|---|
 | iptables-nat | 3.10 | — |
 | nftables | 4.10 | — |
 | netns | 3.0 | — |
 | cgroup v2 | 4.5 | — |
-| **`/bin/sh`** | 4.x+ | ✅ (Linux dev) |
-| **`sync.Once` (Go runtime)** | 4.4+ | ✅ |
-| **`sync.Mutex` (Go runtime)** | 3.x+ | ✅ |
+| `/bin/sh` | 4.x+ | ✅ (Linux dev) |
+| `sync.Once` (Go runtime) | 4.4+ | ✅ |
+| `sync.Mutex` (Go runtime) | 3.x+ | ✅ |
+| **`debug.SetMemoryLimit`** | **3.x+ (Go runtime)** | **✅ (v1.1.0)** |
+
+**Note**: `debug.SetMemoryLimit` was introduced in Go 1.19.
+Since v1.1.0 uses Go 1.22, this is available on all supported
+kernel versions — the kernel itself is not involved.
 
 ### 4.2 Kernel Issues
 
@@ -296,7 +365,7 @@ su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 | x86_64 | ~40 µs | <80 ns | ~15 MB |
 | x86 | ~200 µs | <250 ns | ~15 MB |
 
-**Result**: v1.0.0 does not strain weak devices.
+**Result**: v1.1.0 does not strain weak devices.
 
 ### 5.3 RACE-1 Performance
 
@@ -308,6 +377,87 @@ su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 | x86 | ~800 ms | ~4 s |
 
 **Note**: `rebuildMu` adds no noticeable overhead (coarse-grained lock).
+
+### 5.4 Memory Profile by Device RAM (v1.1.0 — MEM-1)
+
+**This is the recommended profile by device tier.** The WebUI
+process sets a per-profile **soft** memory limit (see §1.3
+for MEM-1). Choosing a profile that matches your device's RAM
+avoids GC thrashing on the WebUI process while keeping DNS
+filtering effective.
+
+| Device RAM | Recommended profile | WebUI soft limit | Filters |
+|---|:---:|---:|:---:|
+| **1 GB** | `light` | 80 MB | ~40K entries |
+| **2 GB** | `normal` | 100 MB | ~120K entries |
+| **3 GB** | `pro` (default) | 120 MB | ~250K entries |
+| **4 GB** | `proplus` | 160 MB | ~350K entries |
+| **6 GB+** | `ultimate` | 220 MB | ~500K entries |
+
+#### 5.4.1 What "Soft Limit" Means
+
+- `debug.SetMemoryLimit` is a **soft** limit.
+- The Go runtime does **not** kill the process when the limit is
+  reached — it runs GC more aggressively instead.
+- Setting the limit too low → GC runs constantly → CPU waste → the
+  WebUI appears slow or unresponsive even though it is not crashed.
+- Setting the limit too high → RAM waste, especially on
+  low-RAM devices.
+
+**v1.1.0** chooses the limit automatically based on the profile.
+No user configuration is needed.
+
+#### 5.4.2 What Happens on Under-Powered Devices
+
+If you run `ultimate` on a 2 GB device:
+
+- ✅ It will work.
+- ⚠️ The WebUI may feel slow after long DNS activity.
+- ⚠️ Battery consumption may increase slightly.
+- ⚠️ Background apps might be killed by Android's LMK.
+
+**Recommendation**: match the profile to the device RAM tier.
+
+#### 5.4.3 What Happens on Over-Powered Devices
+
+If you run `light` on a 12 GB device:
+
+- ✅ It works perfectly.
+- ⚠️ You lose blocking for many domains.
+- ⚠️ No performance benefit versus `pro`.
+
+**Recommendation**: choose based on filtering goals, not just
+RAM.
+
+#### 5.4.4 How to Change the Profile
+
+```bash
+# From the WebUI:
+#   Select a profile → Apply.
+
+# Or from the terminal:
+su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+
+# Verify (wait ~5 s after restart):
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '{profile_key, memory_limit_mb}'
+```
+
+#### 5.4.5 How to Read the Value
+
+```bash
+# Via runtime_info:
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+# Expected: 80 / 100 / 120 / 160 / 220 (MB)
+
+# Via status.sh (v1.1.0):
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh" | grep -A3 "Profile & Memory"
+
+# Via the System Info panel:
+#   Open the WebUI → scroll to "System Info" → expand.
+#   Look for "Profile" and "Memory limit".
+```
 
 ---
 
@@ -384,17 +534,35 @@ su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 - ✅ `shellQuote()` used in `isPortOpen` (after adding firewall check).
 - ✅ `getSystemShell()` works with `iptables` / `nft` calls.
 - ✅ `manage_iptables` unchanged — v1.0.0 is backend-only.
-- ✅ **`rebuildMu` (RACE-1)** protects `rebuildBlocklist` from race conditions.
-- ✅ **`runtime_info` (PORT-2)** returns actual ports (no hardcoded).
+- ✅ `rebuildMu` (RACE-1) protects `rebuildBlocklist` from race conditions.
+- ✅ `runtime_info` (PORT-2) returns actual ports (no hardcoded).
 
-**Verify v1.0.0 firewall-related fixes**:
+### 6.5 Firewall + v1.1.0
+
+**No firewall changes in v1.1.0.** Custom Chains, `manage_firewall`,
+and `_inline_cleanup_firewall` are unchanged.
+
+**v1.1.0 additions relevant to firewall scripts**:
+
+| Change | Impact on firewall |
+|---|---|
+| MEM-2 (extended `shellQuote`) | ✅ More robust when passing `MODDIR` to `runShell` for iptables commands |
+| MEM-3 (`MONITORING_UI_PORT` constant) | ⚪ Unrelated to firewall |
+| MEM-1 (memory limit) | ⚪ Unrelated to firewall |
+
+**Verify v1.1.0 firewall-related changes**:
 
 ```bash
-# RACE-1: rebuildMu
-grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
+# MEM-2: shellQuote extended charset
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
+grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
 
-# PORT-2: runtime_info ports
-grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo "✅ PORT-2"
+# Firewall unaffected: verify no orphans
+su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
+# → 0
+
+# Verify Custom Chains still functional
+su -c "iptables -t nat -L DNSCRYPT_OUT -n 2>/dev/null | head -3"
 ```
 
 ---
@@ -420,30 +588,39 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 | set_perm_recursive | 20.0 |
 | KernelSU API | 0.9.0 |
 
-### 7.2 Root + v1.0.0 Compatibility
+### 7.2 Root + v1.1.0 Compatibility
 
-| Feature | Magisk 20.4 | Magisk 26+ | KernelSU | APatch |
+| Feature | Magisk 20.4+ | KernelSU | APatch |
 |---|:---:|:---:|:---:|:---:|
-| Backup/Restore | ✅ | ✅ | ✅ | ✅ |
-| Fix #1 verify | ✅ | ✅ | ✅ | ✅ |
-| Fix #2 verify | ✅ | ✅ | ✅ | ✅ |
-| NEW-1..NEW-6 verify | ✅ | ✅ | ✅ | ✅ |
-| RACE-1 + PORT-2 verify | ✅ | ✅ | ✅ | ✅ |
-| `hasEndpoint` | ✅ | ✅ | ✅ | ✅ |
-| Dashboard JSON | ✅ | ✅ | ✅ | ✅ |
-| Login POST-only | ✅ | ✅ | ✅ | ✅ |
-| `/readyz` localhost-only | ✅ | ✅ | ✅ | ✅ |
-| `rebuildMu` mutex | ✅ | ✅ | ✅ | ✅ |
-| `runtime_info` ports | ✅ | ✅ | ✅ | ✅ |
+| Backup/Restore | ✅ | ✅ | ✅ |
+| Fix #1 verify | ✅ | ✅ | ✅ |
+| Fix #2 verify | ✅ | ✅ | ✅ |
+| NEW-1..NEW-6 verify | ✅ | ✅ | ✅ |
+| RACE-1 + PORT-2 verify | ✅ | ✅ | ✅ |
+| `hasEndpoint` | ✅ | ✅ | ✅ |
+| Dashboard JSON | ✅ | ✅ | ✅ |
+| Login POST-only | ✅ | ✅ | ✅ |
+| `/readyz` localhost-only | ✅ | ✅ | ✅ |
+| `rebuildMu` mutex | ✅ | ✅ | ✅ |
+| `runtime_info` ports | ✅ | ✅ | ✅ |
+| **MEM-1 memory limit** | **✅** | **✅** | **✅** |
+| **MEM-2 extended shellQuote** | **✅** | **✅** | **✅** |
+| **MEM-3 MONITORING_UI_PORT** | **✅** | **✅** | **✅** |
+| **`runtime_info` profile_key + memory_limit_mb** | **✅** | **✅** | **✅** |
+| **`get_profile` memory_limit_mb** | **✅** | **✅** | **✅** |
 
 **`customize.sh` works the same way on all Root solutions.**
+
+**v1.1.0 note**: MEM-1 uses `debug.SetMemoryLimit` from the Go
+standard library. It is unrelated to the root solution — the
+same behavior applies everywhere.
 
 ### 7.3 Verification on Device
 
 ```bash
 # 1. Check version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.0.0
+# Expected: version=v1.1.0
 
 # 2. Fix #2 — getSystemShell
 su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui | grep -q 'getSystemShell' && echo '✅ Fix #2'"
@@ -453,6 +630,12 @@ su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui | gre
 
 # 4. RACE-1 — rebuildMu
 su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui | grep -q 'rebuildMu' && echo '✅ RACE-1'"
+
+# 5. MEM-1 — memoryLimitForProfile
+su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui | grep -q 'memoryLimitForProfile' && echo '✅ MEM-1'"
+
+# 6. MEM-1 — MEMORY_LIMIT constants
+su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui | grep -q 'MEMORY_LIMIT_ULTIMATE' && echo '✅ MEM-1 constants'"
 ```
 
 ### 7.4 Runtime Verification
@@ -478,9 +661,22 @@ curl -i "http://192.168.1.5:9091/readyz"
 # 5. Basic Auth rate limit (Fix #8)
 for i in {1..6}; do
   curl -u "wrong:wrong" -o /dev/null -w "%{http_code}\n" \
-    http://127.0.0.1:9090/api?action=status
+    http://127.0.0.1:9090/api?status
 done
 # Expected: 401 × 5 then 401 (locked)
+
+# 6. MEM-1 — memory_limit_mb present
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+# Expected: a number (80 / 100 / 120 / 160 / 220)
+
+# 7. MEM-1 — profile_key present
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
+# Expected: light / normal / pro / proplus / ultimate
+
+# 8. MEM-1 — profile_key matches selected_profile.txt
+diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key') \
+     <(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
+# Expected: no diff output
 ```
 
 ---
@@ -502,15 +698,19 @@ done
 | 9 | VPN apps conflict | Any VPN | They cannot run together |
 | 10 | SELinux enforcing blocks | Rare | Requires permissive |
 | 11 | Orphans from old versions in OUTPUT | Upgrade from very old versions | Cleaned automatically |
-| **12** | **Dashboard shows empty data** | **Pre-v1.0.0** | **Update to v1.0.0** |
-| **13** | **Basic Auth locked after 5 attempts** | **v1.0.0+** | **Wait 15 min or restart WebUI** |
-| **14** | **404 for unknown action** | **v1.0.0+** | **Update the script to expect 404** |
-| **15** | **CI Go build fails on Linux** | **Pre-v1.0.0** | **Update to v1.0.0** |
-| **16** | **Settings lost on upgrade** | **Pre-v1.0.0** | **Update to v1.0.0** |
-| **17** | **Login GET rejected (405)** | **v1.0.0+** | **Update integration to use POST** |
-| **18** | **`/readyz` from LAN rejected (403)** | **v1.0.0+** | **Use `/healthz` instead** |
-| **19** | **Credentials change delay (60 s)** | **v1.0.0+** | **Wait 60 s or restart WebUI** |
-| **20** | **Blocklist rebuild may take time on long lists** | **v1.0.0+** | **Normal — RACE-1 serializes rebuilds** |
+| 12 | Dashboard shows empty data | Pre-v1.0.0 | Update to v1.0.0+ |
+| 13 | Basic Auth locked after 5 attempts | v1.0.0+ | Wait 15 min or restart WebUI |
+| 14 | 404 for unknown action | v1.0.0+ | Update the script to expect 404 |
+| 15 | CI Go build fails on Linux | Pre-v1.0.0 | Update to v1.0.0+ |
+| 16 | Settings lost on upgrade | Pre-v1.0.0 | Update to v1.0.0+ |
+| 17 | Login GET rejected (405) | v1.0.0+ | Update integration to use POST |
+| 18 | `/readyz` from LAN rejected (403) | v1.0.0+ | Use `/healthz` instead |
+| 19 | Credentials change delay (60 s) | v1.0.0+ | Wait 60 s or restart WebUI |
+| 20 | Blocklist rebuild may take time on long lists | v1.0.0+ | Normal — RACE-1 serializes rebuilds |
+| **21** | **WebUI slow on `ultimate` (pre-v1.1.0)** | **v1.0.0** | **Update to v1.1.0 (MEM-1)** |
+| **22** | **`profile_key` mismatch (rare)** | **v1.1.0+** | **Fix `selected_profile.txt` + restart** |
+| **23** | **No auto-backup on uninstall** | **v1.1.0+** | **Manual backup before uninstall** |
+| **24** | **`memory_limit_mb` unexpected** | **v1.1.0+** | **Check startup log + `selected_profile.txt`** |
 
 ### 8.2 VPN Interaction
 
@@ -519,73 +719,82 @@ done
 - DNS queries go through the VPN instead of the module.
 - **Solution**: use only one of them.
 
-### 8.3 Hotspot
+### 8.3 v1.1.0-specific Issues
 
-On Android < 11, hotspot traffic may not be redirected to port 5354. Requires additional `iptables` rules.
+**Issue #21 — WebUI slow on `ultimate` (pre-v1.1.0)**:
 
-### 8.3 v1.0.0-specific Issues
-
-**Issue #12 — Dashboard shows empty data**:
-- **Symptom**: Dashboard tables are empty (Overview, Cache, Query Types, etc.).
-- **Cause**: `metricsProxyHandler` returned Prometheus text with `Content-Type: application/json`.
-- **Solution**: update to `v1.0.0`.
+- **Symptom** (v1.0.0 only): After switching to `ultimate`, the
+  WebUI becomes slow or unresponsive. CPU is high on the WebUI
+  process. Dashboard loads take 10+ seconds.
+- **Cause**: `debug.SetMemoryLimit(80 MB)` was hardcoded in
+  v1.0.0. On `ultimate`, actual working set approaches 200 MB
+  → GC thrashing.
+- **Solution**: Update to **v1.1.0** — the limit is now computed
+  per profile (220 MB for `ultimate`).
 - **Verify**:
   ```bash
-  grep -q 'func buildDashboardJSON' proxy/main.go && echo "✅ Fix present"
+  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
+  # Expected: 220 (for ultimate on v1.1.0)
   ```
+- **Reference**: [SECURITY.md](SECURITY.md) §5.30.1;
+  [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §6.10.
 
-**Issue #13 — Basic Auth locked out**:
-- **Symptom**: Basic Auth fails after 5 attempts.
-- **Cause**: intentional — prevents brute force.
-- **Solution**: wait 15 minutes or restart the WebUI.
+**Issue #22 — `profile_key` mismatch (rare)**:
 
-**Issue #14 — 404 for unknown action**:
-- **Symptom**: `GET /api?action=unknown` returns 404 instead of 200.
-- **Solution**: update the script:
-  ```bash
-  status_code=$(curl -s -o /dev/null -w "%{http_code}" "...")
-  if [ "$status_code" = "404" ]; then ...
-  ```
-
-**Issue #15 — CI Go build fails on Linux**:
-- **Symptom**: `fork/exec /system/bin/sh: no such file or directory`.
-- **Solution**: update to `v1.0.0`.
-
-**Issue #16 — Settings lost on upgrade**:
-- **Symptom**: `webui.conf` is reset after an upgrade.
-- **Solution**: update to `v1.0.0`.
-
-**Issue #17 — Login GET rejected (405)**:
-- **Symptom**: `curl "http://127.0.0.1:9090/api/auth/login?username=X&password=Y"` returns 405.
-- **Cause**: intentional (CSRF protection — Fix NEW-1).
-- **Solution**: use POST + JSON body:
-  ```bash
-  curl -X POST http://127.0.0.1:9090/api/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"..."}'
-  ```
-
-**Issue #18 — `/readyz` from LAN rejected (403)**:
-- **Symptom**: from a device on the LAN, `curl http://192.168.1.5:9091/readyz` returns 403.
-- **Cause**: intentional (info leak prevention — Fix NEW-4).
-- **Solution**: use `/healthz` (no details exposed):
-  ```bash
-  curl http://192.168.1.5:9091/healthz
-  # → "ok"
-  ```
-
-**Issue #19 — Credentials change delay (60 s)**:
-- **Symptom**: after changing credentials in `dnscrypt-proxy.toml`, they are not applied immediately.
-- **Cause**: Auth cache (Fix NEW-6) — TTL = 60 s.
-- **Solution**: wait 60 s or restart the WebUI:
+- **Symptom**: `runtime_info.profile_key` does not match
+  `selected_profile.txt`, or the memory limit does not match the
+  expected value for the profile.
+- **Cause**: The WebUI reads the profile file only at startup
+  and after `POST /api/update_profile`. Direct edits to the file
+  are not monitored.
+- **Solution**: Restart the WebUI:
   ```bash
   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
   ```
+- **Verify**:
+  ```bash
+  diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key') \
+       <(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
+  # Expected: no diff
+  ```
+- **Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §5.14.
 
-**Issue #20 — Blocklist rebuild delay**:
-- **Symptom**: when saving allowlist + updating profile at the same time, it may seem slower.
-- **Cause**: intentional — `rebuildMu` (RACE-1) serializes rebuilds.
-- **Solution**: normal — guarantees a consistent BLOCKLIST.
+**Issue #23 — No auto-backup on uninstall**:
+
+- **Symptom**: After uninstalling on v1.1.0, no backup directory
+  is created.
+- **Cause**: Intentional — v1.1.0 removed the auto-backup on
+  uninstall.
+- **Solution**: Take a manual backup before uninstalling:
+  ```bash
+  su -c "mkdir -p /sdcard/dnscrypt-backup-$(date +%Y%m%d)"
+  su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+  # ... (see INSTALL.md §10.5 for the full list)
+  ```
+- **Reference**: [INSTALL.md](INSTALL.md) §10.5;
+  [UPGRADE.md](UPGRADE.md) §6.5.
+
+**Issue #24 — `memory_limit_mb` unexpected**:
+
+- **Symptom**: `runtime_info.memory_limit_mb` does not match the
+  expected value for the active profile.
+- **Cause**: The startup log may show an error, or the profile
+  file may be missing/invalid.
+- **Solution**:
+  1. Verify the profile file:
+     ```bash
+     su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+     ```
+  2. Verify the startup log:
+     ```bash
+     su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+     ```
+  3. If either is wrong, fix and restart:
+     ```bash
+     su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+     su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+     ```
+- **Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §4.12, §5.14.
 
 ---
 
@@ -596,13 +805,20 @@ When reporting an issue, use the following template:
 ```markdown
 ## Environment
 
-- **Module version**: v1.0.0
+- **Module version**: v1.1.0
 - **Android version**: 14 (API 34)
 - **ROM**: LineageOS 21
 - **Kernel**: 5.15.94-lineageos
 - **SoC**: Snapdragon 8 Gen 2
 - **Root**: Magisk 27.0
 - **Architecture**: arm64-v8a
+
+## Profile & Memory (v1.1.0)
+
+- **Active profile** (from `selected_profile.txt`):
+- **`profile_key`** (from `runtime_info`):
+- **`memory_limit_mb`** (from `runtime_info`):
+- **Expected limit for the profile** (see §5.4):
 
 ## Issue Description
 
@@ -628,7 +844,7 @@ When reporting an issue, use the following template:
 <summary>dnscrypt_main.log</summary>
 
 ```text
-[Paste content here]
+[Paste content here — include the "dynamic memory limit" line if present]
 ```
 </details>
 
@@ -679,9 +895,11 @@ ON
 ```json
 $ curl -s http://127.0.0.1:9090/api?action=runtime_info
 {
-  "version": "v1.0.0",
+  "version": "v1.1.0",
   "webui_port": "9090",
   "dashboard_port": "9091",
+  "profile_key": "pro",
+  "memory_limit_mb": 120,
   ...
 }
 ```
@@ -690,7 +908,7 @@ $ curl -s http://127.0.0.1:9090/api?action=runtime_info
 ## Additional Context
 
 - [ ] Works on a previous version
-- [ ] New in v1.0.0
+- [ ] New in v1.1.0
 - [ ] Intermittent
 
 ## Screenshots
@@ -702,7 +920,7 @@ $ curl -s http://127.0.0.1:9090/api?action=runtime_info
 
 ```bash
 #!/bin/bash
-# diagnose.sh — collect all information in one shot
+# diagnose.sh — collect all information in one shot (v1.1.0)
 
 echo "=== Module Info ==="
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/module.prop"
@@ -725,6 +943,11 @@ echo "=== Status ==="
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
 
 echo ""
+echo "=== Profile & Memory (v1.1.0) ==="
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+
+echo ""
 echo "=== Firewall ==="
 su -c "iptables -t nat -L OUTPUT -n | head -5"
 su -c "iptables -t nat -L DNSCRYPT_OUT -n 2>/dev/null | head -5"
@@ -735,7 +958,7 @@ echo "=== Dashboard ==="
 su -c "curl -s http://127.0.0.1:9091/api/metrics" | head -20
 
 echo ""
-echo "=== Runtime Info (PORT-2) ==="
+echo "=== Runtime Info ==="
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info"
 
 echo ""
@@ -750,53 +973,46 @@ echo ""
 echo "✅ Diagnostics complete. Save output to a file and attach to the issue."
 ```
 
-### 9.2 v1.0.0-specific Diagnostics
+### 9.2 v1.1.0-specific Diagnostics
 
 ```bash
 #!/bin/bash
-# diagnose-v1.sh — v1.0.0-specific checks
+# diagnose-v110.sh — v1.1.0-specific checks
 
-echo "=== Fix #1: Dashboard JSON ==="
-curl -s -I http://127.0.0.1:9091/api/metrics | grep Content-Type
-echo "Expected: application/json; charset=utf-8"
-
-echo ""
-echo "=== Fix #2: getSystemShell (source check) ==="
-grep -q 'func getSystemShell' /data/adb/modules/dnscrypt-proxy-webui/proxy/*.go 2>/dev/null \
-  && echo "✅ present" || echo "⚠️ not on device (normal — binary only)"
+echo "=== MEM-1: Memory limit active ==="
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
+    | jq '{profile_key, memory_limit_mb}'
 
 echo ""
-echo "=== Fix #8: Basic Auth rate limit ==="
-for i in {1..6}; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" \
-    -u "wrong:wrong" http://127.0.0.1:9090/api?action=status)
-  echo "Attempt $i: $code"
-done
-echo "Expected: 401 × 5 then 401 (locked)"
+echo "=== MEM-1: Startup log line ==="
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
 
 echo ""
-echo "=== NEW-1: Login POST-only ==="
-curl -s -o /dev/null -w "GET /api/auth/login → %{http_code}\n" \
-  "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
-echo "Expected: 405"
+echo "=== MEM-1: Profile file vs runtime ==="
+echo -n "selected_profile.txt: "
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+echo -n "runtime profile_key:  "
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'"
 
 echo ""
-echo "=== NEW-4: /readyz localhost-only ==="
-curl -s -o /dev/null -w "GET /readyz → %{http_code}\n" \
-  http://127.0.0.1:9091/readyz
-echo "From localhost: 200 or 503"
+echo "=== MEM-2: Extended shellQuote (binary check) ==="
+su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui 2>/dev/null | grep -q 'shellQuote' && echo '✅ shellQuote present in binary'"
 
 echo ""
-echo "=== PORT-2: runtime_info ports ==="
-curl -s http://127.0.0.1:9090/api?action=runtime_info | grep -E 'webui_port|dashboard_port'
+echo "=== MEM-3: MONITORING_UI_PORT (source only) ==="
+# Not present in the binary — verify via the repo
+grep -q 'MONITORING_UI_PORT' proxy/main.go 2>/dev/null && echo "✅ MEM-3 present in source" \
+    || echo "ℹ️  Source not available on device (this is normal)"
 
 echo ""
-echo "=== RACE-1: rebuildMu (binary check) ==="
-strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui 2>/dev/null \
-  | grep -q 'rebuildMu' && echo "✅ RACE-1 present in binary"
+echo "=== v1.1.0: Version in all files ==="
+V=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/module.prop" | grep '^version=' | cut -d= -f2)
+echo "module.prop: $V"
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.version'" \
+    | xargs -I{} echo "runtime_info: {}"
 
 echo ""
-echo "✅ Diagnostics complete."
+echo "✅ v1.1.0-specific diagnostics complete."
 ```
 
 ---
@@ -809,9 +1025,10 @@ echo "✅ Diagnostics complete."
 - Testing on different or modified ROMs.
 - Solutions and workarounds for known issues.
 - Detailed logs.
-- **Dashboard reports** on different browsers.
-- **Platform reports** (Linux, macOS, WSL2).
-- **Performance reports** (`rebuildBlocklist` duration).
+- Dashboard reports on different browsers.
+- Platform reports (Linux, macOS, WSL2).
+- Performance reports (`rebuildBlocklist` duration).
+- **v1.1.0**: Memory-limit reports per device RAM tier.
 
 ### 10.2 How to Contribute
 
@@ -820,55 +1037,70 @@ echo "✅ Diagnostics complete."
 3. Open an Issue titled `[Compat] <Device> <Android>`.
 4. Attach the logs.
 
-### 10.3 Compatibility Testing for v1.0.0
+### 10.3 Compatibility Testing for v1.1.0
 
 **Recommended tests**:
 
 ```bash
-# 1. Test Dashboard (Fix #1)
+# 1. Test Dashboard (Fix #1, still in v1.1.0)
 echo "Open http://127.0.0.1:9091"
 echo "Should show: total_queries, blocked_queries, cache_stats"
 
-# 2. Test shell fallback (Fix #2)
+# 2. Test shell fallback (Fix #2, still in v1.1.0)
 echo "Test on Linux/macOS (dev):"
 cd proxy && go build -buildvcs=false -trimpath -o /tmp/test-main main.go
 grep -q 'func getSystemShell' main.go && echo "✅ getSystemShell present"
 
-# 3. Test Basic Auth rate limit (Fix #8)
+# 3. Test Basic Auth rate limit (Fix #8, still in v1.1.0)
 echo "5 failed attempts:"
 for i in {1..6}; do
   curl -u "wrong:wrong" -o /dev/null -w "%{http_code}\n" \
     http://127.0.0.1:9090/api?action=status
 done
 
-# 4. Test 404 (Fix #12)
+# 4. Test 404 (Fix #12, still in v1.1.0)
 echo "Unknown action:"
 curl -i "http://127.0.0.1:9090/api?action=nonexistent"
 # → 404 Not Found
 
-# 5. Test Preserve Settings (Fix #3)
+# 5. Test Preserve Settings (Fix #3, still in v1.1.0)
 echo "After upgrade:"
 su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 
-# 6. Test Login POST-only (NEW-1)
+# 6. Test Login POST-only (NEW-1, still in v1.1.0)
 curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 # → 405 Method Not Allowed + Allow: POST
 
-# 7. Test /readyz localhost-only (NEW-4)
+# 7. Test /readyz localhost-only (NEW-4, still in v1.1.0)
 curl -i http://127.0.0.1:9091/readyz
 # → 200 or 503 (from localhost)
 
-# 8. Test shellQuote (NEW-5)
+# 8. Test shellQuote (NEW-5 + MEM-2)
 grep -q 'func shellQuote' proxy/main.go && echo "✅ NEW-5 present"
+grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2 braces"
 
-# 9. Test Auth cache (NEW-6)
+# 9. Test Auth cache (NEW-6, still in v1.1.0)
 grep -q 'AUTH_CACHE_TTL' proxy/main.go && echo "✅ NEW-6 present"
 
 # 10. Test RACE-1 (rebuildMu)
 grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
 
-# 11. Test PORT-2 (runtime_info)
+# 11. Test PORT-2 (runtime_info ports)
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'
+
+# 12. Test MEM-1 (memory limit)
+grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1 function"
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+
+# 13. Test MEM-1 (no hardcoded limit remains)
+! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ MEM-1 no hardcoded"
+
+# 14. Test MEM-3 (MONITORING_UI_PORT in metrics handler)
+grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
+
+# 15. Test v1.1.0 profile_key (runtime_info field)
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
+# Expected: light / normal / pro / proplus / ultimate
 ```
 
 ### 10.4 Hall of Fame
@@ -885,6 +1117,17 @@ New badge for those testing on **non-Android platforms** (Linux, macOS, WSL2):
 
 **Benefit**: improves `getSystemShell()` and platform-agnostic shell behavior.
 
+### 10.6 Memory Architect Badge (v1.1.0)
+
+New badge for contributors who:
+
+- Test the dynamic memory limit on multiple RAM tiers.
+- Report GC-related issues with concrete data (profile, RSS,
+  CPU sample, `runtime_info` output).
+- Propose improvements to the per-profile constants.
+
+**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md) — Memory Architect.
+
 ---
 
 ## 11. References
@@ -898,6 +1141,7 @@ New badge for those testing on **non-Android platforms** (Linux, macOS, WSL2):
 - [DNSCrypt-proxy Wiki](https://github.com/DNSCrypt/dnscrypt-proxy/wiki)
 - [Netfilter iptables Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 
 ### 11.2 Project Documentation
 
@@ -918,6 +1162,6 @@ New badge for those testing on **non-Android platforms** (Linux, macOS, WSL2):
 
 ---
 
-*Last updated: 2026-09-24*
-*Version: v1.0.0*
+*Last updated: 2026-09-26*
+*Version: v1.1.0*
 *Author: gasciljh*

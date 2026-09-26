@@ -2,10 +2,25 @@
 
 > Detailed step-by-step installation guide.
 
-**Version**: v1.0.0
-**Last updated**: 2026-09-24
+**Version**: v1.1.0
+**Last updated**: 2026-09-26
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **v1.1.0 changes**:
+>   • Version bumped from v1.0.0 to v1.1.0.
+>   • §4.4 (Successful Installation Screen) now includes the
+>     expected memory limit line printed by `customize.sh`.
+>   • §7.2 (`/readyz` verification) updated to expect `v1.1.0`.
+>   • §7.7 (Dashboard verification) updated with the Content-Type
+>     check and a v1.1.0 note.
+>   • §7.10 (Runtime Info verification) now verifies the two new
+>     fields: `profile_key` and `memory_limit_mb`.
+>   • §12.4 (Key Changes) adds MEM-1 / MEM-2 / MEM-3.
+>   • §12.5 (Verify the Version) updated.
+>   • §13 (Unified Verification Script) extended with v1.1.0 checks.
+>   • All ZIP filename examples updated: `1.0.0` → `1.1.0`.
+>   • No structural changes to the installation procedure.
 
 ---
 
@@ -22,7 +37,7 @@
 9. [Updating](#9-updating)
 10. [Uninstalling](#10-uninstalling)
 11. [Quick Reference](#11-quick-reference)
-12. [v1.0.0 Specific Notes](#12-v100-specific-notes)
+12. [v1.1.0 Specific Notes](#12-v110-specific-notes)
 13. [Unified Verification Script](#13-unified-verification-script)
 14. [References](#14-references)
 
@@ -49,6 +64,10 @@
 | **Root** | Magisk 26+ |
 | **Kernel** | 4.14+ |
 | **RAM** | 2 GB+ |
+
+**v1.1.0 note**: On 1 GB devices, prefer the `light` or
+`normal` profile. The `ultimate` profile sets a 220 MB soft
+limit for the WebUI process — see §12.4.
 
 ### 1.3 Does Not Work With
 
@@ -134,12 +153,12 @@ df -h /data
 ### 3.1 From GitHub Releases
 
 ```bash
-# Latest release
-wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.0.0-module.zip
+# Latest release (v1.1.0)
+wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.1.0-module.zip
 
 # Or
-curl -L -o dnscrypt-webui-1.0.0-module.zip \
-    https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.0.0-module.zip
+curl -L -o dnscrypt-webui-1.1.0-module.zip \
+    https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.1.0-module.zip
 ```
 
 ### 3.2 Verify SHA-256
@@ -150,23 +169,23 @@ curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/down
 
 # Verify
 sha256sum -c module.zip.sha256
-# → dnscrypt-webui-1.0.0-module.zip: OK
+# → dnscrypt-webui-1.1.0-module.zip: OK
 ```
 
 ### 3.3 Verify Signature (optional, recommended)
 
 ```bash
 # Download signature + certificate
-curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.0.0-module.zip.sig
-curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.0.0-module.zip.pem
+curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.1.0-module.zip.sig
+curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.1.0-module.zip.pem
 
 # Verify (Cosign keyless)
 cosign verify-blob \
-    --signature dnscrypt-webui-1.0.0-module.zip.sig \
-    --certificate dnscrypt-webui-1.0.0-module.zip.pem \
+    --signature dnscrypt-webui-1.1.0-module.zip.sig \
+    --certificate dnscrypt-webui-1.1.0-module.zip.pem \
     --certificate-identity-regexp "https://github.com/gasciljh/dnscrypt-proxy-webui/.*" \
     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    dnscrypt-webui-1.0.0-module.zip
+    dnscrypt-webui-1.1.0-module.zip
 ```
 
 **Expected**:
@@ -178,7 +197,7 @@ Verified OK
 
 ```bash
 # Via ADB
-adb push dnscrypt-webui-1.0.0-module.zip /sdcard/Download/
+adb push dnscrypt-webui-1.1.0-module.zip /sdcard/Download/
 
 # Or copy manually
 ```
@@ -192,14 +211,14 @@ adb push dnscrypt-webui-1.0.0-module.zip /sdcard/Download/
 1. Open **Magisk Manager**.
 2. Go to **Modules**.
 3. Press **Install from storage**.
-4. Choose `dnscrypt-webui-1.0.0-module.zip`.
+4. Choose `dnscrypt-webui-1.1.0-module.zip`.
 5. Press **OK** to confirm.
 
 ### 4.2 From TWRP (alternative)
 
 ```bash
 # In TWRP
-adb push dnscrypt-webui-1.0.0-module.zip /sdcard/
+adb push dnscrypt-webui-1.1.0-module.zip /sdcard/
 # Then from TWRP: Install → choose the ZIP
 ```
 
@@ -231,16 +250,18 @@ The steps inside `customize.sh`:
 14. Generate **secure credentials** (username + password).
 15. Set permissions.
 16. Write the module fingerprint.
+17. **v1.1.0**: compute and print the expected memory limit
+    for the active profile (informational).
 
 ### 4.4 Successful Installation Screen
 
 **Expected in Magisk**:
 ```text
-╔══════════════════════════════════════════╗
-║  🛡️  DNSCrypt Smart Filter              ║
-║      v1.0.0                               ║
+╔═════════════════════════════════════╗
+║  🛡️  DNSCrypt Smart Filter                ║
+║      v1.1.0                               ║
 ║      Professional Edition                 ║
-╚══════════════════════════════════════════╝
+╚═════════════════════════════════════╝
 
 - Architecture: arm64-v8a
 - Upgrade detected, cleaning old instances...
@@ -259,24 +280,25 @@ The steps inside `customize.sh`:
 
 - Generating secure credentials...
 
-╔══════════════════════════════════════════╗
+╔════════════════════════════════════╗
 ║  🔐 Login Credentials Generated          ║
-╚══════════════════════════════════════════╝
+╚════════════════════════════════════╝
   👤 Username: admin_xxxxxxxx
   🔑 Password: XXXXXXXXXXXXXXXXXXXXXXXX
 
 📌 Keep these credentials to log in
 📄 Saved copy: /data/local/tmp/dnscrypt_credentials.txt
 
-╔══════════════════════════════════════════╗
-║  ✅ Installation Complete                ║
-║      v1.0.0                               ║
-╚══════════════════════════════════════════╝
+╔═════════════════════════════════════╗
+║  ✅ Installation Complete                 ║
+║      v1.1.0                               ║
+╚═════════════════════════════════════╝
 
   📊 Upgrade detected: YES (5 files restored)
   🌐 WebUI: http://127.0.0.1:9090
   📈 Dashboard: http://127.0.0.1:9091
   🔌 Bind: 127.0.0.1
+  🧠 Memory limit: ~120 MB (profile: pro)   ← v1.1.0
 
   ℹ️  Next steps:
     1. Reboot your device
@@ -285,6 +307,11 @@ The steps inside `customize.sh`:
 ```
 
 ⚠️ **Important**: Copy the credentials — you will need them in **Step 8**.
+
+**v1.1.0 addition**: The `🧠 Memory limit: ~120 MB (profile: pro)`
+line is computed by `customize.sh` from
+`selected_profile.txt`. It reflects the soft limit that
+`main.go` will apply at startup. See §12.4 for the full table.
 
 ### 4.5 Possible Warnings During Installation
 
@@ -329,7 +356,7 @@ correctly until you REBOOT your device.
 1. Open **KernelSU Manager**.
 2. Go to **Modules**.
 3. Press **Install**.
-4. Choose `dnscrypt-webui-1.0.0-module.zip`.
+4. Choose `dnscrypt-webui-1.1.0-module.zip`.
 5. Press **Install**.
 
 ### 5.2 Difference from Magisk
@@ -370,10 +397,10 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
 
 **Expected**:
 ```text
-╔══════════════════════════════════════════════════════════╗
-║  🛡️  DNSCrypt Smart Filter v1.0.0
-║      ✅ ACTIVE
-╚══════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════╗
+║  🛡️  DNSCrypt Smart Filter v1.1.0                      ║
+║      ✅ ACTIVE                                         ║
+╚════════════════════════════════════════════════╝
 
 ━━━ 🖥️  Service Status ━━━
   🟢 DNS Engine:   running on port 5354/UDP
@@ -393,12 +420,12 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
 su -c "curl -s http://127.0.0.1:9090/healthz"
 # → ok
 
-# Readiness (localhost-only — v1.0.0 Fix NEW-4)
+# Readiness (localhost-only — Fix NEW-4)
 su -c "curl -s http://127.0.0.1:9090/readyz"
-# → {"blocklist":"ok","config":"ok","run_dir":"ok","status":"ready","version":"v1.0.0"}
+# → {"blocklist":"ok","config":"ok","run_dir":"ok","status":"ready","version":"v1.1.0"}
 ```
 
-⚠️ **Note**: `version` must be `v1.0.0`.
+⚠️ **Note**: `version` must be `v1.1.0`.
 
 ⚠️ **From LAN (after BIND_ADDR=0.0.0.0)**:
 ```bash
@@ -467,9 +494,9 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
 - `ON` = "User wants the service running" (user intent).
 - `OFF` = "User stopped the service" (user intent).
 
-⚠️ **v1.0.0 — Fix A**: Not written by read-only functions — written only by `startService` / `stopService`.
+⚠️ **Fix A**: Not written by read-only functions — written only by `startService` / `stopService`.
 
-⚠️ **v1.0.0 — Fix #2**: `getSystemShell()` uses `sync.Once` — cached once (no repeated overhead).
+⚠️ **Fix #2**: `getSystemShell()` uses `sync.Once` — cached once (no repeated overhead).
 
 ### 7.6 Verify No Orphans
 
@@ -481,7 +508,7 @@ su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 
 If you see a number > 0 → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
-### 7.7 Verify Dashboard (v1.0.0)
+### 7.7 Verify Dashboard (v1.1.0)
 
 ```bash
 # 1. Correct Content-Type
@@ -497,7 +524,7 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" | head -5
 # You should see statistics (total_queries, blocked_queries, cache_stats)
 ```
 
-⚠️ **If tables are empty** → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
+⚠️ **If tables are empty** → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §4.8.
 
 **Before v1.0.0**: `/api/metrics` returned Prometheus text with `Content-Type: application/json` → `JSON.parse()` failed → Dashboard broken.
 
@@ -539,16 +566,32 @@ done
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
-### 7.10 Verify Runtime Info (PORT-2)
+### 7.10 Verify Runtime Info (PORT-2 + MEM-1)
 
 ```bash
-# 1. runtime_info returns ports
+# 1. Ports (PORT-2)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
 # Expected: {"webui_port": "9090", "dashboard_port": "9091"}
 
 # 2. From LAN (with BIND_ADDR=0.0.0.0)
 curl -s http://192.168.1.5:9090/api?action=runtime_info | jq '.bind_addr'
 # Expected: "0.0.0.0"
+
+# 3. Profile + Memory (v1.1.0 — MEM-1)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+
+# 4. Confirm the value matches the profile
+# If profile_key is "ultimate", memory_limit_mb must be 220.
+# If profile_key is "light", memory_limit_mb must be 80.
+# See §12.4 for the full table.
+```
+
+**Verify the startup log line** (v1.1.0):
+
+```bash
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+# Expected: 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
 ```
 
 ### 7.11 Verify Login POST-only
@@ -582,18 +625,31 @@ Use the credentials generated in **Step 4.4**:
 🔑 Password: XXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
-⚠️ **v1.0.0**: Login is **POST-only** — if you use a script, use POST (see [`API.md`](API.md)).
+⚠️ **v1.1.0**: Login is **POST-only** — if you use a script, use POST (see [`API.md`](API.md)).
 
 ### 8.3 Choose a List
 
 1. In **📝 Select Blocklist**, choose:
-   - ☀️ **Light** (40K entries) — recommended for beginners
-   - 🧹 **Normal** (120K) — balanced
-   - 🛡️ **PRO** (250K) — recommended (default)
-   - ⚡ **PRO++** (350K)
-   - 🔥 **Ultimate** (500K) — for powerful devices
+   - ☀️ **Light** (40K entries) — recommended for 1 GB RAM devices
+   - 🧹 **Normal** (120K) — recommended for 2 GB RAM devices
+   - 🛡️ **PRO** (250K) — recommended (default), 3 GB RAM devices
+   - ⚡ **PRO++** (350K) — recommended for 4 GB RAM devices
+   - 🔥 **Ultimate** (500K) — for 6 GB+ RAM devices
 2. Press **Apply**.
 3. Wait (30s - 5 min depending on the list).
+
+**v1.1.0 note**: Each profile sets a corresponding memory limit
+for the WebUI process. Choose based on your device's RAM:
+
+| Profile | RAM target | WebUI soft limit |
+|---|---|---:|
+| Light | 1 GB | 80 MB |
+| Normal | 2 GB | 100 MB |
+| PRO | 3 GB | 120 MB |
+| PRO++ | 4 GB | 160 MB |
+| Ultimate | 6 GB+ | 220 MB |
+
+See §12.4 for details.
 
 ### 8.4 Configure Custom Rules (optional)
 
@@ -628,6 +684,10 @@ You will see:
 - Cache hit ratio.
 - Resolver health.
 - Top queried domains.
+
+**v1.1.0**: The System Info panel (in both WebUI and Dashboard)
+now also shows the active profile and the memory limit. See
+§7.10.
 
 **To enable `recent_queries` + `top_domains`**:
 Edit `dnscrypt-proxy.toml`:
@@ -664,7 +724,7 @@ Open `https://www.dnsleaktest.com` — you should see:
 
 ```bash
 # 1. Download the new ZIP
-wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-X.Y.Z-module.zip
+wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.1.0-module.zip
 
 # 2. Install over the old one (from Magisk directly)
 # 3. Reboot
@@ -672,7 +732,7 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 
 ### 9.3 What Happens During Update
 
-**v1.0.0**:
+**v1.1.0**:
 - `customize.sh` **backs up** 5 settings files.
 - Extracts the new ZIP (with `unzip -o`).
 - **Restores** the saved files over defaults.
@@ -714,10 +774,10 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
   su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
   # → PORT=9090 (or your custom value)
   ```
-- **Verify PORT-2**:
+- **Verify PORT-2 + MEM-1**:
   ```bash
-  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
-  # → {"webui_port": "9090", "dashboard_port": "9091"}
+  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port, profile_key, memory_limit_mb}'"
+  # → {"webui_port": "9090", "dashboard_port": "9091", "profile_key": "pro", "memory_limit_mb": 120}
   ```
 
 ### 9.5 Upgrading from an older version
@@ -735,6 +795,7 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
      - `DNSCRYPT_OUT` is created.
      - `DNSCRYPT_OUT6` is created (if IPv6 is available).
      - `STATUS_FILE` = "ON".
+     - **v1.1.0**: `applyMemoryLimit()` is called from `main()`.
 3. **Verify**:
    ```bash
    # No orphans
@@ -753,6 +814,9 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 
    # Settings preserved
    su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
+
+   # v1.1.0 fields present
+   su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
    ```
 
 **No manual action required** — everything is automatic.
@@ -784,7 +848,7 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 
 ```bash
 su -c "grep '^versionCode=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: 1000000 (v1.0.0)
+# Expected: 1010000 (v1.1.0)
 ```
 
 **Formula**:
@@ -821,19 +885,18 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 
 During removal, `uninstall.sh` runs:
 
-1. **Save backup** to `/data/local/tmp/dnscrypt_backup_uninstall/`:
-   - Settings files (8 files).
-   - credentials.
-   - `module.prop`.
-   - Status file.
-   - `RESTORE.txt`.
-2. **Stop all processes** (`pkill -9`).
-3. **Full firewall cleanup** (`-D` + `-F` + `-X`).
-4. **Legacy cleanup** (best-effort).
-5. **Reset DNS settings** to normal (**AUTO**).
-6. **Restore `route_localnet`** to its original state (instead of forcing 0).
-7. **Delete runtime files** in `/data/local/tmp/`.
-8. **Delete module settings** (blocklist, allowlist, denylist, ...).
+1. **Stop all processes** (`pkill -9`).
+2. **Full firewall cleanup** (`-D` + `-F` + `-X`).
+3. **Legacy cleanup** (best-effort).
+4. **Reset DNS settings** to normal (**AUTO**).
+5. **Restore `route_localnet`** to its original state (instead of forcing 0).
+6. **Delete runtime files** in `/data/local/tmp/`.
+7. **Delete module settings** (blocklist, allowlist, denylist, ...).
+8. **Remove legacy backup directory** (v1.0.0 artifact, if any).
+
+**v1.1.0 note**: `uninstall.sh` **does not create a new backup**.
+All module settings are removed permanently. If you want to keep
+them, copy them manually before uninstalling (see §10.5).
 
 ### 10.4 Manual Removal (if normal uninstall fails)
 
@@ -860,19 +923,24 @@ su -c "ndc resolver flushdefaultif 2>/dev/null"
 # Reboot
 ```
 
-### 10.5 Recovering Settings
+### 10.5 Manual Backup Before Uninstall (v1.1.0)
+
+Since v1.1.0 does not create a backup during uninstall, copy your
+settings manually if you plan to reinstall later:
 
 ```bash
-# Backup is saved in:
-su -c "ls /data/local/tmp/dnscrypt_backup_uninstall/"
+# Create backup directory
+su -c "mkdir -p /sdcard/dnscrypt-backup-$(date +%Y%m%d)"
 
-# To restore:
-# 1. Reinstall the module normally
-# 2. Copy the old files to proxy/
-su -c "cp /data/local/tmp/dnscrypt_backup_uninstall/*.conf /data/adb/modules/dnscrypt-proxy-webui/proxy/"
-su -c "cp /data/local/tmp/dnscrypt_backup_uninstall/*.toml /data/adb/modules/dnscrypt-proxy-webui/proxy/"
-su -c "cp /data/local/tmp/dnscrypt_backup_uninstall/*.txt /data/adb/modules/dnscrypt-proxy-webui/proxy/"
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+# Copy 5 user config files
+su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/allowlist.txt /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+su -c "cp /data/adb/modules/dnscrypt-proxy-webui/proxy/denylist.txt /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
+
+# Verify
+su -c "ls -la /sdcard/dnscrypt-backup-$(date +%Y%m%d)/"
 ```
 
 ### 10.6 Verify Firewall Cleanliness After Removal
@@ -888,18 +956,6 @@ su -c "iptables -t nat -L DNSCRYPT_OUT -n 2>&1 | grep -c 'No chain'"
 ```
 
 If there are orphans → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
-
-### 10.7 Verify Backup Files
-
-```bash
-su -c "cat /data/local/tmp/dnscrypt_backup_uninstall/RESTORE.txt"
-```
-
-Contains:
-- Creation date.
-- Version.
-- File list.
-- Restore instructions.
 
 ---
 
@@ -917,7 +973,7 @@ Contains:
 
 ---
 
-## 12. v1.0.0 Specific Notes
+## 12. v1.1.0 Specific Notes
 
 ### 12.1 First-Time Installation
 
@@ -925,6 +981,9 @@ Contains:
 2. **Credentials**: Generated by `customize.sh`. Save them.
 3. **Firewall**: Starts empty (no Custom Chains). Created on first run.
 4. **Dashboard**: Works immediately (JSON metrics).
+5. **Memory limit**: Printed by `customize.sh` during install
+   (informational — the effective limit is set by `main.go` at
+   startup). See §12.4.
 
 ### 12.2 On Upgrade
 
@@ -932,44 +991,89 @@ Contains:
 2. **Orphan cleanup**: Automatic from `customize.sh` (legacy best-effort).
 3. **Custom Chains**: Recreated on first `startService()`.
 4. **STATUS_FILE**: Read from the old file if present.
+5. **Memory limit**: Recomputed at startup from the preserved
+   `selected_profile.txt`.
 
 ### 12.3 On Uninstall
 
 1. **Full cleanup**: `_inline_cleanup_firewall` + `_legacy_cleanup_*`.
-2. **Backup**: Saved to `/data/local/tmp/dnscrypt_backup_uninstall/`.
+2. **Legacy backup cleanup**: Any `/data/local/tmp/dnscrypt_backup_uninstall/`
+   from v1.0.0 is removed.
 3. **DNS reset**: `settings delete global private_dns_mode`.
+4. **No backup is created** (v1.1.0 change). Copy settings
+   manually if needed (§10.5).
 
-### 12.4 Key Changes in v1.0.0
+### 12.4 Key Changes in v1.1.0
 
 | Feature | Impact on Installation |
 |---|---|
-| **Dashboard JSON** (Fix #1) | Works immediately |
-| **getSystemShell** (Fix #2) | No impact on Android |
-| **Preserve settings** (Fix #3) | Automatic backup/restore |
-| **Login POST-only** (NEW-1) | Make sure to use POST |
-| **`/readyz` localhost** (NEW-4) | No LAN access |
-| **`hasEndpoint`** (Fix #12) | Stricter endpoints |
-| **`readConfPort`** (NEW-3) | Rejects invalid port values |
-| **`rebuildMu`** (RACE-1) | Safe BLOCKLIST |
-| **`runtime_info` ports** (PORT-2) | Dynamic links |
-| **Auth cache** (NEW-6) | Credentials change after 60s |
-| **`shellQuote`** (NEW-5) | No impact on user |
-| **Basic Auth rate limit** (Fix #8) | May lock after 5 attempts |
-| **404 for unknown action** (Fix #12) | Scripts may need update |
-| **Section header with comment** (Fix #10) | `[monitoring_ui] # comment` supported now |
-| **Per-port cache** (Fix #11) | Correct cache per port |
+| **MEM-1 — Dynamic memory limit per profile** | `customize.sh` prints the expected limit; `main.go` applies it at startup. See the table below. |
+| **MEM-2 — Extended `shellQuote`** | No impact on installation. |
+| **MEM-3 — `MONITORING_UI_PORT` constant** | No impact on installation. |
+| **`runtime_info` new fields** | `profile_key` + `memory_limit_mb` are returned by `/api?action=runtime_info`. Displayed in System Info panels. |
+| **Dashboard JSON** (Fix #1, from v1.0.0) | Works immediately. |
+| **`getSystemShell`** (Fix #2, from v1.0.0) | No impact on Android. |
+| **Preserve settings** (Fix #3, from v1.0.0) | Automatic backup/restore during upgrade. |
+| **Login POST-only** (NEW-1, from v1.0.0) | Make sure to use POST in scripts. |
+| **`/readyz` localhost** (NEW-4, from v1.0.0) | No LAN access to `/readyz`. |
+| **`hasEndpoint`** (Fix #12, from v1.0.0) | Stricter endpoints. |
+| **`readConfPort`** (NEW-3, from v1.0.0) | Rejects invalid port values. |
+| **`rebuildMu`** (RACE-1, from v1.0.0) | Safe BLOCKLIST. |
+| **`runtime_info` ports** (PORT-2, from v1.0.0) | Dynamic links. |
+| **Auth cache** (NEW-6, from v1.0.0) | Credentials change after 60s. |
+| **Basic Auth rate limit** (Fix #8, from v1.0.0) | May lock after 5 attempts. |
+| **404 for unknown action** (Fix #12, from v1.0.0) | Scripts may need update. |
+
+**Memory limits per profile (MEM-1)**:
+
+| `profile_key` | Soft limit | Typical RAM |
+|---|---:|:---:|
+| `light` | 80 MB | 1 GB |
+| `normal` | 100 MB | 2 GB |
+| `pro` | 120 MB | 3 GB |
+| `proplus` | 160 MB | 4 GB |
+| `ultimate` | 220 MB | 6 GB+ |
+
+**Semantics**: `debug.SetMemoryLimit` is a **soft** limit.
+The Go runtime does not kill the process — it runs GC more
+aggressively instead. Setting it too low causes CPU waste; too
+high wastes RAM. Hence the per-profile values.
 
 ### 12.5 Verify the Version
 
 ```bash
 # Method 1: module.prop
 su -c "grep -E '^(version|versionCode)=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+# Expected:
+# version=v1.1.0
+# versionCode=1010000
 
 # Method 2: runtime_info
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | grep version"
+# Expected: contains "version":"v1.1.0"
 
-# Method 3: WebUI
-# Open http://127.0.0.1:9090 — it appears in the footer
+# Method 3: status.sh --check
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: starts with "v1.1.0"
+
+# Method 4: readyz
+su -c "curl -s http://127.0.0.1:9090/readyz | grep version"
+# Expected: contains "version":"v1.1.0"
+
+# Method 5: WebUI
+# Open http://127.0.0.1:9090 — it appears in the footer / badge
+```
+
+**Additional v1.1.0 verifications**:
+
+```bash
+# Memory fields present
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+# Expected: {"profile_key": "<profile>", "memory_limit_mb": <value>}
+
+# Startup log line
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+# Expected: 🧠 v1.1.0: dynamic memory limit — profile=<key>, limit=<value> MB
 ```
 
 ---
@@ -980,12 +1084,12 @@ After installation, run this script for a comprehensive check:
 
 ```bash
 #!/bin/bash
-# verify-install.sh — Comprehensive verification after installation (v1.0.0)
+# verify-install.sh — Comprehensive verification after installation (v1.1.0)
 
-echo "╔══════════════════════════════════════════╗"
+echo "╔════════════════════════════════════╗"
 echo "║  DNSCrypt Verification Script            ║"
-echo "║  v1.0.0                                  ║"
-echo "╚══════════════════════════════════════════╝"
+echo "║  v1.1.0                                  ║"
+echo "╚════════════════════════════════════╝"
 echo ""
 
 echo "=== [1] Version ==="
@@ -1003,7 +1107,7 @@ echo ""
 su -c "curl -s http://127.0.0.1:9090/readyz" | head -3
 echo ""
 
-echo "=== [4] Dashboard (v1.0.0 Fix #1) ==="
+echo "=== [4] Dashboard (Fix #1) ==="
 su -c "curl -s http://127.0.0.1:9091/api/metrics" | head -3
 echo ""
 
@@ -1017,12 +1121,12 @@ echo "=== [6] Status File (user intent) ==="
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
 echo ""
 
-echo "=== [7] Config (v1.0.0 Fix #3) ==="
+echo "=== [7] Config (Fix #3) ==="
 su -c "grep -E '^(PORT|DASHBOARD_PORT|BIND_ADDR)=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 echo ""
 
-echo "=== [8] Runtime Info (PORT-2) ==="
-su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" | grep -E 'webui_port|dashboard_port|version'
+echo "=== [8] Runtime Info (PORT-2 + MEM-1) ==="
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" | grep -E 'webui_port|dashboard_port|version|profile_key|memory_limit_mb'
 echo ""
 
 echo "=== [9] Auth Status ==="
@@ -1041,6 +1145,24 @@ echo ""
 
 echo "=== [12] PORT-2: runtime_info ports ==="
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | grep -E 'webui_port|dashboard_port'"
+echo ""
+
+echo "=== [13] v1.1.0 — Memory limit (MEM-1) ==="
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+echo "Expected values by profile:"
+echo "  light=80, normal=100, pro=120, proplus=160, ultimate=220"
+echo ""
+
+echo "=== [14] v1.1.0 — Startup log line ==="
+su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
+echo ""
+
+echo "=== [15] v1.1.0 — Profile file vs runtime ==="
+echo -n "selected_profile.txt: "
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+echo -n "runtime profile_key:  "
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'"
+echo "(these two must match)"
 echo ""
 
 echo "✅ Verification complete"
@@ -1088,6 +1210,7 @@ su -c "sh /sdcard/verify-install.sh"
 - [Cosign (Sigstore)](https://docs.sigstore.dev/cosign/overview/)
 - [dnscrypt-proxy Wiki](https://github.com/DNSCrypt/dnscrypt-proxy/wiki)
 - [HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists)
+- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 
 ### 14.3 Quick Links
 
@@ -1101,8 +1224,8 @@ su -c "sh /sdcard/verify-install.sh"
 
 <div align="center">
 
-**Last updated**: 2026-09-24
-**Version**: v1.0.0
+**Last updated**: 2026-09-26
+**Version**: v1.1.0
 **Author**: gasciljh
 
 </div>

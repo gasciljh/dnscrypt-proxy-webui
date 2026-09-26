@@ -24,12 +24,46 @@
 
 ---
 
+> **Supersession Verification (v1.1.0 — 2026-09-26)**:
+>
+> This ADR was reviewed during the v1.1.0 release cycle to confirm
+> that the **supersession decision** remains correct. No further
+> amendments are needed.
+>
+> **Verification notes**:
+>
+>   • The reversal has been in effect through **two release cycles**
+>     (v1.0.0 and v1.1.0) without any need to revisit it.
+>   • The **unified template** (`.github/PULL_REQUEST_TEMPLATE.md`)
+>     remains the **default** for all `feature/*`, `fix/*`, `docs/*`,
+>     `chore/*`, `refactor/*`, and `test/*` PRs — exactly as the
+>     supersession intended.
+>   • The **release template**
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) introduced by
+>     [ADR-0005](0005-release-specific-pr-template.md) is used
+>     exclusively for `release/*` and `hotfix/*` → `main` PRs.
+>   • No contributor has reported confusion about which template
+>     to use. The `?template=release.md` pattern documented in
+>     `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §6.5
+>     has worked as intended.
+>   • The **reversal is validated**: keeping the unified template
+>     as the default (not deleting it) was the right choice, since
+>     95%+ of PRs are feature/fix/docs PRs targeting `develop`.
+>   • No new ADR is needed to further modify this decision. ADR-0005
+>     remains authoritative.
+>
+> **Result**: The supersession was correct, and no reconsideration
+> is required. This ADR remains a historical record.
+
+---
+
 ## Context
 
 ### The problem
 
-With the two-branch model adopted in [ADR-0001](0001-two-branch-model.md),
-pull requests can target **two different base branches**:
+With the two-branch model adopted in
+[ADR-0001](0001-two-branch-model.md), pull requests can target
+**two different base branches**:
 
 - `develop` — for features, fixes, docs, chores, refactors, tests.
 - `main` — for `release/*` and `hotfix/*` only.
@@ -49,19 +83,22 @@ overhaul) initially needed to handle both cases.
 
 ### Constraints
 
-- GitHub supports **only one** `PULL_REQUEST_TEMPLATE.md` per repository
-  at the root of `.github/`, `docs/`, or the repository itself.
+- GitHub supports **only one** `PULL_REQUEST_TEMPLATE.md` per
+  repository at the root of `.github/`, `docs/`, or the repository
+  itself.
 - Multiple templates require the **query-string trick**
   (`?template=feature.md`), which is undiscoverable.
-- YAML-based Issue Forms are **not available** for PRs (only Issues).
+- YAML-based Issue Forms are **not available** for PRs (only
+  Issues).
 - The template must remain **valid Markdown** (rendered by GitHub).
 
 ### Scope
 
-This ADR covers **the number of PR templates** used in the project. It
-does **not** cover:
+This ADR covers **the number of PR templates** used in the project.
+It does **not** cover:
 
-- The **content** of the template — see `.github/PULL_REQUEST_TEMPLATE.md`.
+- The **content** of the template — see
+  `.github/PULL_REQUEST_TEMPLATE.md`.
 - Branch structure → see [ADR-0001](0001-two-branch-model.md).
 - Release process → see [ADR-0002](0002-automated-releases.md).
 
@@ -78,7 +115,8 @@ does **not** cover:
 1. **One file only**: `.github/PULL_REQUEST_TEMPLATE.md`.
 2. **Target branch selector** at the top:
    - A `🎯 Target Branch` section with checkboxes.
-   - A quick-reference table mapping branch prefixes to base branches.
+   - A quick-reference table mapping branch prefixes to base
+     branches.
 3. **Sections**:
    - `🎯 Target Branch` (new, to handle the two-branch model).
    - `📝 Description`.
@@ -93,7 +131,8 @@ does **not** cover:
    - `📌 Additional Notes`.
    - `🎯 Reviewer Suggestion`.
 4. **Branch policy block** in the Final Checklist:
-   - "PR target is `develop` (or `main` **only** for `release/*` / `hotfix/*`)."
+   - "PR target is `develop` (or `main` **only** for `release/*` /
+     `hotfix/*`)."
 5. **Final reminder** (bottom of the file):
    - An ASCII box explaining the branch policy.
    - A list of pre-push verification commands.
@@ -104,7 +143,7 @@ does **not** cover:
 .github/
 └── PULL_REQUEST_TEMPLATE.md      ← ONE file for everything
         │
-        ├── 🎯 Target Branch       ← author selects: develop or main
+        ├── 🎯 Target Branch      ← author selects: develop or main
         ├── 📝 Description
         ├── 🔗 Related Issue
         ├── 🏷️ Change Type
@@ -126,29 +165,30 @@ does **not** cover:
 
 - ✅ **Single source of truth.** Only one file to update when the
   contribution process changes.
-- ✅ **Automatic discovery.** GitHub applies it to **every** new PR —
-  no query-string trick required.
+- ✅ **Automatic discovery.** GitHub applies it to **every** new PR
+  — no query-string trick required.
 - ✅ **Consistent structure.** Reviewers know exactly where to look.
-- ✅ **Target branch clarity.** The `🎯 Target Branch` section handles
-  the two-branch model explicitly.
-- ✅ **Fewer files to lint.** `markdownlint` runs on one file, not five.
+- ✅ **Target branch clarity.** The `🎯 Target Branch` section
+  handles the two-branch model explicitly.
+- ✅ **Fewer files to lint.** `markdownlint` runs on one file, not
+  five.
 - ✅ **Simple maintenance.** One author maintains one file.
 
 ### Negative
 
-- ❌ **Longer template.** A release PR must scroll past feature-specific
-  sections (like the Audit Correction registry).
+- ❌ **Longer template.** A release PR must scroll past
+  feature-specific sections (like the Audit Correction registry).
 - ❌ **Release-specific context is buried.** The `🎯 Target Branch`
   section tells the author the base is `main`, but there is no
-  release-specific checklist (e.g. "verify `CHANGELOG.md` was updated",
-  "confirm version bump in `module.prop`").
-- ❌ **Feature contributors may skip release sections.** Nothing in the
-  template enforces that release-specific fields are filled.
+  release-specific checklist (e.g. "verify `CHANGELOG.md` was
+  updated", "confirm version bump in `module.prop`").
+- ❌ **Feature contributors may skip release sections.** Nothing in
+  the template enforces that release-specific fields are filled.
 - ❌ **The template grows over time.** Every new workflow addition
   (e.g. a new CI check) adds a line, making the template denser.
 - ❌ **Not optimal for the release workflow.** Releases have a
-  specific, short lifecycle (bump, tag, publish) that a general-purpose
-  template does not capture well.
+  specific, short lifecycle (bump, tag, publish) that a
+  general-purpose template does not capture well.
 
 ### Neutral
 
@@ -156,8 +196,8 @@ does **not** cover:
   author can delete sections freely.
 - ⚪ **HTML comments** in the template provide guidance without
   cluttering the rendered view.
-- ⚪ **The template lives in `.github/`** — the recommended location
-  per GitHub docs.
+- ⚪ **The template lives in `.github/`** — the recommended
+  location per GitHub docs.
 
 ---
 
@@ -191,14 +231,14 @@ While drafting the release workflow documentation (see
 5. Merge (triggers `release.yml` on tag).
 
 None of these steps fit naturally in the unified template, which is
-dominated by feature-PR concerns (Testing Checklist, Security Checklist,
-Audit Corrections, etc.).
+dominated by feature-PR concerns (Testing Checklist, Security
+Checklist, Audit Corrections, etc.).
 
 ### The insight
 
-Releases are **rare** (monthly at most) but **high-stakes** (a mistake
-breaks user updates). Features are **frequent** but **low-stakes**
-(iterations are cheap).
+Releases are **rare** (monthly at most) but **high-stakes** (a
+mistake breaks user updates). Features are **frequent** but
+**low-stakes** (iterations are cheap).
 
 **A single template optimized for frequency under-serves the rare
 high-stakes case.**
@@ -210,10 +250,10 @@ high-stakes case.**
 - The unified template remains the **default** for all other PRs.
 - `docs/BRANCHING.md` §4.4 documents when to use which.
 
-This is the **first reversal** in the project's ADR history — and it
-demonstrates exactly why ADRs are valuable: the reversal is **explicit**,
-**reasoned**, and **traceable**, rather than a silent change buried in
-a commit.
+This is the **first reversal** in the project's ADR history — and
+it demonstrates exactly why ADRs are valuable: the reversal is
+**explicit**, **reasoned**, and **traceable**, rather than a silent
+change buried in a commit.
 
 ---
 
@@ -231,10 +271,18 @@ a commit.
 
 ### Project files
 
-- [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) — the unified template.
-- [`docs/BRANCHING.md`](../BRANCHING.md) §5.1 — the PR-target rules.
-- [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md) §6 — the PR process.
-- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §5 — release PR steps.
+- [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md) —
+  the unified template.
+- [`.github/PULL_REQUEST_TEMPLATE/release.md`](../../.github/PULL_REQUEST_TEMPLATE/release.md) —
+  the release-specific template (introduced by ADR-0005).
+- [`docs/BRANCHING.md`](../BRANCHING.md) §5.1 — the PR-target
+  rules.
+- [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md) §6 — the PR
+  process.
+- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §6 — release
+  PR steps.
+- [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
+  (v1.0.0 → v1.1.0 used the release template).
 
 ### External references
 
@@ -245,11 +293,35 @@ a commit.
 
 ### Discussion
 
-- Initial decision: see commit history for `.github/PULL_REQUEST_TEMPLATE.md`.
-- Reversal: see [ADR-0005](0005-release-specific-pr-template.md) and the
-  corresponding commit that added `.github/PULL_REQUEST_TEMPLATE/release.md`.
+- Initial decision: see commit history for
+  `.github/PULL_REQUEST_TEMPLATE.md`.
+- Reversal: see [ADR-0005](0005-release-specific-pr-template.md)
+  and the corresponding commit that added
+  `.github/PULL_REQUEST_TEMPLATE/release.md`.
+
+### Supersession verification
+
+- **v1.0.0** (2026-09-24) — first release cycle using the two
+  templates.
+  - `v1.0.0` was published through a `release/*` PR using
+    `?template=release.md`.
+  - No confusion reported by the maintainer.
+  - The unified template remained the default for feature/fix/docs
+    PRs.
+- **v1.1.0** (2026-09-26) — second release cycle; templates
+  unchanged.
+  - `v1.1.0` was published through a `release/*` PR using
+    `?template=release.md`.
+  - No new template was needed.
+  - **No contributor requested** a different template or reported
+    the query-string pattern as a problem.
+- **Supersession status**: confirmed correct. ADR-0005 remains
+  authoritative.
+- **Next review**: v1.2.0 cycle (or when the PR workflow changes).
+- See `CHANGELOG.md` for the full release history.
 
 ---
 
 *This ADR is immutable. It has been superseded — see
-[ADR-0005](0005-release-specific-pr-template.md) for the current decision.*
+[ADR-0005](0005-release-specific-pr-template.md) for the current
+decision.*
