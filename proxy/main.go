@@ -3423,21 +3423,29 @@ func readLogFile(name, confirm string) map[string]interface{} {
 
 		readSize := info.Size()
 		if readSize > LOG_MAX_READ_BYTES {
-			if _, seekErr := f.Seek(-LOG_MAX_READ_BYTES, io.SeekEnd); seekErr != nil {
-				if _, resetErr := f.Seek(0, io.SeekStart); resetErr != nil {
-					return map[string]interface{}{
-						"status":  "error",
-						"message": "Cannot seek file: " + resetErr.Error(),
-					}
-				}
-			}
-			readSize = LOG_MAX_READ_BYTES
 			truncated = true
+			// Fast path: seek to the last N bytes.
+			if _, seekErr := f.Seek(-LOG_MAX_READ_BYTES, io.SeekEnd); seekErr == nil {
+				data := make([]byte, LOG_MAX_READ_BYTES)
+				n, _ := io.ReadFull(f, data)
+				content = string(data[:n])
+			} else {
+				// Slow path: backward seek failed. Read all (bounded)
+				// and slice the last N bytes in memory, so the user
+				// still sees the newest entries.
+				logWithLevel("warn", "readLogFile: backward seek failed for "+name+", using slow path")
+				limited := io.LimitReader(f, LOG_MAX_READ_BYTES*2)
+				data, _ := io.ReadAll(limited)
+				if int64(len(data)) > LOG_MAX_READ_BYTES {
+					data = data[len(data)-LOG_MAX_READ_BYTES:]
+				}
+				content = string(data)
+			}
+		} else {
+			data := make([]byte, readSize)
+			n, _ := io.ReadFull(f, data)
+			content = string(data[:n])
 		}
-
-		data := make([]byte, readSize)
-		n, _ := io.ReadFull(f, data)
-		content = string(data[:n])
 	}
 
 	return map[string]interface{}{
