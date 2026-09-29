@@ -145,6 +145,20 @@
 #     removed from the exception list, which was never true.
 #     That claim has been corrected here.)
 #
+#   🛡️ HARD-CI-09 (2026-09-29) — Shellcheck now runs with
+#     `--shell=bash` and excludes 4 warning classes. Reason:
+#     the 5 scripts run under Android's mksh
+#     (#!/system/bin/sh), which supports bash-isms like
+#     `local`, `[[ ]]`, ${var:0:N}, and $RANDOM. Shellcheck
+#     defaulted to POSIX sh and produced ~230 false-positive
+#     SC3043/SC3057/SC3060/SC3028 warnings on every run,
+#     blocking PR #12 and all Dependabot PRs via the
+#     "Backup Smoke Test" required check. The 4 exclusions:
+#       - SC2010 (ls | grep) — accepted pattern here
+#       - SC2034 (unused variable) — some are exported
+#       - SC2115 (rm -rf "$var" without ?) — guards exist
+#       - SC2155 (declare+assign) — intentional style
+#     No production code was changed; only the CI invocation.
 # ============================================================
 
 name: CI
@@ -232,13 +246,18 @@ jobs:
   # This is NOT a full data-preservation test — that runs on a
   # real device via .github/workflows/upgrade-test.yml.
   #
-  # ⚠️ shellcheck scope (CI-2):
+  # ⚠️ shellcheck scope (CI-2 + HARD-CI-09):
   #    shellcheck runs on 5 of the 8 scripts; the remaining 3
   #    (action.sh, post-fs-data.sh, watchdog.sh) are only
   #    covered by `bash -n`. The excluded scripts contain a mix
   #    of legacy-style code and defensive patterns that produce
   #    shellcheck warnings unrelated to correctness. They are
   #    still validated for syntax errors.
+  #
+  #    As of HARD-CI-09, shellcheck runs with `--shell=bash`
+  #    because the scripts use bash-isms that are valid under
+  #    Android's mksh. Four warning classes are additionally
+  #    excluded — see the header for the full rationale.
   # ============================================================
   backup-smoke-test:
     name: Backup Smoke Test
@@ -272,11 +291,18 @@ jobs:
           echo "::endgroup::"
           echo "✅ All 8 shell scripts pass bash -n"
 
+      # HARD-CI-09: run shellcheck in bash mode, with 4 exclusions.
       - name: Shellcheck (severity=warning)
         run: |
           set -euo pipefail
           echo "::group::shellcheck on 5 scripts (see CI-2 note in ci.yml)"
-          shellcheck --severity=warning \
+          # --shell=bash: these scripts run under Android's mksh
+          # (#!/system/bin/sh), which supports bash-isms like
+          # `local`, `[[ ]]`, ${var:0:N}, and $RANDOM. Telling
+          # shellcheck to treat them as bash eliminates the
+          # false-positive SC3043/SC3057/SC3060/SC3028 warnings.
+          shellcheck --shell=bash --severity=warning \
+            --exclude=SC2010,SC2034,SC2115,SC2155 \
             proxy/customize.sh \
             proxy/functions.sh \
             proxy/service.sh \
