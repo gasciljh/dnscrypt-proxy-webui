@@ -1,43 +1,80 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Offline Page
-     Version: v1.1.0
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
-     Purpose:
-       Standalone HTML page shown when:
-         • WebUI is unreachable (service stopped)
-         • Network timeout
-         • Server not responding
+     Bilingual offline page (English default / Arabic toggle).
 
-     Notes:
-       • This page is served by the Service Worker and cannot
-         read runtime_info (no API available offline).
-       • It uses default ports (9090/9091).
-       • If ports were changed in webui.conf, the user is
-         warned to check that file.
-       • All text and code are English-only (global release).
+     Served by the Service Worker when the local WebUI server
+     cannot be reached. The SW tries /offline.html from cache
+     first (this file), then falls back to an inline English-
+     only page if the cache lookup fails.
 
-     v1.1.0 changes:
-       • CRITICAL FIX — removed the restrictive CSP meta tag.
-         The previous CSP declared `default-src 'none'`, which
-         implicitly forbids `script-src` and blocked the inline
-         <script> at the bottom of this page. The page rendered
-         correctly but every interactive feature (Retry,
-         Diagnose, language toggle, auto-retry) silently failed.
+     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     ============================================================
+     A pre-release audit of this file identified the following
+     issues. All of them are addressed in-place; no version bump.
 
-       • Version badge updated to v1.1.0.
+       🔧 OFF-1 — The <html> tag shipped with static
+         lang="en" dir="ltr", matching index.html and
+         dashboard.html before their IDX-4 fix. For users whose
+         preference is Arabic (stored in localStorage under
+         'dnscrypt-lang'), the page painted LTR for the first
+         ~100 ms before applyLanguage() corrected it. A small
+         inline script in <head> now sets the correct lang/dir
+         BEFORE the first paint.
 
-       • Security note: this page has no user data, no forms,
-         no network calls after load, no localStorage access, and
-         uses only textContent (never innerHTML with user data).
-         Removing the CSP meta does not increase the attack
-         surface because there is no real attack surface to
-         protect. If a future version adds dynamic content from
-         untrusted sources, CSP must be reintroduced — preferably
-         with `script-src` restricted via a nonce rather than
-         `'unsafe-inline'`.
+       🔧 OFF-2 — In toggleLanguage(), the diagnostics box was
+         refreshed by calling handleDiagnose() twice in a row.
+         Because handleDiagnose() is a TOGGLE (if the box is
+         visible, it hides it; otherwise it renders and shows
+         it), the double call was a net no-op: the first call
+         hid the box, the second call re-rendered and re-showed
+         it. The intent was to RE-RENDER the diagnostic labels
+         with the new language, not to toggle. The rendering
+         logic has been extracted into a new function
+         `renderDiagnostics()` which is now called directly
+         from toggleLanguage(). handleDiagnose() keeps its
+         toggle behavior for the button.
+
+       🔧 OFF-3 — updateStatus(false) did not reset the visual
+         state of the connectivity status box. If the box had
+         been switched to the green "online" appearance and the
+         user then went offline, the dot stayed green and the
+         border stayed green while the text reverted to the
+         warning text — a confusing mixed state. The function
+         now resets the box style, dot color, and dot animation
+         in both directions.
+
+       🔧 OFF-4 (critical for LAN users) — All three actionable
+         links on this page hard-coded 127.0.0.1:
+           • #portsWebuiLink   → http://127.0.0.1:9090/
+           • #portsDashLink    → http://127.0.0.1:9091/
+           • #openDashBtn      → http://127.0.0.1:9091/
+         When the user accesses the WebUI over the LAN (for
+         example http://192.168.1.5:9090/), clicking any of
+         these links navigated to 127.0.0.1 on the CLIENT
+         device — which is the user's own phone or laptop, not
+         the Android device running the module. The links are
+         now built at runtime from window.location.hostname,
+         matching the pattern used by index.html's
+         getDashboardUrl(). The port numbers remain the
+         default 9090/9091 (this page cannot read webui.conf;
+         see the ports-note), but the HOSTNAME now reflects
+         however the user actually reached the page.
+
+       🔧 OFF-5 — updateStatus() uses navigator.onLine as its
+         "is the server reachable?" signal. navigator.onLine
+         only reflects the CLIENT's network interface state,
+         not the server's availability. A user can be "online"
+         (Wi-Fi connected) while the module is stopped, or
+         vice versa. The behavior is unchanged (it is the best
+         signal available to a static page), but the comment
+         has been expanded to make this limitation explicit so
+         that a future reader does not mistake it for a
+         reliable health check.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -46,22 +83,26 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta name="theme-color" content="#0d1117">
     <meta name="robots" content="noindex, nofollow">
-    <title>Offline — DNSCrypt Smart Filter</title>
+    <title>Offline — DNSCrypt Smart Filter v1.2.0</title>
 
-    <!--
-        ⚠️ CSP intentionally NOT set here.
-        See the v1.1.0 changes note in the HTML comment above.
-        The page has no user data, no forms, no network calls,
-        and uses only textContent — there is nothing to protect
-        with CSP, and setting `default-src 'none'` would block
-        the inline script that drives the Retry / Diagnose /
-        language-toggle features.
-    -->
+    <!-- OFF-1 fix: apply lang/dir from localStorage BEFORE the
+         first paint, matching IDX-4 in index.html and
+         dashboard.html. Without this, an Arabic-preferring
+         user sees a flash of LTR layout for ~100 ms before
+         applyLanguage() corrects it. -->
+    <script>
+      (function(){
+        try {
+          var l = localStorage.getItem('dnscrypt-lang');
+          if (l === 'ar') {
+            document.documentElement.lang = 'ar';
+            document.documentElement.dir = 'rtl';
+          }
+        } catch(e) {}
+      })();
+    </script>
 
     <style>
-        /* ============================================================
-         * [1] Design tokens (matches index.html and dashboard.html)
-         * ============================================================ */
         :root {
             --bg: #0d1117;
             --bg-card: rgba(22, 27, 34, 0.92);
@@ -92,20 +133,18 @@
             color: var(--text);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
             min-height: 100vh;
             min-height: 100dvh;
             padding: 20px;
             overflow-x: hidden;
         }
 
-        /* ============================================================
-         * [2] Main container
-         * ============================================================ */
         .container {
-            max-width: 520px;
+            max-width: 560px;
             width: 100%;
+            margin: auto 0;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius);
@@ -119,7 +158,6 @@
             overflow: hidden;
         }
 
-        /* Top decoration bar */
         .container::before {
             content: '';
             position: absolute;
@@ -131,19 +169,10 @@
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ============================================================
-         * [3] Language toggle (top corner)
-         * ============================================================ */
         .lang-toggle {
             position: absolute;
             top: 16px;
@@ -165,9 +194,11 @@
             color: var(--text);
         }
 
-        /* ============================================================
-         * [4] Icon
-         * ============================================================ */
+        html[dir="rtl"] .lang-toggle {
+            right: auto;
+            left: 16px;
+        }
+
         .icon-wrapper {
             display: inline-flex;
             align-items: center;
@@ -187,19 +218,10 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.05);
-                opacity: 0.85;
-            }
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50%      { transform: scale(1.05); opacity: 0.85; }
         }
 
-        /* ============================================================
-         * [5] Typography
-         * ============================================================ */
         h1 {
             font-size: 26px;
             font-weight: 900;
@@ -229,8 +251,38 @@
         }
 
         /* ============================================================
-         * [6] Info box (diagnostic tips)
+         * Scrollable code inside info-box list items
+         * ------------------------------------------------------------
+         * Long commands (e.g. the su -c "...action.sh --restart")
+         * stay on one line and can be scrolled horizontally
+         * instead of being clipped at the card edge.
+         * Mirrors the pattern used by #riRawJson in index.html.
          * ============================================================ */
+        .info-box li code {
+            display: inline-block;
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            white-space: nowrap;
+            vertical-align: middle;
+            box-sizing: border-box;
+        }
+
+        .info-box li code::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .info-box li code::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 2px;
+        }
+
+        .info-box li code::-webkit-scrollbar-thumb {
+            background: rgba(88, 166, 255, 0.4);
+            border-radius: 2px;
+        }
+
         .info-box {
             background: rgba(88, 166, 255, 0.05);
             border: 1px solid rgba(88, 166, 255, 0.15);
@@ -273,14 +325,49 @@
             font-weight: 700;
         }
 
+        html[dir="rtl"] .info-box li::before {
+            content: '←';
+        }
+
         .info-box li strong {
             color: var(--text);
             font-weight: 600;
         }
 
-        /* ============================================================
-         * [6b] Ports info box
-         * ============================================================ */
+        .safe-box {
+            background: rgba(63, 185, 80, 0.06);
+            border: 1px solid rgba(63, 185, 80, 0.25);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin: 20px 0;
+            text-align: start;
+        }
+
+        .safe-box h2 {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--success);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .safe-box p {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        .safe-box p + p {
+            margin-top: 8px;
+        }
+
+        .safe-box code {
+            background: rgba(63, 185, 80, 0.1);
+            color: var(--success);
+        }
+
         .ports-box {
             background: rgba(63, 185, 80, 0.05);
             border: 1px solid rgba(63, 185, 80, 0.15);
@@ -351,9 +438,6 @@
             line-height: 1.5;
         }
 
-        /* ============================================================
-         * [7] Buttons
-         * ============================================================ */
         .actions {
             display: flex;
             gap: 10px;
@@ -394,6 +478,12 @@
             transform: translateY(0);
         }
 
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .btn-secondary {
             background: rgba(139, 148, 158, 0.15);
             border: 1px solid rgba(139, 148, 158, 0.3);
@@ -405,7 +495,6 @@
             color: var(--text);
         }
 
-        /* Dashboard button (green) */
         .btn-success {
             background: linear-gradient(135deg, #238636, #2ea043);
             box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
@@ -420,9 +509,6 @@
             transform: translateY(0);
         }
 
-        /* ============================================================
-         * [8] Footer
-         * ============================================================ */
         .footer {
             margin-top: 24px;
             padding-top: 20px;
@@ -450,9 +536,6 @@
             text-decoration: underline;
         }
 
-        /* ============================================================
-         * [9] Connectivity indicator
-         * ============================================================ */
         .connectivity-status {
             display: inline-flex;
             align-items: center;
@@ -477,56 +560,28 @@
 
         @keyframes blink {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
+            50%      { opacity: 0.3; }
         }
 
-        /* ============================================================
-         * [10] RTL overrides (Arabic mode)
-         * ============================================================ */
-        html[dir="rtl"] .lang-toggle {
-            right: auto;
-            left: 16px;
-        }
-
-        /* ============================================================
-         * [11] Accessibility
-         * ============================================================ */
         button:focus-visible,
         a:focus-visible {
             outline: 2px solid var(--primary);
             outline-offset: 2px;
         }
 
-        /* ============================================================
-         * [12] Reduced motion
-         * ============================================================ */
         @media (prefers-reduced-motion: reduce) {
-            *,
-            *::before,
-            *::after {
+            *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
             }
         }
 
-        /* ============================================================
-         * [13] Small screens
-         * ============================================================ */
         @media (max-width: 380px) {
-            .container {
-                padding: 28px 20px;
-            }
-            h1 {
-                font-size: 22px;
-            }
-            .icon-wrapper {
-                width: 80px;
-                height: 80px;
-            }
-            .icon-wrapper .icon {
-                font-size: 44px;
-            }
+            .container { padding: 28px 20px; }
+            h1 { font-size: 22px; }
+            .icon-wrapper { width: 80px; height: 80px; }
+            .icon-wrapper .icon { font-size: 44px; }
         }
     </style>
 </head>
@@ -534,7 +589,6 @@
 
 <div class="container">
 
-    <!-- Language toggle -->
     <button
         class="lang-toggle"
         id="langToggle"
@@ -543,28 +597,40 @@
         <span id="langToggleText">🇸🇦 العربية</span>
     </button>
 
-    <!-- Icon -->
     <div class="icon-wrapper" aria-hidden="true">
         <span class="icon">📡</span>
     </div>
 
-    <!-- Title -->
     <h1 id="title">Offline</h1>
 
-    <!-- Description -->
     <p class="subtitle" id="subtitle">
         Cannot reach DNSCrypt WebUI server.
         <br>
         Make sure the service is running on port <code>9090</code>.
     </p>
 
-    <!-- Connectivity status -->
     <div class="connectivity-status" role="status" aria-live="polite">
         <span class="dot" aria-hidden="true"></span>
         <span id="statusText">Reconnecting...</span>
     </div>
 
-    <!-- Ports info box -->
+    <div class="safe-box">
+        <h2>
+            <span aria-hidden="true">💾</span>
+            <span id="safeTitle">Your data is safe</span>
+        </h2>
+        <p id="safeMsg1">
+            This page is shown because the local WebUI server is
+            not responding. It does <strong>not</strong> mean your
+            settings were lost.
+        </p>
+        <p id="safeMsg2">
+            Since v1.2.0, all 5 user config files are preserved on
+            <code>/sdcard/dnscrypt-webui-backup/</code> and are
+            restored automatically if you reinstall the module.
+        </p>
+    </div>
+
     <div class="ports-box">
         <h2>
             <span aria-hidden="true">🔌</span>
@@ -576,7 +642,11 @@
                 <span id="portsWebuiLabel">WebUI</span>
             </span>
             <span class="port-value">
-                <a href="http://127.0.0.1:9090/" id="portsWebuiLink">http://127.0.0.1:9090/</a>
+                <!-- OFF-4 fix: href is set at runtime from
+                     window.location.hostname; the static value
+                     here is a placeholder and will be replaced
+                     during boot(). -->
+                <a href="#" id="portsWebuiLink">http://127.0.0.1:9090/</a>
             </span>
         </div>
         <div class="port-row">
@@ -585,15 +655,15 @@
                 <span id="portsDashLabel">Dashboard</span>
             </span>
             <span class="port-value">
-                <a href="http://127.0.0.1:9091/" id="portsDashLink">http://127.0.0.1:9091/</a>
+                <!-- OFF-4 fix: href is set at runtime -->
+                <a href="#" id="portsDashLink">http://127.0.0.1:9091/</a>
             </span>
         </div>
         <div class="ports-note" id="portsNote">
-            ⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page cannot read settings (runs offline).
+            ⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page runs from the Service Worker cache and cannot read settings.
         </div>
     </div>
 
-    <!-- Diagnostic help -->
     <div class="info-box">
         <h2>
             <span aria-hidden="true">💡</span>
@@ -617,7 +687,33 @@
         </ul>
     </div>
 
-    <!-- Action buttons -->
+    <div class="info-box">
+        <h2>
+            <span aria-hidden="true">🚨</span>
+            <span id="recoveryTitle">If the module is unbootable</span>
+        </h2>
+        <ul>
+            <li id="recovery1">
+                Create the recovery trigger file:
+                <br>
+                <code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>
+            </li>
+            <li id="recovery2">
+                Reboot the device:
+                <br>
+                <code>su -c "reboot"</code>
+            </li>
+            <li id="recovery3">
+                On next boot, the installer will restore the last
+                known-good configuration from
+                <code>/sdcard/dnscrypt-webui-backup/</code>.
+            </li>
+            <li id="recovery4">
+                Full guide: <strong>docs/EMERGENCY.md</strong>
+            </li>
+        </ul>
+    </div>
+
     <div class="actions">
         <button
             class="btn btn-primary"
@@ -628,10 +724,13 @@
             <span id="retryText">Retry</span>
         </button>
 
+        <!-- OFF-4 fix: href is set at runtime from
+             window.location.hostname. The static value is a
+             placeholder. -->
         <a
             class="btn btn-success"
             id="openDashBtn"
-            href="http://127.0.0.1:9091/"
+            href="#"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Open Dashboard">
@@ -649,7 +748,6 @@
         </button>
     </div>
 
-    <!-- Diagnostics info (shown when "Diagnose" is pressed) -->
     <div class="info-box" id="diagnosticsBox" style="display: none; margin-top: 16px;">
         <h2>
             <span aria-hidden="true">🔍</span>
@@ -664,12 +762,11 @@
         </ul>
     </div>
 
-    <!-- Footer -->
     <div class="footer">
         <div>
             <span aria-hidden="true">🛡️</span>
             DNSCrypt Smart Filter
-            <span class="version" id="versionBadge">v1.1.0</span>
+            <span class="version" id="versionBadge">v1.2.0</span>
         </div>
         <div style="margin-top: 6px;">
             <a
@@ -688,88 +785,152 @@
 (function() {
     'use strict';
 
-    // ============================================================
-    // [1] Translations
-    // ============================================================
-    // Only the strings actually rendered by this page are included.
-    // Any dynamic value (URL, time, UA) is filled at runtime.
-    // ============================================================
     var translations = {
         en: {
-            pageTitle: 'Offline — DNSCrypt Smart Filter',
+            pageTitle: 'Offline — DNSCrypt Smart Filter v1.2.0',
             langToggle: '🇸🇦 العربية',
             title: 'Offline',
             subtitle: 'Cannot reach DNSCrypt WebUI server.<br>Make sure the service is running on port <code>9090</code>.',
             statusText: 'Reconnecting...',
+            statusOnline: 'Connected',
+            safeTitle: 'Your data is safe',
+            safeMsg1: 'This page is shown because the local WebUI server is not responding. It does <strong>not</strong> mean your settings were lost.',
+            safeMsg2: 'Since v1.2.0, all 5 user config files are preserved on <code>/sdcard/dnscrypt-webui-backup/</code> and are restored automatically if you reinstall the module.',
             portsTitle: 'Default Ports',
             portsWebuiLabel: 'WebUI',
             portsDashLabel: 'Dashboard',
-            portsNote: '⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page cannot read settings (runs offline).',
+            portsNote: '⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page runs from the Service Worker cache and cannot read settings.',
             helpTitle: 'How to restart the service?',
             help1: 'Open <strong>Magisk Manager</strong> or <strong>KernelSU</strong>.',
             help2: 'Go to <strong>Modules</strong> → <strong>DNSCrypt Proxy</strong>.',
             help3: 'Tap the <strong>Action</strong> button to restart.',
             help4: 'Or from terminal:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
+            recoveryTitle: 'If the module is unbootable',
+            recovery1: 'Create the recovery trigger file:<br><code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>',
+            recovery2: 'Reboot the device:<br><code>su -c "reboot"</code>',
+            recovery3: 'On next boot, the installer will restore the last known-good configuration from <code>/sdcard/dnscrypt-webui-backup/</code>.',
+            recovery4: 'Full guide: <strong>docs/EMERGENCY.md</strong>',
             retryText: 'Retry',
             openDashText: 'Open Dashboard',
             diagnoseText: 'Diagnose',
             diagTitle: 'Diagnostic Info',
+            diagUrlLabel: 'URL:',
+            diagTimeLabel: 'Time:',
+            diagUaLabel: 'UA:',
+            diagProtoLabel: 'Protocol:',
+            diagOnlineLabel: 'Online:',
             projectText: 'Project on GitHub'
         },
         ar: {
-            pageTitle: 'غير متصل — DNSCrypt Smart Filter',
+            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.2.0',
             langToggle: '🇬🇧 English',
             title: 'غير متصل',
             subtitle: 'لا يمكن الوصول إلى خادم DNSCrypt WebUI.<br>تأكد من أن الخدمة تعمل على المنفذ <code>9090</code>.',
             statusText: 'جاري إعادة الاتصال...',
+            statusOnline: 'متصل',
+            safeTitle: 'بياناتك بأمان',
+            safeMsg1: 'هذه الصفحة تظهر لأن خادم WebUI المحلي لا يستجيب. هذا <strong>لا</strong> يعني أن إعداداتك قد فُقدت.',
+            safeMsg2: 'منذ v1.2.0، تُحفظ جميع ملفات الإعداد الخمسة على <code>/sdcard/dnscrypt-webui-backup/</code> وتُستعاد تلقائيًا عند إعادة تثبيت الموديول.',
             portsTitle: 'المنافذ الافتراضية',
             portsWebuiLabel: 'WebUI',
-            portsDashLabel: 'Dashboard',
-            portsNote: '⚠️ إذا قمت بتغيير المنافذ في <code>webui.conf</code>، استخدم القيم الفعلية. هذه الصفحة لا يمكنها قراءة الإعدادات (تعمل offline).',
-            helpTitle: 'كيف أُعيد تشغيل الخدمة؟',
+            portsDashLabel: 'لوحة المراقبة',
+            portsNote: '⚠️ إذا قمت بتغيير المنافذ في <code>webui.conf</code>، استخدم القيم الفعلية. هذه الصفحة تعمل من ذاكرة Service Worker ولا يمكنها قراءة الإعدادات.',
+            helpTitle: 'كيف أعيد تشغيل الخدمة؟',
             help1: 'افتح <strong>Magisk Manager</strong> أو <strong>KernelSU</strong>.',
-            help2: 'اذهب إلى <strong>Modules</strong> → <strong>DNSCrypt Proxy</strong>.',
+            help2: 'اذهب إلى <strong>Modules</strong> ← <strong>DNSCrypt Proxy</strong>.',
             help3: 'اضغط زر <strong>Action</strong> لإعادة التشغيل.',
             help4: 'أو من الطرفية:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
+            recoveryTitle: 'إذا كان الموديول غير قابل للتمهيد',
+            recovery1: 'أنشئ ملف تفعيل الاستعادة:<br><code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>',
+            recovery2: 'أعد تشغيل الجهاز:<br><code>su -c "reboot"</code>',
+            recovery3: 'عند التمهيد التالي، سيستعيد المُثبِّت آخر إعداد صالح من <code>/sdcard/dnscrypt-webui-backup/</code>.',
+            recovery4: 'الدليل الكامل: <strong>docs/EMERGENCY.md</strong>',
             retryText: 'إعادة المحاولة',
-            openDashText: 'فتح Dashboard',
+            openDashText: 'فتح لوحة المراقبة',
             diagnoseText: 'تشخيص',
             diagTitle: 'معلومات التشخيص',
+            diagUrlLabel: 'الرابط:',
+            diagTimeLabel: 'الوقت:',
+            diagUaLabel: 'UA:',
+            diagProtoLabel: 'البروتوكول:',
+            diagOnlineLabel: 'متصل:',
             projectText: 'المشروع على GitHub'
         }
     };
 
-    // ============================================================
-    // [2] Default language
-    // ============================================================
-    // Follows the same key as index.html / dashboard.html so the
-    // user's preference is preserved across all three pages.
-    // ============================================================
     var currentLang = 'en';
     try {
         currentLang = localStorage.getItem('dnscrypt-lang') || 'en';
     } catch (e) {}
 
-    // ============================================================
-    // [3] Helper: get element by id
-    // ============================================================
     function $(id) { return document.getElementById(id); }
 
+    function escapeHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     // ============================================================
-    // [4] applyLanguage
+    // OFF-4 fix: build the WebUI / Dashboard URLs from the host
+    // the page was actually served from. Falls back to 127.0.0.1
+    // if window.location.hostname is somehow empty.
+    //
+    // Ports remain the DEFAULTS (9090/9091). This page cannot
+    // read webui.conf — the offline state means the API is
+    // unreachable. The ports-note in the UI tells the user this.
     // ============================================================
+    function hostForUrl() {
+        var hostname = window.location.hostname || '127.0.0.1';
+        if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
+            hostname = '[' + hostname + ']';
+        }
+        return hostname;
+    }
+
+    function getWebUIUrl() {
+        var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return protocol + '//' + hostForUrl() + ':9090/';
+    }
+
+    function getDashboardUrl() {
+        var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return protocol + '//' + hostForUrl() + ':9091/';
+    }
+
+    function applyRuntimeUrls() {
+        var webuiUrl = getWebUIUrl();
+        var dashUrl  = getDashboardUrl();
+
+        var wl = $('portsWebuiLink');
+        if (wl) {
+            wl.href = webuiUrl;
+            wl.textContent = webuiUrl;
+        }
+        var dl = $('portsDashLink');
+        if (dl) {
+            dl.href = dashUrl;
+            dl.textContent = dashUrl;
+        }
+        var ob = $('openDashBtn');
+        if (ob) {
+            ob.href = dashUrl;
+        }
+    }
+
     function applyLanguage(lang) {
         var t = translations[lang];
         if (!t) return;
 
-        // HTML lang + dir
         document.documentElement.lang = lang;
         document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
 
-        // Title
         document.title = t.pageTitle;
 
-        // Elements
         var setText = function(id, html) {
             var el = $(id);
             if (el) el.innerHTML = html;
@@ -779,6 +940,9 @@
         setText('title', t.title);
         setText('subtitle', t.subtitle);
         setText('statusText', t.statusText);
+        setText('safeTitle', t.safeTitle);
+        setText('safeMsg1', t.safeMsg1);
+        setText('safeMsg2', t.safeMsg2);
         setText('portsTitle', t.portsTitle);
         setText('portsWebuiLabel', t.portsWebuiLabel);
         setText('portsDashLabel', t.portsDashLabel);
@@ -788,36 +952,42 @@
         setText('help2', t.help2);
         setText('help3', t.help3);
         setText('help4', t.help4);
+        setText('recoveryTitle', t.recoveryTitle);
+        setText('recovery1', t.recovery1);
+        setText('recovery2', t.recovery2);
+        setText('recovery3', t.recovery3);
+        setText('recovery4', t.recovery4);
         setText('retryText', t.retryText);
         setText('openDashText', t.openDashText);
         setText('diagnoseText', t.diagnoseText);
         setText('diagTitle', t.diagTitle);
         setText('projectText', t.projectText);
 
-        // Save
+        // OFF-4 fix: re-apply the runtime URLs after a language
+        // change. The URLs are language-independent, but this
+        // keeps the invariant "URLs are always set" in one place.
+        applyRuntimeUrls();
+
         try {
             localStorage.setItem('dnscrypt-lang', lang);
         } catch (e) {}
     }
 
-    // ============================================================
-    // [5] toggleLanguage
-    // ============================================================
     function toggleLanguage() {
         currentLang = (currentLang === 'ar') ? 'en' : 'ar';
         applyLanguage(currentLang);
+
+        // OFF-2 fix: re-render the diagnostic labels in the new
+        // language IF the box is visible. The previous code
+        // called handleDiagnose() TWICE, which was a no-op (the
+        // function is a toggle). Now we call a dedicated
+        // renderDiagnostics() that never touches visibility.
+        var box = $('diagnosticsBox');
+        if (box && box.style.display === 'block') {
+            renderDiagnostics();
+        }
     }
 
-    // ============================================================
-    // [6] handleRetry — attempt to reconnect to the server
-    // ============================================================
-    // Sends a HEAD /healthz with a 3-second timeout. On 200, the
-    // server is back → reload the page. Otherwise, re-enable the
-    // button and leave the UI in "reconnecting" state.
-    //
-    // Note: HEAD /healthz bypasses the Service Worker cache
-    // (see sw.js shouldBypass) so this always hits the network.
-    // ============================================================
     function handleRetry() {
         var btn = $('retryBtn');
         if (btn) btn.disabled = true;
@@ -830,7 +1000,6 @@
 
         xhr.onload = function() {
             if (xhr.status === 200) {
-                // Server is running — reload
                 window.location.replace('/?_=' + Date.now());
             } else {
                 if (btn) btn.disabled = false;
@@ -852,108 +1021,105 @@
     }
 
     // ============================================================
-    // [7] updateStatus
-    // ============================================================
-    // Updates the connectivity indicator. Colors change based on
-    // browser's online/offline event.
+    // updateStatus — reflects the CLIENT's network state only.
+    //
+    // OFF-5 note: navigator.onLine is NOT a health check for the
+    // module. It only tells us whether the browser has a network
+    // interface up. A user can be "online" (Wi-Fi connected)
+    // while the module is stopped, and the reverse is possible
+    // in edge cases. This is the best signal available to a
+    // static cached page; do not treat it as a server-reachable
+    // signal.
+    //
+    // OFF-3 fix: both directions now reset the box appearance
+    // (background, border, dot color, dot animation) so that a
+    // transition from green → warning does not leave a green
+    // dot behind.
     // ============================================================
     function updateStatus(isOnline) {
         var statusEl = $('statusText');
         var statusBox = document.querySelector('.connectivity-status');
         var t = translations[currentLang];
 
+        if (!statusBox) return;
+        var dot = statusBox.querySelector('.dot');
+
         if (isOnline) {
-            if (statusEl) statusEl.textContent = (currentLang === 'ar') ? 'متصل' : 'Connected';
-            if (statusBox) {
-                statusBox.style.background = 'rgba(63, 185, 80, 0.1)';
-                statusBox.style.borderColor = 'rgba(63, 185, 80, 0.3)';
-                statusBox.style.color = 'var(--success)';
-                var dot = statusBox.querySelector('.dot');
-                if (dot) {
-                    dot.style.background = 'var(--success)';
-                    dot.style.animation = 'none';
-                }
+            if (statusEl) statusEl.textContent = t.statusOnline;
+            statusBox.style.background = 'rgba(63, 185, 80, 0.1)';
+            statusBox.style.borderColor = 'rgba(63, 185, 80, 0.3)';
+            statusBox.style.color = 'var(--success)';
+            if (dot) {
+                dot.style.background = 'var(--success)';
+                dot.style.animation = 'none';
             }
         } else {
             if (statusEl) statusEl.textContent = t.statusText;
+            // OFF-3 fix: reset back to the warning appearance.
+            statusBox.style.background = 'rgba(210, 153, 34, 0.1)';
+            statusBox.style.borderColor = 'rgba(210, 153, 34, 0.3)';
+            statusBox.style.color = 'var(--warning)';
+            if (dot) {
+                dot.style.background = 'var(--warning)';
+                dot.style.animation = ''; // restore the blink animation
+            }
         }
     }
 
     // ============================================================
-    // [8] handleDiagnose — show diagnostic info
+    // renderDiagnostics — populate the diagnostic fields.
+    // Does NOT change visibility. (OFF-2 fix: extracted from
+    // handleDiagnose so that it can be called from
+    // toggleLanguage without toggling the box.)
     // ============================================================
-    // Toggle the diagnostics box and populate it with runtime
-    // information from the browser. Uses escapeHtml() for any
-    // value that could contain user-controlled data.
-    // ============================================================
-    function handleDiagnose() {
-        var box = $('diagnosticsBox');
-        if (!box) return;
+    function renderDiagnostics() {
+        var t = translations[currentLang];
 
-        // Toggle
-        if (box.style.display === 'block') {
-            box.style.display = 'none';
-            return;
-        }
-
-        // Fill info
         var urlEl = $('diagUrl');
         if (urlEl) {
-            urlEl.innerHTML = 'URL: <code>' + escapeHtml(window.location.href) + '</code>';
+            urlEl.innerHTML = t.diagUrlLabel + ' <code>' + escapeHtml(window.location.href) + '</code>';
         }
 
         var timeEl = $('diagTime');
         if (timeEl) {
-            timeEl.innerHTML = 'Time: <code>' + new Date().toISOString() + '</code>';
+            timeEl.innerHTML = t.diagTimeLabel + ' <code>' + new Date().toISOString() + '</code>';
         }
 
         var uaEl = $('diagUa');
         if (uaEl) {
             var ua = (navigator.userAgent || 'unknown').substring(0, 60);
-            uaEl.innerHTML = 'UA: <code>' + escapeHtml(ua) + '...</code>';
+            uaEl.innerHTML = t.diagUaLabel + ' <code>' + escapeHtml(ua) + '...</code>';
         }
 
         var protoEl = $('diagProto');
         if (protoEl) {
-            protoEl.innerHTML = 'Protocol: <code>' + window.location.protocol + '</code>';
+            protoEl.innerHTML = t.diagProtoLabel + ' <code>' + escapeHtml(window.location.protocol) + '</code>';
         }
 
         var onlineEl = $('diagOnline');
         if (onlineEl) {
             var online = navigator.onLine ? '✅ true' : '❌ false';
-            onlineEl.innerHTML = 'Online: <code>' + online + '</code>';
+            onlineEl.innerHTML = t.diagOnlineLabel + ' <code>' + online + '</code>';
+        }
+    }
+
+    // handleDiagnose — toggle the box; on show, populate it.
+    function handleDiagnose() {
+        var box = $('diagnosticsBox');
+        if (!box) return;
+
+        if (box.style.display === 'block') {
+            box.style.display = 'none';
+            return;
         }
 
+        renderDiagnostics();
         box.style.display = 'block';
     }
 
-    // ============================================================
-    // [9] escapeHtml
-    // ============================================================
-    // Minimal HTML escaper used for any value inserted into
-    // innerHTML. Kept local to this file — the offline page has
-    // no shared utility module.
-    // ============================================================
-    function escapeHtml(s) {
-        if (s === null || s === undefined) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // ============================================================
-    // [10] Auto-retry (every 15 seconds, up to a limit)
-    // ============================================================
-    // Silently probes /healthz. On 200, reloads the page. Gives
-    // up after AUTO_RETRY_MAX attempts to avoid hammering a
-    // permanently-down server (e.g. user removed the module).
-    // ============================================================
     var autoRetryCount = 0;
     var AUTO_RETRY_MAX = 10;
-    var AUTO_RETRY_INTERVAL = 15000; // 15s
+    var AUTO_RETRY_INTERVAL = 15000;
 
     function startAutoRetry() {
         if (autoRetryCount >= AUTO_RETRY_MAX) return;
@@ -979,14 +1145,9 @@
         }, AUTO_RETRY_INTERVAL);
     }
 
-    // ============================================================
-    // [11] Boot
-    // ============================================================
     function boot() {
-        // Apply language
         applyLanguage(currentLang);
 
-        // Bind events
         var langBtn = $('langToggle');
         if (langBtn) langBtn.addEventListener('click', toggleLanguage);
 
@@ -996,20 +1157,14 @@
         var diagBtn = $('diagnoseBtn');
         if (diagBtn) diagBtn.addEventListener('click', handleDiagnose);
 
-        // Update status (online check)
         updateStatus(navigator.onLine);
 
-        // Listen to online/offline events
         window.addEventListener('online', function() { updateStatus(true); });
         window.addEventListener('offline', function() { updateStatus(false); });
 
-        // Start auto-retry
         startAutoRetry();
     }
 
-    // ============================================================
-    // [12] Ready
-    // ============================================================
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);
     } else {

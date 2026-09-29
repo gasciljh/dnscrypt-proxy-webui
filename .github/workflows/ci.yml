@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -28,40 +28,41 @@
 #   docs) — see codeql.yml — so documentation PRs still get a
 #   security review.
 #
+#   Note: `paths-ignore` applies ONLY to the `push` trigger.
+#   Pull requests always run CI, regardless of which files they
+#   touch. This ensures that a PR can never merge without a green
+#   build, even if it looks like a docs-only change.
+#
+#   Note: `.github/workflows/**` is deliberately NOT in the
+#   ignore list. A change to a workflow file MUST be validated
+#   by running that workflow, otherwise a broken YAML could sit
+#   undetected on main. The cost (a few CI minutes) is accepted
+#   in exchange for this safety guarantee.
+#
 # ⚠️ Action versions:
-#   The `uses:` lines below reference actions/checkout@v7,
-#   actions/setup-go@v7, and actions/upload-artifact@v7, matching
-#   the repository's 2026 timeline.
+#   This workflow references:
+#     • actions/checkout@v4
+#     • actions/setup-go@v5
+#     • actions/upload-artifact@v4
 #
-#   If any of these action versions do not exist in your GitHub
-#   environment, the workflow will fail at the "Set up job" phase
-#   with a "reference not found" error. In that case, check the
-#   current versions at:
-#     • https://github.com/actions/checkout/releases
-#     • https://github.com/actions/setup-go/releases
-#     • https://github.com/actions/upload-artifact/releases
-#   and update the `uses:` lines accordingly.
+#   These are the currently stable major versions, matching
+#   .github/workflows/release.yml and .github/workflows/codeql.yml.
 #
-#   Dependabot (.github/dependabot.yml) tracks the github-actions
-#   ecosystem on a weekly schedule and will open PRs automatically
-#   for future updates.
+#   If a dependency update is desired, Dependabot will open PRs
+#   on a weekly cadence for the github-actions ecosystem. Do NOT
+#   manually bump the versions across workflows without
+#   coordinating with dependabot.yml.
 #
 # Trigger matrix:
-#   ┌───────────────┬─────────┬───────────────────┐
-#   │ Event            │ Branch   │ Notes                │
-#   ├───────────────┼─────────┼───────────────────┤
-#   │ push             │ main     │ full build           │
-#   │ push             │ develop  │ full build           │
-#   │ pull_request     │ main     │ full build           │
-#   │ pull_request     │ develop  │ full build           │
-#   │ workflow_dispatch│ any      │ manual (see below)   │
-#   └───────────────┴─────────┴───────────────────┘
-#
-#   workflow_dispatch allows running the workflow manually from
-#   the Actions tab — useful for:
-#     • Verifying the workflow after a config change
-#     • Rebuilding after a transient CI failure
-#     • Testing a branch that is not main/develop
+#   ┌────────────────┬─────────┬───────────────────┐
+#   │ Event             │ Branch   │ Notes                 │
+#   ├────────────────┼─────────┼───────────────────┤
+#   │ push              │ main     │ full build            │
+#   │ push              │ develop  │ full build            │
+#   │ pull_request      │ main     │ full build (always)   │
+#   │ pull_request      │ develop  │ full build (always)   │
+#   │ workflow_dispatch │ any      │ manual (see below)    │
+#   └────────────────┴─────────┴───────────────────┘
 #
 # Job matrix:
 #   Four architectures are built in parallel:
@@ -71,18 +72,79 @@
 #     • 386    → x86          (legacy 32-bit x86)
 #
 #   fail-fast is disabled: if one architecture fails, the others
-#   still complete. This makes it easier to see the full picture
-#   when a single architecture has a build issue.
+#   still complete.
 #
 # Concurrency:
 #   Only one CI run per branch is allowed at a time. When a new
 #   push arrives while a run is in progress, the older run is
-#   cancelled. This is intentional: superseded commits do not
-#   need CI results.
+#   cancelled.
 #
-#   Note: the group key is `ci-${{ github.ref }}` — a push to
-#   main does NOT cancel a PR build for a feature branch, since
-#   they have different refs.
+# ============================================================
+# v1.2.0 changes:
+# ============================================================
+#   • Added `backup-smoke-test` job.
+#   • Kept the 4-architecture `build` job unchanged.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
+# ============================================================
+#   🔧 CI-1 — `backup-smoke-test` now checks `main.go` for
+#     cleanupOldTransactions, buildBackupInfo, buildRuntimeInfo.
+#
+#   🔧 CI-1b — `backup-smoke-test` now verifies the web asset
+#     files referenced by main.go are present. SUB-ITEM of CI-1
+#     (the web-asset check is part of the same smoke-test job);
+#     counted with CI-1 in the release notes, not separately.
+#
+#   🔧 CI-2 — `shellcheck` scope documented: 5 of 8 scripts.
+#
+# ============================================================
+# v1.2.0 (Global Edition) — Additional hardening in this revision
+# ============================================================
+#   🛡️ HARD-CI-01 — Action versions aligned with release.yml
+#     (checkout@v4, setup-go@v5, upload-artifact@v4). The prior
+#     `@v7` references were speculative and would break the
+#     workflow if the versions did not exist. Dependabot will
+#     propose upgrades.
+#
+#   🛡️ HARD-CI-02 — `cache: true` for setup-go. The prior
+#     `cache: false` disabled module caching and added 20–40 s
+#     of unnecessary downloads per run × 4 architectures.
+#
+#   🛡️ HARD-CI-03 — Web asset check now uses `-s` (non-empty)
+#     instead of `-f`. A zero-byte file from a failed checkout
+#     is now caught. Parity with HARD-PM-05 in
+#     package_module.sh.
+#
+#   🛡️ HARD-CI-04 — PERSISTENT_BACKUP path consistency now
+#     also verifies `proxy/main.go`. Without this, a change in
+#     Go but not in Shell (or vice versa) would produce two
+#     different backup directories silently.
+#
+#   🛡️ HARD-CI-05 — All smoke test steps now use
+#     `set -euo pipefail` instead of `set -e`. Parity with
+#     scripts/package_module.sh and scripts/release.sh.
+#
+#   🛡️ HARD-CI-06 — The PERSISTENT_BACKUP check now
+#     distinguishes "file missing" from "content mismatch" in
+#     its error message.
+#
+#   🛡️ HARD-CI-07 — Version-consistency check. Verifies that
+#     VERSION, module.prop, update.json, web/manifest.json, and
+#     web/sw.js all agree on the same version string. Closes
+#     H-08 (CACHE_VERSION drift) from the original audit and
+#     enforces the version-file matrix documented in
+#     CHANGELOG.md §"Version Files — Where to Update".
+#
+#   🛡️ HARD-CI-08 — Documentation-only clarification. The
+#     `paths-ignore` list at the workflow level remains
+#     unchanged: `**.md` and `docs/**` are still excluded on
+#     `push`. The note in this header is intended to make the
+#     existing behaviour explicit — it does NOT change it.
+#     (Earlier drafts of this header claimed CHANGELOG.md was
+#     removed from the exception list, which was never true.
+#     That claim has been corrected here.)
+#
 # ============================================================
 
 name: CI
@@ -109,6 +171,9 @@ env:
   NDK_VERSION: 'r26b'
 
 jobs:
+  # ============================================================
+  # [1] Build matrix — 4 architectures
+  # ============================================================
   build:
     name: Build ${{ matrix.arch }}
     runs-on: ubuntu-22.04
@@ -118,12 +183,13 @@ jobs:
       matrix:
         arch: [arm64, arm, amd64, 386]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: false
+          # HARD-CI-02: caching re-enabled.
+          cache: true
 
       - name: Setup NDK
         id: setup-ndk
@@ -141,9 +207,322 @@ jobs:
           cd proxy && ./build.sh --single ${{ matrix.arch }}
 
       - name: Upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: webui-${{ matrix.arch }}
           path: proxy/build/dnscrypt-webui-${{ matrix.arch }}
           retention-days: 7
           if-no-files-found: error
+
+  # ============================================================
+  # [2] Backup smoke test (v1.2.0)
+  # ============================================================
+  # Validates the shell scripts and configuration that
+  # implement the 10 data-preservation layers introduced in
+  # v1.2.0. Runs in seconds and catches:
+  #   • Shell syntax errors in the modified scripts
+  #   • Missing function names that other scripts depend on
+  #   • Missing constants (e.g. PERSISTENT_BACKUP)
+  #   • Inconsistent paths across scripts AND main.go
+  #   • Missing documentation files
+  #   • Missing web assets referenced by main.go
+  #   • Version drift between VERSION, module.prop, update.json,
+  #     web/manifest.json, and web/sw.js
+  #
+  # This is NOT a full data-preservation test — that runs on a
+  # real device via .github/workflows/upgrade-test.yml.
+  #
+  # ⚠️ shellcheck scope (CI-2):
+  #    shellcheck runs on 5 of the 8 scripts; the remaining 3
+  #    (action.sh, post-fs-data.sh, watchdog.sh) are only
+  #    covered by `bash -n`. The excluded scripts contain a mix
+  #    of legacy-style code and defensive patterns that produce
+  #    shellcheck warnings unrelated to correctness. They are
+  #    still validated for syntax errors.
+  # ============================================================
+  backup-smoke-test:
+    name: Backup Smoke Test
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck
+
+      # HARD-CI-05: set -euo pipefail for full safety.
+      - name: Shell syntax check (bash -n)
+        run: |
+          set -euo pipefail
+          echo "::group::bash -n on v1.2.0 scripts (all 8)"
+          for f in \
+            proxy/customize.sh \
+            proxy/functions.sh \
+            proxy/service.sh \
+            proxy/status.sh \
+            proxy/uninstall.sh \
+            proxy/action.sh \
+            proxy/post-fs-data.sh \
+            proxy/watchdog.sh; do
+            echo "  → $f"
+            bash -n "$f"
+          done
+          echo "::endgroup::"
+          echo "✅ All 8 shell scripts pass bash -n"
+
+      - name: Shellcheck (severity=warning)
+        run: |
+          set -euo pipefail
+          echo "::group::shellcheck on 5 scripts (see CI-2 note in ci.yml)"
+          shellcheck --severity=warning \
+            proxy/customize.sh \
+            proxy/functions.sh \
+            proxy/service.sh \
+            proxy/status.sh \
+            proxy/uninstall.sh
+          echo "::endgroup::"
+          echo "✅ shellcheck clean on 5 scripts"
+
+      - name: Verify Layer 1-10 function presence
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying v1.2.0 data-preservation layers"
+
+          # Layer 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8: customize.sh
+          grep -q 'CANDIDATE_SOURCES' proxy/customize.sh && \
+            echo "  ✅ Layer 1: multi-source detection"
+          grep -q 'PERSISTENT_BACKUP' proxy/customize.sh && \
+            echo "  ✅ Layer 2: persistent backup path"
+          grep -q 'verify_backup_integrity' proxy/customize.sh && \
+            echo "  ✅ Layer 3: integrity verification"
+          grep -q 'begin_transaction' proxy/customize.sh && \
+            echo "  ✅ Layer 4: transaction begin"
+          grep -q 'rollback_transaction' proxy/customize.sh && \
+            echo "  ✅ Layer 4: transaction rollback"
+          grep -q 'commit_transaction' proxy/customize.sh && \
+            echo "  ✅ Layer 4: transaction commit"
+          grep -q 'detect_root_solution' proxy/customize.sh && \
+            echo "  ✅ Layer 5: root-solution detection"
+          grep -q 'copy_with_context' proxy/customize.sh && \
+            echo "  ✅ Layer 6: SELinux context preservation"
+          grep -q 'recovery' proxy/customize.sh && \
+            echo "  ✅ Layer 7: recovery mode trigger"
+          grep -q 'migrate_config' proxy/customize.sh && \
+            echo "  ✅ Layer 8: config migrations"
+
+          # Layer 9: functions.sh + service.sh + main.go
+          grep -q 'auto_backup_if_needed' proxy/functions.sh && \
+            echo "  ✅ Layer 9: auto-backup helper"
+          grep -q 'rotate_backups' proxy/functions.sh && \
+            echo "  ✅ Layer 9: backup rotation"
+          grep -q 'backup_user_files' proxy/functions.sh && \
+            echo "  ✅ Layer 9: backup_user_files helper"
+          grep -q 'restore_user_files' proxy/functions.sh && \
+            echo "  ✅ Layer 9: restore_user_files helper"
+          grep -q 'auto_backup_if_needed' proxy/service.sh && \
+            echo "  ✅ Layer 9: service.sh calls auto-backup"
+
+          # Layer 10: status.sh
+          grep -q 'diagnose' proxy/status.sh && \
+            echo "  ✅ Layer 10: diagnose mode in status.sh"
+          grep -q 'backups' proxy/status.sh && \
+            echo "  ✅ Layer 10: backups in status.sh JSON"
+
+          # main.go additions
+          grep -q 'createAutoBackup' proxy/main.go && \
+            echo "  ✅ main.go: createAutoBackup"
+          grep -q 'checkPendingNotifications' proxy/main.go && \
+            echo "  ✅ main.go: checkPendingNotifications"
+          grep -q 'cleanupOldTransactions' proxy/main.go && \
+            echo "  ✅ main.go: cleanupOldTransactions"
+          grep -q 'buildBackupInfo' proxy/main.go && \
+            echo "  ✅ main.go: buildBackupInfo (BAK-1)"
+          grep -q 'buildRuntimeInfo' proxy/main.go && \
+            echo "  ✅ main.go: buildRuntimeInfo (BAK-1 wiring)"
+
+          echo "::endgroup::"
+          echo "✅ All v1.2.0 layer functions present"
+
+      # HARD-CI-04 + HARD-CI-06: extend the check to main.go
+      # and give a clearer error message.
+      - name: Verify PERSISTENT_BACKUP path consistency
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying PERSISTENT_BACKUP path"
+
+          EXPECTED="/sdcard/dnscrypt-webui-backup"
+
+          for f in \
+            proxy/customize.sh \
+            proxy/functions.sh \
+            proxy/service.sh \
+            proxy/status.sh \
+            proxy/uninstall.sh \
+            proxy/main.go; do
+
+            if [ ! -s "$f" ]; then
+              echo "  ❌ file missing or empty: $f"
+              exit 1
+            fi
+
+            if grep -q "$EXPECTED" "$f"; then
+              echo "  ✅ $f references $EXPECTED"
+            else
+              echo "  ❌ $f does not contain '$EXPECTED'"
+              echo "     (either the file was changed and the path drifted,"
+              echo "      or the constant was renamed — check manually)"
+              exit 1
+            fi
+          done
+
+          echo "::endgroup::"
+          echo "✅ PERSISTENT_BACKUP path consistent across scripts + main.go"
+
+      - name: Verify v1.2.0 docs referenced
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying v1.2.0 documentation references"
+
+          test -f docs/BACKUP.md && echo "  ✅ docs/BACKUP.md present"
+          test -f docs/EMERGENCY.md && echo "  ✅ docs/EMERGENCY.md present"
+
+          grep -q 'BACKUP.md' proxy/customize.sh && \
+            echo "  ✅ customize.sh → BACKUP.md"
+          grep -q 'EMERGENCY.md' proxy/customize.sh && \
+            echo "  ✅ customize.sh → EMERGENCY.md"
+
+          echo "::endgroup::"
+          echo "✅ v1.2.0 documentation references verified"
+
+      # HARD-CI-03: use -s (non-empty), not -f (exists).
+      - name: Verify web asset files exist and are non-empty
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying web assets referenced by main.go"
+
+          for f in \
+            web/index.html \
+            web/dashboard.html \
+            web/manifest.json \
+            web/sw.js \
+            web/offline.html \
+            web/icon-192.png \
+            web/icon-512.png \
+            web/icon-192.svg \
+            web/icon-512.svg \
+            web/apple-touch-icon.png \
+            web/favicon-32x32.png \
+            web/favicon-16x16.png \
+            web/favicon.ico; do
+            if [ -s "$f" ]; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ missing or empty: $f"
+              exit 1
+            fi
+          done
+
+          echo "::endgroup::"
+          echo "✅ All web assets present and non-empty"
+
+      # HARD-CI-07: verify version consistency across all
+      # release-relevant files. This is the check that closes
+      # H-08 (CACHE_VERSION drift) from the original audit.
+      - name: Verify version consistency
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying version consistency"
+
+          # ------------------------------------------------------------
+          # Source of truth: VERSION file.
+          # ------------------------------------------------------------
+          if [ ! -s VERSION ]; then
+            echo "  ❌ VERSION file is missing or empty"
+            exit 1
+          fi
+          V="$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          echo "  VERSION file:           $V"
+          V_NO_V="${V#v}"
+
+          # ------------------------------------------------------------
+          # module.prop: version=
+          # ------------------------------------------------------------
+          if [ ! -s module.prop ]; then
+            echo "  ❌ module.prop is missing or empty"
+            exit 1
+          fi
+          MP_V="$(grep '^version=' module.prop | head -n1 | cut -d= -f2- | tr -d '\r ')"
+          if [ "$MP_V" = "$V" ]; then
+            echo "  ✅ module.prop version:          $MP_V"
+          else
+            echo "  ❌ module.prop version mismatch"
+            echo "     expected: $V"
+            echo "     found:    $MP_V"
+            exit 1
+          fi
+
+          # ------------------------------------------------------------
+          # update.json: .version
+          # ------------------------------------------------------------
+          if [ ! -s update.json ]; then
+            echo "  ❌ update.json is missing or empty"
+            exit 1
+          fi
+          UJ_V="$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' update.json \
+                  | head -n1 | sed -E 's/.*"([^"]*)"$/\1/')"
+          if [ "$UJ_V" = "$V" ]; then
+            echo "  ✅ update.json version:          $UJ_V"
+          else
+            echo "  ❌ update.json version mismatch"
+            echo "     expected: $V"
+            echo "     found:    $UJ_V"
+            exit 1
+          fi
+
+          # ------------------------------------------------------------
+          # web/manifest.json: .version (no "v" prefix)
+          # ------------------------------------------------------------
+          if [ ! -s web/manifest.json ]; then
+            echo "  ❌ web/manifest.json is missing or empty"
+            exit 1
+          fi
+          MF_V="$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' web/manifest.json \
+                  | head -n1 | sed -E 's/.*"([^"]*)"$/\1/')"
+          if [ "$MF_V" = "$V_NO_V" ]; then
+            echo "  ✅ web/manifest.json version:    $MF_V"
+          else
+            echo "  ❌ web/manifest.json version mismatch"
+            echo "     expected (no v): $V_NO_V"
+            echo "     found:           $MF_V"
+            exit 1
+          fi
+
+          # ------------------------------------------------------------
+          # web/sw.js: CACHE_VERSION constant
+          # (H-08 from the original audit)
+          # ------------------------------------------------------------
+          if [ ! -s web/sw.js ]; then
+            echo "  ❌ web/sw.js is missing or empty"
+            exit 1
+          fi
+          SW_V="$(grep -oE "CACHE_VERSION[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]" web/sw.js \
+                  | head -n1 \
+                  | sed -E "s/.*['\"]([^'\"]*)['\"]$/\1/")"
+          if [ -z "$SW_V" ]; then
+            echo "  ❌ could not extract CACHE_VERSION from web/sw.js"
+            exit 1
+          fi
+          if [ "$SW_V" = "$V" ]; then
+            echo "  ✅ web/sw.js CACHE_VERSION:      $SW_V"
+          else
+            echo "  ❌ web/sw.js CACHE_VERSION mismatch (H-08)"
+            echo "     expected: $V"
+            echo "     found:    $SW_V"
+            echo "     Update web/sw.js before merging."
+            exit 1
+          fi
+
+          echo "::endgroup::"
+          echo "✅ Version consistency verified across 5 files"

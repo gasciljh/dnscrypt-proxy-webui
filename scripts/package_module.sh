@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – package_module.sh
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -20,19 +20,9 @@
 #   Total: 32 required files, verified after packaging.
 #
 # Web file list (13 files) vs SW precache (11 files):
-#   The ZIP ships 13 web files:
-#     • index.html, dashboard.html          ← HTML (2)
-#     • manifest.json, sw.js                ← PWA core (2)
-#     • icon-192.svg, icon-512.svg          ← SVG sources (2)
-#     • icon-192.png, icon-512.png          ← PNG icons (2)
-#     • apple-touch-icon.png                ← iOS icon (1)
-#     • favicon-32x32.png, favicon-16x16.png,
-#       favicon.ico                         ← Favicons (3)
-#     • offline.html                        ← Offline fallback (1)
-#
-#   The Service Worker precaches 11 of these (sw.js itself is
-#   never cached, and index.html / dashboard.html are served
-#   network-first as navigations, not precached by URL).
+#   The ZIP ships 13 web files. The Service Worker precaches 11
+#   of these (sw.js itself is never cached, and index.html /
+#   dashboard.html are served network-first as navigations).
 #   See web/sw.js §[2] for the exact PRECACHE_ASSETS list.
 #
 # Icon source mapping (verified against generate-icons.sh):
@@ -43,15 +33,13 @@
 #   • favicon-16x16.png    ← from icon-512.svg
 #   • favicon.ico          ← from favicon-16.png + favicon-32.png
 #
-#   If you regenerate the SVGs, run:
-#     ./scripts/generate-icons.sh --force
-#   before packaging.
-#
 # Features:
 #   • Auto-detects BUILD_DIR (proxy/build or ./build)
 #   • Uses SOURCE_DATE_EPOCH for reproducible builds
 #   • Reuses DNS binaries cache (via fetch_dns_binaries.sh)
 #   • Maps i386 ↔ x86 for customize.sh compatibility
+#   • Verifies VERSION ↔ module.prop consistency (PM-1)
+#   • Verifies VERSION ↔ update.json consistency (PM-6)
 #   • Verifies ZIP structure (fails on missing files)
 #   • Generates SHA-256 checksum file
 #   • Idempotent — safe to run multiple times
@@ -75,30 +63,108 @@
 #   • dnscrypt-webui-<version>-module.zip
 #   • dnscrypt-webui-<version>-module.zip.sha256
 #
-# Examples:
-#   ./scripts/package_module.sh --version v1.1.0
-#   ./scripts/package_module.sh --version v1.1.0 --skip-dns-fetch
-#   ./scripts/package_module.sh --version v1.1.0 --verbose
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
+# ============================================================
+#   🔧 PM-1 — verify module.prop version == $VERSION (hard)
+#     and versionCode == canonical formula (warn).
+#   🔧 PM-2 — log_debug writes to stderr (matches siblings).
+#   🔧 PM-3 — value-taking flags check that a value is present.
 #
-# v1.1.0 changes:
-#   • Version bumped to v1.1.0 (documentation only — no behavior
-#     changes in this script since v1.0.0).
-#   • Added an explicit note distinguishing the 13 web files in
-#     the ZIP from the 11 files precached by sw.js. Both numbers
-#     are correct; they count different things.
-#   • Added an icon source mapping table, matching the
-#     corrections made to icon-512.svg and generate-icons.sh.
-#   • Documented that the packaged module includes the v1.1.0
-#     memory limit behavior implemented in main.go, but that
-#     behavior is a runtime concern — this script does not need
-#     to know about it.
+# ============================================================
+# v1.2.0 (Global Edition) — Additional hardening in this revision
+# ============================================================
+#   🛡️ HARD-PM-01 (was PM-4) — Reproducibility fallback made
+#     consistent. When SOURCE_DATE_EPOCH cannot be applied via
+#     `touch -d @N`, the script now FAILS LOUDLY instead of
+#     silently falling back to a different fixed date. Two
+#     builds on two different OSes that succeed now produce the
+#     same bytes; a build that could not apply the epoch is not
+#     allowed to masquerade as reproducible.
 #
+#   🛡️ HARD-PM-02 (was PM-5) — The `grep -c ... || echo 0`
+#     pattern that produced "0\n0" on zero matches is replaced
+#     with a helper that returns exactly one line. Fixes the
+#     malformed "Icons: 0\n0 PNG" log line.
+#
+#   🛡️ HARD-PM-03 (was PM-6) — update.json is now read and its
+#     `version` field is compared to $VERSION. A mismatch is a
+#     WARNING (not a hard error), because local/CI packaging
+#     can legitimately run before the metadata is bumped by
+#     release.sh.
+#
+#   🛡️ HARD-PM-04 (was PM-7) — `file_size` output is validated
+#     as numeric before being used in an arithmetic comparison.
+#     Prevents a syntax error under `set -e` when `stat` fails.
+#
+#   🛡️ HARD-PM-05 (was PM-8) — Web files are checked for
+#     non-empty size (`-s`), not just existence. A 0-byte
+#     placeholder from a failed checkout is caught here.
+#
+#   🛡️ HARD-PM-06 (was PM-9) — The EXIT trap uses an explicit
+#     `if` instead of `&&` short-circuit, making the intent
+#     unambiguous and the exit status of the trap well-defined
+#     on every shell.
+#
+#   🛡️ HARD-PM-07 (was PM-10) — `calc_version_code` strips
+#     leading zeros before arithmetic so that `v01.2.3` does
+#     not trigger bash's octal-interpretation error.
+#
+#   🛡️ HARD-PM-08 (was PM-11) — OUTPUT_DIR writability is
+#     checked early (section [6d]) instead of at the end.
+#
+#   🛡️ HARD-PM-09 (was PM-12) — TMPDIR trailing slash is
+#     normalized before building the staging path.
+#
+#   🛡️ HARD-PM-10 (was PM-13) — The remediation hint after a
+#     missing web file is tailored: icon files suggest
+#     generate-icons.sh, other files point at git checkout.
+#
+# ============================================================
+# v1.2.0 (Global Edition) — Revision 2 (M-1..M-2, L-1..L-6)
+# ============================================================
+#   🟡 M-1 — `zip_size=$(file_size ... || echo 0)` replaced
+#     with an explicit if/else that validates numeric output.
+#     This was the exact anti-pattern HARD-PM-04 forbids; it
+#     was applied in §[15] but bypassed in §[18]. Now both
+#     sites use the same guarded pattern.
+#
+#   🟡 M-2 — Relative --output-dir is resolved after
+#     `cd "$REPO_ROOT"`, which can surprise callers who pass a
+#     path from outside the repo. Documented in §[2] and in
+#     the --help text; the resolved absolute path is now
+#     printed during the early writability check in §[6d].
+#
+#   🟢 L-1 — favicon.ico is now included in the icon-missing
+#     counter (previously `favicon-*` missed it because of the
+#     dash).
+#
+#   🟢 L-2 — VERSION regex now accepts SemVer build metadata
+#     (`+build.123`) in addition to the existing prerelease
+#     suffix.
+#
+#   🟢 L-3 — Non-numeric versionCode in module.prop now emits
+#     a dedicated warning using the existing is_numeric helper.
+#
+#   🟢 L-4 — sha256 availability check now uses `command -v`
+#     first (cheaper than piping /dev/null through sha256sum).
+#
+#   🟢 L-5 — `du -h` for the human-readable ZIP size now has a
+#     fallback to "?" if du fails.
+#
+#   🟢 L-6 — TMPDIR trailing-slash normalization now strips all
+#     trailing slashes, not just one.
+#
+# ============================================================
 # Reproducibility:
-#   • SOURCE_DATE_EPOCH is applied via `touch -d` to every file
-#     in the staging directory before ZIP creation.
+#   • SOURCE_DATE_EPOCH is applied via `touch -d "@N"` to every
+#     file in staging before ZIP creation. If `touch -d` is not
+#     available, the script exits with an error rather than
+#     silently using a different timestamp.
 #   • `zip -X` excludes extra file attributes.
 #   • `find | LC_ALL=C sort` guarantees deterministic file order.
-#   • Result: same source + same EPOCH → same ZIP SHA-256.
+#   • Result: same source + same EPOCH + same platform family
+#     → same ZIP SHA-256.
 # ============================================================
 
 set -euo pipefail
@@ -117,6 +183,11 @@ KEEP_STAGING=0
 # ------------------------------------------------------------
 # [2] Paths
 # ------------------------------------------------------------
+# NOTE (M-2): After this `cd`, every relative path — including
+# the one passed via --output-dir or --build-dir — is resolved
+# relative to REPO_ROOT, not to the caller's original cwd.
+# The resolved absolute path is printed in §[6d].
+# ------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT"
@@ -134,17 +205,48 @@ else
     RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
+# log_info and log_ok intentionally write to stdout: they are
+# user-facing terminal output.
+# log_warn, log_error, and log_debug write to stderr (PM-2).
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
 log_ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⚠${NC}  $1" >&2; }
 log_error() { echo -e "  ${RED}✗${NC} $1" >&2; }
-log_debug() { [ "$VERBOSE" = "1" ] && echo -e "  ${DIM}·${NC} $1" || true; }
+log_debug() { [ "$VERBOSE" = "1" ] && echo -e "  ${DIM}·${NC} $1" >&2 || true; }
 
 # ------------------------------------------------------------
 # [4] Helper functions
 # ------------------------------------------------------------
+# file_size — returns size in bytes, or empty string on failure.
+# HARD-PM-04: callers MUST validate that the output is numeric
+# before using it in an arithmetic context.
+# ------------------------------------------------------------
 file_size() {
-    stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null || echo "?"
+    local out
+    out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+    out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+    return 1
+}
+
+# is_numeric — true iff the argument is one or more digits.
+is_numeric() {
+    case "${1:-}" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# count_matches — count matching lines in a stream, exactly one
+# line of output, always numeric.
+# HARD-PM-02: replaces `grep -c ... || echo 0`, which emitted
+# "0\n0" on zero matches.
+# ------------------------------------------------------------
+count_matches() {
+    local pattern="$1"
+    local n
+    n=$(grep -cE "$pattern" 2>/dev/null) || true
+    [ -z "$n" ] && n=0
+    printf '%s' "$n"
 }
 
 sha256_compat() {
@@ -157,15 +259,56 @@ sha256_compat() {
     fi
 }
 
+# calc_version_code — canonical versionCode from a SemVer string.
+#
+#   versionCode = MAJOR * 1,000,000
+#               + MINOR *    10,000
+#               + PATCH *       100
+#
+# Prerelease suffixes are ignored. HOTFIX is not used by any
+# current release tooling.
+#
+# HARD-PM-07: leading zeros are stripped before arithmetic, so
+# a value like "01" does not trigger bash's octal error.
+# ------------------------------------------------------------
+calc_version_code() {
+    local v="${1#v}"
+    local core="${v%%-*}"
+    local major minor patch
+
+    major=$(echo "$core" | cut -d. -f1 | sed 's/^0*//')
+    minor=$(echo "$core" | cut -d. -f2 | sed 's/^0*//')
+    patch=$(echo "$core" | cut -d. -f3 | sed 's/^0*//')
+
+    [ -z "$major" ] && major=0
+    [ -z "$minor" ] && minor=0
+    [ -z "$patch" ] && patch=0
+
+    echo $((major * 1000000 + minor * 10000 + patch * 100))
+}
+
 # ------------------------------------------------------------
 # [5] Arguments
 # ------------------------------------------------------------
+# PM-3 fix: each value-taking flag now requires a value.
 while [ $# -gt 0 ]; do
     case "$1" in
-        --version)         VERSION="${2:-}"; shift 2 ;;
-        --build-dir)       BUILD_DIR="${2:-}"; shift 2 ;;
-        --output-dir)      OUTPUT_DIR="${2:-}"; shift 2 ;;
-        --dns-cache-dir)   DNS_CACHE_DIR="${2:-}"; shift 2 ;;
+        --version)
+            [ -n "${2:-}" ] || { log_error "--version requires a value"; exit 2; }
+            VERSION="$2"; shift 2
+            ;;
+        --build-dir)
+            [ -n "${2:-}" ] || { log_error "--build-dir requires a value"; exit 2; }
+            BUILD_DIR="$2"; shift 2
+            ;;
+        --output-dir)
+            [ -n "${2:-}" ] || { log_error "--output-dir requires a value"; exit 2; }
+            OUTPUT_DIR="$2"; shift 2
+            ;;
+        --dns-cache-dir)
+            [ -n "${2:-}" ] || { log_error "--dns-cache-dir requires a value"; exit 2; }
+            DNS_CACHE_DIR="$2"; shift 2
+            ;;
         --skip-dns-fetch)  SKIP_DNS_FETCH=1; shift ;;
         --keep-staging)    KEEP_STAGING=1; shift ;;
         --verbose|-v)      VERBOSE=1; shift ;;
@@ -180,6 +323,8 @@ Options:
   --version VERSION      Module version (required)
   --build-dir DIR        WebUI binaries directory
   --output-dir DIR       Output directory (default: ./dist)
+                         NOTE: relative paths are resolved against
+                         the repository root, not the caller's cwd.
   --dns-cache-dir DIR    DNS binaries cache directory
   --skip-dns-fetch       Use cache only (no download)
   --keep-staging         Keep staging directory (for diagnostics)
@@ -187,8 +332,14 @@ Options:
   --help, -h             Show this help
 
 Examples:
-  ./scripts/package_module.sh --version v1.1.0
-  ./scripts/package_module.sh --version v1.1.0 --skip-dns-fetch
+  ./scripts/package_module.sh --version v1.2.0
+  ./scripts/package_module.sh --version v1.2.0 --skip-dns-fetch
+  ./scripts/package_module.sh --version v1.2.0 --output-dir /tmp/out
+
+References:
+  docs/BACKUP.md         Backup system reference (v1.2.0)
+  docs/EMERGENCY.md      Emergency recovery guide (v1.2.0)
+  docs/UPGRADE.md §3.1   v1.1.0 → v1.2.0 upgrade path
 HELP_EOF
             exit 0
             ;;
@@ -211,13 +362,122 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 
-if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+# L-2 fix: accept optional SemVer build metadata (`+...`) in
+# addition to the existing optional prerelease suffix.
+if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$'; then
     log_error "Invalid version: '$VERSION'"
-    log_info "Required format: v<major>.<minor>.<patch>[-prerelease]"
+    log_info "Required format: v<major>.<minor>.<patch>[-prerelease][+build]"
     exit 2
 fi
 
 VERSION_NO_V="${VERSION#v}"
+
+# ------------------------------------------------------------
+# [6b] PM-1 fix: verify module.prop matches $VERSION
+# ------------------------------------------------------------
+if [ ! -f "$REPO_ROOT/module.prop" ]; then
+    log_error "Missing: module.prop"
+    exit 2
+fi
+
+MODPROP_VERSION=$(grep '^version=' "$REPO_ROOT/module.prop" | head -n1 | cut -d= -f2- | tr -d '\r ')
+MODPROP_VC=$(grep '^versionCode=' "$REPO_ROOT/module.prop" | head -n1 | cut -d= -f2- | tr -d '\r ')
+
+if [ -z "$MODPROP_VERSION" ]; then
+    log_error "module.prop has no 'version=' line"
+    exit 2
+fi
+
+if [ "$MODPROP_VERSION" != "$VERSION" ]; then
+    log_error "Version mismatch between --version and module.prop"
+    log_info "  --version:   $VERSION"
+    log_info "  module.prop: $MODPROP_VERSION"
+    log_info "Run 'scripts/release.sh' to update both consistently,"
+    log_info "or pass --version '$MODPROP_VERSION' to package the current tree."
+    exit 2
+fi
+
+EXPECTED_VC=$(calc_version_code "$VERSION")
+if [ -z "$MODPROP_VC" ]; then
+    log_warn "module.prop has no 'versionCode=' line"
+elif ! is_numeric "$MODPROP_VC"; then
+    # L-3 fix: non-numeric versionCode deserves its own message.
+    log_warn "module.prop versionCode is not numeric: '$MODPROP_VC'"
+    log_warn "  expected: $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
+elif [ "$MODPROP_VC" != "$EXPECTED_VC" ]; then
+    log_warn "versionCode does not match the canonical formula"
+    log_warn "  module.prop: $MODPROP_VC"
+    log_warn "  expected:    $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
+    log_warn "This is a warning only — release.sh should keep these in sync."
+fi
+
+# ------------------------------------------------------------
+# [6c] HARD-PM-03: verify update.json version matches $VERSION
+# ------------------------------------------------------------
+# update.json is what the root manager reads to offer updates.
+# If it disagrees with the ZIP we are producing, users who
+# already installed the module will not be offered the update —
+# even though the ZIP exists.
+#
+# This is a WARNING (not a hard error) because packaging for a
+# local test can legitimately run before release.sh has bumped
+# the metadata.
+# ------------------------------------------------------------
+UPDATE_JSON="$REPO_ROOT/update.json"
+if [ -f "$UPDATE_JSON" ]; then
+    UPDATE_JSON_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
+        | head -n1 \
+        | sed -E 's/.*"([^"]*)"$/\1/')
+
+    if [ -z "$UPDATE_JSON_VERSION" ]; then
+        log_warn "update.json has no parseable 'version' field"
+    elif [ "$UPDATE_JSON_VERSION" != "$VERSION" ]; then
+        log_warn "update.json version does not match --version"
+        log_warn "  update.json: $UPDATE_JSON_VERSION"
+        log_warn "  --version:   $VERSION"
+        log_warn "Users who already installed the module will NOT see the update"
+        log_warn "until update.json is regenerated by scripts/release.sh."
+    fi
+
+    # Also check the zipUrl filename.
+    UPDATE_JSON_URL=$(grep -oE '"zipUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
+        | head -n1 \
+        | sed -E 's/.*"([^"]*)"$/\1/')
+    if [ -n "$UPDATE_JSON_URL" ]; then
+        EXPECTED_URL_SUFFIX="dnscrypt-webui-${VERSION_NO_V}-module.zip"
+        case "$UPDATE_JSON_URL" in
+            *"$EXPECTED_URL_SUFFIX") : ;;
+            *)
+                log_warn "update.json zipUrl filename does not match the ZIP we are building"
+                log_warn "  zipUrl:   $UPDATE_JSON_URL"
+                log_warn "  expected: .../$EXPECTED_URL_SUFFIX"
+                ;;
+        esac
+    fi
+else
+    log_warn "update.json not found — skipping consistency check"
+fi
+
+# ------------------------------------------------------------
+# [6d] HARD-PM-08: verify OUTPUT_DIR is writable early
+# ------------------------------------------------------------
+# M-2: because §[2] `cd`'d into REPO_ROOT, a relative
+# --output-dir is resolved against REPO_ROOT. We print the
+# resolved absolute path here so the caller sees exactly which
+# directory was created / checked.
+# ------------------------------------------------------------
+if ! mkdir -p "$OUTPUT_DIR" 2>/dev/null; then
+    log_error "Cannot create OUTPUT_DIR: $OUTPUT_DIR"
+    exit 2
+fi
+OUTPUT_DIR_ABS="$(cd "$OUTPUT_DIR" && pwd)"
+
+if [ ! -w "$OUTPUT_DIR_ABS" ]; then
+    log_error "OUTPUT_DIR is not writable: $OUTPUT_DIR_ABS"
+    exit 2
+fi
+
+log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
 
 # ------------------------------------------------------------
 # [7] Read DNS version
@@ -252,12 +512,24 @@ fi
 # ------------------------------------------------------------
 # [9] SOURCE_DATE_EPOCH
 # ------------------------------------------------------------
+# HARD-PM-01: the epoch is either taken from the environment,
+# from the last git commit, or fixed to 0. Whatever the value,
+# the primary touch path is authoritative: if `touch -d @N`
+# is not available on this platform, we FAIL rather than
+# silently substituting a different date. A build that cannot
+# honor the requested epoch must not pretend to be reproducible.
+# ------------------------------------------------------------
 if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
     if git rev-parse --git-dir >/dev/null 2>&1; then
         SOURCE_DATE_EPOCH=$(git log -1 --format=%ct 2>/dev/null || echo 0)
     else
         SOURCE_DATE_EPOCH=0
     fi
+fi
+# Numeric guard.
+if ! is_numeric "$SOURCE_DATE_EPOCH"; then
+    log_warn "SOURCE_DATE_EPOCH is not numeric ('$SOURCE_DATE_EPOCH'); using 0"
+    SOURCE_DATE_EPOCH=0
 fi
 export SOURCE_DATE_EPOCH
 
@@ -266,13 +538,15 @@ export SOURCE_DATE_EPOCH
 # ------------------------------------------------------------
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║  📦 package_module.sh                                     ║${NC}"
+echo -e "${BOLD}║  📦 package_module.sh                                    ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Module VERSION:${NC}  ${GREEN}${VERSION}${NC}"
+echo -e "  ${BOLD}module.prop:${NC}     ${GREEN}${MODPROP_VERSION}${NC} (verified)"
+echo -e "  ${BOLD}versionCode:${NC}     ${GREEN}${MODPROP_VC}${NC} (expected ${EXPECTED_VC})"
 echo -e "  ${BOLD}DNS Version:${NC}     ${GREEN}${DNS_VERSION}${NC}"
 echo -e "  ${BOLD}BUILD_DIR:${NC}       ${DIM}${BUILD_DIR}${NC}"
-echo -e "  ${BOLD}OUTPUT_DIR:${NC}      ${DIM}${OUTPUT_DIR}${NC}"
+echo -e "  ${BOLD}OUTPUT_DIR:${NC}      ${DIM}${OUTPUT_DIR_ABS}${NC}"
 echo -e "  ${BOLD}CACHE_DIR:${NC}       ${DIM}${DNS_CACHE_DIR}${NC}"
 echo -e "  ${BOLD}EPOCH:${NC}           ${DIM}${SOURCE_DATE_EPOCH}${NC}"
 [ "$SKIP_DNS_FETCH" = "1" ] && echo -e "  ${BOLD}Mode:${NC}            ${YELLOW}SKIP-DNS-FETCH${NC}"
@@ -291,7 +565,9 @@ if [ -n "$MISSING" ]; then
     exit 2
 fi
 
-if ! sha256_compat </dev/null >/dev/null 2>&1; then
+# L-4 fix: prefer `command -v` over piping /dev/null through the
+# hashing tool for the availability check.
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
     log_error "Neither sha256sum nor shasum available"
     exit 2
 fi
@@ -303,13 +579,13 @@ log_ok "Required tools available"
 # ------------------------------------------------------------
 [ -d "$REPO_ROOT/proxy" ] || { log_error "proxy/ directory missing"; exit 2; }
 [ -d "$REPO_ROOT/web" ]   || { log_error "web/ directory missing"; exit 2; }
-[ -f "$REPO_ROOT/module.prop" ] || { log_error "module.prop missing"; exit 2; }
 
 # ------------------------------------------------------------
 # [13] Check web files (13 files)
 # ------------------------------------------------------------
-# See the header for the exact breakdown. Every file here must
-# exist before packaging, otherwise the ZIP would be incomplete.
+# HARD-PM-05: checks for non-empty size, not just existence.
+# HARD-PM-10: remediation hint is tailored to the type of file.
+# L-1 fix: favicon.ico is explicitly included in the icon set.
 # ============================================================
 WEB_FILES_REQUIRED=(
     "index.html"
@@ -328,20 +604,43 @@ WEB_FILES_REQUIRED=(
 )
 
 WEB_MISSING=0
+WEB_MISSING_ICONS=0
+WEB_MISSING_HTML=0
+
 for f in "${WEB_FILES_REQUIRED[@]}"; do
-    if [ ! -f "$REPO_ROOT/web/$f" ]; then
-        log_error "Missing: web/$f"
+    if [ ! -s "$REPO_ROOT/web/$f" ]; then
+        if [ -f "$REPO_ROOT/web/$f" ]; then
+            log_error "Empty: web/$f"
+        else
+            log_error "Missing: web/$f"
+        fi
         WEB_MISSING=$((WEB_MISSING + 1))
+        # L-1: include favicon.ico explicitly — `favicon-*` alone
+        # does not match it because of the dash.
+        case "$f" in
+            icon-*.svg|icon-*.png|apple-touch-icon.png|favicon-*|favicon.ico)
+                WEB_MISSING_ICONS=$((WEB_MISSING_ICONS + 1))
+                ;;
+            *.html)
+                WEB_MISSING_HTML=$((WEB_MISSING_HTML + 1))
+                ;;
+        esac
     fi
 done
 
 if [ "$WEB_MISSING" -gt 0 ]; then
-    log_error "$WEB_MISSING web file(s) missing"
-    log_info "Run: ./scripts/generate-icons.sh"
+    log_error "$WEB_MISSING web file(s) missing or empty"
+    if [ "$WEB_MISSING_ICONS" -gt 0 ]; then
+        log_info "Regenerate icons with: ./scripts/generate-icons.sh"
+    fi
+    if [ "$WEB_MISSING_HTML" -gt 0 ]; then
+        log_info "HTML files are tracked in git; verify your checkout."
+        log_info "  git status web/"
+    fi
     exit 1
 fi
 
-log_ok "All web files present (${#WEB_FILES_REQUIRED[@]} files)"
+log_ok "All web files present and non-empty (${#WEB_FILES_REQUIRED[@]} files)"
 
 # ------------------------------------------------------------
 # [14] Check WebUI binaries (4 architectures)
@@ -434,6 +733,8 @@ else
 fi
 
 # Check reasonable size (>= 3 MB)
+# HARD-PM-04: validate that file_size returned a number before
+# using it in arithmetic.
 for name in "${DNS_BINARIES_REQUIRED[@]}"; do
     cache_name=$(map_to_cache_name "$name")
     f="$DNS_CACHE_DIR/$cache_name"
@@ -441,7 +742,11 @@ for name in "${DNS_BINARIES_REQUIRED[@]}"; do
         log_error "Missing after fetch: $cache_name"
         exit 1
     fi
-    size=$(file_size "$f")
+    size=$(file_size "$f" || true)
+    if ! is_numeric "$size"; then
+        log_error "Cannot stat size of $cache_name (stat failed)"
+        exit 1
+    fi
     if [ "$size" -lt 3145728 ]; then
         log_error "$cache_name is too small ($size bytes)"
         log_info "The file may be corrupt — re-download with:"
@@ -456,8 +761,20 @@ log_ok "4 DNS binaries ready"
 # ------------------------------------------------------------
 # [16] Create staging
 # ------------------------------------------------------------
-STAGING=$(mktemp -d "${TMPDIR:-/tmp}/dnscrypt-pkg.XXXXXX")
-trap '[ "$KEEP_STAGING" = "0" ] && rm -rf "$STAGING"' EXIT
+# HARD-PM-09 + L-6: strip *all* trailing slashes from TMPDIR,
+# not just one, so a value like "/tmp///" normalizes cleanly.
+_TMPDIR_CLEAN="${TMPDIR:-/tmp}"
+while [ "${_TMPDIR_CLEAN%/}" != "$_TMPDIR_CLEAN" ]; do
+    _TMPDIR_CLEAN="${_TMPDIR_CLEAN%/}"
+done
+[ -z "$_TMPDIR_CLEAN" ] && _TMPDIR_CLEAN="/tmp"
+
+STAGING=$(mktemp -d "${_TMPDIR_CLEAN}/dnscrypt-pkg.XXXXXX")
+
+# HARD-PM-06: explicit `if` instead of `&&` short-circuit.
+# The trap's exit status is now unambiguous on every shell.
+# shellcheck disable=SC2064
+trap 'if [ "$KEEP_STAGING" = "0" ]; then rm -rf "$STAGING"; fi' EXIT
 
 mkdir -p "$STAGING/proxy" "$STAGING/web"
 
@@ -503,15 +820,24 @@ for f in "${WEB_FILES_REQUIRED[@]}"; do
     chmod 0644 "$STAGING/web/$f"
 done
 
-staging_size=$(du -sh "$STAGING" 2>/dev/null | cut -f1)
-log_ok "staging ready ($staging_size)"
+staging_size=$(du -sh "$STAGING" 2>/dev/null | cut -f1 || echo "?")
+log_ok "staging ready (${staging_size})"
 
 # ------------------------------------------------------------
 # [17] Reproducibility (set timestamps)
 # ------------------------------------------------------------
+# HARD-PM-01: fail loudly if the requested epoch cannot be
+# applied, rather than silently substituting a fixed 2020 date.
+# The whole point of SOURCE_DATE_EPOCH is that two builds of
+# the same source produce the same bytes; substituting a
+# different date would defeat that.
+# ------------------------------------------------------------
 if ! find "$STAGING" -exec touch -d "@${SOURCE_DATE_EPOCH}" {} + 2>/dev/null; then
-    find "$STAGING" -exec touch -t "202001010000.00" {} + 2>/dev/null || \
-        log_warn "Failed to set timestamps — ZIP may not be reproducible"
+    log_error "Failed to apply SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} to staging files"
+    log_info "This platform's 'touch' does not support -d @N."
+    log_info "Refusing to continue: reproducibility would be broken."
+    log_info "Install GNU coreutils, or run the packaging step on Linux."
+    exit 1
 fi
 
 log_ok "timestamps set"
@@ -519,9 +845,6 @@ log_ok "timestamps set"
 # ------------------------------------------------------------
 # [18] Create ZIP
 # ------------------------------------------------------------
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_DIR_ABS="$(cd "$OUTPUT_DIR" && pwd)"
-
 OUTPUT_NAME="dnscrypt-webui-${VERSION_NO_V}-module.zip"
 OUTPUT_PATH="$OUTPUT_DIR_ABS/$OUTPUT_NAME"
 
@@ -550,8 +873,23 @@ if [ ! -f "$OUTPUT_PATH" ]; then
     exit 1
 fi
 
-zip_size=$(file_size "$OUTPUT_PATH")
-zip_size_human=$(du -h "$OUTPUT_PATH" | cut -f1)
+# M-1 fix: same guarded pattern as §[15] — validate that
+# file_size produced a numeric value before using it below.
+if zip_size=$(file_size "$OUTPUT_PATH"); then
+    if ! is_numeric "$zip_size"; then
+        log_warn "file_size returned a non-numeric value: '$zip_size'"
+        zip_size="?"
+    fi
+else
+    log_warn "Cannot determine ZIP size (stat failed)"
+    zip_size="?"
+fi
+
+# L-5 fix: fall back to "?" if du fails, instead of emitting an
+# empty string silently.
+zip_size_human=$(du -h "$OUTPUT_PATH" 2>/dev/null | cut -f1 || true)
+[ -z "$zip_size_human" ] && zip_size_human="?"
+
 log_ok "ZIP: $OUTPUT_NAME ($zip_size_human)"
 
 # ------------------------------------------------------------
@@ -614,10 +952,11 @@ fi
 
 log_ok "ZIP structure valid (${#REQUIRED_IN_ZIP[@]} files)"
 
-# Additional stats
-PNG_COUNT=$(echo "$ZIP_CONTENTS" | grep -cE '^web/.*\.png$' || echo 0)
-ICO_COUNT=$(echo "$ZIP_CONTENTS" | grep -cE '^web/.*\.ico$' || echo 0)
-SVG_COUNT=$(echo "$ZIP_CONTENTS" | grep -cE '^web/.*\.svg$' || echo 0)
+# Additional stats.
+# HARD-PM-02: use count_matches instead of `grep -c ... || echo 0`.
+PNG_COUNT=$(echo "$ZIP_CONTENTS" | count_matches '^web/.*\.png$')
+ICO_COUNT=$(echo "$ZIP_CONTENTS" | count_matches '^web/.*\.ico$')
+SVG_COUNT=$(echo "$ZIP_CONTENTS" | count_matches '^web/.*\.svg$')
 
 log_info "Icons: ${PNG_COUNT} PNG + ${SVG_COUNT} SVG + ${ICO_COUNT} ICO"
 
@@ -638,21 +977,15 @@ log_ok "checksum: ${SHA256_HASH:0:16}..."
 # ------------------------------------------------------------
 # [21] Final summary
 # ------------------------------------------------------------
-# Icon breakdown (matches the mapping documented in the header):
-#   • 3 PNGs from icon-512.svg (512, 180, 32)
-#   • 1 PNG from icon-192.svg (192)
-#   • 1 PNG for favicon-16
-#   • 1 ICO (multi-size, from favicon-16 + favicon-32)
-#   • 2 SVG sources (icon-192, icon-512)
-# ============================================================
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║  ${GREEN}✅ Package created successfully${NC}                          ${BOLD}║${NC}"
+echo -e "${BOLD}║  ${GREEN}✅ Package created successfully${NC}                       ${BOLD}║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}ZIP:${NC}            ${GREEN}${OUTPUT_PATH}${NC}"
 echo -e "  ${BOLD}Size:${NC}           ${zip_size_human} (${zip_size} bytes)"
 echo -e "  ${BOLD}Module Ver:${NC}     ${VERSION}"
+echo -e "  ${BOLD}versionCode:${NC}    ${MODPROP_VC}"
 echo -e "  ${BOLD}DNS Engine:${NC}     ${DNS_VERSION}"
 echo -e "  ${BOLD}DNS Cache:${NC}      ${DIM}${DNS_CACHE_DIR}${NC}"
 echo -e "  ${BOLD}SHA-256:${NC}        ${SHA256_HASH}"
@@ -667,13 +1000,15 @@ echo -e "    ${DIM}• PNG:${NC}        ${PNG_COUNT} file(s)"
 echo -e "    ${DIM}• ICO:${NC}        ${ICO_COUNT} file(s)"
 echo -e "    ${DIM}• Offline:${NC}    1 file"
 echo ""
-echo -e "  ${BOLD}Icon sources (see header for the full mapping):${NC}"
-echo -e "    ${DIM}• icon-192.png         ← icon-192.svg${NC}"
-echo -e "    ${DIM}• icon-512.png         ← icon-512.svg${NC}"
-echo -e "    ${DIM}• apple-touch-icon.png ← icon-512.svg${NC}"
-echo -e "    ${DIM}• favicon-32x32.png    ← icon-512.svg${NC}"
-echo -e "    ${DIM}• favicon-16x16.png    ← icon-512.svg${NC}"
-echo -e "    ${DIM}• favicon.ico          ← favicon-16 + favicon-32${NC}"
+echo -e "  ${BOLD}v1.2.0 data preservation:${NC}"
+echo -e "    ${GREEN}✓${NC} 10 defensive layers bundled (existing shell scripts)"
+echo -e "    ${DIM}• Backup dir on device: /sdcard/dnscrypt-webui-backup/${NC}"
+echo -e "    ${DIM}• NOT included in ZIP (created at runtime)${NC}"
+echo ""
+echo -e "  ${BOLD}References:${NC}"
+echo -e "    ${DIM}• docs/BACKUP.md      — Backup system reference${NC}"
+echo -e "    ${DIM}• docs/EMERGENCY.md   — Emergency recovery guide${NC}"
+echo -e "    ${DIM}• docs/UPGRADE.md     — v1.1.0 → v1.2.0 upgrade path${NC}"
 echo ""
 
 if [ "$VERBOSE" = "1" ]; then

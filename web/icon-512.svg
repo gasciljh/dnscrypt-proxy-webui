@@ -1,72 +1,151 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
-     DNSCrypt Smart Filter — PWA Icon (512×512)
-     Version: v1.1.0
+     DNSCrypt Smart Filter - PWA Icon (512x512)
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
-     Large SVG icon for modern browsers. Rendered at 512×512 in
-     web/manifest.json → icons[3] (purpose: any).
+     Large SVG icon for modern browsers. Rendered at 512x512 in
+     web/manifest.json -> icons[3] (purpose: any).
 
      Design:
-       • Blue gradient background (full-bleed, no rounded corners)
-       • Shield with subtle inner highlight edge
-       • "DNS" bold label
-       • Green status dot with Gaussian glow
+       * Blue gradient background (full-bleed, no rounded corners)
+       * Shield with subtle inner highlight edge
+       * "DNS" bold label
+       * Green status dot with Gaussian glow
 
+     ============================================================
      Role in the icon pipeline (verified against
-     scripts/generate-icons.sh):
+     scripts/generate-icons.sh)
+     ============================================================
+     This SVG is the SOURCE for FOUR generated files:
+       * icon-512.png         (512x512)
+       * apple-touch-icon.png (180x180)
+       * favicon-32x32.png    (32x32)
+       * favicon-16x16.png    (16x16)
 
-       SVG source           → Generated PNG
-       ─────────────────────────────────────────────
-       icon-192.svg         → icon-192.png        (192×192)
-       icon-512.svg         → icon-512.png        (512×512)
-       icon-512.svg         → apple-touch-icon.png (180×180)
-       icon-512.svg         → favicon-32x32.png   (32×32)
-       icon-512.svg         → favicon-16x16.png   (16×16)
+     [!] This SVG is NOT the source for icon-192.png. That PNG is
+         generated from icon-192.svg. Prior documentation claimed
+         otherwise - corrected here in v1.1.0 and reaffirmed in
+         v1.2.0.
 
-     ⚠️ This SVG is NOT the source for icon-192.png. That PNG is
-        generated from icon-192.svg (see the previous file).
-        Prior documentation claimed otherwise — corrected here.
+     ============================================================
+     Purpose in manifest.json
+     ============================================================
+     * This SVG: declared as "purpose": "any".
+     * icon-512.png (derived from this SVG): declared as
+       "purpose": "any, maskable".
 
-     Purpose in manifest.json:
-       • This SVG: declared as `"purpose": "any"`.
-       • icon-512.png (derived from this SVG): declared as
-         `"purpose": "maskable"`.
+     The same PNG serves both purposes because the underlying
+     shape fits both. See the "Maskable-safe zone" analysis below
+     for the trade-off.
 
-     ⚠️ Maskable-safe zone — honest assessment:
-       The maskable safe zone is a circle of radius 40% of the
-       canvas (≈205 px in a 512 canvas, i.e. from 51.2 to 460.8
-       on each axis).
+     ============================================================
+     Maskable-safe zone - honest assessment (v1.2.0)
+     ============================================================
+     Per the W3C Web App Manifest spec, the maskable safe zone
+     is a circle of radius 40% of the canvas:
 
-       The shield currently extends from y=52 to y=448 — that is
-       right at the top boundary (52 vs 51.2). Horizontal extent
-       (x=96 to x=416) is safely inside.
+       512 x 40% = 204.8 px  ->  safe-zone boundary at:
+         x = 51.2  to  x = 460.8
+         y = 51.2  to  y = 460.8
 
-       Result: on the majority of Android launchers the icon
-       renders fine, but on devices that apply an aggressive
-       circular mask (e.g. some OEM launchers at 45%+), the top
-       of the shield may be clipped by a few pixels.
+     The shield path in this SVG extends from:
+       x = 96  to  x = 416   [OK]  (safely inside horizontal)
+       y = 52  to  y = 448   [!]   (near top boundary)
+       y = 68  to  y = 428   [OK]  (inner highlight is well inside)
 
-       A future release may ship a dedicated maskable variant
-       with a wider safe-zone margin. Until then, the manifest
-       accepts this trade-off rather than shipping a shrunk,
-       visually-weaker icon.
+     Result:
+       * On launchers that apply a CIRCULAR mask (Pixel Launcher,
+         most AOSP-based launchers at 40%), the icon renders
+         correctly - the top 0.8 px of the shield is covered by
+         antialiasing anyway.
+       * On launchers that apply an AGGRESSIVE mask (OEM
+         launchers at 45%+), the top of the shield may be
+         clipped by a few pixels.
 
-     v1.1.0 note:
-       • Version bumped from v1.0.0 to v1.1.0 to match the module
-         release. No design changes were made.
-       • Corrected the "source for all PNGs" claim — the 192 PNG
-         comes from icon-192.svg, not from this file.
-       • Corrected the "maskable icon" claim — this SVG is
-         declared `any` in manifest.json. Only the PNG carries
-         the maskable purpose.
-       • Replaced the unsupported "40% safe circle" claim with an
-         honest assessment of the current safe-zone situation.
+     A future release may ship a dedicated icon-maskable.svg
+     with a wider safe-zone margin (~10% inset). Until then,
+     the manifest accepts this trade-off rather than shipping a
+     shrunk, visually-weaker icon.
+
+     Rationale for the trade-off:
+       * The shield is the visual identity of the icon.
+       * Shrinking it to fit a 45% mask would make it visually
+         tiny on launchers that use a 40% mask.
+       * The current margin is safe on the majority of Android
+         launchers, which is the pragmatic choice.
+
+     ============================================================
+     Design decisions (v1.2.0 documentation)
+     ============================================================
+     1. Full-bleed background (rect fills 0,0 to 512,512):
+          No rounded corners. This is deliberate for the
+          maskable case: the mask handles the corner shape, so
+          the SVG must NOT pre-round its corners (otherwise the
+          mask would clip an already-rounded rect).
+
+     2. Shield shape centered at (256, 256):
+          Width 320 px, height 396 px. Placed so that the shield
+          dominates the canvas while leaving enough margin for
+          the mask.
+
+     3. Inner highlight edge:
+          A second, slightly-inset shield path with a lighter
+          stroke at 60% opacity. Adds visual depth at large
+          sizes (512+) without cluttering small sizes (favicon
+          32, 16) - the highlight becomes a subtle hint at
+          smaller scales.
+
+     4. "DNS" text at font-size 160, weight 900:
+          Chosen to match the visual weight of the shield. At
+          small render sizes (favicon 16) the text remains
+          legible (becomes a blob, but the shield shape carries
+          recognition).
+
+     5. Green status dot with Gaussian glow:
+          Uses a radial gradient (#5ee06b -> #2eb841) plus two
+          concentric rings at decreasing opacity. Signals
+          "active protection" without any text. The glow is a
+          subtle visual cue that survives downscaling.
+
+     6. Full-bleed design prevents letterboxing:
+          When a browser or launcher renders the icon at
+          non-square aspect ratios (rare but possible), the
+          background rect fills the entire viewBox, so no
+          transparent gaps appear.
+
+     ============================================================
+     [!] What you should NOT do
+     ============================================================
+     * Do NOT edit this SVG without regenerating the 4 PNGs:
+           ./scripts/generate-icons.sh -f
+       Otherwise the cached PNGs will not match this SVG.
+     * Do NOT round the corners of the background rect. It is
+       deliberately square (see "Design decisions" #1).
+     * Do NOT change the shield position without re-checking the
+       maskable-safe-zone analysis above.
+
+     ============================================================
+     v1.2.0 note:
+       * Version bumped from v1.1.0 to v1.2.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.1.0.
+       * Expanded the "Role in the icon pipeline" section.
+       * Expanded the "Maskable-safe zone" section with the
+         actual math (512 x 40% = 204.8 px) and the trade-off
+         rationale.
+       * Added a "Design decisions" section documenting the 6
+         visual choices.
+       * Added a "What you should NOT do" section to prevent
+         common mistakes.
+       * All messages and comments are English-only (global
+         edition). No Arabic strings exist in this file.
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>
-    <desc>Shield-shaped icon with DNS label and green status indicator</desc>
+    <desc>Shield icon with DNS label and green status dot</desc>
 
     <defs>
         <linearGradient id="bgGrad512" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -90,43 +169,19 @@
         </filter>
     </defs>
 
-    <!-- Background (full-bleed for maskable compatibility) -->
     <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad512)"/>
 
-    <!-- Shield shape -->
-    <path d="M 256 52
-             L 416 116
-             L 416 256
-             Q 416 374 256 448
-             Q 96 374 96 256
-             L 96 116 Z"
-          fill="url(#shieldGrad512)"
-          stroke="#2d5a94"
-          stroke-width="5"
-          stroke-linejoin="round"/>
+    <path d="M 256 52 L 416 116 L 416 256 Q 416 374 256 448 Q 96 374 96 256 L 96 116 Z"
+          fill="url(#shieldGrad512)" stroke="#2d5a94" stroke-width="5" stroke-linejoin="round"/>
 
-    <!-- Inner highlight edge -->
-    <path d="M 256 68
-             L 400 126
-             L 400 256
-             Q 400 362 256 428
-             Q 112 362 112 256
-             L 112 126 Z"
-          fill="none"
-          stroke="#5a8fd4"
-          stroke-width="2"
-          opacity="0.6"/>
+    <path d="M 256 68 L 400 126 L 400 256 Q 400 362 256 428 Q 112 362 112 256 L 112 126 Z"
+          fill="none" stroke="#5a8fd4" stroke-width="2" opacity="0.6"/>
 
-    <!-- "DNS" text -->
     <text x="256" y="312"
-          font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
-          font-size="160"
-          font-weight="900"
-          fill="#0d1117"
-          text-anchor="middle"
-          letter-spacing="3">DNS</text>
+          font-family="-apple-system, Segoe UI, Roboto, Arial, sans-serif"
+          font-size="160" font-weight="900" fill="#0d1117"
+          text-anchor="middle" letter-spacing="3">DNS</text>
 
-    <!-- Green status dot with glow -->
     <circle cx="256" cy="376" r="24" fill="url(#dotGrad512)" filter="url(#dotGlow512)"/>
     <circle cx="256" cy="376" r="34" fill="none" stroke="#5ee06b" stroke-width="3" opacity="0.55"/>
     <circle cx="256" cy="376" r="44" fill="none" stroke="#5ee06b" stroke-width="2" opacity="0.25"/>

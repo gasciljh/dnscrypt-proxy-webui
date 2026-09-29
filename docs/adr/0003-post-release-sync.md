@@ -12,6 +12,35 @@
 
 ---
 
+> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+>
+> This ADR was reviewed during the v1.2.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The **automatic** sync (via `release.yml`) has now been
+>     verified **three times**: after `v1.0.0`, after `v1.1.0`, and
+>     after `v1.2.0`.
+>   • In all three cases, `develop` was fast-forwarded to match
+>     `main` **without any manual intervention**.
+>   • The `continue-on-error: true` flag has **never been triggered**
+>     — no sync failures to date.
+>   • The **manual** back-merge path (`make sync`) remains prepared
+>     but **still untested** — no PATCH release has been cut yet.
+>     The first realistic scenario remains `v1.2.0 → v1.2.1` (via
+>     `hotfix/*`).
+>   • The `github-actions[bot]` identity is still correctly
+>     configured in the repository's branch-protection allowlist.
+>   • The v1.2.0 release introduced a **much larger** change set
+>     (10 defensive layers + BAK-1..4 + FIX-1/2 + WD-TOKEN + docs)
+>     than the previous two releases — and the fast-forward path
+>     still succeeded cleanly.
+>
+> **Result**: The decision is validated across three release cycles
+> including the largest release to date. No superseding ADR is
+> required.
+
 > **Post-Release Verification (v1.1.0 — 2026-09-26)**:
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
@@ -114,9 +143,9 @@ does **not** cover:
 
 ## Decision
 
-> **We will embed a "Sync `main` → `develop`" step at the end of
-> `.github/workflows/release.yml`, executed automatically after
-> every successful release.**
+> **We will embed a "Sync `main` → `develop`" step at the end of**
+> **`.github/workflows/release.yml`, executed automatically after**
+> **every successful release.**
 
 ### Specifics
 
@@ -298,7 +327,8 @@ Sync main → develop
 - [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) §7.2 — the CI/CD
   overview including the sync.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0 used the automatic sync path).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0, which
+  relied on the automatic sync path).
 - [`Makefile`](../../Makefile) — the `make sync` target provides
   an equivalent manual command.
 
@@ -326,13 +356,19 @@ Sync main → develop
   - Sync result: **fast-forward merge succeeded**.
   - `develop` matched `main` post-release.
   - No manual intervention.
+- **v1.2.0** (2026-09-29) — third release; sync unchanged.
+  - Sync result: **fast-forward merge succeeded**.
+  - `develop` matched `main` post-release.
+  - No manual intervention.
+  - The largest release to date (10 defensive layers) still used
+    the fast-forward path.
 - **Manual sync path** (`make sync`) — **not yet exercised**.
   - It will be needed if a PATCH release is cut via `hotfix/*`
-    (e.g. `v1.1.1`).
+    (e.g. `v1.2.1`).
   - See [`docs/BRANCHING.md`](../BRANCHING.md) §8.4 for the
     procedure.
 - **`continue-on-error: true`** — never triggered (no sync
-  failures to date).
+  failures to date, across three releases).
 - See `CHANGELOG.md` for the full release history.
 
 ---

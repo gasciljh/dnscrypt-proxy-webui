@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – CODEOWNERS
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -17,26 +17,27 @@
 #
 # Supported patterns:
 #   *           → all files (fallback)
-#   *.go        → all Go files
 #   /proxy/     → a specific directory
-#   /docs/*.md  → specific files
+#   /docs/*.md  → specific files (glob)
+#   *.go        → all Go files (extension glob)
 #
 # Matching rules:
-#   • The last matching pattern wins (more specific overrides more general).
+#   • The last matching pattern wins (more specific overrides
+#     more general).
 #   • Order matters: general first, then specific.
 #   • Blank lines are for readability only.
-#   • No inline comments (only full lines starting with #).
+#   • Comments must be on their own line (starting with #).
 #
 # ⚠️ Note:
 #   CODEOWNERS works on FILE PATHS only — it does NOT control
-#   branch rules. For branch policies (which branches can be pushed
-#   to, PR targets, etc.), see:
+#   branch rules. For branch policies (which branches can be
+#   pushed to, PR targets, etc.), see:
 #     • docs/BRANCHING.md §6 (Branch Protection)
 #     • Repository Settings → Branches
 #     • Repository Settings → Rules → Rulesets
 #
 # ============================================================
-# v1.1.0 additions:
+# v1.1.0 additions (kept):
 #   • Added /docs/adr/ — all Architecture Decision Records are
 #     reviewed together. ADRs are immutable once accepted and
 #     encode long-term architectural choices, so they get the
@@ -51,6 +52,86 @@
 #   • Expanded the "Notes on branch policy" section to point at
 #     the newer Rulesets UI in addition to classic Branch
 #     Protection.
+#
+# ============================================================
+# v1.2.0 additions:
+#   • Version bumped from v1.1.0 to v1.2.0.
+#   • Added explicit ownership for the v1.2.0 data-preservation
+#     artifacts:
+#       - /proxy/customize.sh   → primary owner of the 10 layers
+#       - /proxy/functions.sh   → backup helpers
+#       - /proxy/service.sh     → periodic auto-backup trigger
+#       - /proxy/status.sh      → --diagnose tool (Layer 10)
+#       - /proxy/main.go        → createAutoBackup + notifications
+#     These were already covered by the /proxy/ pattern, but are
+#     now listed explicitly because they encode the entire
+#     data-preservation contract. Any change here requires
+#     careful review.
+#   • Added /docs/BACKUP.md and /docs/EMERGENCY.md as
+#     high-priority documentation requiring the maintainer's
+#     review. These describe runtime behavior on a real device
+#     and must stay in sync with the shell scripts above.
+#   • Added /docs/UPGRADE.md — the upgrade guide is the
+#     user-facing companion to the data-preservation layers.
+#     Any change to §3.0 (v1.0.0 → v1.1.0) or §3.1 (v1.1.0 →
+#     v1.2.0) must be reviewed together with the corresponding
+#     change in customize.sh.
+#   • The list of core shell scripts (§2) was regrouped:
+#       - Lifecycle scripts (customize, service, post-fs-data,
+#         uninstall) are now marked as "data-preservation critical".
+#       - Runtime scripts (action, status, functions, watchdog)
+#         are grouped separately.
+#   • Added /.github/workflows/upgrade-test.yml to the CI/CD
+#     section — the 42-scenario data-preservation matrix is a
+#     critical piece of the v1.2.0 pipeline.
+#   • Documentation section expanded to include:
+#       - /docs/BACKUP.md
+#       - /docs/EMERGENCY.md
+#       - /docs/UPGRADE.md
+#   • All comments and messages are English-only (global
+#     edition). No Arabic strings exist in this file.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# ============================================================
+# A pre-release audit of this file identified the following
+# issues. All of them are addressed in-place; no version bump.
+#
+#   🔧 CO-1 — Section [4] claimed the maintainer reviews
+#     "release signing, SBOM + Attestations, security policy".
+#     The first two claims were FALSE — this project does not
+#     sign releases (the tag is annotated, not signed), does
+#     not produce a Cosign signature, and does not generate an
+#     SBOM. See the "Non-goals" section in
+#     .github/workflows/release.yml for the authoritative list.
+#     The comment in section [4] now lists only what actually
+#     exists (version + versionCode, SHA256 checksum,
+#     security policy). This is the same class of correction
+#     that was applied to release.yml (REL-1, REL-2, REL-3)
+#     and to README.md.
+#
+#   🔧 CO-2 — Five classes of files that are CRITICAL to the
+#     module's install/runtime behavior were not listed
+#     explicitly. They were covered only by the catch-all `*`
+#     pattern, which made them invisible to a reader who scans
+#     this file to understand what "critical" means:
+#       • /META-INF/                — Magisk install entry point
+#       • /.github/ISSUE_TEMPLATE/  — structured bug reports
+#       • /.github/SECURITY.md      — vulnerability disclosure
+#       • /proxy/build.sh           — the cross-compile driver
+#       • /proxy/dnscrypt-proxy.version — single source of truth
+#                                      for the DNS engine version
+#     All five are now listed in their appropriate sections.
+#     META-INF is in a new section [4b] because it is neither
+#     frontend nor backend — it is the installer bootstrap.
+#
+#   🔧 CO-3 — The header listed `/docs/*.md` as an example of
+#     a "specific files" pattern, but the file itself only uses
+#     directory patterns (`/docs/`). The header now presents
+#     the glob form as an EXAMPLE (not as something used here),
+#     and adds the `*.go` extension-glob form as a second
+#     example, so the reader understands both styles.
+#
 # ============================================================
 
 # ============================================================
@@ -69,15 +150,32 @@
 /proxy/main.go              @gasciljh
 /proxy/go.mod               @gasciljh
 
-# --- Shell scripts (lifecycle + firewall) ---
-/proxy/functions.sh         @gasciljh
-/proxy/watchdog.sh          @gasciljh
-/proxy/service.sh           @gasciljh
+# --- Data-preservation scripts (v1.2.0 — Layer 1–8) ---
+# These scripts implement the 10 defensive layers. Any change
+# requires a careful review of the corresponding section in
+# docs/BACKUP.md and docs/EMERGENCY.md.
 /proxy/customize.sh         @gasciljh
+/proxy/service.sh           @gasciljh
 /proxy/post-fs-data.sh      @gasciljh
 /proxy/uninstall.sh         @gasciljh
+
+# --- Runtime scripts (firewall + lifecycle + observability) ---
+/proxy/functions.sh         @gasciljh
+/proxy/watchdog.sh          @gasciljh
 /proxy/action.sh            @gasciljh
 /proxy/status.sh            @gasciljh
+
+# --- Build tooling inside proxy/ ---
+# CO-2 fix: build.sh drives the 4-architecture cross-compile
+# and injects -ldflags (BuildVersion, BuildCommit, BuildTime,
+# ProjectURL). Any change here affects every binary shipped.
+/proxy/build.sh             @gasciljh
+
+# --- DNS engine version (single source of truth) ---
+# CO-2 fix: this file is read by scripts/fetch_dns_binaries.sh
+# to determine which upstream dnscrypt-proxy version to fetch.
+# Changing it affects every install and every upgrade.
+/proxy/dnscrypt-proxy.version  @gasciljh
 
 # --- Config (security — Port Guard + credentials) ---
 /proxy/dnscrypt-proxy.toml  @gasciljh
@@ -91,21 +189,55 @@
 # ============================================================
 # [4] Security and versions
 # ============================================================
-# Any change in these files must be reviewed by the maintainer
-# (they control: version + versionCode, release signing,
-# SBOM + Attestations, security policy).
+# CO-1 fix: the previous comment claimed the maintainer reviews
+# "release signing, SBOM + Attestations". Those claims were
+# inaccurate — this project does NOT sign releases, does not
+# use Cosign, and does not generate an SBOM. See the "Non-goals"
+# section in .github/workflows/release.yml for the authoritative
+# list of what the pipeline does and does not produce.
+#
+# What these files DO control:
+#   • version (VERSION, module.prop:version)
+#   • versionCode (module.prop:versionCode) — drives update detection
+#   • SHA256 checksum of the release ZIP (produced by
+#     scripts/package_module.sh, not by these files themselves)
+#   • auto-update metadata (update.json: version, versionCode, zipUrl)
+#   • security policy (SECURITY.md)
 /VERSION                    @gasciljh
 /module.prop                @gasciljh
 /update.json                @gasciljh
+
+# ============================================================
+# [4b] Installer bootstrap (CO-2 fix)
+# ============================================================
+# META-INF/com/google/android/ is the standard Magisk /
+# KernelSU / APatch entry point. It contains exactly two files:
+#   • update-binary  — sources util_functions.sh and calls
+#                      install_module, which runs customize.sh
+#   • updater-script — the single line "#MAGISK"
+#
+# Any change here affects whether the module can be installed
+# at all. This is separate from /proxy/ because it is a
+# module-format concern, not a project concern.
+/META-INF/                  @gasciljh
 
 # ============================================================
 # [5] CI/CD (critical — may publish releases)
 # ============================================================
 /.github/workflows/         @gasciljh
 /.github/CODEOWNERS         @gasciljh
+/.github/SECURITY.md        @gasciljh
 /.github/PULL_REQUEST_TEMPLATE.md           @gasciljh
 /.github/PULL_REQUEST_TEMPLATE/             @gasciljh
+/.github/ISSUE_TEMPLATE/                    @gasciljh
 /.github/dependabot.yml     @gasciljh
+
+# --- v1.2.0: data-preservation CI matrix ---
+# The upgrade-test workflow runs the 42-scenario matrix that
+# validates the 10 defensive layers across:
+#   • 3 root solutions × 2 source versions × 7 scenarios
+# See docs/BACKUP.md for the full scenario list.
+/.github/workflows/upgrade-test.yml  @gasciljh
 
 # ============================================================
 # [6] Documentation (lighter review)
@@ -144,7 +276,34 @@
 /docs/adr/                  @gasciljh
 
 # ============================================================
-# [10] Repo hygiene
+# [10] Data preservation documentation (v1.2.0)
+# ============================================================
+# These three files are the user-facing companion to the 10
+# defensive layers implemented in /proxy/*.sh and /proxy/main.go.
+# Any change to one of them MUST be reviewed together with the
+# corresponding change in the shell scripts.
+#
+# /docs/BACKUP.md
+#   Full reference for the persistent backup system:
+#   directory layout, rotation policy, .manifest.json schema,
+#   .upgrade_history.json schema, manual backup/restore.
+#
+# /docs/EMERGENCY.md
+#   Step-by-step recovery guide for catastrophic scenarios:
+#   bootloop, user data lost, DNS broken, firewall broken,
+#   corrupted backup, last-resort reinstall.
+#
+# /docs/UPGRADE.md
+#   Version upgrade guide. §3.0 covers v1.0.0 → v1.1.0,
+#   §3.1 covers v1.1.0 → v1.2.0. Future upgrade paths will be
+#   added as new §3.X sections.
+# ============================================================
+/docs/BACKUP.md             @gasciljh
+/docs/EMERGENCY.md          @gasciljh
+/docs/UPGRADE.md            @gasciljh
+
+# ============================================================
+# [11] Repo hygiene
 # ============================================================
 # Formatting, secrets detection, and dev environment config.
 /.gitattributes             @gasciljh
@@ -168,6 +327,14 @@
 #
 #   • Security (fast + mandatory):
 #       /proxy/main.go      @gasciljh @security-team
+#
+#   • Data preservation (v1.2.0 — critical):
+#       /proxy/customize.sh @gasciljh @data-guardian
+#       /docs/BACKUP.md     @gasciljh @data-guardian
+#       /docs/EMERGENCY.md  @gasciljh @data-guardian
+#
+#   • Installer bootstrap:
+#       /META-INF/          @gasciljh @installer-reviewer
 #
 #   • CI/CD:
 #       /.github/workflows/ @gasciljh @ci-reviewer
@@ -206,6 +373,25 @@
 #   → matched by `/scripts/` and `/scripts/release-patch.sh`.
 #     The more specific pattern wins — but both point to @gasciljh.
 #
+# When a PR modifies /proxy/customize.sh (v1.2.0):
+#   → matched by `/proxy/` and `/proxy/customize.sh`.
+#     The more specific pattern wins.
+#   → This file encodes the 10 data-preservation layers.
+#     A reviewer MUST cross-check docs/BACKUP.md and
+#     docs/EMERGENCY.md before approving.
+#
+# When a PR modifies /docs/BACKUP.md (v1.2.0):
+#   → matched by `/docs/` and `/docs/BACKUP.md`.
+#     Any change here MUST be reviewed together with
+#     /proxy/customize.sh — they describe the same contract.
+#
+# When a PR modifies /META-INF/com/google/android/update-binary
+# (CO-2 fix):
+#   → matched by `/META-INF/` → @gasciljh.
+#   → A reviewer MUST confirm the change does not break the
+#     Magisk install pipeline — this file is the first thing
+#     the root manager runs.
+#
 # ============================================================
 # Benefits
 # ============================================================
@@ -216,6 +402,8 @@
 # ✅ Team-friendly: supports team handles like @org/team-name.
 # ✅ GitHub standard: officially supported feature.
 # ✅ ADR-aware: architectural decisions trigger the right reviewer.
+# ✅ Data-preservation-aware (v1.2.0): critical backup/restore
+#    files are explicitly enumerated.
 #
 # ============================================================
 # Notes on branch policy

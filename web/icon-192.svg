@@ -1,39 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
-     DNSCrypt Smart Filter — PWA Icon (192×192)
-     Version: v1.1.0
+     DNSCrypt Smart Filter - PWA Icon (192x192)
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
      Small SVG icon for modern browsers (PWA, favicon fallback).
-     Rendered at 192×192 in web/manifest.json → icons[1].
+     Rendered at 192x192 in web/manifest.json -> icons[1].
 
      Design:
-       • Blue gradient background with rounded corners (rx=42)
-       • Shield shape
-       • "DNS" text
-       • Green status dot at bottom center
+       * Blue gradient background with rounded corners (rx=42)
+       * Shield shape
+       * "DNS" text
+       * Green status dot at bottom center
 
      Purpose in manifest.json:
-       • Declared as `"purpose": "any"` — this SVG is served to
+       * Declared as "purpose": "any" - this SVG is served to
          browsers that support SVG icons and prefer vector.
 
-     Not maskable:
-       • This SVG has rounded corners (rx=42) and content close
+     [!] Not maskable:
+         This SVG has rounded corners (rx=42) and content close
          to the edges, which makes it unsuitable for the
-         `maskable` purpose. The maskable PNG is generated from
+         "maskable" purpose. The maskable PNG is generated from
          icon-512.svg (see that file for details).
 
-     v1.1.0 note:
-       • Version bumped from v1.0.0 to v1.1.0 to match the
-         module release. No design changes were made.
-       • Clarified the purpose (any, not maskable) and the
-         rounded-corner behavior. Previous header was silent
-         on both points.
+     ============================================================
+     Icon source pipeline (v1.2.0)
+     ============================================================
+     This SVG is the SOURCE for icon-192.png only. It is NOT the
+     source for the 512x512 PNG or the favicons.
+
+     Generated from this file:
+       * icon-192.png (192x192)
+
+     Generated from icon-512.svg (for reference):
+       * icon-512.png         (512x512)
+       * apple-touch-icon.png (180x180)
+       * favicon-32x32.png    (32x32)
+       * favicon-16x16.png    (16x16)
+       * favicon.ico          (from favicon-16 and favicon-32)
+
+     ============================================================
+     Design decisions (v1.2.0 documentation)
+     ============================================================
+     1. Rounded corners (rx=42, ~22% of the canvas):
+          Chosen for a modern app-icon look on Android launchers
+          that do NOT apply their own mask. On launchers that DO
+          apply a circular mask, the rounded corners are inside
+          the mask and are therefore invisible.
+
+     2. Shield shape:
+          Centered at (96, 96), width 120 px, height 148 px.
+          Fits well inside the 40% safe circle (radius ~76 px).
+
+     3. "DNS" label:
+          Bold, black text on the blue shield. Chosen for instant
+          recognition at small sizes.
+
+     4. Green status dot:
+          Radial gradient with a subtle ring. Signals "active
+          protection" without text.
+
+     5. Full-bleed background (rect fills 0,0 to 192,192):
+          Ensures the icon renders correctly even if a future
+          version switches this SVG to the "maskable" purpose
+          (the mask would only crop the rounded corners).
+
+     ============================================================
+     v1.2.0 note:
+       * Version bumped from v1.1.0 to v1.2.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.1.0.
+       * Expanded the "Design decisions" section to explain each
+         visual choice (previously undocumented).
+       * Added explicit cross-reference to
+         scripts/generate-icons.sh (the authoritative pipeline).
+       * Reaffirmed the purpose (any, not maskable) with the
+         rounded-corner rationale.
+       * All messages and comments are English-only (global
+         edition). No Arabic strings exist in this file.
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>
-    <desc>Shield-shaped icon with DNS label and green status indicator</desc>
+    <desc>Shield icon with DNS label and green status dot</desc>
 
     <defs>
         <linearGradient id="bgGrad192" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -50,30 +100,16 @@
         </radialGradient>
     </defs>
 
-    <!-- Background with rounded corners -->
     <rect x="0" y="0" width="192" height="192" rx="42" ry="42" fill="url(#bgGrad192)"/>
 
-    <!-- Shield shape -->
-    <path d="M 96 20
-             L 156 44
-             L 156 96
-             Q 156 140 96 168
-             Q 36 140 36 96
-             L 36 44 Z"
-          fill="url(#shieldGrad192)"
-          stroke="#2d5a94"
-          stroke-width="2"/>
+    <path d="M 96 20 L 156 44 L 156 96 Q 156 140 96 168 Q 36 140 36 96 L 36 44 Z"
+          fill="url(#shieldGrad192)" stroke="#2d5a94" stroke-width="2"/>
 
-    <!-- "DNS" text -->
     <text x="96" y="118"
-          font-family="-apple-system, 'Segoe UI', Roboto, Arial, sans-serif"
-          font-size="60"
-          font-weight="900"
-          fill="#0d1117"
-          text-anchor="middle"
-          letter-spacing="1">DNS</text>
+          font-family="-apple-system, Segoe UI, Roboto, Arial, sans-serif"
+          font-size="60" font-weight="900" fill="#0d1117"
+          text-anchor="middle" letter-spacing="1">DNS</text>
 
-    <!-- Green status dot -->
     <circle cx="96" cy="142" r="9" fill="url(#dotGrad192)"/>
     <circle cx="96" cy="142" r="13" fill="none" stroke="#5ee06b" stroke-width="1.5" opacity="0.55"/>
 </svg>

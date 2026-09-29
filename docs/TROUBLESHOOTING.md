@@ -2,27 +2,76 @@
 
 > Comprehensive diagnostic guide: from symptoms to solutions.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • Added §4.12 (Memory limit issues) — covers the dynamic
->     per-profile soft memory limit introduced in v1.1.0.
->   • Added §5.14 (Profile key problems) — for issues where the
->     active profile does not match the user's expectation.
->   • Added §6.10 (GC thrashing symptoms) — how to recognize
->     the "WebUI is slow / unresponsive" pattern that MEM-1
->     resolves.
->   • Added §15.13 (Memory diagnostics helper) — one-shot
->     script to dump the memory state.
->   • Updated §16.2 (Issue template) with two new fields:
->     `profile_key` and `memory_limit_mb`.
->   • All `v1.0.0` references in examples updated to `v1.1.0`.
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Added §4.13 (Backup directory missing) — covers the
+>     v1.2.0 persistent backup directory
+>     (`/sdcard/dnscrypt-webui-backup/`).
+>   • Added §4.14 (Backup state issues) — how to read and
+>     troubleshoot the 7-field `runtime_info.backups` object.
+>   • Added §5.15 (Watchdog token issues) — the v1.2.0
+>     `X-Watchdog-Token` auth on `/api/ensure_running_service`.
+>   • Added §7.8 (append_denylist requires content) — BUG-A fix.
+>   • Added §12.8 (Backup layer fails after upgrade).
+>   • Added §12.9 (Recovery mode correctness — FIX-1).
+>     **Corrected in this revision**: the actual FIX-1 mechanism
+>     is **snapshot-and-reapply** (using
+>     `$MODPATH/.recovery_snapshot/` + the new `§[9b2]` block),
+>     NOT "reorder + exclude". The old description was incorrect
+>     and has been fully replaced. See §12.9 for the verified
+>     behavior and the corrected verify commands.
+>   • Added §13.4 (Orphan-txn preserved on uninstall).
+>   • Added §13.5 (Preserved backup directory after uninstall).
+>     **Corrected in this revision**: the manual removal command
+>     now uses the correct path
+>     `/sdcard/dnscrypt-webui-backup` (previously written as
+>     `/sdcrypt-webui-backup`).
+>   • Added §14.5 (Recovery mode) — full procedure + verify.
+>   • Added §15.14 (Backup diagnostics helper — v1.2.0).
+>   • Added §15.15 (Recovery mode test helper — v1.2.0).
+>   • Updated §16.2 (Issue template) with backup fields.
+>   • Updated §12.7 (Settings lost after upgrade) — v1.2.0
+>     supersedes the v1.1.0 mechanism with the 10 defensive
+>     layers.
+>   • All `v1.1.0` references in examples updated to `v1.2.0`.
 >   • No structural changes to the diagnostic tree — all
->     v1.0.0 sections remain valid.
+>     v1.0.0 and v1.1.0 sections remain valid.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+>   • **Encoding correction (this revision)**: fixed mojibake in
+>     section markers, arrows, checkmarks, warnings, and box
+>     drawing characters. All symbols now render as proper UTF-8.
+
+> **v1.2.0 (Global Edition) — Corrections in this revision**:
+>   • 🔧 **N-4 (`$MODPATH` portability in §15.15)** — The
+>     `recovery-mode-test.sh` helper previously relied on
+>     `$MODPATH` inside the echoed "next steps" strings. When the
+>     user copied those strings to a fresh shell (or read the
+>     script source directly), `$MODPATH` was undefined and the
+>     suggested commands became broken. The echoed commands now
+>     use the **literal path**
+>     (`/data/adb/modules/dnscrypt-proxy-webui`) instead. This
+>     makes the strings self-contained and copy-paste-safe,
+>     independent of any shell variable.
+>   • 🔧 **Path typo (`/sdcrypt-webui-backup`)** — Verified that
+>     every reference to the persistent backup directory uses the
+>     correct path `/sdcard/dnscrypt-webui-backup`. The earlier
+>     typo (missing `ard/`) is gone from this file.
+
+> **📖 Related documents**:
+> - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
+> - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
+> - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
+> - API reference → [`docs/API.md`](API.md)
 
 ---
 
@@ -65,7 +114,9 @@ Problem?
 │   ├── § 4.9 (/readyz rejected from LAN) ← NEW-4
 │   ├── § 4.10 (Invalid port ignored) ← NEW-3
 │   ├── § 4.11 (Broken Dashboard links) ← PORT-2
-│   └── § 4.12 (Memory limit issues) ← MEM-1 (v1.1.0)
+│   ├── § 4.12 (Memory limit issues) ← MEM-1 (v1.1.0)
+│   ├── § 4.13 (Backup directory missing) ← v1.2.0
+│   └── § 4.14 (Backup state issues) ← v1.2.0
 │
 ├── Cannot log in
 │   └── § 5 (Authentication)
@@ -75,7 +126,8 @@ Problem?
 │   ├── § 5.11 (Login GET rejected) ← NEW-1
 │   ├── § 5.12 (Basic Auth locked) ← Fix #8
 │   ├── § 5.13 (Credentials change delay) ← NEW-6
-│   └── § 5.14 (Profile key problems) ← MEM-1 (v1.1.0)
+│   ├── § 5.14 (Profile key problems) ← MEM-1 (v1.1.0)
+│   └── § 5.15 (Watchdog token issues) ← v1.2.0
 │
 ├── DNS not working at all
 │   └── § 6 (DNS)
@@ -84,7 +136,8 @@ Problem?
 │
 ├── Some sites are not blocked
 │   └── § 7 (Blocklist)
-│   └── § 7.7 (Blocklist inconsistent on concurrent edit) ← RACE-1
+│   ├── § 7.7 (Blocklist inconsistent on concurrent edit) ← RACE-1
+│   └── § 7.8 (append_denylist requires content) ← BUG-A (v1.2.0)
 │
 ├── Battery drains quickly
 │   └── § 8 (Performance)
@@ -100,7 +153,16 @@ Problem?
 │   └── § 12.6 (CI Go tests fail) ← Fix #2
 │
 ├── Settings lost after upgrade
-│   └── § 12.7 (Upgrade loses settings) ← Fix #3
+│   └── § 12.7 (Upgrade loses settings) ← Fix #3 (superseded by v1.2.0)
+│   └── § 12.8 (Backup layer fails) ← v1.2.0
+│   └── § 12.9 (Recovery mode correctness) ← FIX-1 (v1.2.0)
+│
+├── Backup/orphan issues after uninstall
+│   └── § 13.4 (Orphan-txn preserved) ← v1.2.0
+│   └── § 13.5 (Preserved backup directory) ← v1.2.0
+│
+├── Module cannot boot / data corrupted
+│   └── § 14.5 (Recovery mode) ← v1.2.0
 │
 └── Other issues
     └── § 2 (Collecting information) → then the relevant loop
@@ -132,12 +194,21 @@ su -c "ss -tulnp | grep -E '9090|9091|5354|8080'"
 # STATUS_FILE (user intent)
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
 
-# runtime_info (PORT-2 + MEM-1)
+# runtime_info (PORT-2 + MEM-1 + BAK-1)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port, profile_key, memory_limit_mb}'"
 
 # Memory state (v1.1.0)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'"
+
+# Backup state (v1.2.0 — 7 fields)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+
+# Backup directory listing (v1.2.0)
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+
+# Full diagnostic report (v1.2.0 — Layer 10)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 ```
 
 ---
@@ -184,7 +255,13 @@ echo ""
 echo "=== Memory Profile (v1.1.0) ==="
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
 
-# 7. Logs (last 50)
+# 7. Backup state (v1.2.0)
+echo ""
+echo "=== Backup State (v1.2.0) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
+ls -la /sdcard/dnscrypt-webui-backup/ 2>&1
+
+# 8. Logs (last 50)
 echo ""
 echo "=== Logs ==="
 tail -50 /data/local/tmp/dnscrypt_main.log
@@ -208,6 +285,9 @@ tail -50 /data/local/tmp/dnscrypt_main.log
 | Runtime Info | `curl -s http://127.0.0.1:9090/api?action=runtime_info` |
 | **Profile (v1.1.0)** | **`curl -s .../runtime_info \| jq -r .profile_key`** |
 | **Memory limit (v1.1.0)** | **`curl -s .../runtime_info \| jq .memory_limit_mb`** |
+| **Backup state (v1.2.0)** | **`curl -s .../runtime_info \| jq .backups`** |
+| **Backup directory (v1.2.0)** | **`ls -la /sdcard/dnscrypt-webui-backup/`** |
+| **Diagnose report (v1.2.0)** | **`sh status.sh --diagnose`** |
 | Logs | `tail -50 dnscrypt_main.log` |
 
 ---
@@ -247,10 +327,11 @@ su -c "which unzip sed tr date grep head cut"
 **Solution**:
 ```bash
 # 1. verify ZIP
-unzip -t /sdcard/dnscrypt-webui-1.1.0-module.zip
+unzip -t /sdcard/dnscrypt-webui-1.2.0-module.zip
 
 # 2. verify space
 df -h /data
+df -h /sdcard
 
 # 3. re-download from GitHub Releases
 ```
@@ -261,7 +342,7 @@ df -h /data
 - Download a fresh ZIP.
 - Verify SHA256:
   ```bash
-  sha256sum -c dnscrypt-webui-1.1.0-module.zip.sha256
+  sha256sum -c dnscrypt-webui-1.2.0-module.zip.sha256
   ```
 
 ### 3.6 "DNS binary missing for <arch>"
@@ -286,6 +367,30 @@ getprop ro.product.cpu.abi
 su -c "grep -E 'PORT|DASHBOARD' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 # Expected: PORT=9090, DASHBOARD_PORT=9091
 ```
+
+### 3.8 Persistent backup created during install (v1.2.0)
+
+**Symptom**:
+- During install, `customize.sh` prints:
+  ```text
+  → Multi-source detection (Layer 1): 5 file(s) found
+  → Transaction begun (Layer 4): txn-20260929-150000-12345
+  → Persistent backup created (Layer 2): 20260929-150000-v1.2.0-12345
+    → SHA256 manifest written (Layer 3)
+  ```
+
+**Is this normal?**
+- ✅ Yes — on upgrades, the 10 defensive layers snapshot the 5
+  user config files to `/sdcard/dnscrypt-webui-backup/`.
+- ✅ On a fresh install (no source found), no snapshot is created.
+
+**Verify after install**:
+```bash
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+# Expected: current/, <ts>-<version>/, .last_stable, ...
+```
+
+**See**: §4.13 (if missing), §4.14 (state issues).
 
 ---
 
@@ -350,7 +455,7 @@ su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/"
 
 ### 4.5 "404 Not Found" on /icon-192.svg
 
-**Solution**: confirm version `v1.1.0`.
+**Solution**: confirm version `v1.2.0`.
 
 ```bash
 su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
@@ -363,7 +468,7 @@ su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
 - Dashboard at `http://127.0.0.1:9091` opens.
 - But the Metrics tables are empty.
 
-**Solution**: update to `v1.1.0` (or v1.0.0). `/api/metrics` now returns proper JSON.
+**Solution**: update to `v1.2.0` (or v1.0.0+). `/api/metrics` returns proper JSON.
 
 **Verify**:
 ```bash
@@ -425,7 +530,7 @@ su -c "curl -s -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics" | head -5
 
 # After the fix: JSON:
 # {
-#   "generated_at": "2026-09-26T10:30:00Z",
+#   "generated_at": "2026-09-29T10:30:00Z",
 #   "total_queries": 15234,
 #   ...
 # }
@@ -448,7 +553,7 @@ su -c "curl -s -u \"user:pass\" http://127.0.0.1:8080/api/metrics | head -10"
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or v1.0.0+).
 - Now `metricsProxyHandler` contains:
   ```go
   func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -571,7 +676,7 @@ func readConfPort(key, defaultPort string) string {
 ```
 
 **Solution**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or v1.0.0+).
 - Now `readConfPort`:
   ```go
   func readConfPort(key, defaultPort string) string {
@@ -631,7 +736,7 @@ su -c "sed -i 's/^PORT=.*/PORT=9090/' /data/adb/modules/dnscrypt-proxy-webui/pro
 ```
 
 **Solution**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or v1.0.0+).
 - Now:
   - `runtime_info` returns `webui_port` + `dashboard_port`.
   - The frontend updates the links dynamically.
@@ -699,7 +804,8 @@ to use a lighter profile.
 
 **Solution**:
 
-**For (A)** — Update to `v1.1.0`. The limit is now computed per profile:
+**For (A)** — Update to `v1.2.0` (the fix was introduced in v1.1.0).
+The limit is now computed per profile:
 
 ```go
 MEMORY_LIMIT_LIGHT     = 80 MB
@@ -761,6 +867,139 @@ su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
 
 **Reference**: [SECURITY.md](SECURITY.md) §5.30.1, §14.22; [ARCHITECTURE.md](ARCHITECTURE.md) §3.9, §4.9.1, §11.22.
 
+### 4.13 Backup directory missing (v1.2.0 — Layer 2)
+
+**Symptom**:
+- After upgrading to v1.2.0, the persistent backup directory
+  `/sdcard/dnscrypt-webui-backup/` does not exist.
+- `runtime_info.backups.available` is `0`.
+- `backups.last_backup_name` is `null`.
+
+**Possible causes**:
+
+1. **`/sdcard/` not mounted at install time** — on some ROMs,
+   the FUSE daemon is not ready when `customize.sh` runs.
+2. **`/sdcard/` is read-only** — rare, but possible if the user
+   mounted external storage with restrictive flags.
+3. **Storage full** — if `/sdcard/` has less than ~10 MB free,
+   the backup dir cannot be created.
+
+**Diagnosis**:
+
+```bash
+# 1. Check /sdcard/ is mounted
+su -c "ls /sdcard/"
+# Expected: the standard Android directory list (DCIM, Download, ...)
+
+# 2. Check the backup directory
+su -c "ls -la /sdcard/dnscrypt-webui-backup/ 2>&1"
+# Expected (v1.2.0+): current/, <ts>-<version>/, .last_stable, ...
+
+# 3. Check storage
+su -c "df -h /sdcard"
+# Expected: at least 10 MB free
+
+# 4. Check runtime_info
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+```
+
+**Solutions**:
+
+- **Cause 1**: Reboot. On the next boot, `service.sh` runs
+  `auto_backup_if_needed` and creates the directory.
+- **Cause 2**: Check the ROM's FUSE configuration. This is rare;
+  file an issue.
+- **Cause 3**: Free up space and reboot. The auto-backup will
+  run on the next boot.
+
+**Manual trigger** (if the auto-backup does not run):
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+```
+
+**Verify success**:
+
+```bash
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available'"
+# Expected: >= 1
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.1;
+[`docs/EMERGENCY.md`](EMERGENCY.md) §4.
+
+### 4.14 Backup state issues (v1.2.0 — BAK-1)
+
+**Symptom (A)** — `runtime_info.backups` returns 5 fields instead
+of 7:
+
+```bash
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'"
+# Before: ["available", "last_backup", "last_backup_name", "last_stable", "path"]
+# After:  ["available", "in_flight_txn", "last_backup", "last_backup_name",
+#          "last_stable", "orphan_txn", "path"]
+```
+
+**Symptom (B)** — `status.sh --json` and `runtime_info` disagree
+on the shared fields.
+
+**Symptom (C)** — `available` is greater than the actual number
+of snapshot directories on disk.
+
+**Symptom (D)** — `last_stable` is `null` even though snapshots
+exist.
+
+**Cause (A)** — Version mismatch between `main.go` and `status.sh`.
+This should not occur on v1.2.0 — both were updated in the same
+release.
+
+**Cause (B)** — Same as (A): version mismatch.
+
+**Cause (C)** — The counter includes `txn-*` or `orphan-txn-*`
+directories. In v1.2.0, `available` should exclude them. If it
+does not, `main.go` is out of date.
+
+**Cause (D)** — `.last_stable` is updated only by
+**install-time** snapshots (`customize.sh`). Runtime snapshots
+(`main.go`, `service.sh`, `action.sh`) do not update it. This is
+by design — the pointer must reference a version-tagged snapshot,
+not a runtime one whose `version` field is `"unknown"`.
+
+**Solution**:
+
+1. Confirm the module version:
+
+```bash
+su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+# → must be version=v1.2.0
+```
+
+2. If the binary is stale (older than the scripts), reinstall
+   the module from the v1.2.0 ZIP.
+
+3. After fixing, restart the WebUI and re-run:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+
+# 7 fields
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'"
+# Expected: ["available", "in_flight_txn", "last_backup", "last_backup_name",
+#            "last_stable", "orphan_txn", "path"]
+
+# Cross-check with status.sh --json
+diff <(su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups'") \
+     <(su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | jq -S '.backups | del(.status, .last_backup_age_seconds)'")
+# Expected: no diff
+```
+
+**Note**: `status.sh --json` adds two diagnostic-only fields
+(`status`, `last_backup_age_seconds`) that are **not** part of the
+API surface. See [`docs/API.md`](API.md) §6.1.7.
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.6.
+
 ---
 
 ## 5. Authentication Issues
@@ -776,6 +1015,10 @@ su -c "cat /data/local/tmp/dnscrypt_credentials.txt"
 su -c "grep -E 'username|password' /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml"
 ```
 *Note: the values are between `'...'` — do not copy the quotes.*
+
+**v1.2.0**: The credentials are also preserved in the persistent
+backup at
+`/sdcard/dnscrypt-webui-backup/current/dnscrypt-proxy.toml`.
 
 ### 5.2 Forgot password
 
@@ -795,7 +1038,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
 ### 5.4 Session expires quickly
 
-**Solution**: v1.1.0 relies on `HttpOnly cookie` — session lasts 24h.
+**Solution**: v1.2.0 relies on `HttpOnly cookie` — session lasts 24h.
 
 ### 5.5 "Session Expired" modal frequently
 
@@ -829,7 +1072,7 @@ ip := strings.Split(r.RemoteAddr, ":")[0]
 // RemoteAddr = "[::1]:12345" → ip = "["  ← wrong!
 ```
 
-**Solution**: update to `v1.1.0` (or v1.0.0).
+**Solution**: update to `v1.2.0` (or `v1.0.0+`).
 
 **Verify**:
 ```bash
@@ -845,7 +1088,7 @@ grep -A5 'func getClientIP' proxy/main.go | grep -q 'net.SplitHostPort' && echo 
 **Cause (before v1.0.0)**:
 `getMonitoringAuth` read the first line containing `username=` regardless of the section.
 
-**Solution**: update to `v1.1.0` (or v1.0.0).
+**Solution**: update to `v1.2.0` (or `v1.0.0+`).
 
 **Verify**:
 ```bash
@@ -1064,7 +1307,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 **Why not immediate?**
 - Credentials are changed very **rarely**.
 - 60 seconds is acceptable for the performance gain.
-- `invalidateAuthCache()` is available internally for immediate use (e.g. SIGHUP handler).
+- `invalidateAuthCache()` is available internally for immediate use.
 
 **Diagnose**:
 ```bash
@@ -1192,6 +1435,135 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
 **Reference**: [SECURITY.md](SECURITY.md) §5.30.1; [ARCHITECTURE.md](ARCHITECTURE.md) §4.9.1.
 
+### 5.15 Watchdog token issues (v1.2.0 — WD-TOKEN)
+
+**Symptom (A)** — The watchdog no longer restarts the DNS engine
+after a crash:
+
+- `pgrep -x dnscrypt-proxy` returns nothing.
+- `STATUS_FILE` is `ON` (user intent).
+- The watchdog process is running.
+- But the DNS engine stays down.
+
+**Symptom (B)** — The log contains repeated messages:
+
+```text
+watchdog: ensure_running → 401 Unauthorized
+watchdog: no auth header
+```
+
+**Symptom (C)** — A malicious webpage can silently restart the
+DNS engine:
+
+- You visit a webpage in a browser on the device.
+- The DNS engine restarts unexpectedly.
+
+**Cause (A)** — The token file
+`/data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token`
+is missing or unreadable. This can happen if:
+
+- The install was interrupted before `customize.sh §[19b]` ran.
+- A non-root user deleted the file.
+- The file is on a filesystem that does not support `0600`.
+
+**Cause (B)** — Same as (A). The watchdog is failing to
+authenticate to `POST /api/ensure_running_service` because the
+token file is missing.
+
+**Cause (C)** — The watchdog token was **removed** by mistake, and
+the WebUI fell back to normal user auth — except the WebUI
+rejects requests with no auth. But if the request comes from
+localhost **and** carries the correct credentials, the token
+requirement is bypassed. This is not a vulnerability (the
+credentials are still required), but a **downgrade** in the
+defense-in-depth posture.
+
+**What the token protects against**:
+
+- CSRF from any page loaded in a browser on the same device
+  (the browser can send a POST, but cannot set a custom header
+  like `X-Watchdog-Token`).
+
+**Solution**:
+
+**Verify the token file exists**:
+
+```bash
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+# Expected: -rw------- root root
+```
+
+**If missing, regenerate it** by restarting the WebUI:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+```
+
+`main.go` calls `loadOrCreateWatchdogToken()` at startup, which
+generates a new 64-hex token and writes it atomically (tmp +
+rename).
+
+**Verify the token was created**:
+
+```bash
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+su -c "wc -c /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+# Expected: ~64 (hex token) or ~65 (with newline)
+```
+
+**Verify the watchdog picks it up**:
+
+```bash
+su -c "grep -i 'watchdog token' /data/local/tmp/dnscrypt_main.log | tail -5"
+```
+
+**Test the recovery path**:
+
+```bash
+# 1. Ensure the DNS engine is running
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: "DNS=UP"
+
+# 2. Kill the DNS engine
+su -c "pkill -9 dnscrypt-proxy"
+
+# 3. Wait for the watchdog (up to 60s)
+sleep 60
+
+# 4. Verify it was restarted
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: "DNS=UP" (Watchdog restarted it via token)
+```
+
+**Manual test of the token endpoint**:
+
+```bash
+# 1. Get the token
+TOKEN=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token")
+echo "Token: $TOKEN"
+
+# 2. Without the header → 401
+curl -s -o /dev/null -w "Without token: %{http_code}\n" \
+    -X POST http://127.0.0.1:9090/api/ensure_running_service
+# Expected: 401
+
+# 3. With the header → 200
+curl -s -o /dev/null -w "With token: %{http_code}\n" \
+    -X POST -H "X-Watchdog-Token: $TOKEN" \
+    http://127.0.0.1:9090/api/ensure_running_service
+# Expected: 200
+```
+
+**If the token is deleted repeatedly**:
+
+- Check for a cron job, a root script, or a file manager app that
+  cleans `/data/adb/modules/*/proxy/run/`.
+- The token file is a **runtime secret**, not user config. It is
+  not part of the 5 preserved files.
+
+**Reference**: [`docs/SECURITY.md`](SECURITY.md) §5.33;
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.5.1, §5.7.
+
 ---
 
 ## 6. DNS Issues
@@ -1304,7 +1676,7 @@ su -c "settings delete global private_dns_mode"
 - On crash: `getStatusUncached` wrote `STATUS_FILE = "OFF"`.
 - Watchdog reads "OFF" → ignores restart.
 
-**Solution**: update to `v1.1.0` (or v1.0.0).
+**Solution**: update to `v1.2.0` (or v1.0.0+).
 
 **Verify after update**:
 ```bash
@@ -1325,6 +1697,10 @@ grep -A5 'func getStatusUncached' proxy/main.go | grep -q 'return "OFF"' && echo
 grep -A5 'func getStatusUncached' proxy/main.go | grep -q 'atomicWriteFile' && echo "⚠️ still writes!"
 # Last check should NOT find atomicWriteFile
 ```
+
+**v1.2.0 note**: If the restart does not work even after the fix,
+see §5.15 (Watchdog token issues) — the v1.2.0 watchdog requires
+the `X-Watchdog-Token` header.
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #18.
 
@@ -1364,7 +1740,7 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
 
 - If you are running v1.0.0 (or older), the value will be `80`
   no matter which profile is active.
-- If you are running v1.1.0, it should match the profile
+- If you are running v1.1.0+, it should match the profile
   (see §4.12).
 
 **Step 2 — Confirm CPU is the bottleneck (not RAM)**:
@@ -1387,12 +1763,12 @@ su -c "grep -i 'gc\|memory' /data/local/tmp/dnscrypt_main.log | tail -20"
 ```
 
 If you see repeated `memory limit adjusted` lines from the
-WebUI's own logging (v1.1.0), that is fine. If you see nothing
+WebUI's own logging (v1.1.0+), that is fine. If you see nothing
 and are on v1.0.0, this confirms the hardcoded limit.
 
 **Solution**:
 
-**Option 1 — Update to v1.1.0** (recommended):
+**Option 1 — Update to v1.1.0+** (recommended):
 
 The per-profile limit resolves this without any manual work:
 
@@ -1403,7 +1779,7 @@ The per-profile limit resolves this without any manual work:
 **Option 2 — If you cannot update, use a lighter profile**:
 
 ```bash
-# Change to "pro" (120 MB effective on v1.1.0, ~80 MB on v1.0.0)
+# Change to "pro" (120 MB effective on v1.1.0+, ~80 MB on v1.0.0)
 su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
@@ -1411,7 +1787,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 This will not change the v1.0.0 soft limit (still 80 MB), but
 a lighter profile generates less garbage and reduces GC pressure.
 
-**Option 3 — Verify on v1.1.0**:
+**Option 3 — Verify on v1.1.0+**:
 
 ```bash
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" \
@@ -1465,7 +1841,7 @@ su -c "tail -100 /data/local/tmp/dnscrypt_main.log"
 
 ### 7.3 "Custom Rules are not applied"
 
-**Solution**: ensure `v1.1.0` (or `v1.0.0+`).
+**Solution**: ensure `v1.2.0` (or `v1.0.0+`).
 
 ### 7.4 "Allowlist does not exclude the domain"
 
@@ -1527,7 +1903,7 @@ Two functions call `rebuildBlocklist`:
 **Without a lock**: interleaved reads → inconsistent `BLOCKLIST`.
 
 **Solution**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or `v1.0.0+`).
 - Now `rebuildBlocklist`:
   ```go
   var rebuildMu sync.Mutex
@@ -1558,7 +1934,105 @@ grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock
 - ✅ `BLOCKLIST` always consistent.
 - ⚠️ Slight delay during concurrent edits (acceptable — rare operation).
 
+**v1.2.0 parallel**: `backupMu` uses the same pattern for
+`createAutoBackup`. See §4.14 and [`docs/BACKUP.md`](BACKUP.md) §12.5.
+
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #32.
+
+### 7.8 append_denylist requires content (BUG-A — v1.2.0)
+
+**Symptom**:
+- You call `POST /api/append_denylist` (as in v1.1.0 or earlier):
+  ```bash
+  curl -X POST -b /tmp/cookies.txt \
+      http://127.0.0.1:9090/api/append_denylist
+  ```
+- Result (v1.2.0):
+  ```json
+  {
+    "status": "error",
+    "message": "Missing or empty 'content' parameter"
+  }
+  ```
+
+**Is this a bug?**
+- No — intentional v1.2.0 change (BUG-A fix).
+- In earlier drafts of v1.2.0, `appendDenylist` took no arguments
+  and re-saved the current denylist unchanged, producing a no-op
+  that still consumed a pre-critical backup. That behavior has
+  been removed.
+
+**The v1.2.0 contract**:
+
+`POST /api/append_denylist` **requires** a `content` parameter.
+
+**Response — rules applied (changed)**:
+
+```json
+{
+  "status": "ok",
+  "changed": true,
+  "message": "Processed 250000 rules",
+  "hash": "xyz789...",
+  "allow_hash": "abc123...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
+}
+```
+
+**Response — no change**:
+
+```json
+{
+  "status": "ok",
+  "changed": false,
+  "message": "No changes detected",
+  "hash": "xyz789...",
+  "allow_hash": "abc123...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
+}
+```
+
+**Solution**:
+
+**Send the `content` parameter** (URL-encoded):
+
+```bash
+# 1. With cURL
+curl -X POST -b /tmp/cookies.txt \
+    --data-urlencode "content=facebook.com
+tiktok.com" \
+    http://127.0.0.1:9090/api/append_denylist
+
+# 2. From a script
+CONTENT=$(cat new_domains.txt)
+curl -X POST -b /tmp/cookies.txt \
+    --data-urlencode "content=$CONTENT" \
+    http://127.0.0.1:9090/api/append_denylist | jq
+```
+
+**Or use `POST /api/save_denylist`** with the full new content:
+
+```bash
+NEW_DENY=$(cat /data/adb/modules/dnscrypt-proxy-webui/proxy/denylist.txt)
+NEW_DENY="${NEW_DENY}
+facebook.com
+tiktok.com"
+
+curl -X POST -b /tmp/cookies.txt \
+    --data-urlencode "denylist=$NEW_DENY" \
+    http://127.0.0.1:9090/api/save_denylist | jq
+```
+
+**Note for WebUI users**: The current WebUI does **not yet** send a
+`content` parameter. This means the WebUI itself does not use the
+`append_denylist` endpoint — it uses `save_denylist` for full
+content updates. The WebUI-side update to use `append_denylist`
+is planned for v1.3.0.
+
+**Reference**: [`docs/API.md`](API.md) §6.2.7;
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §12.8.
 
 ---
 
@@ -1613,7 +2087,7 @@ su -c "nano /data/adb/modules/dnscrypt-proxy-webui/proxy/watchdog.sh"
 - ~5–10 ms per request (on Android).
 - 100 req/s → ~1 MB/s I/O.
 
-**Solution**: update to `v1.1.0` (or v1.0.0).
+**Solution**: update to `v1.2.0` (or `v1.0.0+`).
 
 Now:
 - Auth cache (60 s TTL).
@@ -1630,6 +2104,10 @@ grep -q 'AUTH_CACHE_TTL' proxy/main.go && echo "✅ Auth cache present"
 | 100 req/s | ~1 MB/s I/O | ~0 MB/s |
 | Response time | ~5–10 ms | ~0.05 ms |
 | Battery consumption | High | Low |
+
+**v1.2.0 note**: The backup layer adds negligible I/O. Rotation
+keeps the total footprint under ~2.5 MB. Pre-critical backups
+run < 5 s and are serialized by `backupMu`.
 
 **Reference**: [SECURITY.md](SECURITY.md).
 
@@ -1734,6 +2212,35 @@ su -c "> /data/local/tmp/dnscrypt_main.log"
 ```bash
 su -c "grep -E 'MAX_LOG_SIZE|LOG_LEVEL' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 ```
+
+### 10.4 Backup log lines (v1.2.0)
+
+**What to look for**:
+
+```bash
+su -c "grep -iE 'auto-backup|backup|restore|rotate|orphan|txn-' \
+    /data/local/tmp/dnscrypt_main.log | tail -30"
+```
+
+**Expected log lines** (examples):
+
+```text
+[2026-09-29T15:00:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+[2026-09-29T15:00:05Z] 📢 Restored 5 user files from backup
+[2026-09-29T15:00:30Z] 🧹 cleanupOldTransactions: removed 1 COMMIT'd txn
+[2026-09-29T15:30:00Z] 💾 auto-backup (reason=pre-allowlist-save): 5 file(s)
+[2026-09-29T15:30:01Z] 🔄 rotate_backups: kept 21 snapshot(s)
+```
+
+**If backups are failing silently**:
+
+- **Before BUG-2 fix**: `createAutoBackup` discarded stderr, so a
+  failed shell command left no trace.
+- **After BUG-2 fix (v1.2.0)**: stderr is captured and logged.
+- If you see no backup lines at all after a save operation, check:
+  ```bash
+  su -c "grep -iE 'backup' /data/local/tmp/dnscrypt_main.log | tail -20"
+  ```
 
 ---
 
@@ -1874,9 +2381,11 @@ If `MODDIR = "/tmp/evil;rm -rf/"`:
 - No practical vector today.
 
 **Solution**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or `v1.0.0+`).
 - v1.0.0 extended `shellQuote` covers 20 shell metacharacters.
 - v1.1.0 extends it further to 24 (`{`, `}`, `\n`, `\t` added).
+- v1.2.0's `copy_with_context` helper uses `shellQuote` for all
+  dynamic paths during backup restore.
 
 **Verify**:
 ```bash
@@ -1888,6 +2397,10 @@ USAGE=$(grep -c 'shellQuote(MODDIR)' proxy/main.go)
 # 2. v1.1.0 extended charset
 grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
 grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
+
+# 3. v1.2.0: copy_with_context uses shellQuote
+su -c "grep -A5 'copy_with_context' /data/adb/modules/dnscrypt-proxy-webui/functions.sh | \
+       grep -q 'shellQuote' && echo '✅ copy uses shellQuote'"
 ```
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #31 + §5.30.2.
@@ -1901,6 +2414,7 @@ grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ n
 **Loop**:
 ```bash
 df -h /data
+df -h /sdcard
 su -c "rm -rf /data/adb/modules/dnscrypt-proxy-webui"
 # Reinstall from Magisk
 ```
@@ -1914,7 +2428,10 @@ su -c "cat /data/local/tmp/dnscrypt_credentials.txt"
 
 ### 12.3 "Settings lost"
 
-**Solution**: keep a backup before upgrade (should be automatic in v1.1.0 / v1.0.0).
+**Solution**: 
+- **v1.2.0**: The 10 defensive layers preserve all 5 config files
+  automatically. See §12.7.
+- **Before v1.2.0**: keep a manual backup before upgrade.
 
 ### 12.4 "Old modules detected"
 
@@ -1967,7 +2484,7 @@ grep -n '/system/bin/sh' proxy/main.go
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.1.0` (or v1.0.0).
+- Update to `v1.2.0` (or `v1.0.0+`).
 - Now `runShell` uses:
   ```go
   func getSystemShell() string {
@@ -2008,7 +2525,7 @@ cd proxy && go build -buildvcs=false -trimpath -o /tmp/test-main main.go
 
 **Reference**: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-### 12.7 Settings lost after upgrade (Fix #3)
+### 12.7 Settings lost after upgrade (Fix #3 — superseded in v1.2.0)
 
 **Symptom**:
 - After upgrading the module, `webui.conf` is reset:
@@ -2044,9 +2561,36 @@ done
 - The condition `[ ! -f "$BIN_DIR/$f" ]` = **false**.
 - **No copy** → user settings are lost.
 
-**Verify the old behavior**:
+**v1.0.0 solution**: `customize.sh` backs up 5 files before
+`unzip` and restores them after (mechanism:
+`/data/local/tmp/dnscrypt-upgrade-backup-$$`).
 
-**Method 1 — Monitor before/after upgrade**:
+**v1.2.0 supersession**: The v1.0.0 mechanism is replaced by the
+10 defensive layers (see [`docs/BACKUP.md`](BACKUP.md) §1.3).
+
+The v1.0.0 mechanism had two limitations:
+- `/data/local/tmp/` is **cleared on reboot**.
+- `/data/local/tmp/` is **deleted on uninstall**.
+
+The v1.2.0 persistent backup at
+`/sdcard/dnscrypt-webui-backup/` survives reboot, uninstall, and
+factory reset of `/data`.
+
+**Verify v1.2.0 is active**:
+
+```bash
+su -c "grep -q 'CANDIDATE_SOURCES' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+       echo '✅ Layer 1 (multi-source)'"
+su -c "grep -q 'PERSISTENT_BACKUP' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+       echo '✅ Layer 2 (persistent backup)'"
+su -c "grep -q 'begin_transaction' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+       echo '✅ Layer 4 (transaction)'"
+su -c "grep -q 'copy_with_context' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+       echo '✅ Layer 6 (SELinux)'"
+```
+
+**Test the fix**:
+
 ```bash
 # 1. Save the current settings
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf" > /sdcard/before.txt
@@ -2059,36 +2603,12 @@ su -c "sed -i 's/^PORT=9090/PORT=9191/' /data/adb/modules/dnscrypt-proxy-webui/p
 
 # 4. After install, verify
 su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
-# Before the fix: PORT=9090 (lost!)
-# After the fix: PORT=9191 (preserved ✅)
-```
+# Before v1.0.0: PORT=9090 (lost!)
+# v1.0.0+:      PORT=9191 (preserved ✅)
+# v1.2.0+:      PORT=9191 (preserved + a snapshot exists)
 
-**Solution**:
-
-**Option 1 — Update (recommended)**:
-- Update to `v1.1.0` (or v1.0.0).
-- New `customize.sh`:
-  ```bash
-  # [8b] Backup before extraction
-  BACKUP_TMP="/data/local/tmp/dnscrypt-upgrade-backup-$$"
-  mkdir -p "$BACKUP_TMP"
-  for f in webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt; do
-      [ -f "$_EXISTING_MODULE/proxy/$f" ] && cp -f "$_EXISTING_MODULE/proxy/$f" "$BACKUP_TMP/$f"
-  done
-
-  # [9] unzip -o ...
-  # [9c] Restore after extraction
-  for f in webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt; do
-      [ -f "$BACKUP_TMP/$f" ] && cp -f "$BACKUP_TMP/$f" "$BIN_DIR/$f"
-  done
-  rm -rf "$BACKUP_TMP"
-  ```
-
-**Option 2 — Verify the fix**:
-```bash
-# static audit
-grep -q 'BACKUP_TMP' proxy/customize.sh && echo "✅ Backup present"
-grep -q 'Restoring user configuration' proxy/customize.sh && echo "✅ Restore present"
+# 5. v1.2.0: verify a snapshot was created
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 ```
 
 **Files preserved (5)**:
@@ -2106,7 +2626,149 @@ grep -q 'Restoring user configuration' proxy/customize.sh && echo "✅ Restore p
 - `run/` — re-created.
 - `public-resolvers.md` — cache regenerated.
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #26.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #26 +
+[`docs/BACKUP.md`](BACKUP.md) §1.
+
+### 12.8 Backup layer fails after upgrade (v1.2.0)
+
+**Symptom**:
+- After upgrading to v1.2.0, the log contains:
+  ```text
+  ⚠️ auto-backup failed (continuing)
+  ⚠️ PERSISTENT_BACKUP not writable
+  ```
+- Or `runtime_info.backups.available` is 0.
+- Or `backups.last_backup_name` is null.
+
+**Cause**:
+- `/sdcard/` was not mounted when `customize.sh` ran.
+- Or `/sdcard/` was full (< 10 MB free).
+- Or the FUSE mount was slow on this ROM.
+
+**Diagnosis**:
+
+```bash
+# 1. Check the backup directory
+su -c "ls -la /sdcard/dnscrypt-webui-backup/ 2>&1"
+
+# 2. Check available space
+su -c "df -h /sdcard"
+
+# 3. Check the install log
+su -c "grep -iE 'backup|PERSISTENT' /data/local/tmp/dnscrypt_install.log | tail -20"
+
+# 4. Check runtime_info
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+```
+
+**Solution**:
+
+**Step 1 — Reboot** (to let `service.sh` retry):
+
+```bash
+su -c "reboot"
+```
+
+**Step 2 — Wait for boot and check again**:
+
+```bash
+sleep 60
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+# Expected: available >= 1
+```
+
+**Step 3 — If still failing, trigger a manual backup**:
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+```
+
+**Step 4 — If that fails, check the shell script**:
+
+```bash
+# Bash syntax
+bash -n /data/adb/modules/dnscrypt-proxy-webui/functions.sh
+# Should return no errors
+
+# Function presence
+su -c "grep -c 'backup_user_files\|rotate_backups\|ensure_backup_dir' \
+    /data/adb/modules/dnscrypt-proxy-webui/functions.sh"
+# Expected: >= 3
+```
+
+**Step 5 — As a last resort, create the directory manually**:
+
+```bash
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup"
+su -c "chmod 0700 /sdcard/dnscrypt-webui-backup"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.1, §10.2, §10.4;
+§4.13 in this file.
+
+### 12.9 Recovery mode correctness (FIX-1 — v1.2.0)
+
+**Symptom**:
+- You triggered recovery mode (`touch recovery && reboot`).
+- After reboot, only 3 of the 5 config files are restored.
+- `webui.conf` and `dnscrypt-proxy.toml` show the ZIP's defaults,
+  not the preserved values.
+
+**Cause (early v1.2.0 draft only)**:
+- The ZIP extraction step (`customize.sh §[9]`) ran **after** the
+  recovery restore (`§[8a]`).
+- It overwrote the two files with the ZIP's defaults.
+- The subsequent restore step (`§[9c]`) was skipped in recovery
+  mode — the corrupted files were never re-fixed.
+
+**The fix (FIX-1) — snapshot-and-reapply strategy**:
+
+Rather than reordering the ZIP extraction steps (which would
+require maintaining a duplicate exclusion list that depends on
+knowing the ZIP's contents), the final v1.2.0 release uses a
+**snapshot-and-reapply** approach:
+
+| Phase | Section | What happens |
+|---|---|---|
+| **A** | `§[8a]` | Restore 5 files from `$RESTORE_SOURCE` into `$MODPATH/proxy/` **AND** copy each file to `$MODPATH/.recovery_snapshot/` |
+| **B** | `§[9]` | Extract the ZIP normally. This overwrites `webui.conf` and `dnscrypt-proxy.toml` with the ZIP's defaults (unavoidable without knowing the ZIP's contents) |
+| **C** | `§[9b]` | Move root-level web assets into `web/` |
+| **D** | `§[9b2]` | Re-apply the 5 files from `$MODPATH/.recovery_snapshot/` back into `$MODPATH/proxy/` |
+| **E** | `§[9c]` | Skipped when `RECOVERY_MODE=1` — already handled by A + D |
+
+**Partial re-application**: If `[9b2]` re-applies fewer files
+than were snapshotted (e.g. one file is missing or empty), the
+snapshot directory is **preserved** at
+`$MODPATH/.recovery_snapshot/` so the user can recover the
+remaining files manually.
+
+**Verify you are on the fixed version**:
+
+```bash
+# 1. Module version
+su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+# → must be version=v1.2.0
+
+# 2. The snapshot directory constant must be present
+su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' \
+    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+    echo '✅ FIX-1 present (snapshot dir)'"
+
+# 3. The re-apply block (§[9b2]) must be present
+su -c "grep -q 'Re-applying recovery snapshot' \
+    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
+    echo '✅ FIX-1 present (§[9b2] re-apply block)'"
+```
+
+**If the fix is missing**: reinstall the module from the v1.2.0 ZIP.
+
+**Test procedure** (full):
+
+See §14.5 (Recovery mode).
+
+**Reference**: [`docs/SECURITY.md`](SECURITY.md) §5.32;
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §3.10.
 
 ---
 
@@ -2148,19 +2810,120 @@ su -c "svc wifi disable && svc wifi enable"
 
 ### 13.3 "Backup directory remaining"
 
-> **v1.1.0 note**: `uninstall.sh` no longer creates a backup
-> directory. Any legacy backup directory from v1.0.0 is removed
-> automatically when `uninstall.sh` v1.1.0 runs.
+> **v1.2.0 note**: `uninstall.sh` **preserves** the persistent
+> backup directory at `/sdcard/dnscrypt-webui-backup/`. This is
+> intentional — a future reinstall can restore your settings
+> automatically (via Layer 1 multi-source detection).
 
-If you still see a backup directory from an older install:
+**Verify what survived**:
+
+```bash
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+# Expected: current/, <ts>-<version>/, .last_stable, ...
+```
+
+**If you want to remove it**:
+
+```bash
+su -c "rm -rf /sdcard/dnscrypt-webui-backup"
+```
+
+**If a legacy v1.0.0 backup dir is present**:
 
 ```bash
 su -c "ls -la /data/local/tmp/dnscrypt_backup_uninstall/"
-# Remove it (safe — this is a legacy artifact from v1.0.0)
+# This is a legacy artifact from v1.0.0
+# uninstall.sh v1.2.0 removes it automatically
+# To remove manually:
 su -c "rm -rf /data/local/tmp/dnscrypt_backup_uninstall/"
 ```
 
-**Reference**: [uninstall.sh](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/proxy/uninstall.sh) — §[9] Legacy backup cleanup.
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §5.6; §13.5 in this file.
+
+### 13.4 Orphan-txn preserved on uninstall (v1.2.0)
+
+**Symptom**:
+- After uninstalling the module, an `orphan-txn-*/` directory
+  appears under `/sdcard/dnscrypt-webui-backup/`.
+
+**Is this a bug?**
+- No — intentional.
+- An `orphan-txn-*` directory is a **preserved unfinished
+  transaction**.
+- It was created when `uninstall.sh` found a `txn-*` directory
+  with `.state=START` — a signal that an install was interrupted
+  mid-flight.
+- The orphan may contain the **only** copy of the user's data.
+
+**Action**:
+
+```bash
+# 1. Inspect the state
+su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.state"
+# Expected: START
+
+# 2. Inspect the contents
+su -c "ls -la /sdcard/dnscrypt-webui-backup/orphan-txn-*/"
+
+# 3. Inspect the manifest (if present)
+su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.manifest.json 2>/dev/null | jq"
+```
+
+**DO NOT DELETE BLINDLY**.
+
+**If you want to keep it long-term**:
+
+```bash
+# Move to a safe location
+su -c "mkdir -p /sdcard/orphan-backup"
+su -c "cp -a /sdcard/dnscrypt-webui-backup/orphan-txn-* /sdcard/orphan-backup/"
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.5;
+[`docs/EMERGENCY.md`](EMERGENCY.md) §4.5.
+
+### 13.5 Preserved backup directory after uninstall (v1.2.0)
+
+**What survives**:
+
+| Item | Preserved? |
+|---|:---:|
+| `current/` (live snapshot) | ✅ |
+| All `<ts>-<version>/` snapshots | ✅ |
+| `orphan-txn-*/` | ✅ |
+| `.last_stable` pointer | ✅ |
+| `.upgrade_history.json` | ✅ |
+| `README.md` | ✅ |
+
+**What is removed**:
+
+| Item | Removed? |
+|---|:---:|
+| `txn-*` with `.state=COMMIT` | 🗑️ |
+| `txn-*` with `.state=ROLLBACK` | 🗑️ |
+| Legacy v1.0.0 backup dir | 🗑️ |
+| External recovery trigger | 🗑️ |
+
+**Why this design?** So a future reinstall can recover your 5
+config files automatically (via Layer 1 multi-source detection).
+
+**Verify after uninstall**:
+
+```bash
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+# Expected: current/, <ts>-<version>/…, .last_stable, …
+
+su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+# Expected: <snapshot-name>
+```
+
+**To remove it manually**:
+
+```bash
+su -c "rm -rf /sdcard/dnscrypt-webui-backup"
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §5.6.
 
 ---
 
@@ -2185,6 +2948,9 @@ rm -rf /data/adb/modules/dnscrypt-proxy-webui
 adb shell su -c "rm -rf /data/adb/modules/dnscrypt-proxy-webui"
 adb reboot
 ```
+
+**v1.2.0 alternative**: use recovery mode (§14.5) — it restores
+the last known-good config without reinstalling.
 
 ### 14.2 "Wi-Fi does not work at all"
 
@@ -2217,6 +2983,72 @@ nslookup google.com
 
 **Warning**: `iptables -t nat -F OUTPUT` clears all rules. If you have a VPN, delete the rules individually (§13.2).
 
+### 14.5 Recovery mode (v1.2.0)
+
+**When to use it**:
+
+- The module is unbootable but you can run commands via ADB.
+- User data is corrupted but the backup directory is intact.
+- You want a "one-shot" recovery without manual file copying.
+- You upgraded from a version with the v1.1.0 data-loss bug and
+  want to recover from the persistent backup.
+
+**Pre-flight checklist**:
+
+- [ ] You have a recent snapshot: `su -c "ls /sdcard/dnscrypt-webui-backup/"`.
+- [ ] `.last_stable` is set: `su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"`.
+- [ ] You recorded the current profile:
+  `su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"`.
+
+**Procedure**:
+
+```bash
+# 1. Trigger recovery (module-specific)
+su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
+su -c "reboot"
+
+# Or, if the module folder is inaccessible (external trigger)
+su -c "touch /data/adb/dnscrypt-recovery"
+su -c "reboot"
+```
+
+**On next boot**:
+
+`customize.sh` runs in **recovery mode** and restores the last
+known-good snapshot from `/sdcard/dnscrypt-webui-backup/`.
+
+**Recovery source priority**:
+1. `.last_stable` → the pointer file.
+2. `current/` → the live snapshot.
+3. In-place `proxy/` → fallback.
+
+**Verify the recovery** (after boot, ~60s):
+
+```bash
+# 1. All 5 files present
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/proxy/*.conf"
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/proxy/*.toml"
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/proxy/*.txt"
+
+# 2. Profile restored
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+# Expected: your original profile
+
+# 3. Trigger files consumed
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>&1"
+# Expected: No such file or directory
+su -c "ls /data/adb/dnscrypt-recovery 2>&1"
+# Expected: No such file or directory
+
+# 4. Full diagnostic
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+```
+
+**If the trigger file reappears**: see [`docs/EMERGENCY.md`](EMERGENCY.md)
+§3.4 (recovery mode runs twice on some devices).
+
+**Full guide**: [`docs/EMERGENCY.md`](EMERGENCY.md) §9.
+
 ---
 
 ## 15. Helper Tools
@@ -2228,24 +3060,15 @@ sh /data/adb/modules/dnscrypt-proxy-webui/status.sh
 sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json
 sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check
 sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --short
+sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose
 ```
 
 **v1.1.0 note**: `status.sh` now also reports the active profile and
-the expected memory limit:
+the expected memory limit.
 
-```bash
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh" | grep -A3 "Profile"
-# ─── Profile & Memory ───
-#   Profile:       PRO
-#   Memory limit:  120 MB (pro)
-#   Managed by:    main.go (Go runtime soft limit)
-```
-
-The `--check` mode output was extended with two fields:
-
-```
-v1.1.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | RUNDIR=...
-```
+**v1.2.0 addition**: `--diagnose` mode (Layer 10) — full diagnostic
+report including the backup listing, in-flight transactions, and
+recovery-mode state. See §15.14 for details.
 
 ### 15.2 action.sh
 
@@ -2254,33 +3077,28 @@ sh /data/adb/modules/dnscrypt-proxy-webui/action.sh
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --check
 sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --status
+sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup    # v1.2.0
+sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --diagnose  # v1.2.0
 ```
 
-**v1.1.0 note**: `action.sh --check` prints four sections:
+**v1.2.0 additions**:
+- `--backup` — trigger a manual backup.
+- `--diagnose` — full diagnostic report.
 
-```
-─── Service Status ───
-  🟢 WebUI    : Running on port 9090
-  🟢 DNS      : Running on 5354/UDP
-  🐕 Watchdog : Running (PID: 12345)
+**Expected output of `--backup`**:
 
-─── Runtime ───
-  📁 run/     : /data/adb/modules/dnscrypt-proxy-webui/proxy/run
-  📄 Intent   : ON (user intent)
-  🏷️  Version  : v1.1.0
-  📚 functions: ✅ loaded
+```text
+╔══════════════════════════════════════════════════════════╗
+║  💾 DNSCrypt – Manual Backup                           ║
+╚══════════════════════════════════════════════════════════╝
 
-─── Configuration ───
-  🌐 WebUI port    : 9090
-  📊 Dashboard port: 9091
-  🔄 Auto-DNS      : enabled
-  🔄 Auto-WebUI    : enabled
-  🔌 BIND_ADDR     : 127.0.0.1
+  Source: /data/adb/modules/dnscrypt-proxy-webui/proxy
+  Target: /sdcard/dnscrypt-webui-backup
 
-─── Profile & Memory ───
-  📋 Profile       : pro
-  🧠 Memory limit  : 120 MB (pro)
-  ℹ️  Managed by    : main.go (Go runtime soft limit)
+  ✅ Backup created: .../<ts>-manual-<pid> (5 file(s))
+
+  Current backup state:
+    7 snapshot(s), latest 0s ago
 ```
 
 ### 15.3 Firewall Diagnostics
@@ -2332,6 +3150,9 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, 
 
 # Profile + memory (v1.1.0 — MEM-1)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+
+# Backups object (v1.2.0 — BAK-1, 7 fields)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
 ```
 
 ### 15.6 dnsleaktest
@@ -2352,6 +3173,7 @@ grep -c "$(date +%Y-%m-%d)" /data/local/tmp/dnscrypt-blocked.log
 grep -i error /data/local/tmp/dnscrypt_main.log | tail -10
 grep -i 'watchdog\|ensure_running' /data/local/tmp/dnscrypt_main.log | tail -10
 grep -iE 'metrics|proxy|error' /data/local/tmp/dnscrypt_main.log | tail -10
+grep -iE 'backup|restore|rotate|orphan|txn-' /data/local/tmp/dnscrypt_main.log | tail -20  # v1.2.0
 ```
 
 ### 15.9 Status File Check
@@ -2362,12 +3184,7 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
 # "OFF" → user stopped it manually
 ```
 
-**Important**: `STATUS_FILE` is **read-only** — written only by `startService()` / `stopService()`. Not written by `getStatusUncached()` (Fix A — Audit #18).
-
-**Verify**:
-```bash
-grep -A5 'func getStatusUncached' proxy/main.go | grep -q 'atomicWriteFile' && echo "⚠️ writes!" || echo "✅ read-only"
-```
+**Important**: `STATUS_FILE` is **read-only** — written only by `startService()` / `stopService()`.
 
 ### 15.10 CI Debugging
 
@@ -2414,6 +3231,24 @@ grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
 
 # PORT-2 (runtime_info)
 grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo "✅ PORT-2"
+
+# MEM-1 (v1.1.0)
+grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1"
+
+# BAK-1 (v1.2.0 — 7 fields)
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1 in_flight_txn"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ BAK-1 orphan_txn"
+
+# BAK-2 (v1.2.0)
+grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2"
+grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 backupMu"
+
+# BAK-3 / BAK-4 (v1.2.0)
+grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
+grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
+
+# WD-TOKEN (v1.2.0)
+grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
 ```
 
 ### 15.12 RACE-1 + PORT-2 Diagnostics
@@ -2453,7 +3288,7 @@ WebUI process for bug reports or verification.
 
 ```bash
 #!/system/bin/sh
-# memory-diagnostics.sh — v1.1.0
+# memory-diagnostics.sh — v1.1.0+
 # Collects: profile_key, memory_limit_mb, RSS, CPU sample, log tail.
 
 echo "=== 1. runtime_info (v1.1.0 fields) ==="
@@ -2508,7 +3343,7 @@ su -c "sh /data/local/tmp/memory-diagnostics.sh"
 {
   "profile_key": "pro",
   "memory_limit_mb": 120,
-  "version": "v1.1.0"
+  "version": "v1.2.0"
 }
 
 === 2. selected_profile.txt (raw) ===
@@ -2522,8 +3357,8 @@ VmRSS:     18234 kB
  5678 u0_a123      20   0 1.2G  18M  12M S  0.5   0.9  0:12.34 dnscrypt-webui
 
 === 5. GC / memory log lines ===
-2026-09-26 10:00:00 - 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
-2026-09-26 10:05:00 - memory limit adjusted: 80 MB → 120 MB (profile=pro, previous runtime value=120 MB)
+2026-09-29 10:00:00 - 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+2026-09-29 10:05:00 - memory limit adjusted: 80 MB → 120 MB (profile=pro, previous runtime value=120 MB)
 
 === 6. Expected values ===
 light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
@@ -2539,135 +3374,285 @@ light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
 | CPU idle | < 5% | > 20% → see §6.10 (GC thrashing) |
 | Log line | reported once at startup | repeated "adjusted" lines → check for rapid profile changes |
 
+### 15.14 Backup Diagnostics Helper (v1.2.0 — new)
+
+**Purpose**: one-shot script to dump the full backup state for bug
+reports or verification.
+
+```bash
+#!/system/bin/sh
+# backup-diagnostics.sh — v1.2.0
+# Collects: 7-field backups object, directory listing, .last_stable,
+# transaction states, recovery triggers, 10-layer function presence.
+
+echo "=== 1. Backup state (7-field object) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
+
+echo ""
+echo "=== 2. Backup directory listing ==="
+ls -la /sdcard/dnscrypt-webui-backup/ 2>&1
+
+echo ""
+echo "=== 3. .last_stable pointer ==="
+cat /sdcard/dnscrypt-webui-backup/.last_stable 2>&1
+
+echo ""
+echo "=== 4. In-flight transactions ==="
+ls -la /sdcard/dnscrypt-webui-backup/txn-* 2>&1
+
+echo ""
+echo "=== 5. Orphan transactions ==="
+ls -la /sdcard/dnscrypt-webui-backup/orphan-txn-* 2>&1
+```
+
+**Usage**:
+
+```bash
+# Save the script
+su -c "cat > /data/local/tmp/backup-diagnostics.sh << 'EOF'
+...paste script here...
+EOF
+chmod +x /data/local/tmp/backup-diagnostics.sh"
+
+# Run it
+su -c "sh /data/local/tmp/backup-diagnostics.sh"
+```
+
+**Sample output** (on a healthy v1.2.0 install):
+
+```
+=== 1. Backup state (7-field object) ===
+{
+  "available": 7,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-29 15:30:00",
+  "last_backup_name": "20260929-153000-manual-12345",
+  "last_stable": "20260929-095826-v1.2.0-12345",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+
+=== 2. Backup directory listing ===
+drwx------  current/
+drwx------  20260929-153000-manual-12345/
+drwx------  20260929-095826-v1.2.0-12345/
+-rw-------  .last_stable
+-rw-------  .upgrade_history.json
+
+=== 3. .last_stable pointer ===
+20260929-095826-v1.2.0-12345
+
+=== 4. In-flight transactions ===
+ls: /sdcard/dnscrypt-webui-backup/txn-*: No such file or directory
+
+=== 5. Orphan transactions ===
+ls: /sdcard/dnscrypt-webui-backup/orphan-txn-*: No such file or directory
+```
+
+**Interpretation**:
+
+| Field | Healthy | Suspicious |
+|---|---|---|
+| `available` | ≥ 1 | 0 → see §4.13 |
+| `in_flight_txn` | 0 | > 0 → an install is running or interrupted |
+| `orphan_txn` | 0 | > 0 → see §13.4 |
+| `last_stable` | a valid snapshot name | `null` → see §4.14 |
+| `.last_stable` | matches `last_stable` field | mismatch → version mismatch |
+| Directory listing | `current/` + ≥ 1 snapshot | missing `current/` → see §4.13 |
+
+### 15.15 Recovery Mode Test Helper (v1.2.0 — new)
+
+**Purpose**: verify the FIX-1 snapshot-and-reapply mechanism on a
+real device without reinstalling the module.
+
+> **ℹ️ Portability note (N-4)**: the echoed "next steps" strings use
+> the **literal path** (`/data/adb/modules/dnscrypt-proxy-webui`),
+> not the `$MODPATH` shell variable. This makes every suggested
+> command self-contained and safe to copy-paste into a fresh shell,
+> independent of the script's environment.
+
+```bash
+#!/system/bin/sh
+# recovery-mode-test.sh — v1.2.0
+# Verifies FIX-1 by:
+#   1. Recording the current PORT value
+#   2. Taking a backup
+#   3. Triggering recovery mode
+#   4. Verifying PORT survived the ZIP extraction
+#
+# NOTE: all echoed "next steps" use the LITERAL module path
+# (/data/adb/modules/dnscrypt-proxy-webui) so that copy-paste
+# into a new shell works without a $MODPATH variable in scope.
+
+set -e
+
+MODPATH=/data/adb/modules/dnscrypt-proxy-webui
+PERSISTENT_BACKUP=/sdcard/dnscrypt-webui-backup
+
+echo "=== 0. Pre-flight: current state ==="
+CURRENT_PORT=$(grep '^PORT=' $MODPATH/proxy/webui.conf | cut -d= -f2)
+echo "Current PORT: $CURRENT_PORT"
+echo "Current profile: $(cat $MODPATH/proxy/selected_profile.txt)"
+
+echo ""
+echo "=== 1. Record baseline ==="
+echo "PORT=$CURRENT_PORT" > /sdcard/recovery-test-before.txt
+
+echo ""
+echo "=== 2. Take a manual backup ==="
+sh $MODPATH/action.sh --backup
+
+echo ""
+echo "=== 3. Verify snapshot exists ==="
+ls -la $PERSISTENT_BACKUP/
+cat $PERSISTENT_BACKUP/.last_stable
+
+echo ""
+echo "=== 4. Verify FIX-1 markers in customize.sh ==="
+grep -q 'RECOVERY_SNAPSHOT_DIR' $MODPATH/customize.sh && \
+    echo "✅ RECOVERY_SNAPSHOT_DIR present"
+grep -q 'Re-applying recovery snapshot' $MODPATH/customize.sh && \
+    echo "✅ §[9b2] re-apply block present"
+
+echo ""
+echo "=== 5. Trigger recovery (manual step required) ==="
+echo "Run these commands manually:"
+echo "  su -c 'touch /data/adb/modules/dnscrypt-proxy-webui/recovery'"
+echo "  su -c 'reboot'"
+echo ""
+echo "After reboot, run:"
+echo "  su -c 'sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose'"
+echo "  su -c 'grep \"^PORT=\" /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf'"
+echo "  # Expected: PORT=$CURRENT_PORT (preserved)"
+echo ""
+echo "Also verify no leftover snapshot dir:"
+echo "  su -c 'ls -la /data/adb/modules/dnscrypt-proxy-webui/.recovery_snapshot/ 2>&1'"
+echo "  # Expected: No such file or directory (cleaned up by §[9b2])"
+
+echo ""
+echo "=== 6. Verify no orphan txn created ==="
+ls -la $PERSISTENT_BACKUP/orphan-txn-* 2>&1 || \
+    echo "(no orphan txn — good)"
+```
+
+**Usage**:
+
+```bash
+su -c "sh /data/local/tmp/recovery-mode-test.sh"
+```
+
+**Expected results**:
+
+1. **Before reboot**: `PORT=9191` (or whatever you set), backup created.
+2. **After reboot**:
+   - `PORT=9191` still present (preserved by FIX-1).
+   - `/data/adb/modules/dnscrypt-proxy-webui/.recovery_snapshot/` removed (cleaned up by §[9b2]).
+   - No `orphan-txn-*` created.
+   - `recovery` trigger file removed.
+
+**If the test fails**:
+
+- Check `PORT` value after reboot:
+  - If it reverted to `9090`, FIX-1 may not be present → reinstall.
+  - If it stayed but `.recovery_snapshot/` remains, partial re-apply
+    happened → inspect the directory manually.
+
+**Reference**: §12.9, [`docs/SECURITY.md`](SECURITY.md) §5.32,
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §3.10.
+
 ---
 
 ## 16. When All Else Fails
 
-### 16.1 Before Opening an Issue
-- [ ] Read `docs/FAQ.md`.
-- [ ] Read this file carefully.
-- [ ] Try reinstalling the module.
-- [ ] Tried `--restart`.
-- [ ] Collected diagnostic logs.
-- [ ] Checked Firewall: §15.3.
-- [ ] Checked `STATUS_FILE`: §15.9.
-- [ ] Checked Dashboard: §4.8.
-- [ ] Checked RACE-1 if BLOCKLIST is inconsistent: §7.7.
-- [ ] Checked PORT-2 if links are broken: §4.11.
-- [ ] **v1.1.0**: Checked memory limit if WebUI is slow: §4.12, §6.10, §15.13.
-- [ ] **v1.1.0**: Checked profile key if it does not match: §5.14.
+### 16.1 Collect and Submit a Report
+
+If none of the above worked:
+
+```bash
+# 1. Full diagnostic (v1.2.0 — Layer 10)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" \
+    > /sdcard/diagnose.txt 2>&1
+
+# 2. JSON state
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" \
+    > /sdcard/diagnose.json 2>&1
+
+# 3. Backup state (v1.2.0)
+su -c "sh /data/local/tmp/backup-diagnostics.sh" \
+    > /sdcard/backup-diagnose.txt 2>&1
+
+# 4. Logs
+su -c "tail -200 /data/local/tmp/dnscrypt_main.log" \
+    > /sdcard/logs.txt 2>&1
+
+# 5. Module info
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/module.prop" \
+    >> /sdcard/logs.txt 2>&1
+```
 
 ### 16.2 Issue Template
 
-```markdown
-## Environment
-- Module: v1.1.0
-- Android: 14
-- Device: Pixel 6
-- Root: Magisk 27.0
+When opening a GitHub Issue, include:
 
-## Profile & Memory (v1.1.0)
-- Active profile (from selected_profile.txt):
-- profile_key (from runtime_info):
-- memory_limit_mb (from runtime_info):
-- Expected limit for this profile:
+**Required**:
 
-## Problem
-[Clear description]
+- Android version + API level
+- Device model
+- Kernel version
+- Root solution (Magisk / KernelSU / APatch) + version
+- Module version (`grep '^version=' module.prop`)
+- Steps to reproduce
+- Expected vs actual behavior
 
-## Steps
-1. ...
-2. ...
+**Attachments**:
 
-## Firewall State
-```text
-$ iptables -t nat -L OUTPUT -n
-$ iptables -t nat -L DNSCRYPT_OUT -n
-```
+- `diagnose.txt` (from §16.1 step 1)
+- `diagnose.json` (from §16.1 step 2)
+- `logs.txt` (from §16.1 step 4)
 
-## Dashboard State
-```text
-$ curl -s http://127.0.0.1:9091/api/metrics | head -10
-```
+**For backup-related issues, also include**:
 
-## Runtime Info
-```text
-$ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
-```
+- `backup-diagnose.txt` (from §16.1 step 3)
+- The 7-field `backups` object:
+  ```bash
+  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+  ```
+- Directory listing:
+  ```bash
+  su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+  ```
 
-## Memory Diagnostics
-```text
-$ sh /data/local/tmp/memory-diagnostics.sh
-[paste output here]
-```
+**For recovery-mode issues, also include**:
 
-## Status File
-```text
-$ cat proxy/run/dnscrypt.status
-ON
-```
+- `customize.sh` version markers:
+  ```bash
+  su -c "grep -n 'RECOVERY_SNAPSHOT_DIR\|Re-applying recovery snapshot' \
+      /data/adb/modules/dnscrypt-proxy-webui/customize.sh"
+  ```
+- The `.last_stable` pointer:
+  ```bash
+  su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+  ```
 
-## Logs
-[excerpt — include the "dynamic memory limit" line if present]
+**For watchdog issues, also include**:
 
-## Tried
-- [x] status.sh
-- [x] Reinstall
-- [x] Restart
-- [x] §11.6 (Custom Chains check)
-- [x] §6.9 (Watchdog check)
-- [x] §4.8 (Dashboard check)
-- [x] §7.7 (RACE-1 check)
-- [x] §4.11 (PORT-2 check)
-- [x] §4.12 (Memory limit check)
-- [x] §5.14 (Profile key check)
-```
+- Token file state:
+  ```bash
+  su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  ```
+- Watchdog log lines:
+  ```bash
+  su -c "grep -i 'watchdog' /data/local/tmp/dnscrypt_main.log | tail -20"
+  ```
 
-### 16.3 Where to Ask
+### 16.3 Support Links
 
-- **GitHub Issues**: [bug_report.yml](../.github/ISSUE_TEMPLATE/bug_report.yml)
-- **GitHub Discussions**: community help
-- **Private Advisory**: for security vulnerabilities
-
-### 16.4 Useful Tips
-
-- Do not open a public Issue for security vulnerabilities → [Private Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new).
-- Always attach logs.
-- Be specific (not "DNS does not work").
-- Mention what you tried.
-- **v1.1.0**: if the issue relates to slowness or RAM, always include `profile_key` and `memory_limit_mb`.
+- **Bug reports**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
+- **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
+- **Security issues**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new (do **not** open public issues for security)
 
 ---
 
-## References
-
-### Project Documentation
-
-- [README.md](../README.md) — Overview
-- [docs/INSTALL.md](INSTALL.md) — Installation guide
-- [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix
-- [docs/SECURITY.md](SECURITY.md) — Audit Corrections Registry
-- [docs/API.md](API.md) — HTTP API Reference
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — Full architecture
-- [docs/FAQ.md](FAQ.md) — Frequently asked questions
-- [docs/DEVELOPMENT.md](DEVELOPMENT.md) — Developer guide
-- [docs/UPGRADE.md](UPGRADE.md) — Upgrade guide
-- [docs/DNS_BINARIES.md](DNS_BINARIES.md) — DNS binaries (Level 4)
-- [docs/GLOSSARY.md](GLOSSARY.md) — Glossary
-- [CHANGELOG.md](../CHANGELOG.md) — Version history
-
-### External Resources
-
-- [dnscrypt-proxy Wiki](https://github.com/DNSCrypt/dnscrypt-proxy/wiki)
-- [Magisk Documentation](https://topjohnwu.github.io/Magisk/)
-- [Android DNS Architecture](https://source.android.com/docs/core/ota/modular-system/dns-resolver)
-- [iptables Manual](https://ipset.netfilter.org/iptables.man.html)
-- [Netfilter iptables Custom Chains Best Practices](https://www.netfilter.org/documentation/)
-- [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
-- [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
-
----
-
-**Last updated**: 2026-09-26
-**Version**: v1.1.0
-**Author**: gasciljh
+*Last updated: 2026-09-29*
+*Version: v1.2.0*
+*Author: gasciljh*

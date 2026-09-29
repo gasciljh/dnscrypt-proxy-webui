@@ -2,27 +2,51 @@
 
 > Recognition for everyone who has contributed to this project.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • `Last updated` reflects the v1.1.0 release date.
->   • **New badge**: 🧠 **Memory Architect** — recognizes
->     contributors who test the dynamic memory limit (MEM-1)
->     across device RAM tiers and report GC behavior.
->   • `Auditor` badge note clarified: v1.1.0 does **not** add
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • `Last updated` reflects the v1.2.0 release date.
+>   • **New badge**: 🛡️ **Data Guardian** — recognizes
+>     contributors who test the backup/restore system (the 10
+>     defensive layers) across devices, root solutions, and
+>     upgrade scenarios.
+>   • `Concurrency Guardian` badge note extended: now also covers
+>     `backupMu` (BAK-2, v1.2.0) in addition to `rebuildMu`
+>     (RACE-1, v1.0.0).
+>   • `Translator` badge note extended: with the bilingual WebUI
+>     (English default + Arabic toggle), a significant
+>     contribution to `translations.ar` also qualifies.
+>   • `Auditor` badge note clarified: v1.2.0 does **not** add
 >     audit corrections. The registry remains at **#33**.
 >   • New subsection in "Audit Corrections Registry" explicitly
->     documenting that v1.1.0 is a runtime-improvement release,
->     not an audit-correction release.
+>     documenting that v1.2.0 is a data-preservation release, not
+>     an audit-correction release.
 >   • New subsection in "Changelog for Contributors" for the
->     v1.1.0 cycle.
->   • "How to Get Added" section extended with the Memory
->     Architect acceptance criteria.
->   • `References` extended with `docs/UPGRADE.md`.
+>     v1.2.0 cycle.
+>   • "How to Get Added" section extended with the Data Guardian
+>     acceptance criteria.
+>   • `References` extended with `docs/BACKUP.md` and
+>     `docs/EMERGENCY.md`.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+
+> **v1.2.0 (Global Edition) — Corrections in this revision**:
+>   • 🔧 **FIX-1 description** — In the v1.2.0 "Changelog for
+>     Contributors" section, FIX-1 was previously described as a
+>     "recovery-mode reorder". The actual implementation in
+>     `customize.sh` uses a **snapshot-and-reapply** strategy
+>     (`§[8a]` + `§[9]` + `§[9b2]`), which keeps the extraction
+>     logic of `§[9]` untouched. The description has been
+>     corrected to match the shipped code. See
+>     `docs/SECURITY.md` §5.32.1 for the full analysis.
 
 ---
 
@@ -83,9 +107,15 @@ languages.*
 | [@gasciljh](https://github.com/gasciljh) | Arabic / English (primary languages) |
 | *Your spot is reserved* | — |
 
-**Note (v1.1.0)**: Although the **documentation** is now
-English-only (global edition), the **WebUI itself remains bilingual
+**Note (v1.2.0)**: Although the **documentation** is English-only
+(global edition), the **WebUI itself remains bilingual
 (English / Arabic)** for the benefit of Arabic-speaking users.
+
+**v1.2.0 acceptance extension**: With the bilingual WebUI, a
+significant contribution to the `translations.ar` object (e.g.
+adding many new keys with correct Arabic strings and RTL
+verification) also qualifies for this badge — not just a full
+documentation translation.
 
 ---
 
@@ -101,8 +131,9 @@ compatibility.*
 **Acceptance criteria**:
 - Testing on **3+ different devices** (Android 5-15).
 - Submitting a detailed report (logs + behavior).
-- Testing v1.1.0 on older devices (Android 5-9).
+- Testing v1.2.0 on older devices (Android 5-9).
 - Testing on non-Android platforms (Linux, macOS, WSL2).
+- **(v1.2.0)** Testing the bilingual WebUI on multiple browsers.
 
 ---
 
@@ -117,7 +148,7 @@ compatibility.*
 **Acceptance criteria**:
 - Testing on **3+ different devices** (Android 5-14).
 - Submitting a detailed report (logs + behavior).
-- Testing v1.0.0 + v1.1.0 on older devices (Android 5-9).
+- Testing v1.0.0 + v1.1.0 + v1.2.0 on older devices (Android 5-9).
 - Testing on non-Android platforms (Linux, macOS, WSL2).
 
 ---
@@ -131,6 +162,10 @@ compatibility.*
 | [@gasciljh](https://github.com/gasciljh) | Designed the WebUI + Dashboard + PWA + icons + logo |
 | *Your spot is reserved* | — |
 
+**v1.2.0 note**: Contributions to the bilingual UI (English
+default + Arabic toggle), the RTL layout, or the Service Worker
+update-banner fix (FIX-2) qualify.
+
 ---
 
 ### 🔍 Auditor
@@ -141,9 +176,14 @@ compatibility.*
 **Note**: The Auditor badge is granted to anyone who contributes at
 least one Audit Correction.
 
-⚠️ **v1.1.0 note**: The v1.1.0 release does **not** add new audit
+⚠️ **v1.2.0 note**: The v1.2.0 release does **not** add new audit
 corrections. The registry remains at **#33** (the last entry from
-v1.0.0). New audit corrections will resume at **#34** in v1.2.x.
+v1.0.0). The v1.2.0 additions (BAK-1..BAK-4, FIX-1, FIX-2) are
+**runtime improvements and correctness fixes**, not exploitable
+vulnerabilities — they are documented in `docs/SECURITY.md` §5.31
+and §5.32 without audit numbers.
+
+New audit corrections will resume at **#34** in **v1.3.x**.
 
 | Contributor | Audit Correction | Version | Reference |
 |---------|:----------------:|:-------:|-----------|
@@ -224,18 +264,24 @@ v1.0.0). New audit corrections will resume at **#34** in v1.2.x.
 | Contributor | Fix | Version | Reference |
 |---------|:-------:|:-------:|-----------|
 | [@gasciljh](https://github.com/gasciljh) | `rebuildMu` mutex — serializes `rebuildBlocklist` (RACE-1) | v1.0.0 | [SECURITY.md](SECURITY.md) |
+| [@gasciljh](https://github.com/gasciljh) | `backupMu` mutex — serializes pre-critical backups (BAK-2) | v1.2.0 | [SECURITY.md](SECURITY.md) §5.31 |
 | *Your spot is reserved* | — | — | — |
 
 **Acceptance criteria**:
 
 - Detecting and fixing a real race condition.
-- **Example**: `rebuildMu` protects `rebuildBlocklist` (v1.0.0,
-  RACE-1).
+- **Examples**:
+  - `rebuildMu` protects `rebuildBlocklist` (v1.0.0, RACE-1).
+  - `backupMu` serializes pre-critical backups (v1.2.0, BAK-2).
 - **Requirements**:
   - ✅ The problem is documented (scenario + result).
   - ✅ The solution uses `sync.Mutex` / `sync.RWMutex` correctly.
   - ✅ `defer unlock()` in all paths.
   - ✅ No deadlock.
+
+**v1.2.0 note**: The badge now recognizes contributions to **both**
+the `rebuildMu` mutex (v1.0.0) and the `backupMu` mutex (v1.2.0).
+If you fix or improve either, you can qualify.
 
 ---
 
@@ -324,6 +370,97 @@ tuning.
 
 ---
 
+### 🛡️ Data Guardian (v1.2.0)
+
+*Those who test the backup/restore system across devices, root
+solutions, and upgrade scenarios.*
+
+| Contributor | Test scope | Version | Reference |
+|---------|:---------:|:-------:|-----------|
+| [@gasciljh](https://github.com/gasciljh) | 10 defensive layers design + implementation + testing on 3 root solutions | v1.2.0 | [SECURITY.md](SECURITY.md) §5.31 |
+| *Your spot is reserved* | — | — | — |
+
+**What this badge recognizes**:
+
+The v1.2.0 release introduced the **10 defensive layers** — a
+comprehensive data-preservation system that protects the 5 user
+config files across in-place upgrades, renames, reinstalls, root
+solution changes, and catastrophic failures.
+
+Testing this properly requires:
+- Running the module on devices with **different root solutions**
+  (Magisk / KernelSU / APatch).
+- Testing **in-place upgrades** from v1.0.0 and v1.1.0.
+- Testing **recovery mode** and inspecting the result.
+- Reporting concrete backup state via the 7-field
+  `runtime_info.backups` object.
+
+Contributors who provide **concrete, reproducible backup reports**
+across multiple scenarios earn this badge.
+
+**Acceptance criteria**:
+
+- ✅ Tested the 10 data-preservation layers on **3+ devices** or
+  **3+ root solutions** (Magisk / KernelSU / APatch).
+- ✅ Verified that all 5 user config files
+  (`webui.conf`, `dnscrypt-proxy.toml`, `selected_profile.txt`,
+  `allowlist.txt`, `denylist.txt`) survive an in-place upgrade.
+- ✅ Verified that recovery mode restores all 5 files.
+- ✅ Reported the 7-field `backups` object before/after each
+  scenario.
+- ✅ Reported `status.sh --diagnose` output.
+- ✅ Reported `dnscrypt_install.log` excerpts.
+- ✅ If a mismatch was found, documented it with the exact
+  reproduction steps.
+
+**Recommended scenarios to test**:
+
+| Scenario | Expected result |
+|---|---|
+| Fresh install | 5 files created; no backup (first install) |
+| In-place upgrade from v1.1.0 | 5 files preserved; snapshot created |
+| In-place upgrade from v1.0.0 | 5 files preserved; `MEMORY_LIMIT_HINT=auto` added |
+| Reinstall after uninstall | 5 files restored from `/sdcard/` backup |
+| Recovery mode | 5 files restored; trigger file consumed |
+| Renamed module folder | 5 files found via multi-source detection |
+| APatch install | 5 files found via `modules_update/` fallback |
+| Concurrency | Two rapid `save_allowlist` calls → no corrupted snapshot |
+
+**Optional (bonus)**:
+
+- Testing after a factory reset of `/data`.
+- Testing the SW update-banner fix (FIX-2) on both `index.html`
+  and `dashboard.html`.
+- Testing the bilingual toggle across different browsers.
+
+**Example report**:
+
+```text
+Device:        Pixel 6a
+Android:       14 (API 34)
+Root:          Magisk 27.0
+Scenario:      In-place upgrade v1.1.0 → v1.2.0
+Files before:  5 (profile=ultimate, 200 allowlist, 50 denylist)
+Files after:   5 (all identical)
+Backups:       available=3, in_flight_txn=0, orphan_txn=0
+last_stable:   20260929-095826-v1.2.0
+Notes:         Recovery mode not triggered. All 5 files intact.
+```
+
+**Why this matters**:
+
+The v1.2.0 release fixes a **data-loss bug** in v1.1.0 that
+silently erased the 5 user config files on every in-place upgrade.
+By documenting real-world behavior across devices and root
+solutions, contributors help verify the fix works and identify any
+edge cases that need further tuning.
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §12;
+[`docs/SECURITY.md`](SECURITY.md) §5.31;
+[`docs/FAQ.md`](FAQ.md) Q129.
+
+---
+
 ## 🌟 Special Thanks
 
 ### Upstream Projects
@@ -373,6 +510,15 @@ tuning.
 - **Reviewers of the `ultimate` GC thrashing issue** — For the
   analysis that motivated the per-profile limit.
 
+### v1.2.0 Acknowledgments
+
+- **Android FUSE / storage team** — For documentation on the
+  `/sdcard/` FUSE mount behavior that informs the backup layer.
+- **Android SELinux team** — For documentation on `restorecon` /
+  `chcon` used by Layer 6.
+- **Reviewers of the v1.1.0 in-place upgrade data-loss issue** —
+  For the analysis that motivated the 10 defensive layers.
+
 ---
 
 ## 🎁 How to Get Added to the Hall of Fame
@@ -401,20 +547,23 @@ tuning.
 - Translating the interface and adding code in the `translations
   object` in `index.html`.
 - Adding `docs/*.<lang>.md`.
+- **(v1.2.0)** Adding significant contributions to the WebUI's
+  `translations.ar` object (e.g. many new keys, RTL verification).
 
 ### 🧪 Testing Heroes
 - Testing the project on 3 or more different devices.
 - Submitting a detailed report (logs + actual behavior).
 - Actively helping solve compatibility conflict issues.
-- Testing v1.1.0 on different devices (especially Android 5–9).
+- Testing v1.2.0 on different devices (especially Android 5–9).
 - Testing on non-Android platforms (Linux, macOS, WSL2).
+- **(v1.2.0)** Testing the bilingual WebUI on multiple browsers.
 
 ### 💎 Compatibility Champions
 - Testing the project on 3 or more different devices.
 - Submitting a detailed report (logs + actual behavior).
 - Actively helping solve compatibility conflict issues.
-- Testing v1.0.0 + v1.1.0 on different devices (especially
-  Android 5–9).
+- Testing v1.0.0 + v1.1.0 + v1.2.0 on different devices
+  (especially Android 5–9).
 - Testing on non-Android platforms (Linux, macOS, WSL2).
 
 ### 🎨 UI/UX
@@ -422,6 +571,7 @@ tuning.
 - Adding a useful UX feature.
 - Improving and supporting accessibility.
 - Testing the Dashboard JSON on different browsers.
+- **(v1.2.0)** Improving the bilingual UI or the RTL layout.
 
 ### 🔍 Auditor
 - Discovering an **architectural** vulnerability (not just a bug).
@@ -441,10 +591,11 @@ tuning.
   semantics).
 - ✅ The documentation is in `docs/SECURITY.md` with HTML anchor.
 
-**⚠️ v1.1.0 note**: The v1.1.0 release did not add any new audit
-corrections. Audit Corrections will resume at **#34** in v1.2.x.
-If your contribution fixes an architectural issue, it will be the
-first new Auditor badge since v1.0.0.
+**⚠️ v1.2.0 note**: The v1.2.0 release did not add any new audit
+corrections. The registry remains at **#33**. Audit Corrections
+will resume at **#34** in **v1.3.x**. If your contribution fixes
+an architectural issue, it will be the first new Auditor badge
+since v1.0.0.
 
 ### 🔧 Platform Fixer
 - Fixing a problem preventing the system from working on a specific
@@ -467,7 +618,9 @@ first new Auditor badge since v1.0.0.
 
 ### ⚙️ Concurrency Guardian
 - Discovering and fixing a real race condition.
-- **Example**: `rebuildMu` (v1.0.0, RACE-1).
+- **Examples**:
+  - `rebuildMu` (v1.0.0, RACE-1).
+  - `backupMu` (v1.2.0, BAK-2).
 - **Criteria**:
   - ✅ The solution uses mutex correctly.
   - ✅ `defer unlock()` in all paths.
@@ -493,6 +646,26 @@ first new Auditor badge since v1.0.0.
   - ✅ The report compares against expected values from
     [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §5.4.
   - ✅ If a mismatch is found, it is documented with evidence.
+
+### 🛡️ Data Guardian (v1.2.0)
+- Testing the 10 defensive layers across **3+ devices** or **3+
+  root solutions** (Magisk / KernelSU / APatch).
+- Verifying all 5 user config files survive an in-place upgrade.
+- Verifying recovery mode restores all 5 files.
+- Reporting the 7-field `backups` object for each scenario.
+- **Criteria**:
+  - ✅ Tested at least 3 scenarios from the recommended list.
+  - ✅ Reported the 7-field `backups` object for each scenario.
+  - ✅ Reported `status.sh --diagnose` output.
+  - ✅ Reported `dnscrypt_install.log` excerpts.
+  - ✅ If a mismatch was found, documented it with the exact
+    reproduction steps.
+- **Optional (bonus)**:
+  - Testing after a factory reset of `/data`.
+  - Testing the concurrency scenario (two rapid writes).
+  - Testing the SW update-banner fix on both `index.html` and
+    `dashboard.html`.
+  - Testing the bilingual toggle across different browsers.
 
 ---
 
@@ -528,12 +701,16 @@ first new Auditor badge since v1.0.0.
 8. **Metrics**: The `Metrics Wizard` badge is granted for a
    tangible improvement to the metrics/Dashboard system.
 9. **Concurrency**: The `Concurrency Guardian` badge is granted
-   for fixing a real race condition.
+   for fixing a real race condition (RACE-1 or BAK-2).
 10. **Ports**: The `Port Architect` badge is granted for fixing
     dynamic ports issues.
 11. **Memory (v1.1.0)**: The `Memory Architect` badge is granted
     for testing the dynamic memory limit across 3+ RAM tiers with
     concrete, reproducible data.
+12. **Data Preservation (v1.2.0)**: The `Data Guardian` badge is
+    granted for testing the 10 defensive layers across 3+ devices
+    or 3+ root solutions with concrete, reproducible backup
+    reports.
 
 ### Disputes
 
@@ -553,6 +730,8 @@ The Hall of Fame is **updated manually** in the following cases:
   automatically).
 - **(v1.1.0)** When a **Memory Architect** report is accepted
   (added immediately).
+- **(v1.2.0)** When a **Data Guardian** report is accepted (added
+  immediately).
 
 ---
 
@@ -595,7 +774,7 @@ Official registry of all discovered and fixed Audit Corrections:
 | **#33** | **`runtime_info` dynamic ports (PORT-2)** | **v1.0.0** | [SECURITY.md](SECURITY.md) |
 
 **Last Audit Correction**: #33 (v1.0.0)
-**Next expected**: #34 (v1.2.x)
+**Next expected**: #34 (v1.3.x)
 
 ### v1.1.0 — No New Audit Corrections
 
@@ -619,12 +798,101 @@ These are documented in [`docs/SECURITY.md`](SECURITY.md) §5.30 and
 a functional regression, not an exploitable vulnerability — so it
 also does not receive an audit correction number.
 
+### v1.2.0 — No New Audit Corrections
+
+**The v1.2.0 release does not extend the Audit Corrections
+Registry either.**
+
+This is intentional. The v1.2.0 release is a **data-preservation
+release**. Its additions close a data-loss bug and harden the write
+path, but they do not fix known exploitable vulnerabilities:
+
+| ID | Change | Type |
+|:-:|---|---|
+| **BAK-1** | 7-field `runtime_info.backups` | Observability |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | Data preservation |
+| **BAK-3** | `cleanupOldTransactions` | Housekeeping |
+| **BAK-4** | `checkPendingNotifications` | UX / observability |
+| **FIX-1** | Recovery-mode correctness via **snapshot-and-reapply** | Correctness fix |
+| **FIX-2** | Service Worker update-banner | Correctness fix |
+
+These are documented in [`docs/SECURITY.md`](SECURITY.md) §5.31 and
+§5.32 but are **not assigned audit correction numbers**.
+
+**The Audit Corrections Registry remains at #33.**
+
 **Next audit correction** (if any) will be **#34**, expected in
-**v1.2.x**.
+**v1.3.x**.
 
 ---
 
 ## 📋 Changelog for Contributors
+
+### v1.2.0 (2026-09-29)
+
+**Data-preservation release — no breaking changes.**
+
+**New badge (1)**:
+
+- 🛡️ **Data Guardian** — recognizes contributors who test the
+  backup/restore system across devices, root solutions, and
+  upgrade scenarios.
+
+**Data-preservation additions (10 defensive layers)**:
+
+- **Layer 1** — Multi-source detection (7 candidate locations).
+- **Layer 2** — Persistent backup to `/sdcard/dnscrypt-webui-backup/`.
+- **Layer 3** — SHA256 integrity verification (advisory).
+- **Layer 4** — Transactional upgrades with rollback.
+- **Layer 5** — Root-solution compatibility (Magisk / KernelSU / APatch).
+- **Layer 6** — SELinux preservation (`restorecon` / `chcon`).
+- **Layer 7** — Recovery mode via trigger file.
+- **Layer 8** — Config migrations.
+- **Layer 9** — Auto-backup (24 h) + rotation (max 21 snapshots).
+- **Layer 10** — Observability (`.upgrade_history.json`,
+  `status.sh --diagnose`, 7-field `runtime_info.backups`).
+
+**Runtime additions (4 — documented in `docs/SECURITY.md` §5.31)**:
+
+- **BAK-1** — `runtime_info.backups` returns 7 fields.
+- **BAK-2** — `createAutoBackup` + `backupMu` + rotation.
+- **BAK-3** — `cleanupOldTransactions`.
+- **BAK-4** — `checkPendingNotifications`.
+
+**Correctness fixes (2 — documented in `docs/SECURITY.md` §5.32)**:
+
+- **FIX-1** — Recovery-mode correctness via **snapshot-and-reapply**:
+  `§[8a]` restores the 5 files AND copies each one to
+  `$MODPATH/.recovery_snapshot/`. `§[9]` extracts the ZIP normally
+  (the extraction logic is left untouched, so the normal-install
+  path is byte-for-byte identical). `§[9b2]` re-applies the 5 files
+  from the snapshot. This strategy does not depend on knowing the
+  ZIP's contents.
+
+- **FIX-2** — Service Worker update-banner (send `SKIP_WAITING` to
+  the correct worker).
+
+**New API fields (1)**:
+
+- `runtime_info.backups` — a 7-field object describing the backup
+  state.
+
+**Documentation updates**:
+
+- `docs/BACKUP.md` — new file (full backup system reference).
+- `docs/EMERGENCY.md` — new file (emergency recovery guide).
+- `docs/ARCHITECTURE.md` — new sections §3.10, §4.10.
+- `docs/API.md` — §6.1.7 extended with the 7-field `backups`.
+- `docs/SECURITY.md` — new sections §5.31, §5.32.
+- `docs/COMPATIBILITY.md` — new §2.5, §8.4, §10.3, §10.7.
+- `docs/FAQ.md` — new section Q121–Q130.
+- `docs/CONTRIBUTING.md` — new §8.9, §8.10, §8.11, §9.5, §9.6.
+- `docs/DEVELOPMENT.md` — new §8.12, §8.13, §8.14.
+
+**Audit Corrections**: **None** — the registry remains at **#33**.
+
+**See**: [`CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0] for the full
+changelog.
 
 ### v1.1.0 (2026-09-26)
 
@@ -756,6 +1024,11 @@ appreciated, including:
 - 🆕 Testing `/readyz` localhost-only (NEW-4).
 - 🆕 Testing RACE-1 (BLOCKLIST consistency).
 - 🆕 **(v1.1.0)** Reporting memory-limit behavior across RAM tiers.
+- 🆕 **(v1.2.0)** Testing the 10 defensive layers on a new device.
+- 🆕 **(v1.2.0)** Reporting the 7-field `backups` object from a
+  real device.
+- 🆕 **(v1.2.0)** Testing recovery mode (`touch recovery && reboot`).
+- 🆕 **(v1.2.0)** Testing the bilingual WebUI (EN ↔ AR toggle).
 
 ...all are **very important contributions** and shape the success
 and value of this project.
@@ -767,28 +1040,35 @@ and value of this project.
 ## 📚 References
 
 - [`SECURITY.md`](SECURITY.md) — How to report vulnerabilities +
-  Audit Corrections Registry.
+  Audit Corrections Registry (§5.31, §5.32).
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution guide.
 - [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — Code of Conduct.
 - [`CHANGELOG.md`](../CHANGELOG.md) — Version history (v1.0.0 +
-  v1.1.0).
+  v1.1.0 + v1.2.0).
 - [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — System architecture.
 - [`docs/API.md`](API.md) — HTTP API Reference.
+- [`docs/BACKUP.md`](BACKUP.md) — **Backup system reference
+  (v1.2.0)**.
+- [`docs/EMERGENCY.md`](EMERGENCY.md) — **Emergency recovery
+  (v1.2.0)**.
 - [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) — DNS binaries
   (Level 4).
 - [`docs/GLOSSARY.md`](GLOSSARY.md) — Glossary.
 - [`docs/ROADMAP.md`](ROADMAP.md) — Project plan.
 - [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) — Compatibility
   matrix.
-- [`docs/UPGRADE.md`](UPGRADE.md) — Version upgrade guide.
+- [`docs/UPGRADE.md`](UPGRADE.md) — Version upgrade guide (§3.0,
+  §3.1).
+- [`docs/FAQ.md`](FAQ.md) — Frequently asked questions
+  (Q121–Q130).
 - [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) — This file.
 
 ---
 
 <div align="center">
 
-**Last updated**: 2026-09-26
-**Version**: v1.1.0
+**Last updated**: 2026-09-29
+**Version**: v1.2.0
 
 [⬆ Back to top](#hall-of-fame--dnscrypt-smart-filter)
 

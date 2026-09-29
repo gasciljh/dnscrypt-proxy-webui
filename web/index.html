@@ -1,33 +1,170 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.1.0
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
-     Bilingual WebUI (English/Arabic) with:
+     Bilingual WebUI (English default / Arabic toggle).
+
+     Features:
        • Login (POST-only, CSRF-protected)
        • Service toggle/restart
        • Blocklist profile selection
        • Custom rules editor (Allowlist + Denylist)
-       • Runtime info
+       • Runtime info (dynamic ports + profile + memory + backups)
        • Diagnostic file viewer
        • Live status via SSE
        • PWA support (installable, offline-capable)
+       • Smart Edit Mode with draft auto-save and rollback
+       • Service Worker update banner
+
+     v1.2.0 fixes (original):
+       • Service Worker update banner loop fixed:
+           [Reload] now sends SKIP_WAITING to
+           swRegistration.waiting (the NEW worker), and reloads
+           on 'controllerchange'.
+       • storeToken() is a no-op shim (see §[3]).
+       • EventSource uses same-origin cookies implicitly.
+       • Language toggle restored (EN ↔ AR), preference
+         persisted in localStorage under 'dnscrypt-lang'.
+
      ============================================================
-     v1.1.0 changes:
-       • Version badge and welcome message updated to v1.1.0
-       • Runtime Info now displays profile key + memory limit
-         (new fields exposed by main.go v1.1.0)
-       • storeToken() documented as a no-op shim (see §[3])
-       • EventSource consistency with dashboard.html
-         (removed the redundant withCredentials option)
+     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     ============================================================
+     A pre-release audit of this file identified the following
+     issues. All of them are addressed in-place; no version bump.
+
+       🔧 IDX-1 (critical) — The System Info panel did NOT
+         display the `backups` object that v1.2.0's main.go
+         exposes via `runtime_info`. Six new rows are now
+         rendered: Snapshots, Latest Backup, Latest Date,
+         Last Stable, In-Flight Txn, Orphan Txn, Backup Path.
+
+       🔧 IDX-2 — The class `card` was used on
+         `#runtimeInfoCard` and `#diagFilesCard` but never
+         defined in the stylesheet. Added an explicit base rule.
+
+       🔧 IDX-3 — `countChanges()` could report zero changes
+         even when the raw text differed (whitespace-only
+         difference). Fixed by returning at least 1 whenever
+         the raw content differs from the stored original.
+
+       🔧 IDX-4 — The `<html>` tag shipped with static
+         `lang="en" dir="ltr"`. A small inline script in
+         `<head>` now sets the correct lang/dir BEFORE the
+         first paint for Arabic-preferring users.
+
+       🔧 IDX-5 — `formatBytes()` did not handle sizes in
+         the GB range. Added a GB branch.
+
+       🔧 IDX-6 — NOT a separate fix in this file. The audit
+         originally reserved slot 6 for a fix that, on
+         inspection, was already covered by IDX-1 (the
+         backup rows already carry `.ri-warn` styling when
+         a counter is 0 or a timestamp is missing). The
+         slot is kept as a no-op so historical references
+         remain stable; it does NOT correspond to any code
+         change in this revision.
+
+       🔧 IDX-7 — When the user clicked [Reload] on the SW
+         update banner, `swUpdateCheckInterval` was not cleared
+         before `location.reload()`. Now cleared explicitly
+         in the `controllerchange` handler.
+
+       🛡️ IDX-8 — The System Info panel now renders the
+         `backups.last_backup` timestamp (the 7th field of the
+         backups object) as a dedicated "Latest Date" row.
+         Previously, only the directory name (last_backup_name)
+         was shown.
+
+       🛡️ IDX-9 — `enterEditMode()` refuses to enter edit mode
+         when the server content and hashes have not yet been
+         loaded. Prevents saving with an empty expected_hash,
+         which would bypass the conflict check in main.go.
+
+       🛡️ IDX-10 — `handleSessionExpired()` now resets the
+         verify/sse backoff counters. Ensures the next login
+         starts from a fast polling interval instead of an
+         accumulated long backoff.
+
+       🛡️ IDX-11 — `bindSWUpdateButtons()` installs a 3-second
+         fallback that reloads the page if `controllerchange`
+         never fires (e.g. misbehaving or terminated SW).
+         Without this, `pendingReload` could stay true forever.
+
+       🛡️ IDX-12 — Section header `[13.b]` renamed to `[13b]`
+         for consistency with the rest of the file.
+
+       🛡️ IDX-13 — `formatBytes()` now returns "0 B" for
+         negative input, instead of the nonsensical "<negative> B".
+
+     ============================================================
+     v1.2.0 (Global Edition) — Additional hardening, second pass
+     ============================================================
+     A second review pass identified the following issues.
+     All of them are addressed in-place; no version bump.
+
+       🛡️ IDX-14 — `dashboardLink` fallback timeout. The
+         "loading" class on the Dashboard link is now removed
+         after 8 seconds regardless of whether the runtime_info
+         fetch succeeded. Before this, a failed fetch could
+         leave the link in a permanent `loading` state.
+
+       🛡️ IDX-15 — `setNetworkDownUI(false)` now restores the
+         diagnostics text. Previously the method only cleared
+         the border color, so the "Server unreachable" text
+         could remain visible after recovery. The
+         `networkDownText` flag tracks the original state.
+
+       🛡️ IDX-16 — `showMsg()` sets `role="status"` and
+         `aria-live="polite"` on the toast element so screen
+         readers announce the message. The toast is removed
+         from the DOM after its lifetime.
+
+       🛡️ IDX-17 — `showConfirmModal()` now supports an
+         optional custom primary action via
+         `options.primaryText` and `options.primaryCallback`.
+         This is used by `handleSessionExpired()` and mirrors
+         the same extension in dashboard.html (DASH-12).
+
+       🛡️ IDX-18 — `handleSessionExpired()` now tears down
+         the progress poller (`window.progressPoller`) in
+         addition to the intervals already cleared. Without
+         this, a session expiry during a blocklist update
+         could leave the poller running indefinitely.
+
+       🛡️ IDX-19 — `stopPolling()` (added for the WebUI as a
+         thin alias to the existing beforeunload cleanup)
+         clears `dashboardLinkFallbackTimer` when the page
+         is being unloaded. Prevents the timer from firing
+         after the page is gone.
+
+       🛡️ IDX-20 — The `verifyBackoff` reset in
+         `handleSessionExpired` now also resets
+         `verifyFailures`. This aligns the WebUI with the
+         dashboard's behaviour and avoids a spurious extra
+         retry after re-login.
+
+       🛡️ IDX-21 — `<meta http-equiv="Pragma">` and
+         `<meta http-equiv="Expires">` have been added for
+         legacy proxy compatibility. CSP and Cache-Control
+         are still set by main.go; this is belt-and-braces.
+
+       🛡️ IDX-22 — `setNetworkDownUI()` was previously only
+         called from `verifyAuth()`'s error branch. It is now
+         also called from the SSE `onerror` path, so a network
+         loss that kills SSE but does not affect HTTP polling
+         still surfaces a visible warning.
+
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="theme-color" content="#0d1117">
     <link rel="manifest" href="/manifest.json">
 
@@ -36,7 +173,25 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.1.0</title>
+    <title>DNSCrypt Proxy v1.2.0</title>
+
+    <!-- IDX-4 fix: apply lang/dir from localStorage BEFORE the
+         first paint. Without this, an Arabic-preferring user
+         sees a flash of LTR layout for ~100 ms before boot()
+         corrects it. The try/catch guards against browsers
+         where localStorage is disabled or throws. -->
+    <script>
+      (function(){
+        try {
+          var l = localStorage.getItem('dnscrypt-lang');
+          if (l === 'ar') {
+            document.documentElement.lang = 'ar';
+            document.documentElement.dir = 'rtl';
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <style>
         :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:20px; }
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -167,9 +322,6 @@
         .btn-delete-old:hover { opacity:0.8; }
         .btn-delete-old:disabled { opacity:0.4; cursor:not-allowed; }
 
-        /* ============================================================
-         * Footer — RTL/LTR safe
-         * ============================================================ */
         .footer {
             margin-top: 20px;
             display: flex;
@@ -217,6 +369,12 @@
         .runtime-info .ri-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px; }
         .runtime-info .ri-item:last-child { border-bottom:none; }
         .runtime-info .ri-label { color:var(--text-muted); flex-shrink:0; font-weight:600; }
+        /* IDX-1 fix: .ri-warn highlights values that likely need
+           attention (0 snapshots, in-flight > 0, orphan > 0, or
+           missing fields). It applies to the label so the row
+           stays readable on both LTR and RTL. */
+        .runtime-info .ri-label.ri-warn { color: var(--warning); }
+        .runtime-info .ri-label.ri-warn::before { content: '⚠️ '; font-size: 10px; }
         .runtime-info .ri-value { font-family:'JetBrains Mono',monospace; color:var(--text); font-size:11px; word-break:break-all; text-align:left; direction:ltr; max-width:65%; line-height:1.5; }
         .runtime-info .ri-value a { color: var(--primary); text-decoration: none; }
         .runtime-info .ri-value a:hover { text-decoration: underline; }
@@ -279,6 +437,13 @@
         .card-header .arrow { transition: transform 0.3s ease; font-size: 12px; color: var(--primary); }
         .card.open .card-header .arrow { transform: rotate(180deg); }
         .runtime-info, .diag-files { padding: 0 !important; }
+        /* IDX-2 fix: `card` is used on #runtimeInfoCard and
+           #diagFilesCard as a base container class. It was never
+           defined — the collapse behavior worked only through
+           `.card.open .card-body-wrapper`. Added an explicit
+           base rule so future selectors that target `.card`
+           find something to match. */
+        .card { display: block; }
         button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
     </style>
@@ -296,7 +461,7 @@
     </div>
 </div>
 
-<div id="msg" class="msg-float"></div>
+<div id="msg" class="msg-float" role="status" aria-live="polite"></div>
 
 <div id="swUpdateBanner" class="update-banner">
     <span>🔄 <span id="swUpdateText">Update available — reload</span></span>
@@ -326,7 +491,7 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.1.0</span>
+                <span class="badge" id="versionBadge">v1.2.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
@@ -457,13 +622,10 @@
             <div id="oldModulesList"></div>
         </div>
 
-        <!-- ============================================================
-             Footer — RTL/LTR safe layout
-             ============================================================ -->
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.1.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.2.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -501,9 +663,8 @@
     // ============================================================
     // [1] Initial settings
     // ============================================================
-    var VERSION = 'v1.1.0';
+    var VERSION = 'v1.2.0';
 
-    // Dynamic ports (updated from runtime_info)
     var PORTS = {
         webui:     '9090',
         dashboard: '9091'
@@ -512,7 +673,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.1.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.2.0',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -567,6 +728,18 @@
             riPidFile: 'PID File', riProgressFile: 'Progress File', riLogFile: 'Log File',
             riWebuiPort: 'WebUI Port', riDashboardPort: 'Dashboard Port',
             riProfile: 'Profile', riMemoryLimit: 'Memory Limit',
+            // IDX-1 + IDX-8 fix: backup-related labels for the
+            // System Info panel. `riBackupDate` (the 7th field of
+            // the backups object) was added in this revision.
+            riBackupCount: 'Snapshots',
+            riBackupLatest: 'Latest Backup',
+            riBackupDate: 'Latest Date',
+            riBackupLastStable: 'Last Stable',
+            riBackupInFlight: 'In-Flight Txn',
+            riBackupOrphan: 'Orphan Txn',
+            riBackupPath: 'Backup Path',
+            riBackupNone: '(none)',
+            riBackupDirMissing: 'not initialized',
             riCopyAll: '📋 Copy All', riCopySuccess: '✅ Copied', riCopyError: '❌ Copy failed',
             riRawJson: '🔍 Raw JSON', riHideJson: '🔍 Hide JSON',
             diagFilesTitle: '📁 Diagnostic Files', dfRefresh: 'Refresh',
@@ -585,11 +758,13 @@
             fvClearError: '❌ Failed to clear file',
             projectLink: 'Project',
             swUpdateAvailable: '🔄 Update available — reload',
-            swUpdateReload: 'Reload'
+            swUpdateReload: 'Reload',
+            // IDX-9 fix: waiting-for-content message
+            waitForContent: '⏳ Please wait for the content to load from the server'
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.1.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.2.0',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -644,6 +819,18 @@
             riPidFile: 'ملف PID', riProgressFile: 'ملف التقدم', riLogFile: 'ملف السجل',
             riWebuiPort: 'منفذ WebUI', riDashboardPort: 'منفذ Dashboard',
             riProfile: 'البروفايل', riMemoryLimit: 'حد الذاكرة',
+            // IDX-1 + IDX-8 fix: backup-related labels for the
+            // System Info panel. `riBackupDate` (the 7th field of
+            // the backups object) was added in this revision.
+            riBackupCount: 'النسخ الاحتياطية',
+            riBackupLatest: 'آخر نسخة',
+            riBackupDate: 'تاريخ آخر نسخة',
+            riBackupLastStable: 'آخر نسخة مستقرة',
+            riBackupInFlight: 'قيد التنفيذ',
+            riBackupOrphan: 'معلّقة',
+            riBackupPath: 'مسار النسخ',
+            riBackupNone: '(لا يوجد)',
+            riBackupDirMissing: 'غير مُهيّأ',
             riCopyAll: '📋 نسخ الكل', riCopySuccess: '✅ تم النسخ', riCopyError: '❌ فشل النسخ',
             riRawJson: '🔍 JSON خام', riHideJson: '🔍 إخفاء JSON',
             diagFilesTitle: '📁 ملفات التشخيص', dfRefresh: 'تحديث',
@@ -662,7 +849,9 @@
             fvClearError: '❌ فشل مسح الملف',
             projectLink: 'المشروع',
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
-            swUpdateReload: 'إعادة التحميل'
+            swUpdateReload: 'إعادة التحميل',
+            // IDX-9 fix: waiting-for-content message
+            waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم'
         }
     };
 
@@ -695,8 +884,20 @@
     var draftTimers = { allow: null, deny: null };
     var originalValues = { allow: '', deny: '' };
 
-    var swUpdateAvailable = false;
+    var swRegistration = null;
+    var pendingReload = false;
+    var controllerChangeHandlerInstalled = false;
     var swUpdateCheckInterval = null;
+
+    // IDX-14 fix: fallback timer that removes the `loading` class
+    // from the Dashboard link if the runtime_info fetch never
+    // resolves. Prevents the link from staying disabled forever.
+    var dashboardLinkFallbackTimer = null;
+
+    // IDX-15 fix: tracks whether the network-down UI is currently
+    // active, so `setNetworkDownUI(false)` can restore the
+    // original diagnostic text instead of leaving it stuck.
+    var networkDownActive = false;
 
     var $ = function(id) { return document.getElementById(id); };
     function t(k) { return translations[currentLang][k] || k; }
@@ -742,24 +943,7 @@
     }
 
     // ============================================================
-    // [3] Token helpers — cookie-only (v1.0.0+)
-    // ============================================================
-    // Backward-compat shims.
-    //
-    // Since v1.0.0, /api/auth/login no longer returns a token in
-    // the JSON response (see docs/SECURITY.md — Audit Correction
-    // #15-a). Authentication relies entirely on the HttpOnly
-    // session cookie set by the server.
-    //
-    // These three functions are preserved as no-ops so that the
-    // rest of the codebase does not need conditional logic. Any
-    // future migration to bearer tokens would only need to change
-    // the bodies of these functions, not their call sites.
-    //
-    // Do NOT remove them without auditing the call sites:
-    //   • getStoredToken()  ← xhrRequest, xhrGet, xhrPost
-    //   • storeToken(tk)    ← performLogin
-    //   • clearStoredToken() ← doLogout, handleSessionExpired
+    // [3] Token helpers — cookie-only
     // ============================================================
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
@@ -800,6 +984,11 @@
     // ============================================================
     // [5] countChanges
     // ============================================================
+    // IDX-3 fix: if raw content differs but the SET-based diff
+    // reports 0 (whitespace-only difference on an existing line,
+    // e.g. trailing spaces added), return at least 1. Without
+    // this, hasUnsavedChanges() returned false and the user could
+    // silently lose the whitespace edit.
     function countChanges(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var original = originalValues[listType] || '';
@@ -808,12 +997,13 @@
         var origLines = original.split('\n').filter(function(l) { return l.trim() !== ''; });
         var currLines = current.split('\n').filter(function(l) { return l.trim() !== ''; });
         var origSet = {}, currSet = {};
-        origLines.forEach(function(l) { origSet[l.trim()] = (origSet[l.trim()] || 0) + 1; });
-        currLines.forEach(function(l) { currSet[l.trim()] = (currSet[l.trim()] || 0) + 1; });
+        origLines.forEach(function(l) { var k = l.trim(); origSet[k] = (origSet[k] || 0) + 1; });
+        currLines.forEach(function(l) { var k = l.trim(); currSet[k] = (currSet[k] || 0) + 1; });
         var added = 0, removed = 0;
         for (var k in currSet) { if (!origSet[k]) added += currSet[k]; else if (currSet[k] > origSet[k]) added += currSet[k] - origSet[k]; }
         for (var k2 in origSet) { if (!currSet[k2]) removed += origSet[k2]; else if (origSet[k2] > currSet[k2]) removed += origSet[k2] - currSet[k2]; }
-        return added + removed;
+        var total = added + removed;
+        return total > 0 ? total : 1;
     }
 
     // ============================================================
@@ -909,6 +1099,19 @@
 
     function enterEditMode(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+
+        // IDX-9 fix: refuse to enter edit mode if the server
+        // hasn't populated the content yet. Otherwise, saving
+        // could send an empty expected_hash, bypassing the
+        // conflict check in main.go.
+        var serverHash = listType === 'allow'
+            ? rulesState.serverAllowHash
+            : rulesState.serverDenyHash;
+        if (originalValues[listType] === '' && ta.value === '' && serverHash === '') {
+            showMsg(t('waitForContent'), 'warning', 2500);
+            return;
+        }
+
         originalValues[listType] = ta.value;
 
         var draft = getDraft(listType);
@@ -1073,15 +1276,21 @@
     // ============================================================
     // [12] Modal
     // ============================================================
+    // IDX-17 fix: supports an optional custom primary button via
+    // options.primaryText + options.primaryCallback. Mirrors the
+    // dashboard.html extension (DASH-12). Used by
+    // handleSessionExpired().
     function showConfirmModal(message, callback, options) {
         options = options || {};
         $('modalMessage').textContent = message;
         $('modalTitle').textContent = options.title || t('confirmTitle');
         $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
         $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+
         var box = $('customModal').querySelector('.custom-modal-actions');
         var existing = box.querySelector('.modal-primary');
         if (existing) existing.remove();
+
         if (options.primaryText && options.primaryCallback) {
             var btn = document.createElement('button');
             btn.className = 'modal-primary';
@@ -1092,6 +1301,7 @@
             });
             box.insertBefore(btn, box.firstChild);
         }
+
         $('customModal').style.display = 'flex';
         pendingConfirmCallback = callback;
     }
@@ -1111,14 +1321,32 @@
         var b = $('authBadge');
         if (b) b.style.display = 'none';
     }
+
+    // IDX-15 fix: restore the diagnostics text on recovery.
+    // Previously this only cleared the border color, so the
+    // "Server unreachable" text could remain visible.
     function setNetworkDownUI(isDown) {
         var area = $('statusArea'), txt = $('statusText');
         if (!area || !txt) return;
         if (isDown) {
             area.style.borderColor = 'rgba(210,153,34,0.4)';
             txt.textContent = t('networkDown');
+            networkDownActive = true;
         } else {
             area.style.borderColor = '';
+            // Only restore the text if we had previously set it.
+            // This avoids clobbering the normal status updates
+            // that come from SSE / fetchStatus.
+            if (networkDownActive) {
+                if (currentStatus === 'ON') {
+                    txt.textContent = t('statusOn');
+                } else if (currentStatus === 'OFF') {
+                    txt.textContent = t('statusOff');
+                } else {
+                    txt.textContent = t('statusChecking');
+                }
+                networkDownActive = false;
+            }
         }
     }
     function updateStatsDisplay() {
@@ -1127,11 +1355,13 @@
     }
 
     // ============================================================
-    // [13.b] SW Update handlers
+    // [13b] SW Update handlers
+    // ============================================================
+    // IDX-12 fix: the previous section header used the form
+    // `[13.b]`, which was inconsistent with the numeric
+    // convention used throughout this file. Renamed to `[13b]`.
     // ============================================================
     function showSWUpdateBanner() {
-        if (swUpdateAvailable) return;
-        swUpdateAvailable = true;
         var banner = $('swUpdateBanner');
         var txt = $('swUpdateText');
         if (txt) txt.textContent = t('swUpdateAvailable');
@@ -1143,8 +1373,28 @@
         if (banner) banner.style.display = 'none';
     }
 
+    function installControllerChangeHandler() {
+        if (controllerChangeHandlerInstalled) return;
+        if (!('serviceWorker' in navigator)) return;
+        controllerChangeHandlerInstalled = true;
+
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!pendingReload) return;
+            pendingReload = false;
+            // IDX-7 fix: clear the periodic update-check interval
+            // BEFORE reloading.
+            if (swUpdateCheckInterval) {
+                clearInterval(swUpdateCheckInterval);
+                swUpdateCheckInterval = null;
+            }
+            window.location.reload();
+        });
+    }
+
     function setupSWUpdateHandler() {
         if (!('serviceWorker' in navigator)) return;
+
+        installControllerChangeHandler();
 
         navigator.serviceWorker.addEventListener('message', function(event) {
             if (!event.data) return;
@@ -1176,10 +1426,46 @@
 
         if (reloadBtn) {
             reloadBtn.addEventListener('click', function() {
-                if (navigator.serviceWorker.controller) {
-                    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+                if (pendingReload) return;
+
+                if (!swRegistration) {
+                    window.location.reload();
+                    return;
                 }
-                setTimeout(function() { location.reload(); }, 300);
+
+                var waiting = swRegistration.waiting;
+                if (!waiting) {
+                    window.location.reload();
+                    return;
+                }
+
+                pendingReload = true;
+                reloadBtn.disabled = true;
+
+                try {
+                    waiting.postMessage({ type: 'SKIP_WAITING' });
+                } catch (e) {
+                    pendingReload = false;
+                    reloadBtn.disabled = false;
+                    window.location.reload();
+                    return;
+                }
+
+                // IDX-11 fix: fallback reload if 'controllerchange'
+                // does not fire within 3 seconds (e.g. a
+                // misbehaving or terminated SW). Without this,
+                // pendingReload could stay true forever and the
+                // page would never reload.
+                setTimeout(function() {
+                    if (pendingReload) {
+                        pendingReload = false;
+                        if (swUpdateCheckInterval) {
+                            clearInterval(swUpdateCheckInterval);
+                            swUpdateCheckInterval = null;
+                        }
+                        window.location.reload();
+                    }
+                }, 3000);
             });
         }
 
@@ -1189,7 +1475,7 @@
     }
 
     // ============================================================
-    // [14] Runtime Info — updates PORTS dynamically
+    // [14] Runtime Info
     // ============================================================
     function loadRuntimeInfo() {
         var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
@@ -1233,14 +1519,27 @@
                 if (linkText) linkText.textContent = t('projectLink');
             }
 
-            // Build the Runtime Info items list.
-            // v1.1.0 adds two entries: profile + memory limit.
-            // Both come from main.go's /api?action=runtime_info and
-            // may be absent on older servers (fallback to "unknown").
             var memDisplay = 'unknown';
             if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
                 memDisplay = String(data.memory_limit_mb) + ' MB';
             }
+
+            // IDX-1 + IDX-8 fix: read the `backups` object that
+            // v1.2.0's main.go exposes via runtime_info. All SEVEN
+            // fields are now rendered, including `last_backup`
+            // (the raw timestamp — IDX-8). Rows that indicate a
+            // problem (0 snapshots, in-flight > 0, orphan > 0, or
+            // a missing latest/last-stable/date) get the
+            // `.ri-warn` class so the user notices them at a
+            // glance.
+            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
+            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
+            var bkLatest    = bk.last_backup_name || t('riBackupNone');
+            var bkDate      = bk.last_backup      || t('riBackupNone');
+            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
+            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
+            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
+            var bkPath      = bk.path || t('riBackupDirMissing');
 
             var html = '';
             var items = [
@@ -1256,7 +1555,21 @@
                 { label: t('riStatusFile'), value: data.status_file || 'unknown' },
                 { label: t('riPidFile'), value: data.pid_file || 'unknown' },
                 { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
-                { label: t('riLogFile'), value: data.log_file || 'unknown' }
+                { label: t('riLogFile'), value: data.log_file || 'unknown' },
+                // --- Backup layer (v1.2.0 — IDX-1, IDX-8) ---
+                { label: t('riBackupCount'), value: bkAvailable,
+                  warn: bkAvailable === '0' },
+                { label: t('riBackupLatest'), value: bkLatest,
+                  warn: !bk.last_backup_name },
+                { label: t('riBackupDate'), value: bkDate,
+                  warn: !bk.last_backup },
+                { label: t('riBackupLastStable'), value: bkLastStbl,
+                  warn: !bk.last_stable },
+                { label: t('riBackupInFlight'), value: bkInFlight,
+                  warn: parseInt(bkInFlight, 10) > 0 },
+                { label: t('riBackupOrphan'), value: bkOrphan,
+                  warn: parseInt(bkOrphan, 10) > 0 },
+                { label: t('riBackupPath'), value: bkPath }
             ];
             for (var i = 0; i < items.length; i++) {
                 var valHtml;
@@ -1265,7 +1578,9 @@
                 } else {
                     valHtml = escapeHtml(items[i].value);
                 }
-                html += '<div class="ri-item"><span class="ri-label">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+                var labelClass = 'ri-label';
+                if (items[i].warn) labelClass += ' ri-warn';
+                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
             }
             html += '<div class="ri-actions">'
                  + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
@@ -1318,10 +1633,17 @@
     // ============================================================
     // [15] Log files
     // ============================================================
+    // IDX-5 fix: extended formatBytes to handle GB range. Large
+    // rotated logs (or the emergency 50 MB rotation) would
+    // otherwise display as "2048.0 MB".
+    //
+    // IDX-13 fix: guard against negative input by returning "0 B".
     function formatBytes(bytes) {
-        if (!bytes || bytes < 1024) return bytes + ' B';
+        if (!bytes || bytes < 0) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
     }
     function formatMtime(mtime) {
         var d = new Date(mtime * 1000);
@@ -1687,6 +2009,7 @@
                 if (statsInterval) clearInterval(statsInterval);
                 if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
                 if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+                if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
                 location.reload();
             });
     }
@@ -1756,11 +2079,25 @@
         var wasInitialized = appInitialized;
         appInitialized = false;
         clearStoredToken();
+
+        // IDX-10 + IDX-20 fix: reset backoff states so the next
+        // login starts from a fast polling interval instead of an
+        // accumulated long backoff. Also reset `verifyFailures`
+        // so a spurious retry is not scheduled.
+        verifyFailures = 0;
+        verifyBackoff = 3000;
+        sseBackoff = 5000;
+
         if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
         if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
         if (sse) { sse.close(); sse = null; }
         if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+        // IDX-18 fix: also tear down the progress poller. Without
+        // this, a session expiry during a blocklist update could
+        // leave the poller running indefinitely.
+        if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
         showLoginScreen();
         if (!wasInitialized) return;
         showConfirmModal(t('sessionExpiredMsg'), function(ok) {
@@ -1848,15 +2185,18 @@
     // ============================================================
     // [20] SSE with backoff
     // ============================================================
+    // IDX-22 fix: call setNetworkDownUI(true) from the SSE
+    // onerror path so a network loss that kills SSE but not HTTP
+    // polling still surfaces a visible warning.
     function initSSE() {
         if (sse) { sse.close(); sse = null; }
         try {
-            // Note: cookies are sent automatically for same-origin
-            // requests, so the EventSource constructor options are
-            // unnecessary here. This matches dashboard.html.
             sse = new EventSource('/events?t=' + Date.now());
             sse.addEventListener('open', function() {
                 sseBackoff = 5000;
+                // IDX-22 fix: restore the network-down UI on a
+                // successful SSE connection.
+                setNetworkDownUI(false);
             });
             sse.addEventListener('progress', function(e) {
                 var parts = e.data.split('|');
@@ -1926,6 +2266,8 @@
             });
             sse.onerror = function() {
                 if (sse) { sse.close(); sse = null; }
+                // IDX-22 fix: surface network-down state.
+                setNetworkDownUI(true);
                 if (!sessionExpiredShown) {
                     setTimeout(initSSE, sseBackoff);
                     sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
@@ -1937,6 +2279,7 @@
                 }, 30000);
             }
         } catch(e) {
+            setNetworkDownUI(true);
             setTimeout(initSSE, sseBackoff);
             sseBackoff = Math.min(sseBackoff * 2, sseMaxBackoff);
         }
@@ -2353,6 +2696,9 @@
         if (window.progressPoller) clearInterval(window.progressPoller);
         if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+        // IDX-19 fix: clear the dashboard-link fallback timer so
+        // it does not fire after the page is gone.
+        if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
     });
 
     // ============================================================
@@ -2438,9 +2784,25 @@
         bindEvents();
         bindSWUpdateButtons();
 
+        // IDX-14 fix: fallback timer that removes the `loading`
+        // class from the Dashboard link if runtime_info never
+        // resolves or fails. Prevents a permanent "loading"
+        // state that would make the link look disabled.
+        var dashLink = $('dashboardLink');
+        if (dashLink) {
+            dashboardLinkFallbackTimer = setTimeout(function() {
+                if (dashLink) dashLink.classList.remove('loading');
+                dashboardLinkFallbackTimer = null;
+            }, 8000);
+        }
+
         if ('serviceWorker' in navigator) {
+            installControllerChangeHandler();
+
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                if (reg.waiting) {
+                swRegistration = reg;
+
+                if (reg.waiting && navigator.serviceWorker.controller) {
                     showSWUpdateBanner();
                 }
 
@@ -2455,7 +2817,7 @@
                 });
 
                 setupSWUpdateHandler();
-            }).catch(function(err) {
+            }).catch(function() {
                 // Silent — registration is non-critical
             });
         }

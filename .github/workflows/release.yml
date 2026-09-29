@@ -1,14 +1,17 @@
 # ============================================================
 # DNSCrypt Smart Filter – Release Workflow
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Purpose:
-#   Publishes a signed GitHub Release when a version tag is
-#   pushed. Can also be triggered manually via workflow_dispatch.
+#   Publishes a GitHub Release when a version tag is pushed.
+#   Can also be triggered manually via workflow_dispatch for
+#   re-publishing an existing tag (does NOT create new tags).
 #
+# ============================================================
 # Release trigger:
+# ============================================================
 #   Two paths lead to a release:
 #
 #   1. Tag push (automated, preferred)
@@ -16,106 +19,181 @@
 #                     v<MAJOR>.<MINOR>.<PATCH>-<prerelease>
 #        Created by:  scripts/release.sh
 #                     scripts/release-patch.sh
+#        Tag type:    ANNOTATED (via `git tag -a` in release.sh)
 #
 #   2. workflow_dispatch (manual, emergency)
 #        Triggered from: Actions → Release → Run workflow
-#        Version source: VERSION file (not a tag)
-#        Use when: fixing a broken release without a new commit
+#        Version source: VERSION file
+#        Requires: an existing tag matching VERSION to be present
+#        Use when: re-publishing a release without a new commit
+#        Tag type: ANNOTATED (the tag must already exist)
 #
-# Pipeline steps (11 + 1):
-#   ┌───┬───────────────────────────┬────────────┐
-#   │ #  │ Step                           │ Duration    │
-#   ├───┼───────────────────────────┼────────────┤
-#   │  1 │ Checkout (fetch-depth: 0)      │ ~5 s        │
-#   │  2 │ Setup Go 1.22                  │ ~10 s       │
-#   │  3 │ Setup Android NDK r26b         │ ~30 s       │
-#   │  4 │ Determine version              │ ~2 s        │
-#   │  5 │ Install packaging tools        │ ~15 s       │
-#   │  6 │ Build WebUI binaries (4 arch)  │ ~60 s       │
-#   │  7 │ Verify binaries (ELF + PIE)    │ ~5 s        │
-#   │  8 │ Package Magisk module          │ ~30 s       │
-#   │  9 │ Upload artifacts (backup)      │ ~20 s       │
-#   │ 10 │ Create GitHub Release          │ ~10 s       │
-#   │ 11 │ Sync main → develop           │ ~15 s       │
-#   └───┴───────────────────────────┴────────────┘
+# ============================================================
+# update.json responsibility (IMPORTANT):
+# ============================================================
+#   This workflow does NOT modify update.json.
+#
+#   update.json is updated LOCALLY by scripts/release.sh in
+#   the same commit that bumps VERSION and module.prop. As of
+#   v1.2.0, release.sh writes three fields together:
+#     • version     (e.g. "v1.2.0")
+#     • versionCode (e.g. 1020000)
+#     • zipUrl      (built from the tag pattern below)
+#
+#   The zipUrl written by release.sh uses the SAME template that
+#   this workflow uses to attach the release asset:
+#     https://github.com/<owner>/<repo>/releases/download/
+#         <tag>/dnscrypt-webui-<version-without-v>-module.zip
+#
+#   Because release.sh writes the URL before the tag is pushed,
+#   the commit and the release are guaranteed to be consistent.
+#
+# ============================================================
+# Pipeline steps (11):
+# ============================================================
+#   ┌────┬──────────────────────────┬──────────┐
+#   │ #  │ Step                          │ Duration   │
+#   ├────┼──────────────────────────┼──────────┤
+#   │  1 │ Checkout (fetch-depth: 0)     │ ~5 s       │
+#   │  2 │ Setup Go 1.22                 │ ~10 s      │
+#   │  3 │ Setup Android NDK r26b        │ ~30 s      │
+#   │  4 │ Determine + validate version  │ ~2 s       │
+#   │  5 │ Install packaging tools       │ ~15 s      │
+#   │  6 │ Build WebUI binaries (4 arch) │ ~60 s      │
+#   │  7 │ Verify binaries (ELF + PIE)   │ ~5 s       │
+#   │  8 │ Package Magisk module         │ ~30 s      │
+#   │  9 │ Upload artifacts (backup)     │ ~20 s      │
+#   │ 10 │ Create GitHub Release         │ ~10 s      │
+#   │ 11 │ Sync main → develop           │ ~15 s      │
+#   └────┴──────────────────────────┴──────────┘
 #
 #   Total: ~3–5 minutes (excluding runner setup).
 #
-# Artifacts produced:
-#   Attached to the GitHub Release (6 files):
-#     • dnscrypt-webui-<ver>-module.zip         (~12 MB)
-#     • dnscrypt-webui-<ver>-module.zip.sha256  (~100 B)
-#     • dnscrypt-webui-arm64                    (~8 MB)
-#     • dnscrypt-webui-arm                      (~7 MB)
-#     • dnscrypt-webui-amd64                    (~7.5 MB)
-#     • dnscrypt-webui-386                      (~7 MB)
+# ============================================================
+# Release artifacts (6 files attached to the GitHub Release):
+# ============================================================
+#   • dnscrypt-webui-<ver>-module.zip         (~12 MB)
+#   • dnscrypt-webui-<ver>-module.zip.sha256  (~100 B)
+#   • dnscrypt-webui-arm64                    (~8 MB)
+#   • dnscrypt-webui-arm                      (~7 MB)
+#   • dnscrypt-webui-amd64                    (~7.5 MB)
+#   • dnscrypt-webui-386                      (~7 MB)
 #
-#   Also uploaded as a workflow artifact (backup, 30-day retention):
-#     • dist/            (the ZIP + .sha256)
-#     • proxy/build/     (the 4 binaries)
+#   Also uploaded as a workflow artifact (backup, 30-day retention).
 #
+# ============================================================
+# Non-goals (what this workflow does NOT do):
+# ============================================================
+#   • No GPG signing of the tag or the artifacts.
+#     The tag is created ANNOTATED by release.sh (git tag -a),
+#     not signed (git tag -s).
+#
+#   • No Cosign signature. `cosign` is not invoked anywhere.
+#
+#   • No SBOM. A software bill of materials is not generated.
+#     The SHA256 file is the only integrity artifact attached
+#     to the release.
+#
+#   • No update.json modification. See above.
+#
+#   • No tag creation on workflow_dispatch. The tag must
+#     already exist. Use scripts/release.sh to create one.
+#
+# ============================================================
 # Sync main → develop (step 11):
-#   After the release is published, this workflow syncs main into
-#   develop so the two branches do not drift apart.
-#
-#   Why this matters:
-#     • Releases land on main first (via release/* or hotfix/*).
-#     • Without a sync, develop lags behind main after every
-#       release, and the next release/* PR would reintroduce
-#       stale commits.
-#
-#   Behavior:
-#     • Tries fast-forward merge first (preserves linear history).
-#     • Falls back to a regular merge with a chore commit if
-#       fast-forward is not possible.
-#     • On conflict: aborts, logs a warning, exits 0.
-#       Manual resolution required.
+# ============================================================
+#   After the release is published, this workflow syncs main
+#   into develop. See docs/adr/0003-post-release-sync.md.
 #
 #   Safety:
 #     • `continue-on-error: true` — a failed sync NEVER fails
-#       the release. The release is already published at this
-#       point; the sync is a follow-up convenience.
-#     • `if: github.event_name == 'push'` — only runs on tag
-#       pushes, not on workflow_dispatch.
-#     • Uses GITHUB_TOKEN with `contents: write` (already
-#       granted at the top of the workflow).
+#       the release.
+#     • `if: github.event_name == 'push'` — only on tag pushes.
 #
-#   See docs/adr/0003-post-release-sync.md for the full rationale.
-#
+# ============================================================
 # ⚠️ Action versions:
+# ============================================================
 #   This workflow references:
-#     • actions/checkout@v7
-#     • actions/setup-go@v7
-#     • actions/upload-artifact@v7
+#     • actions/checkout@v4
+#     • actions/setup-go@v5
+#     • actions/upload-artifact@v4
 #     • nttld/setup-ndk@v1
-#     • softprops/action-gh-release@v3
+#     • softprops/action-gh-release@v2
 #
-#   If any `uses:` line fails with "reference not found", see the
-#   note in ci.yml — the resolution is the same (check the
+#   These are the currently stable major versions. If a
+#   dependency update is desired, Dependabot will open PRs on
+#   a weekly cadence for the github-actions ecosystem.
+#
+#   If any `uses:` line fails with "reference not found", see
+#   the note in ci.yml — the resolution is the same (check the
 #   action's releases page and update the version).
 #
-#   Dependabot tracks the github-actions ecosystem weekly and
-#   will open PRs for updates automatically.
-#
+# ============================================================
 # ⚠️ Permissions:
+# ============================================================
 #   `contents: write` is required for:
 #     • Creating the GitHub Release
 #     • Pushing to develop in the sync step
 #
-#   Do not downgrade to `contents: read` — the release creation
-#   step would fail with a 403.
+#   Do not downgrade to `contents: read`.
 #
-# v1.1.0 changes:
-#   • Version bumped to v1.1.0 (documentation only — no behavior
-#     changes since v1.0.0).
-#   • Added a "Pipeline steps" table with duration estimates.
-#   • Added a "Sync main → develop" section explaining the
-#     rationale and safety mechanisms, with a reference to
-#     ADR-0003.
-#   • Added a "Permissions" note explaining why contents: write
-#     is required.
-#   • Added an "Action versions" warning, consistent with
-#     ci.yml and codeql.yml.
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
+# ============================================================
+#   🔧 REL-1 — Header now says "Publishes a GitHub Release".
+#   🔧 REL-2 — Documentation clarified: this workflow does NOT
+#     modify update.json.
+#   🔧 REL-3 — Non-goals section explicitly lists GPG, Cosign,
+#     and SBOM.
+#   🔧 REL-4 — Verify step checks binary size (> 1 MB).
+#
+# ============================================================
+# v1.2.0 (Global Edition) — Additional hardening in this revision
+# ============================================================
+#   🛡️ HARD-REL-03 (was missing from the previous revision;
+#     documented here for completeness) — The version string is
+#     escaped before it reaches a regex context. In
+#     `scripts/release.sh`, dots in `1.2.0` are escaped to
+#     `1\.2\.0` via `sed 's/\./\\./g'` before being used in
+#     an awk/sed pattern. This prevents the regex `1.2.0` from
+#     matching `1a2b0` or `1-2-0`. The SAME fix is applied to
+#     the `Extract CHANGELOG section` step below, which had
+#     been overlooked in the first pass of this revision.
+#
+#   🛡️ HARD-REL-12 — workflow_dispatch now REQUIRES an
+#     existing tag. Without this check, the
+#     `softprops/action-gh-release` step would create a
+#     lightweight tag via the GitHub API, producing an
+#     inconsistent mix of annotated tags (from release.sh)
+#     and lightweight tags (from manual runs). The new step
+#     "Verify tag exists" fails fast with a clear message
+#     when the tag is missing.
+#
+#   🛡️ HARD-REL-13 — Action versions downgraded to
+#     currently-stable majors. The prior `@v7` references
+#     were speculative and would break the workflow if the
+#     versions did not exist. Dependabot will propose upgrades.
+#
+#   🛡️ HARD-REL-14 — Release notes are now read from
+#     CHANGELOG.md when a matching section exists, falling
+#     back to GitHub's auto-generated notes otherwise. This
+#     keeps the GitHub Release page consistent with the
+#     curated CHANGELOG instead of silently producing a
+#     second source of truth.
+#
+#   🛡️ HARD-REL-15 — All workflow context values
+#     (`github.event_name`, `github.ref_name`) are now passed
+#     through `env:` instead of being interpolated directly
+#     into the shell script. This eliminates the entire class
+#     of "context values as shell tokens" issues.
+#
+#   🛡️ HARD-REL-16 — `cache: true` for setup-go. The prior
+#     `cache: false` disabled module caching and added 20–40 s
+#     of unnecessary downloads per run.
+#
+#   🛡️ HARD-REL-17 — Version format is validated in BOTH
+#     trigger paths, not just the tag-push path.
+#
 # ============================================================
 
 name: Release
@@ -140,14 +218,16 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache: false
+          # HARD-REL-16: caching re-enabled. The Go module cache
+          # speeds up repeated runs significantly.
+          cache: true
 
       - name: Setup NDK
         id: setup-ndk
@@ -156,17 +236,64 @@ jobs:
           ndk-version: ${{ env.NDK_VERSION }}
           add-to-path: false
 
-      - name: Determine version
+      # ============================================================
+      # [Determine + validate version]
+      # ============================================================
+      # HARD-REL-15: context values are passed via env, not
+      # interpolated directly into the shell script.
+      # HARD-REL-17: the version is validated in both trigger
+      # paths (push and workflow_dispatch), not just push.
+      # ============================================================
+      - name: Determine and validate version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            V="${GITHUB_REF#refs/tags/}"
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            V="$REF_NAME"
           else
-            V=$(tr -d '\r\n' < VERSION)
+            V=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           fi
-          echo "value=$V" >> $GITHUB_OUTPUT
-          echo "no_v=${V#v}" >> $GITHUB_OUTPUT
+
+          # HARD-REL-17: format validation on both paths.
+          if ! printf '%s' "$V" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Invalid version format: '$V'"
+            echo "::error::Expected: v<major>.<minor>.<patch>[-prerelease]"
+            exit 1
+          fi
+
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "no_v=${V#v}" >> "$GITHUB_OUTPUT"
           echo "::notice::Version: $V"
+
+      # ============================================================
+      # [HARD-REL-12] Require tag existence on workflow_dispatch
+      # ============================================================
+      # Without this check, `softprops/action-gh-release` would
+      # create a lightweight tag via the GitHub API, producing
+      # an inconsistent mix of tag types. This step fails fast
+      # and tells the operator to use scripts/release.sh.
+      # ============================================================
+      - name: Verify tag exists (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          V: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          if ! git rev-parse -q --verify "refs/tags/$V" >/dev/null; then
+            echo "::error::Tag $V does not exist in this repository."
+            echo "::error::workflow_dispatch is only for re-publishing"
+            echo "::error::an existing tag, not for creating new ones."
+            echo "::error::Run scripts/release.sh $V locally first,"
+            echo "::error::then push the tag with 'git push origin $V'."
+            exit 1
+          fi
+          echo "::notice::Tag $V exists — proceeding with re-publish"
 
       - name: Install packaging tools
         run: |
@@ -188,17 +315,26 @@ jobs:
           for arch in arm64 arm amd64 386; do
             f="proxy/build/dnscrypt-webui-$arch"
             [ -f "$f" ] || { echo "::error::Missing $f"; exit 1; }
-            file "$f" | grep -q "pie executable" || { echo "::error::$f not PIE"; exit 1; }
+
+            file "$f" | grep -q "pie executable" \
+              || { echo "::error::$f not PIE"; exit 1; }
+
+            size=$(stat -c '%s' "$f")
+            if [ "$size" -lt 1048576 ]; then
+              echo "::error::$f suspiciously small ($size bytes < 1 MB)"
+              exit 1
+            fi
           done
           echo "::notice::All 4 WebUI binaries OK"
 
       - name: Package Magisk module
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_VALUE: ${{ steps.version.outputs.value }}
         run: |
           chmod +x scripts/package_module.sh scripts/fetch_dns_binaries.sh
           ./scripts/package_module.sh \
-            --version "${{ steps.version.outputs.value }}" \
+            --version "$VERSION_VALUE" \
             --output-dir ./dist \
             --verbose
 
@@ -211,7 +347,7 @@ jobs:
           ls -la proxy/build/
 
       - name: Upload artifacts (backup)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: release-${{ steps.version.outputs.value }}
           path: |
@@ -220,12 +356,56 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      # ============================================================
+      # [HARD-REL-03 + HARD-REL-14] Extract CHANGELOG section
+      # ============================================================
+      # HARD-REL-03: dots in the version string are escaped
+      # before they are embedded in the awk regex. Without
+      # this, `1.2.0` matches `1a2b0`, `1-2-0`, etc.
+      #
+      # HARD-REL-14: falls back to GitHub's auto-generated
+      # notes only when a matching section is missing from
+      # CHANGELOG.md.
+      # ============================================================
+      - name: Extract CHANGELOG section
+        id: changelog
+        env:
+          V: ${{ steps.version.outputs.value }}
+        run: |
+          set -euo pipefail
+
+          V_NO_V="${V#v}"
+          # HARD-REL-03: escape regex metacharacters in the
+          # version string. Only `.` needs escaping for the
+          # version format `X.Y.Z`, but the sed call is a
+          # no-op for prerelease suffixes containing dots
+          # (e.g. `1.2.0-rc.1` → `1\.2\.0-rc\.1`).
+          VER_ESCAPED=$(printf '%s' "$V_NO_V" | sed 's/\./\\./g')
+
+          OUT="/tmp/release_notes.md"
+
+          awk -v ver="$VER_ESCAPED" '
+            $0 ~ "^## \\[v?" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > "$OUT" || true
+
+          if [ -s "$OUT" ]; then
+            echo "::notice::Using CHANGELOG section for release notes"
+            echo "use_auto=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No CHANGELOG section found for $V"
+            echo "::warning::Falling back to GitHub auto-generated notes"
+            echo "use_auto=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.version.outputs.value }}
           tag_name: ${{ steps.version.outputs.value }}
-          generate_release_notes: true
+          generate_release_notes: ${{ steps.changelog.outputs.use_auto == 'true' }}
+          body_path: ${{ steps.changelog.outputs.use_auto == 'false' && '/tmp/release_notes.md' || '' }}
           draft: false
           files: |
             dist/dnscrypt-webui-*-module.zip
@@ -238,28 +418,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ============================================================
-      # Post-release synchronization
+      # [Post-release synchronization]
       # ============================================================
-      # Sync develop branch with main after a successful release.
-      #
-      # Rationale:
-      #   • Tags are created on main (protected branch).
-      #   • After the release, develop lags behind main.
-      #   • This step keeps develop up to date so future feature
-      #     branches start from the latest code.
+      # Sync develop with main after a successful release.
       #
       # Safety:
       #   • Does NOT fail the release on conflict.
       #   • Only runs when a tag was pushed (not workflow_dispatch).
       #   • Uses GITHUB_TOKEN with contents: write permission.
       #
-      # See docs/adr/0003-post-release-sync.md for full details.
+      # See docs/adr/0003-post-release-sync.md.
       # ============================================================
       - name: Sync main → develop
         if: github.event_name == 'push'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
 
@@ -273,7 +448,6 @@ jobs:
           git fetch origin develop
           echo "::endgroup::"
 
-          # Check if develop branch exists
           if ! git rev-parse --verify origin/develop >/dev/null 2>&1; then
             echo "::warning::develop branch does not exist — skipping sync"
             exit 0
@@ -288,7 +462,7 @@ jobs:
             echo "::notice::Fast-forward merge succeeded"
           else
             echo "::warning::Fast-forward not possible — trying regular merge"
-            if ! git merge origin/main --no-edit -m "chore: sync develop with main after ${{ steps.version.outputs.value }} release"; then
+            if ! git merge origin/main --no-edit -m "chore: sync develop with main after ${V} release"; then
               echo "::warning::Merge conflict detected — manual resolution required"
               echo "::warning::develop will NOT be synced automatically"
               git merge --abort || true

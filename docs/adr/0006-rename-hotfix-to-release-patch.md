@@ -12,6 +12,45 @@
 
 ---
 
+> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+>
+> This ADR was reviewed during the v1.2.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The script has now been **present in the repository** as
+>     `scripts/release-patch.sh` for **three releases** (v1.0.0,
+>     v1.1.0, and v1.2.0).
+>   • The script's **behavior** (3 safety rules: branch=`main`,
+>     MAJOR equal, MINOR equal, PATCH = current + 1) remains
+>     unchanged.
+>   • The script has **still not been exercised for a real PATCH
+>     release**, because:
+>     - `v1.0.0` was a first stable release.
+>     - `v1.1.0` was a MINOR release (via `release.sh`).
+>     - `v1.2.0` was a MINOR release (via `release.sh`).
+>     - No `v1.0.x`, `v1.1.x`, or `v1.2.x` PATCH has been needed.
+>   • The **naming decision** (`release-` prefix instead of
+>     `hotfix-`) remains correct:
+>     - It still aligns with `scripts/release.sh` alphabetically.
+>     - It accurately describes the version component (PATCH).
+>     - It avoids confusion with the `hotfix/*` **branch** prefix.
+>     - **v1.2.0 confirmed this**: the release used the `release/*`
+>       branch prefix and the `release.sh` script — a clear split
+>       from `hotfix/*` + `release-patch.sh` that this ADR
+>       established.
+>   • The **first realistic use** of the script remains the same:
+>     a critical bug in `v1.2.0` requiring a `v1.2.1` PATCH release
+>     (via `hotfix/*`).
+>   • The **naming decision** has not caused any confusion in the
+>     documentation or contributor guides.
+>
+> **Result**: The decision is validated by its continued
+> integration into the codebase and documentation across three
+> releases. Full runtime validation will follow the first PATCH
+> release. No superseding ADR is required.
+
 > **Post-Release Verification (v1.1.0 — 2026-09-26)**:
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
@@ -297,7 +336,8 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
   release type.
 - [`docs/ROADMAP.md`](../ROADMAP.md) §10.2 — workflow priorities.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0; the PATCH flow will be relevant for v1.1.1).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0; the
+  PATCH flow will be relevant for v1.2.1 if needed).
 - [`CHANGELOG.md`](../../CHANGELOG.md) — the rename is recorded
   here.
 
@@ -334,17 +374,30 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
     documentation, the `Makefile`, or the contributor guides.
   - `docs/BRANCHING.md` §8 uses `v1.1.1` as the first realistic
     PATCH example.
+- **v1.2.0** (2026-09-29) — third release cycle.
+  - No PATCH release was needed (v1.2.0 was a MINOR release via
+    `release.sh`).
+  - `scripts/release-patch.sh` remained unchanged.
+  - The naming decision continued to hold: the v1.2.0 release
+    demonstrated the split established by this ADR — `release/*`
+    branch + `release.sh` script for MINOR releases, keeping
+    `hotfix/*` + `release-patch.sh` for emergency PATCH releases.
+  - `docs/BRANCHING.md` §8 now uses `v1.2.1` as the first
+    realistic PATCH example (was `v1.1.1`).
+  - No confusion in any updated documentation
+    (`docs/RELEASE_PROCESS.md`, `docs/CONTRIBUTING.md`,
+    `docs/UPGRADE.md`).
 - **First real PATCH release** — **not yet exercised**.
-  - Expected scenario: `v1.1.0 → v1.1.1` via `hotfix/*`.
+  - Expected scenario: `v1.2.0 → v1.2.1` via `hotfix/*`.
   - The 3 safety rules will be validated in production.
   - See [`docs/BRANCHING.md`](../BRANCHING.md) §8.2 for the
     procedure.
-- **Naming consistency** — verified:
+- **Naming consistency** — verified across three releases:
   - `ls scripts/release*.sh` lists both `release.sh` and
     `release-patch.sh`.
   - No remaining references to `hotfix.sh` in the codebase.
-- **Next review**: after the first PATCH release (v1.1.1 or
-  later), or the v1.2.0 cycle, whichever comes first.
+- **Next review**: after the first PATCH release (v1.2.1 or
+  later), or the v1.3.0 cycle, whichever comes first.
 - See `CHANGELOG.md` for the full release history.
 
 ---

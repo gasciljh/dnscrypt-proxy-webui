@@ -3,7 +3,7 @@
 System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.1.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.2.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
@@ -14,11 +14,18 @@ System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-pr
 > - Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
 > - Release process → [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md)
 > - Architecture Decisions → [`docs/adr/README.md`](docs/adr/README.md)
+> - Backup system → [`docs/BACKUP.md`](docs/BACKUP.md)
+> - Emergency recovery → [`docs/EMERGENCY.md`](docs/EMERGENCY.md)
 > - Version history → [`CHANGELOG.md`](CHANGELOG.md)
 >
-> **🎯 Current version**: **v1.1.0** — Dynamic per-profile memory limits,
-> extended `shellQuote` charset, and `MONITORING_UI_PORT` constant.
-> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.1.0 changelog.
+> **🎯 Current version**: **v1.2.0** — Data-Preservation Release.
+> The **10 defensive layers** protect your 5 user config files
+> across upgrades, renames, reinstalls, and root-solution changes.
+> Includes the persistent backup directory
+> (`/sdcard/dnscrypt-webui-backup/`), recovery mode, transactional
+> installs, a 7-field `runtime_info.backups` object, and a bilingual
+> WebUI (English default + Arabic toggle).
+> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.2.0 changelog.
 
 ---
 
@@ -31,11 +38,16 @@ Android device into a filtered, encrypted DNS resolver.
 - Transparent redirection of port 53 traffic to the local engine
 - Multi-level blocklists (HaGeZi Light → Ultimate)
 - Allowlist / Denylist with a browser editor
-- Bilingual WebUI (English / Arabic)
+- Bilingual WebUI (English default + Arabic toggle)
 - Separate monitoring Dashboard with JSON metrics
 - Installable PWA with offline fallback
 - **v1.1.0**: Dynamic Go runtime memory limit per blocklist profile
   (light=80 MB → ultimate=220 MB) — prevents GC thrashing on heavy profiles
+- **v1.2.0**: **10 defensive layers** for user-data preservation —
+  persistent backup at `/sdcard/dnscrypt-webui-backup/`,
+  multi-source detection, transactional installs with rollback,
+  recovery mode, SHA256 integrity verification, and
+  SELinux context preservation
 
 Works at the system level — no per-app configuration, no VPN.
 
@@ -51,7 +63,8 @@ Works at the system level — no per-app configuration, no VPN.
 | Root | Magisk 20.4+ / KernelSU 0.9+ / APatch |
 | Kernel | 3.10+ |
 | RAM | 1 GB |
-| Storage | ~20 MB free |
+| Storage (`/data`) | ~20 MB free |
+| Storage (`/sdcard`) | **~10 MB free** (v1.2.0 backup) |
 | Architecture | `arm64-v8a` / `armeabi-v7a` / `x86_64` / `x86` |
 
 ### Recommended by Profile (v1.1.0)
@@ -78,7 +91,7 @@ while keeping DNS filtering effective.
 
 ## Installation
 
-1. Download `dnscrypt-webui-1.1.0-module.zip` from
+1. Download `dnscrypt-webui-1.2.0-module.zip` from
    [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
 2. Install via Magisk Manager / KernelSU Manager / APatch.
 3. Save the credentials shown on-screen (also stored at
@@ -92,14 +105,33 @@ active profile during installation (v1.1.0). This is informational only —
 `main.go` remains the authority for the actual
 `debug.SetMemoryLimit()` value at runtime.
 
-User settings are preserved across upgrades. The installer backs up the
-following 5 files before extraction and restores them afterwards:
+### Data preservation (v1.2.0)
+
+The installer runs **10 defensive layers** to protect your 5 user
+config files:
+
+- **Layer 1** — Multi-source detection (7 candidate locations).
+- **Layer 2** — Persistent backup to `/sdcard/dnscrypt-webui-backup/`.
+- **Layer 3** — SHA256 integrity verification (advisory).
+- **Layer 4** — Transactional install with automatic rollback.
+- **Layer 5** — Root-solution compatibility (Magisk / KernelSU / APatch).
+- **Layer 6** — SELinux context preservation.
+- **Layer 7** — Recovery mode (trigger file).
+- **Layer 8** — Config migrations.
+- **Layer 9** — Auto-backup (24 h) + rotation (max 21 snapshots).
+- **Layer 10** — Observability (`status.sh --diagnose` + 7-field
+  `runtime_info.backups`).
+
+**What is preserved**:
 
 - `webui.conf`
 - `dnscrypt-proxy.toml`
 - `selected_profile.txt`
 - `allowlist.txt`
 - `denylist.txt`
+
+**Where it lives**: `/sdcard/dnscrypt-webui-backup/` — survives
+reboot, uninstall, and factory reset of `/data`.
 
 ---
 
@@ -147,15 +179,20 @@ dnscrypt-proxy :5354
 WebUI :9090     ← HTTP / SSE ───── browser
 Dashboard :9091 ← /api/metrics (JSON proxy)
                   → monitoring_ui :8080
+
+Persistent Backup :/sdcard/dnscrypt-webui-backup/
+    ← 10 defensive layers (v1.2.0)
+    ← protects the 5 user config files
+    ← survives reboot, uninstall, /data reset
 ```
 
 Components:
 
 | Component | Language | Role |
 |---|---|---|
-| `proxy/main.go` | Go | HTTP server, auth, blocklist rebuild, metrics proxy, dynamic memory limit (v1.1.0) |
-| `proxy/*.sh` | Shell (BusyBox) | Install, service lifecycle, watchdog, firewall |
-| `web/` | HTML / CSS / JS | WebUI, Dashboard, PWA |
+| `proxy/main.go` | Go | HTTP server, auth, blocklist rebuild, metrics proxy, dynamic memory limit (v1.1.0), pre-critical backups (v1.2.0), watchdog token (v1.2.0) |
+| `proxy/*.sh` | Shell (BusyBox) | Install, service lifecycle, watchdog, firewall, backup helpers (v1.2.0) |
+| `web/` | HTML / CSS / JS | WebUI, Dashboard, PWA (bilingual EN/AR since v1.2.0) |
 | `scripts/` | Bash | Build, packaging, DNS binaries fetcher, release automation |
 
 ---
@@ -177,13 +214,14 @@ dnscrypt-proxy-webui/
 ├── README.md                        # Overview (EN)
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.1.0)
+├── VERSION                          # Single source of truth (v1.2.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
-│   │   ├── ci.yml                   # Build matrix for 4 architectures
+│   │   ├── ci.yml                   # Build matrix + backup-smoke-test
 │   │   ├── codeql.yml               # Security scanning (SAST)
-│   │   └── release.yml              # Signed release + sync main → develop
+│   │   ├── release.yml              # Signed release + sync main → develop
+│   │   └── upgrade-test.yml         # 42-scenario data-preservation matrix (v1.2.0)
 │   │
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.yml           # Bug report template
@@ -210,22 +248,22 @@ dnscrypt-proxy-webui/
 │   └── release-patch.sh             # PATCH-only (hotfix) automation
 │
 ├── proxy/                           # Backend (Go + Shell)
-│   ├── action.sh                    # Magisk Action button handler
+│   ├── action.sh                    # Magisk Action button (+ --backup/--diagnose)
 │   ├── build.sh                     # 4-arch cross-compile
-│   ├── customize.sh                 # Magisk installer (with backup/restore)
+│   ├── customize.sh                 # Magisk installer (10 data-preservation layers)
 │   ├── dnscrypt-proxy.toml          # DNSCrypt engine config
 │   ├── dnscrypt-proxy.version       # DNS binary version (2.1.18)
-│   ├── functions.sh                 # Shared shell library
+│   ├── functions.sh                 # Shared shell library (backup helpers)
 │   ├── go.mod                       # Go module definition
 │   ├── main.go                      # HTTP server
 │   ├── post-fs-data.sh              # Early boot cleanup
-│   ├── service.sh                   # Boot service + Watchdog launcher
-│   ├── status.sh                    # Status display (4 modes)
-│   ├── uninstall.sh                 # Cleanup on removal
-│   ├── watchdog.sh                  # Standalone watchdog process
+│   ├── service.sh                   # Boot service + periodic auto-backup
+│   ├── status.sh                    # Status display (+ --diagnose/--json)
+│   ├── uninstall.sh                 # Cleanup + orphan txn preservation
+│   ├── watchdog.sh                  # Standalone watchdog (token auth)
 │   └── webui.conf                   # WebUI/Dashboard config
 │
-├── web/                             # Frontend (PWA)
+├── web/                             # Frontend (PWA, bilingual EN/AR)
 │   ├── apple-touch-icon.png         # iOS icon (180×180)
 │   ├── dashboard.html               # Monitoring dashboard
 │   ├── favicon.ico                  # IE + bookmarks
@@ -235,12 +273,12 @@ dnscrypt-proxy-webui/
 │   ├── icon-192.svg                 # PWA icon (SVG, modern browsers)
 │   ├── icon-512.png                 # PWA icon (maskable PNG)
 │   ├── icon-512.svg                 # PWA icon (maskable SVG)
-│   ├── index.html                   # Main UI (FSM + SW Update)
-│   ├── manifest.json                # PWA manifest
+│   ├── index.html                   # Main UI (FSM + SW Update + EN/AR toggle)
+│   ├── manifest.json                # PWA manifest (lang=en, dir=ltr defaults)
 │   ├── offline.html                 # Offline fallback page
-│   └── sw.js                        # Service Worker (v1.1.0)
+│   └── sw.js                        # Service Worker (language-neutral)
 │
-└── docs/                            # Documentation (23 files)
+└── docs/                            # Documentation (25 files)
     ├── adr/                         # Architecture Decision Records (7 files)
     │   ├── README.md                # ADR index + template + methodology
     │   ├── 0001-two-branch-model.md
@@ -252,12 +290,14 @@ dnscrypt-proxy-webui/
     │
     ├── API.md                       # HTTP API reference
     ├── ARCHITECTURE.md              # System architecture
+    ├── BACKUP.md                    # Backup system reference (v1.2.0)
     ├── BRANCHING.md                 # Git branching strategy
     ├── COMPATIBILITY.md             # Device compatibility matrix
     ├── CONTRIBUTING.md              # Contribution guide
     ├── DEVELOPMENT.md               # Developer guide
     ├── DNS_BINARIES.md              # DNS binaries management
-    ├── FAQ.md                       # Common questions
+    ├── EMERGENCY.md                 # Emergency recovery (v1.2.0)
+    ├── FAQ.md                       # Common questions (Q121–Q130 = v1.2.0)
     ├── GLOSSARY.md                  # Terms & abbreviations
     ├── HALL_OF_FAME.md              # Contributors recognition
     ├── INSTALL.md                   # Installation guide
@@ -276,16 +316,22 @@ dnscrypt-proxy-webui/
 # Full status
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
 
-# JSON status
+# JSON status (includes 7-field backups object in v1.2.0)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
 
 # One-line status (includes profile + memory hint in v1.1.0)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
 
+# Full diagnostic report (v1.2.0 — Layer 10)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+
 # Restart WebUI
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
-# Comprehensive check (DNS + WebUI + profile + memory hint)
+# Manual backup (v1.2.0)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+
+# Comprehensive check (DNS + WebUI + profile + memory + backup)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --check"
 ```
 
@@ -316,6 +362,25 @@ Rules:
 addresses, resolver selection, cache, blocklists, monitoring UI).
 Credentials for the internal monitoring UI live in `[monitoring_ui]`.
 
+### Persistent Backup Directory (v1.2.0)
+
+```
+/sdcard/dnscrypt-webui-backup/
+├── current/                          # live mirror (always up-to-date)
+├── <timestamp>-<version>-<pid>/      # install snapshot
+├── <timestamp>-manual-<pid>/         # manual snapshot
+├── <timestamp>-auto-<pid>/           # periodic snapshot
+├── txn-<timestamp>-<pid>/            # in-flight transaction
+├── orphan-txn-<timestamp>-<pid>/     # preserved interrupted install
+├── .last_stable                      # recovery pointer
+├── .last_auto_backup                 # periodic marker (mtime)
+├── .upgrade_history.json             # upgrade log
+└── README.md                         # user guide
+```
+
+Permissions: `0700` on directories, `0600` on files (owned by root).
+Rotation: keeps the 21 newest snapshots (~2.5 MB max).
+
 ---
 
 ## HTTP API
@@ -329,20 +394,39 @@ All endpoints on `http://127.0.0.1:9090` unless noted.
 | GET | `/api?action=status` | Yes | Service status (ON / OFF) |
 | GET | `/api?action=get_profile` | Yes | Current profile + entry count + `memory_limit_mb` (v1.1.0) |
 | GET | `/api?action=get_custom_rules` | Yes | Allowlist + Denylist content |
-| GET | `/api?action=runtime_info` | Yes | Build info + ports + `profile_key` + `memory_limit_mb` (v1.1.0) |
+| GET | `/api?action=runtime_info` | Yes | Build info + ports + `profile_key` + `memory_limit_mb` + `backups` object (v1.2.0) |
 | GET | `/api?action=logs` | Yes | Last log lines |
 | GET | `/api?action=list_logs` | Yes | List diagnostic files |
 | GET | `/events` | Yes | SSE stream |
 | GET | `/api/metrics` | Yes | Dashboard JSON (port 9091) |
 | POST | `/api/auth/login` | No | Login (POST-only) |
 | POST | `/api/auth/logout` | Yes | Logout (POST-only) |
-| POST | `/api/update_profile` | Yes | Update blocklist |
-| POST | `/api/save_allowlist` | Yes | Save allowlist |
-| POST | `/api/save_denylist` | Yes | Save denylist |
+| POST | `/api/update_profile` | Yes | Update blocklist (+ pre-critical backup) |
+| POST | `/api/save_allowlist` | Yes | Save allowlist (+ pre-critical backup) |
+| POST | `/api/save_denylist` | Yes | Save denylist (+ pre-critical backup) |
+| POST | `/api/save_custom_rules` | Yes | Save both (+ pre-critical backup) |
+| POST | `/api/append_denylist` | Yes | Append to denylist (**requires `content` param in v1.2.0**) |
 | POST | `/api/toggle_service` | Yes | Toggle DNS engine |
 | POST | `/api/restart_service` | Yes | Restart DNS engine |
+| POST | `/api/ensure_running_service` | **Watchdog token** (v1.2.0) | Ensure DNS running |
 
-Full reference: [`docs/API.md`](docs/API.md).
+### `runtime_info.backups` (v1.2.0)
+
+A new 7-field object:
+
+```json
+{
+  "available": 5,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-29 15:00:00",
+  "last_backup_name": "20260929-150000-manual-12345",
+  "last_stable": "20260929-095826-v1.2.0-12345",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+```
+
+Full reference: [`docs/API.md`](docs/API.md) §6.1.7.
 
 ---
 
@@ -358,6 +442,8 @@ Applied protections:
 - Constant-time password comparison (`subtle.ConstantTimeCompare`)
 - HttpOnly session cookies with `SameSite=Lax`
 - CSRF-GET protection on state-changing endpoints
+- **v1.2.0**: Watchdog token (`X-Watchdog-Token`) on
+  `ensure_running_service` — closes a CSRF hole
 
 **Headers**
 
@@ -367,7 +453,7 @@ Applied protections:
 
 - `MaxBytesReader` (5 MB) on all POST bodies
 - `/readyz` restricted to localhost
-- `shellQuote()` on all dynamic shell paths
+- `shellQuote()` on all dynamic shell paths (extended charset in v1.1.0)
 - `readConfPort()` range check (1–65535)
 
 **Firewall**
@@ -380,7 +466,17 @@ Applied protections:
 
 - STATUS_FILE represents user intent (not process state)
 - `rebuildMu` mutex serializes blocklist rebuilds (RACE-1)
+- **`backupMu` mutex serializes pre-critical backups (v1.2.0)**
 - Auth cache (60 s) reduces file I/O
+
+**Data preservation (v1.2.0)**
+
+- 10 defensive layers for user config files
+- Persistent backup directory with `0700`/`0600` permissions
+- SHA256 integrity verification (advisory)
+- Transactional install with rollback
+- Recovery mode via trigger file
+- SELinux context preservation (`restorecon` / `chcon`)
 
 **v1.1.0 additions**
 
@@ -442,7 +538,24 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
 
 # Active profile key
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
+
+# Backup state (v1.2.0)
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
+
+### Backup Storage (v1.2.0)
+
+| Metric | Value |
+|---|---|
+| Size per snapshot | ~30–100 KB (5 config files) |
+| Total with rotation (21 snapshots) | ~2.5 MB max |
+| Backup duration | < 5 s wall |
+| Restore duration | < 3 s |
+| Rotation policy | Keep 21 newest by directory name |
+| Pre-critical backup frequency | On every destructive write |
+| Periodic backup interval | 24 h (service.sh) |
+
+**Impact**: Negligible. No measurable CPU or battery impact.
 
 ---
 
@@ -457,10 +570,13 @@ cd dnscrypt-proxy-webui
 git checkout develop
 
 # 3. Common commands
-make version         # show current version (v1.1.0)
+make version         # show current version (v1.2.0)
 make build           # build all 4 architectures
 make package         # build + package
 make clean           # clean build outputs
+make check-backup    # validate backup shell functions (v1.2.0)
+make check-all       # run all local validations (v1.2.0)
+make diagnose-help   # how to run diagnose on a device (v1.2.0)
 make help            # show available targets
 ```
 
@@ -473,6 +589,7 @@ make help            # show available targets
 - Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
 - Release automation → [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md)
 - Architecture decisions → [`docs/adr/README.md`](docs/adr/README.md)
+- Backup system → [`docs/BACKUP.md`](docs/BACKUP.md)
 
 **Toolchain**: Go 1.22+, Android NDK r26b+ (for cross-compilation).
 
@@ -509,13 +626,13 @@ Releases are automated through two scripts:
 **Stable release** (from `develop`):
 
 ```bash
-./scripts/release.sh v1.2.0
+./scripts/release.sh v1.3.0
 ```
 
 **PATCH release** (from `main`):
 
 ```bash
-./scripts/release-patch.sh v1.1.1
+./scripts/release-patch.sh v1.2.1
 ```
 
 The scripts update version files, create a signed tag, and push to
@@ -536,6 +653,10 @@ release-specific PR template:
 https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...<branch>?template=release.md
 ```
 
+**v1.2.0 addition**: The `backup-smoke-test` job in `ci.yml` validates
+the 10 defensive layers, and the `upgrade-test.yml` matrix runs 42
+scenarios before release.
+
 Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 
 ---
@@ -545,24 +666,26 @@ Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 | File | Purpose |
 |---|---|
 | [`docs/INSTALL.md`](docs/INSTALL.md) | Installation guide |
-| [`docs/FAQ.md`](docs/FAQ.md) | Common questions |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Diagnostics and fixes |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model + Audit Corrections |
-| [`docs/API.md`](docs/API.md) | HTTP API reference |
+| [`docs/FAQ.md`](docs/FAQ.md) | Common questions (Q121–Q130 = v1.2.0) |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Diagnostics and fixes (§7.8–§7.11 = backups) |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture (§3.10, §4.10 = v1.2.0) |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model + Audit Corrections (§5.31–§5.33 = v1.2.0) |
+| [`docs/API.md`](docs/API.md) | HTTP API reference (§6.1.7, §10.6, §10.7) |
+| [`docs/BACKUP.md`](docs/BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [`docs/EMERGENCY.md`](docs/EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Device compatibility matrix |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Developer guide |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution guidelines |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Developer guide (§8.12–§8.14 = v1.2.0) |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution guidelines (§8.9–§8.11 = v1.2.0) |
 | [`docs/BRANCHING.md`](docs/BRANCHING.md) | Git branching strategy |
 | [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) | Release process guide |
 | [`docs/adr/README.md`](docs/adr/README.md) | Architecture Decision Records |
-| [`docs/UPGRADE.md`](docs/UPGRADE.md) | Version upgrade guide |
+| [`docs/UPGRADE.md`](docs/UPGRADE.md) | Version upgrade guide (§3.1 = v1.2.0) |
 | [`docs/DNS_BINARIES.md`](docs/DNS_BINARIES.md) | DNS binaries management |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Terms and abbreviations |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Future plans |
-| [`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md) | Contributors |
+| [`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md) | Contributors (Data Guardian badge) |
 | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community guidelines |
-| [`CHANGELOG.md`](CHANGELOG.md) | Version history (including v1.1.0) |
+| [`CHANGELOG.md`](CHANGELOG.md) | Version history (including v1.2.0) |
 
 ---
 
@@ -573,7 +696,20 @@ Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 - **Pull requests** → follow [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
 - **Branch policy** → [`docs/BRANCHING.md`](docs/BRANCHING.md)
 - **Architecture decisions** → [`docs/adr/README.md`](docs/adr/README.md)
+- **Backup testing** → [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §8.9, §8.10, §8.11
 - **Security reports** → [`SECURITY.md`](SECURITY.md)
+
+**v1.2.0 contribution requirements**:
+
+- Any PR touching the 10 defensive layers must update
+  `docs/BACKUP.md` and `docs/EMERGENCY.md`.
+- Any new user-facing string must supply both `en` and `ar` entries.
+- Any destructive operation on user data must call
+  `createAutoBackup(reason)` first.
+
+**Data Guardian badge**: Test the backup/restore system across
+3+ devices or 3+ root solutions and submit a report. See
+[`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md).
 
 This project follows the
 [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
@@ -592,6 +728,8 @@ This project follows the
 - [golangci-lint](https://github.com/golangci/golangci-lint) — Go linting
 - [Cosign](https://github.com/sigstore/cosign) — artifact signing
 - [Go runtime/debug](https://pkg.go.dev/runtime/debug#SetMemoryLimit) — for `SetMemoryLimit` (v1.1.0)
+- [Android FUSE documentation](https://source.android.com/docs/core/storage) — for `/sdcard/` mount behavior (v1.2.0)
+- [Android SELinux documentation](https://source.android.com/docs/security/features/selinux) — for `restorecon` / `chcon` (v1.2.0)
 
 ---
 

@@ -2,25 +2,106 @@
 
 Complete reference for the HTTP API used to control the module programmatically.
 
-**Version**: v1.1.0
+**Version**: v1.2.0
 **Base URL (WebUI)**: `http://127.0.0.1:9090`
 **Base URL (Dashboard)**: `http://127.0.0.1:9091`
-**Last updated**: 2026-09-26
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • `runtime_info` now returns two additional fields:
->     `profile_key` (string) and `memory_limit_mb` (int). See §6.1.7
->     for the full schema.
->   • `metricsProxyHandler` now builds the upstream monitoring_ui
->     URL using the `MONITORING_UI_PORT` constant instead of the
->     hardcoded string `"8080"`. The observable behavior is
->     unchanged. See §6.1.14.
->   • Added §2.1 — Memory limits per profile (v1.1.0).
->   • No breaking changes. All v1.0.0 clients continue to work.
->     The two new fields are additive.
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • **Global edition — English default with Arabic toggle** — the
+>     WebUI ships with English as the default language and an
+>     in-page toggle to switch to Arabic. The `lang` field of
+>     `manifest.json` defaults to `en` and `dir` to `ltr`; the
+>     toggle switches them at runtime. Documentation remains
+>     English-only. **No API break** — the language preference is
+>     client-side only (`localStorage['dnscrypt-lang']`) and is
+>     never transmitted to the server.
+>   • `runtime_info.backups` now returns **seven** fields
+>     (previously five):
+>       `available`, `in_flight_txn`, `orphan_txn`,
+>       `last_backup`, `last_backup_name`, `last_stable`,
+>       `path`.
+>     This aligns the JSON schema returned by `main.go` with
+>     the one already produced by `status.sh --json` (see
+>     §6.1.7 and §10.6).
+>   • `get_profile` unchanged in shape; still returns
+>     `memory_limit_mb`.
+>   • Five destructive endpoints now trigger a **pre-critical
+>     backup** before writing:
+>       - `POST /api/update_profile`
+>       - `POST /api/save_allowlist`
+>       - `POST /api/save_denylist`
+>       - `POST /api/save_custom_rules`
+>       - `POST /api/append_denylist`
+>     The backup is best-effort (never blocks the operation).
+>     See §6.2.3, §6.2.4, and §6.2.5.
+>   • No new endpoints, no removed endpoints, no changed
+>     request formats, no changed auth requirements.
+>   • All v1.0.0 and v1.1.0 clients continue to work without
+>     modification. All changes are additive.
+>
+> **v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)**:
+>   A pre-release audit of this file identified the following
+>   issues. All of them are addressed in-place; no version bump.
+>
+>   🔧 API-1 — §5.1 (404 vs 405 table) showed the response body
+>     for "Unknown action" and "Disallowed method" as
+>     `{"error": "..."}`. The actual `handleAPI` responses use
+>     `{"status": "error", "message": "..."}` for every code
+>     path except `/readyz`. The table now matches the code.
+>     `/readyz` is the sole endpoint that returns `{"error": ...}`
+>     and its row is left unchanged.
+>
+>   🔧 API-2 — §10.6 claimed "Both paths return the same 7
+>     fields" when comparing `runtime_info.backups` (API) with
+>     `status.sh --json` `.backups` (shell). That statement was
+>     incomplete: the shell tool adds TWO diagnostic-only fields
+>     (`status` and `last_backup_age_seconds`), so its object has
+>     NINE fields. The section now distinguishes the two shapes
+>     explicitly and explains what to do if they diverge.
+>
+>   🔧 API-3 — §6.2.7 (`POST /api/append_denylist`) documented
+>     only the "Processed N rules" response. The v1.2.0 post-audit
+>     fix in `main.go` (BUG-1 + BUG-5) made the handler return a
+>     distinct `"No changes detected"` message when the on-disk
+>     denylist already matches the request. Both branches are now
+>     documented.
+>
+>   🔧 API-4 — §1.3 (Endpoint Map) and §6.1.7 listed only
+>     `/api/runtime_info` (no trailing slash). The v1.2.0
+>     post-audit fix in `main.go` (BUG-6) also registers
+>     `/api/runtime_info/` with a trailing slash. Both variants
+>     return the same JSON.
+>
+>   🔧 API-5 — §6.1.7 described the path-based form as the
+>     "Alternative" to the query-string form, which was backwards.
+>     Both forms are first-class; the doc now presents them as
+>     equivalent entry points, listing both without implying a
+>     preference.
+>
+>   🔧 API-6 — §8.4 JavaScript example used
+>     `new EventSource('/events', { withCredentials: true })`,
+>     but the note immediately below stated that the WebUI and
+>     Dashboard removed `withCredentials` in v1.2.0. The example
+>     now matches the shipped code (`new EventSource('/events')`)
+>     and the note explains why the option is unnecessary for
+>     same-origin requests.
+>
+>   🔧 API-7 — §6.2.13 documented the `ensure_running_service`
+>     auth exemption as applying only to `127.0.0.1`. The
+>     `isLocalRequest()` helper accepts three values:
+>     `127.0.0.1`, `::1`, and `localhost`. The doc now lists all
+>     three.
+>
+>   🔧 API-8 — §11 (Changelog → v1.2.0) listed only the API-level
+>     additions (BAK-1, BAK-2). It did not mention the seven
+>     post-audit fixes applied to `main.go` in the same release
+>     window (BUG-1 .. BUG-6, N-1, N-4). The entry now lists them
+>     as a distinct subsection so a reader can trace the full
+>     v1.2.0 delta.
 
 ---
 
@@ -53,6 +134,7 @@ Complete reference for the HTTP API used to control the module programmatically.
 | **Content-Type** | `application/json` (default) |
 | **Auth** | Bearer / Cookie / Basic |
 | **Timeout (client)** | 15 s (normal GET), 60 s (`toggle`/`restart`), 310 s (`update_profile`) |
+| **Language** | The WebUI is bilingual (English default + Arabic toggle via `langToggle`). The API itself is **language-neutral** — it returns JSON without localized strings. |
 
 ### 1.2 Port Constraints
 
@@ -107,8 +189,11 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 │    GET  /api?action=read_log     Read log file               │
 │    GET  /api?action=get_progress Progress                    │
 │    GET  /api?action=check_old_modules  Old modules           │
-│    GET  /api?action=runtime_info Build info + ports + memory │
-│    GET  /api/runtime_info        Build info (path)           │
+│    GET  /api/runtime_info        Build + ports + memory      │
+│    GET  /api/runtime_info/       (same; BUG-6 fix)           │
+│    GET  /api?action=runtime_info (same; query-string form)   │
+│                                  → both include backups      │
+│                                    (v1.2.0 — 7 fields)       │
 │    GET  /api/download_log        Download log file           │
 │    GET  /api/metrics             Metrics (Dashboard)         │
 │    GET  /events                  SSE stream                  │
@@ -130,7 +215,7 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 └─────────────────────────────────────────────────────┘
 ```
 
-### 1.4 What is New in v1.1.0
+### 1.4 What was New in v1.1.0
 
 | Section | Change | Reference |
 |---|---|---|
@@ -144,7 +229,42 @@ additive. All v1.0.0 clients continue to work without changes.
 
 ---
 
-### 1.5 What was New in v1.0.0
+### 1.5 What is New in v1.2.0
+
+| Section | Change | Reference |
+|---|---|---|
+| **§1.1** | Language is now bilingual (EN default + AR toggle). The API stays language-neutral. | — |
+| **§6.1.7** | `runtime_info.backups` returns **7 fields** (was 5) | BAK-1 |
+| **§6.2.3** | `update_profile` creates a pre-critical backup | BAK-2 |
+| **§6.2.4** | `save_allowlist` creates a pre-critical backup | BAK-2 |
+| **§6.2.5** | `save_denylist` creates a pre-critical backup | BAK-2 |
+| **§6.2.6** | `save_custom_rules` creates a pre-critical backup | BAK-2 |
+| **§6.2.7** | `append_denylist` creates a pre-critical backup | BAK-2 |
+| **§10.6** | New backup diagnostic examples | BAK-3 |
+| **§10.7** | New recovery-mode examples | BAK-4 |
+| **§11** | Changelog entry for v1.2.0 | — |
+
+**Compatibility**: All v1.0.0 and v1.1.0 clients continue to
+work without modification. All v1.2.0 changes are additive:
+
+- The `backups` object gained **two** fields
+  (`in_flight_txn`, `orphan_txn`).
+- Five POST endpoints now trigger a best-effort backup before
+  writing. This is transparent to clients: the request/response
+  format is unchanged, and a failed backup never fails the
+  request.
+- The `lang`/`dir` fields of `manifest.json` default to `en`/`ltr`
+  and are updated at runtime by the in-page toggle. This affects
+  only the PWA shell, not the API.
+- The API itself is **language-neutral**: it never sends nor
+  accepts a language identifier. The `langToggle` is a purely
+  client-side concern.
+
+**Architectural note**: v1.2.0 is a **data-preservation
+release**. It does not change the API contract — it only
+enriches the observability surface and hardens the write path.
+
+### 1.6 What was New in v1.0.0
 
 | Section | Change | Reference |
 |---|---|---|
@@ -290,6 +410,12 @@ Set-Cookie: dnscrypt_session=<token>; Path=/; Max-Age=86400; HttpOnly; Secure; S
 }
 ```
 
+> **Note on `Secure`**: the `Secure` attribute is set only when
+> the server runs on a loopback address (`BIND_ADDR` = `127.0.0.1`,
+> `::1`, or `localhost`). The example above assumes the default
+> `127.0.0.1` bind. On a LAN bind the attribute is omitted so
+> that browsers accept the cookie over plain HTTP. See §2.5.
+
 There is no `token` field in the response. Authentication relies solely on the HttpOnly cookie.
 
 > **v1.1.0 note**: the `profile` object in the response now also
@@ -360,12 +486,12 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 | Path | `/` | — |
 | MaxAge | 86400 (24 h) | — |
 | HttpOnly | `true` | JavaScript cannot read it |
-| Secure | conditional | `true` only on localhost |
+| Secure | conditional | `true` only on loopback binds (`127.0.0.1`, `::1`, `localhost`) |
 | SameSite | `Lax` | PWA-friendly |
 
 Secure details:
 
-- `true` if `BIND_ADDR` = 127.0.0.1 / ::1 / localhost.
+- `true` if `BIND_ADDR` = `127.0.0.1` / `::1` / `localhost`.
 - `false` otherwise (LAN access).
 
 SameSite details:
@@ -440,7 +566,7 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 
 ## 3. Rate Limiting
 
-### 3.1 Limits (v1.1.0)
+### 3.1 Limits (v1.2.0)
 
 | Endpoint | Limit | Window | Enforcement |
 |---|---|---|---|
@@ -589,6 +715,11 @@ Content-Type: application/json
 }
 ```
 
+> **Exception — `/readyz`**: `/readyz` is the only endpoint that
+> does NOT use the `{status, message}` shape. On a non-localhost
+> request it returns `{"error": "readyz is localhost-only"}` with
+> HTTP 403. See §9.2.
+
 ### 4.3 Conflict
 
 ```json
@@ -656,10 +787,17 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 
 | Case | HTTP Code | Response |
 |---|---|---|
-| **Unknown action** (`?action=foo`) | **404** | `{"error": "unknown action: \"foo\""}` |
-| **Disallowed method** (GET on POST endpoint) | **405** | `{"error": "This endpoint requires POST"}` + `Allow: POST` |
-| **Login GET** | **405** | `{"error": "Login requires POST (CSRF protection)"}` + `Allow: POST` |
+| **Unknown action** (`?action=foo`) | **404** | `{"status": "error", "message": "unknown action: \"foo\""}` |
+| **Disallowed method** (GET on POST endpoint) | **405** | `{"status": "error", "message": "This endpoint requires POST (CSRF-GET protection)", "hint": "Use POST /api/<name>_service"}` + `Allow: POST` |
+| **Login GET** | **405** | `{"status": "error", "message": "Login requires POST (CSRF protection)"}` + `Allow: POST` |
 | **`/readyz` from LAN** | **403** | `{"error": "readyz is localhost-only"}` |
+
+> **API-1 fix**: the first two rows previously showed `{"error": "..."}`
+> bodies, which did not match the actual `handleAPI` responses.
+> `handleAPI` uses the `{status, message}` shape for every code
+> path (see §4.2). Only `/readyz` uses `{"error": ...}`, because
+> it is served by `handleReadyz` — a separate handler — and not
+> by `handleAPI`.
 
 ### 5.2 Not Found vs 405 Table
 
@@ -760,15 +898,25 @@ This endpoint is read-only. It does not write STATUS_FILE.
 }
 ```
 
-#### 6.1.7 `GET /api/runtime_info` — includes ports + profile + memory
+#### 6.1.7 `runtime_info` — ports + profile + memory + backups
 
-Alternative: `GET /api?action=runtime_info` (path-based).
+**Equivalent entry points (API-5 fix)**:
 
-**Response (v1.1.0):**
+| Form | Handler | Notes |
+|---|---|---|
+| `GET /api/runtime_info` | `handleRuntimeInfo` | Path-based (canonical) |
+| `GET /api/runtime_info/` | `handleRuntimeInfo` | Path-based with trailing slash (BUG-6 fix) |
+| `GET /api?action=runtime_info` | `handleAPI` | Query-string form |
+
+All three return the **same JSON body** — they invoke
+`buildRuntimeInfo()`. Choose whichever form fits the client
+convention; none is deprecated.
+
+**Response (v1.2.0):**
 
 ```json
 {
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "commit": "a1b2c3d",
   "build_time": "1726987200",
   "build_time_human": "2026-09-26T10:00:00Z",
@@ -782,11 +930,20 @@ Alternative: `GET /api?action=runtime_info` (path-based).
   "webui_port": "9090",
   "dashboard_port": "9091",
   "profile_key": "pro",
-  "memory_limit_mb": 120
+  "memory_limit_mb": 120,
+  "backups": {
+    "available": 7,
+    "in_flight_txn": 0,
+    "orphan_txn": 0,
+    "last_backup": "2026-09-26 15:00:00",
+    "last_backup_name": "20260926-150000-manual",
+    "last_stable": "20260926-095826-v1.2.0",
+    "path": "/sdcard/dnscrypt-webui-backup"
+  }
 }
 ```
 
-Field groups:
+**Field groups:**
 
 | Group | Fields | Version |
 |---|---|---|
@@ -794,24 +951,39 @@ Field groups:
 | **Runtime paths** | `run_dir`, `status_file`, `pid_file`, `progress_file`, `log_file` | v1.0.0 |
 | **Network** | `bind_addr` | v1.0.0 |
 | **Dynamic ports** (PORT-2) | `webui_port`, `dashboard_port` | v1.0.0 |
-| **Memory profile** (MEM-1) | `profile_key`, `memory_limit_mb` | **v1.1.0** |
+| **Memory profile** (MEM-1) | `profile_key`, `memory_limit_mb` | v1.1.0 |
+| **Backups** (BAK-1) | `available`, `in_flight_txn`, `orphan_txn`, `last_backup`, `last_backup_name`, `last_stable`, `path` | **v1.2.0** |
 
 **`profile_key`** — one of: `light`, `normal`, `pro`, `proplus`, `ultimate`.
 
 **`memory_limit_mb`** — the Go runtime soft limit for the active profile. See §2.1 for the mapping.
 
-**Why these fields exist**:
-- **Observability**: a user reporting a GC or performance issue can paste the JSON output.
-- **Verification**: the WebUI/Dashboard System Info panel displays them.
-- **Shell equivalent**: `functions.sh:get_profile_memory_hint()`.
+**`backups` object — full schema (v1.2.0):**
 
-Benefits:
+| Field | Type | Description |
+|---|---|---|
+| `available` | int | Number of snapshots (excludes `current/`, `txn-*`, `orphan-txn-*`) |
+| `in_flight_txn` | int | Number of `txn-*` directories (install in progress or interrupted) |
+| `orphan_txn` | int | Number of `orphan-txn-*` directories (preserved interrupted installs) |
+| `last_backup` | string \| null | Modification time of the newest snapshot, formatted as `YYYY-MM-DD HH:MM:SS` |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20260926-150000-manual`) |
+| `last_stable` | string \| null | Content of the `.last_stable` pointer file, or null if not set |
+| `path` | string | Absolute path of the persistent backup directory (`/sdcard/dnscrypt-webui-backup`) |
+
+**Why these fields exist**:
+- **Observability** — a user reporting a GC or performance issue can paste the JSON output.
+- **Verification** — the WebUI/Dashboard System Info panel displays them.
+- **Shell equivalent** — `functions.sh:get_profile_memory_hint()` for memory, `status.sh --json` for backups.
+- **Consistency** — the JSON schema now matches `status.sh --json` on the seven shared fields (see §10.6; the shell tool adds two more).
+
+**Benefits**:
 
 - HTML/JS can update links dynamically.
 - Supports LAN access (`window.location.hostname`).
 - Supports IPv6 loopback (`[::1]`).
+- Clients can detect a corrupted backup layer (e.g. `orphan_txn > 0`).
 
-`status_file` = "user intent". Values: ON / OFF. Written only by `startService` / `stopService`. To check the actual state, use `GET /api?action=status`.
+**`status_file`** = "user intent". Values: ON / OFF. Written only by `startService` / `stopService`. To check the actual state, use `GET /api?action=status`.
 
 #### 6.1.8 `GET /api?action=logs`
 
@@ -933,6 +1105,16 @@ Content-Length: 45312
 Cache-Control: no-cache, no-store, must-revalidate
 ```
 
+**Error responses** (plain text bodies, not JSON):
+
+| Condition | HTTP status | Body |
+|---|---|---|
+| Not authenticated | 401 | `Unauthorized` |
+| Path outside whitelist | 403 | `Forbidden` |
+| Sensitive file without `confirm=1` | 403 | `Confirmation required` |
+| File not found | 404 | (empty, from `http.NotFound`) |
+| File size > 100 MB | 413 | `File too large` |
+
 #### 6.1.14 `GET /api/metrics` — JSON (Dashboard)
 
 Dashboard-only endpoint (port 9091).
@@ -1040,6 +1222,10 @@ Cache-Control: no-cache, no-store, must-revalidate
 }
 ```
 
+> **Exception**: `metricsProxyHandler` — like `handleReadyz` — uses
+> the `{"error": ...}` shape rather than the `{status, message}`
+> shape that `handleAPI` uses. See §4.2.
+
 **Response (500 Internal Server Error):**
 
 ```json
@@ -1107,6 +1293,12 @@ curl -sI http://127.0.0.1:9091/api/metrics | grep Content-Type
 
 Update the blocklist from a profile.
 
+**Pre-critical backup (v1.2.0):** Before writing, the handler
+calls `createAutoBackup("pre-profile-change")`, which snapshots
+the 5 user config files to the persistent backup directory
+(`/sdcard/dnscrypt-webui-backup/`). This is **best-effort**: a
+failed backup logs a warning but does not block the update.
+
 **Request:**
 
 ```http
@@ -1134,7 +1326,16 @@ applies the new profile's memory limit via `applyMemoryLimit()`.
 The new limit is reflected in subsequent `runtime_info` calls
 (§6.1.7).
 
+**v1.2.0 (BAK-2)**: A pre-critical backup is created before the
+profile change. The backup appears as a new snapshot directory
+under `/sdcard/dnscrypt-webui-backup/`. It is visible via
+`runtime_info.backups.last_backup_name`.
+
 #### 6.2.4 `POST /api/save_allowlist`
+
+**Pre-critical backup (v1.2.0):** Calls
+`createAutoBackup("pre-allowlist-save")` before writing
+(best-effort).
 
 **Request:**
 
@@ -1149,7 +1350,7 @@ allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
 - `allowlist` (required) — content (URL-encoded).
 - `expected_hash` (optional) — hash from `get_custom_rules`.
 
-**Response (200):**
+**Response (200 — changed):**
 
 ```json
 {
@@ -1161,6 +1362,24 @@ allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
   "entries": 250000
 }
 ```
+
+**Response (200 — no change):**
+
+```json
+{
+  "status": "ok",
+  "changed": false,
+  "hash": "def456...",
+  "allow_hash": "def456...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
+}
+```
+
+> When the submitted content is byte-identical to what is
+> already on disk, the handler short-circuits: no file write,
+> no blocklist rebuild, no service reload. `changed: false`
+> is returned and the hashes are the current on-disk values.
 
 **Response (409 conflict):**
 
@@ -1175,9 +1394,17 @@ allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
 
 Same as `save_allowlist` but uses the `denylist` param.
 
+**Pre-critical backup (v1.2.0):** Calls
+`createAutoBackup("pre-denylist-save")` before writing
+(best-effort).
+
 #### 6.2.6 `POST /api/save_custom_rules`
 
 Save both atomically.
+
+**Pre-critical backup (v1.2.0):** Calls
+`createAutoBackup("pre-custom-rules-save")` before writing
+(best-effort).
 
 **Request:**
 
@@ -1193,20 +1420,56 @@ allowlist=googleadservices.com&denylist=facebook.com
 ```json
 {
   "status": "ok",
-  "message": "Rules saved successfully"
+  "changed": true,
+  "hash": "def456...",
+  "allow_hash": "def456...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
 }
 ```
 
 #### 6.2.7 `POST /api/append_denylist`
 
-**Response:**
+**Pre-critical backup (v1.2.0):** The pre-critical backup is
+performed **once** by the delegated `saveDenylist` path (the
+v1.2.0 post-audit fix BUG-1 removed a duplicate call in the
+original `appendDenylist` implementation). The backup is
+best-effort.
+
+**Response — rules applied (changed):**
 
 ```json
 {
   "status": "ok",
-  "message": "Processed 250000 rules"
+  "changed": true,
+  "message": "Processed 250000 rules",
+  "hash": "xyz789...",
+  "allow_hash": "abc123...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
 }
 ```
+
+**Response — no change (API-3 fix):**
+
+```json
+{
+  "status": "ok",
+  "changed": false,
+  "message": "No changes detected",
+  "hash": "xyz789...",
+  "allow_hash": "abc123...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
+}
+```
+
+> The `"Processed N rules"` message reports the **total blocklist
+> entry count** (not the size of the deny list). The
+> `"No changes detected"` branch triggers when the on-disk
+> denylist is byte-identical to what the handler reads back —
+> in that case the atomic-save path short-circuits and no
+> rebuild is performed.
 
 #### 6.2.8 `POST /api/clear_log_file`
 
@@ -1384,7 +1647,20 @@ This endpoint relies on `STATUS_FILE` as "user intent":
 - `STATUS_FILE` = "ON" → DNS engine crashed; Watchdog restarts it.
 - `STATUS_FILE` = "OFF" → user stopped the service; Watchdog does nothing.
 
-*Security: endpoint is exempt from auth if the request comes from `127.0.0.1` (`isLocalRequest`).*
+**Authentication exemption (API-7 fix)**: `checkAuth()`
+short-circuits to `true` when **both** of the following hold:
+
+1. The request originated from a **loopback** address — one of
+   `127.0.0.1`, `::1`, or `localhost` (as determined by
+   `isLocalRequest()`).
+2. The request is a **POST** to
+   `/api/ensure_running_service` (matched via `hasEndpoint`).
+
+Requests from a LAN IP (even with valid credentials) go through
+normal auth. Any method other than POST, or any other endpoint,
+goes through normal auth. The exemption exists because the
+Watchdog runs on the same host and cannot easily carry a
+session cookie.
 
 ---
 
@@ -1554,7 +1830,11 @@ data: 100|✅ Protection applied successfully (250000 entries)
 ### 8.4 JavaScript Client
 
 ```javascript
-const sse = new EventSource('/events', { withCredentials: true });
+// API-6 fix: `withCredentials` is not passed — it is unnecessary
+// for same-origin requests. The /events endpoint is same-origin
+// with both the WebUI (9090) and the Dashboard (9091), so the
+// browser sends cookies automatically.
+const sse = new EventSource('/events');
 
 sse.addEventListener('status', (e) => {
   console.log('Status:', e.data);
@@ -1569,6 +1849,13 @@ sse.onerror = () => {
   // reconnect with backoff
 };
 ```
+
+> **Note (v1.2.0)**: `withCredentials: true` is optional for
+> same-origin requests — cookies are sent automatically. The
+> WebUI and Dashboard dropped this option in v1.2.0 as part of a
+> cleanup. It remains supported by the browser for clients that
+> connect from a different origin (rare, and usually blocked by
+> CORS anyway).
 
 ### 8.5 SSE Write Deadline
 
@@ -1624,7 +1911,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "ok",
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "status": "ready"
 }
 ```
@@ -1637,7 +1924,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "not_running",
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "status": "unhealthy"
 }
 ```
@@ -1652,6 +1939,11 @@ Content-Type: application/json
   "error": "readyz is localhost-only"
 }
 ```
+
+> **Exception**: `/readyz` is one of the few endpoints that
+> returns `{"error": ...}` instead of `{"status": "error",
+> "message": ...}`. This is because it is served by the dedicated
+> `handleReadyz` handler, not by `handleAPI`. See §4.2.
 
 *Checks:*
 - `config` — `dnscrypt-proxy.toml` exists.
@@ -1763,8 +2055,9 @@ for i in 1 2 3 4 5 6; do
   curl -u "wronguser:wrongpass" http://127.0.0.1:9090/api?action=status
   echo ""
 done
-# After 5: 401
-# After 6: 401 (locked out)
+# Each response is HTTP 401. After the 5th failure the IP is
+# locked; the 6th request still returns 401 (no 429 — 429 is
+# only emitted by handleLogin for the /api/auth/login endpoint).
 ```
 
 **Login GET rejected:**
@@ -1789,10 +2082,23 @@ curl -i "http://127.0.0.1:9090/api?action=foo"
 curl -b /tmp/cookies.txt \
   "http://127.0.0.1:9090/api?action=runtime_info" | jq
 
-# Only the two new fields
+# Only the two v1.1.0 fields
 curl -b /tmp/cookies.txt \
   "http://127.0.0.1:9090/api?action=runtime_info" | jq '{profile_key, memory_limit_mb}'
 # Expected: {"profile_key": "pro", "memory_limit_mb": 120}
+```
+
+**v1.2.0 — Runtime info with backup state (all three path forms):**
+
+```bash
+# Path form
+curl -b /tmp/cookies.txt http://127.0.0.1:9090/api/runtime_info | jq '.backups'
+
+# Path form with trailing slash (BUG-6 fix — same JSON)
+curl -b /tmp/cookies.txt http://127.0.0.1:9090/api/runtime_info/ | jq '.backups'
+
+# Query-string form (same JSON)
+curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups'
 ```
 
 ### 10.2 Python
@@ -1838,12 +2144,21 @@ print(f"Total queries: {metrics['total_queries']}")
 print(f"Blocked: {metrics['blocked_queries']}")
 print(f"Cache hit ratio: {metrics['cache_stats']['cache_hit_ratio']:.2%}")
 
-# Runtime info (PORT-2 + MEM-1)
+# Runtime info (PORT-2 + MEM-1 + BAK-1)
 info = s.get(f"{BASE}/api?action=runtime_info").json()
 print(f"WebUI port: {info['webui_port']}")
 print(f"Dashboard port: {info['dashboard_port']}")
 print(f"Profile: {info['profile_key']}")
 print(f"Memory limit: {info['memory_limit_mb']} MB")
+
+# v1.2.0 — Backup state
+bk = info["backups"]
+print(f"Backups available: {bk['available']}")
+print(f"Latest backup: {bk['last_backup_name']}")
+print(f"Last stable: {bk['last_stable']}")
+print(f"In-flight txn: {bk['in_flight_txn']}")
+print(f"Orphan txn: {bk['orphan_txn']}")
+print(f"Backup path: {bk['path']}")
 ```
 
 ### 10.3 Go
@@ -1901,7 +2216,7 @@ func main() {
     json.NewDecoder(resp4.Body).Decode(&metrics)
     fmt.Printf("Total queries: %v\n", metrics["total_queries"])
 
-    // Runtime info (PORT-2 + MEM-1)
+    // Runtime info (PORT-2 + MEM-1 + BAK-1)
     resp5, _ := client.Get(base + "/api?action=runtime_info")
     defer resp5.Body.Close()
     var info map[string]interface{}
@@ -1910,6 +2225,14 @@ func main() {
     fmt.Printf("Dashboard port: %v\n", info["dashboard_port"])
     fmt.Printf("Profile: %v\n", info["profile_key"])
     fmt.Printf("Memory limit: %v MB\n", info["memory_limit_mb"])
+
+    // v1.2.0 — Backup state
+    if bk, ok := info["backups"].(map[string]interface{}); ok {
+        fmt.Printf("Backups available: %v\n", bk["available"])
+        fmt.Printf("Latest backup: %v\n", bk["last_backup_name"])
+        fmt.Printf("In-flight txn: %v\n", bk["in_flight_txn"])
+        fmt.Printf("Orphan txn: %v\n", bk["orphan_txn"])
+    }
 }
 ```
 
@@ -1962,7 +2285,7 @@ async function getMetrics() {
   return resp.json();
 }
 
-// Runtime info — PORT-2 + MEM-1
+// Runtime info (PORT-2 + MEM-1 + BAK-1)
 async function getRuntimeInfo() {
   const resp = await fetch(`${BASE}/api?action=runtime_info`, {
     credentials: 'same-origin',
@@ -2007,9 +2330,253 @@ curl -i "http://192.168.1.5:9091/readyz"
 # {"error": "readyz is localhost-only"}
 ```
 
+### 10.6 Backup Diagnostics (v1.2.0)
+
+**Read the full backup state via the API:**
+
+```bash
+# Full runtime_info (includes the backups object)
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups'
+```
+
+Expected shape:
+
+```json
+{
+  "available": 7,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-26 15:00:00",
+  "last_backup_name": "20260926-150000-manual",
+  "last_stable": "20260926-095826-v1.2.0",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+```
+
+**Only the essential fields:**
+
+```bash
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" \
+  | jq '{available: .backups.available, latest: .backups.last_backup_name, last_stable: .backups.last_stable}'
+```
+
+**Detect a degraded backup layer:**
+
+```bash
+# Any non-zero txn count means the installer needs attention.
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" \
+  | jq 'select(.backups.in_flight_txn > 0 or .backups.orphan_txn > 0)'
+```
+
+**Compare with `status.sh --json` (API-2 fix):**
+
+The `backups` object has **different shapes** depending on the
+source. Both describe the same reality; they differ only in the
+amount of diagnostic detail they expose:
+
+| Source | Field count | Extra fields |
+|---|---:|---|
+| `runtime_info` (HTTP API) | **7** | — |
+| `status.sh --json` (shell) | **9** | `status`, `last_backup_age_seconds` |
+
+The two shell-only fields are:
+- **`status`** — `"ok"` \| `"empty"` \| `"missing"`. A coarse
+  classification of the backup layer's health.
+- **`last_backup_age_seconds`** — integer number of seconds since
+  the newest snapshot. Provided so that shell scripts do not have
+  to compute the delta themselves (there is no `date -r` in some
+  Android shells).
+
+Run both and compare the seven shared fields:
+
+```bash
+# API (7 fields)
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups | keys'
+
+# Shell (9 fields)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups | keys'
+```
+
+Both paths return the same seven shared fields. If the seven
+shared fields ever diverge, the `main.go` and `status.sh`
+versions are out of sync — restart the WebUI (or reinstall the
+module) to pick up the matching versions.
+
+**Trigger a manual backup (on the device):**
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+```
+
+**Run the full diagnostic report (on the device):**
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+```
+
+The `--diagnose` report is human-readable and includes:
+- System + module info.
+- The 5 user data files with size + mtime.
+- The backup listing (sorted by name).
+- In-flight + orphan transaction listings.
+- Recovery mode state.
+- Health checks with a final ✅ / ⚠️ / ❌.
+
+### 10.7 Recovery Mode (v1.2.0)
+
+Recovery mode restores the last known-good configuration from
+the persistent backup directory. It is intended for scenarios
+where the module cannot boot normally or user data was
+corrupted.
+
+**Trigger recovery (on the device):**
+
+```bash
+# Option A — module-specific trigger
+su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
+su -c "reboot"
+
+# Option B — external trigger (survives module folder loss)
+su -c "touch /data/adb/dnscrypt-recovery"
+su -c "reboot"
+```
+
+On the next boot, `customize.sh` runs before normal installation
+and restores the last known-good snapshot. Then it continues
+with the normal install flow.
+
+**Recovery source priority** (enforced by `customize.sh §[8a]`):
+
+1. `$PERSISTENT_BACKUP/.last_stable` → the pointer file.
+2. `$PERSISTENT_BACKUP/current/` → the live snapshot.
+3. `$FOUND_SOURCE` → the in-place data (fallback).
+
+**Verify the recovery succeeded:**
+
+```bash
+# After the reboot, check the runtime info
+curl -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups.last_stable'
+```
+
+**Inspect the recovery log:**
+
+```bash
+su -c "grep 'RECOVERY MODE' /data/local/tmp/dnscrypt_install.log"
+```
+
+**Full documentation:**
+- [`docs/EMERGENCY.md`](EMERGENCY.md) — step-by-step recovery procedures.
+- [`docs/BACKUP.md`](BACKUP.md) — backup system reference.
+- [`docs/UPGRADE.md`](UPGRADE.md) §3.1 — the v1.1.0 → v1.2.0 upgrade path.
+
+### 10.8 Language Preference (v1.2.0)
+
+**The API is language-neutral.** The WebUI's bilingual toggle
+(English default + Arabic) is a **client-side concern only**:
+
+- The preference is stored in `localStorage['dnscrypt-lang']`
+  (values: `"en"` or `"ar"`).
+- No API endpoint accepts or returns a language identifier.
+- No server-side state is involved.
+- The Service Worker cache (`web/sw.js`) is language-neutral:
+  it caches the HTML once, and the toggle operates on the DOM.
+
+**Verify the client state (from the browser console):**
+
+```javascript
+// Read the current preference
+localStorage.getItem('dnscrypt-lang')  // → "en" (default) or "ar"
+
+// Read the current document state
+document.documentElement.lang  // → "en" or "ar"
+document.documentElement.dir   // → "ltr" or "rtl"
+```
+
+**Impact on API clients**: **None.** A script that calls the API
+does not need to know or set the language. The JSON payloads are
+identical regardless of the WebUI language.
+
 ---
 
 ## 11. Changelog
+
+### v1.2.0 (2026-09-29)
+
+**Data-preservation release — no breaking changes. All changes are additive.**
+
+Added (API surface):
+
+- **§6.1.7** — `runtime_info.backups` now returns **seven**
+  fields: `available`, `in_flight_txn`, `orphan_txn`,
+  `last_backup`, `last_backup_name`, `last_stable`, `path`
+  (BAK-1).
+- **§6.2.3, §6.2.4, §6.2.5, §6.2.6, §6.2.7** — five destructive
+  endpoints now trigger a pre-critical backup before writing
+  (BAK-2). The backup is best-effort and never blocks the
+  operation.
+- **§10.6** — new examples for backup diagnostics.
+- **§10.7** — new examples for recovery mode.
+- **§10.8** — new section documenting that the API is
+  language-neutral (the WebUI toggle is client-side only).
+
+**v1.2.0 post-audit fixes (main.go — API-8 fix):**
+
+The v1.2.0 post-audit pass applied seven corrections to
+`proxy/main.go`. They do not change the API contract, but they
+fix behaviors that clients could observe:
+
+| ID | Scope | Observable effect |
+|---|---|---|
+| **BUG-1** | `appendDenylist` — the pre-critical backup is performed **once**, via `saveDenylist` | One snapshot per call instead of two |
+| **BUG-2** | `createAutoBackup` — stderr is no longer discarded | Failed backups are now visible in `dnscrypt_main.log` |
+| **BUG-3** | `buildBackupInfo` — snapshots are sorted by directory **name**, not `mtime` | `last_backup_name` now matches `status.sh --json` and the rotation policy |
+| **BUG-4** | `readLogFile` — a failed `Seek` is handled explicitly | `?action=read_log` no longer silently returns the wrong slice |
+| **BUG-5** | `appendDenylist` — the response message distinguishes "rules applied" from "no changes" | See §6.2.7 |
+| **BUG-6** | `main()` registers `/api/runtime_info/` (trailing slash) | See §1.3 and §6.1.7 |
+| **N-1** | `USER_AGENT` derived from `BuildVersion` | Custom `-ldflags` no longer leave a stale UA |
+| **N-4** | `getEntriesCount` caches `lastSize` even when count is `0` | Fewer full scans on the "no blocklist yet" state |
+
+Changed (documentation only — no API surface change):
+
+- **§1.1** — the language field is now bilingual (EN default +
+  AR toggle). All "English-only" references were replaced with
+  "English default with Arabic toggle".
+- **§1.5** — new section describing the v1.2.0 changes.
+- **§1.6** — the previous "What is New in v1.0.0" section
+  (renumbered from §1.5).
+- **§11** — this entry.
+- **§12** — References now include `docs/BACKUP.md`,
+  `docs/EMERGENCY.md`, and `docs/UPGRADE.md`.
+
+Deprecated:
+
+- None.
+
+Removed:
+
+- None.
+
+Fixed:
+
+- No API-level fixes at the contract level. All v1.2.0 fixes to
+  `main.go` (listed above) are internal — the request/response
+  shapes are unchanged.
+
+Client compatibility:
+
+- **v1.0.0 clients**: unaffected. All new fields are additive.
+- **v1.1.0 clients**: unaffected. The `backups` object gained
+  two fields; clients that read only the original five fields
+  continue to work.
+- **v1.2.0 clients**: can rely on all seven `backups` fields
+  being present.
+- **Order of fields**: not guaranteed. Use a JSON parser, not
+  string indexing.
 
 ### v1.1.0 (2026-09-26)
 
@@ -2131,6 +2698,8 @@ Documentation:
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
 | [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide |
 | [docs/FAQ.md](FAQ.md) | FAQ |
+| [docs/BACKUP.md](BACKUP.md) | Backup system reference (v1.2.0) |
+| [docs/EMERGENCY.md](EMERGENCY.md) | Emergency recovery guide (v1.2.0) |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 
 ### 12.3 v1.0.0 References
@@ -2166,11 +2735,26 @@ Documentation:
 > The Audit Corrections Registry remains at #33 (last entry from
 > v1.0.0). The next audit correction will be #34.
 
+### 12.5 v1.2.0 References
+
+| Change | ID | Reference |
+|---|:---:|---|
+| `runtime_info.backups` full schema (7 fields) | BAK-1 | [BACKUP.md](BACKUP.md) §8.1, [ARCHITECTURE.md](ARCHITECTURE.md) §16.7 |
+| Pre-critical backup on destructive endpoints | BAK-2 | [BACKUP.md](BACKUP.md) §4.3, [ARCHITECTURE.md](ARCHITECTURE.md) §4.10 |
+| Backup diagnostic examples | BAK-3 | [BACKUP.md](BACKUP.md) §8.1–§8.3, [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §7.8–§7.10 |
+| Recovery mode examples | BAK-4 | [EMERGENCY.md](EMERGENCY.md) §9, [UPGRADE.md](UPGRADE.md) §3.1 |
+| Post-audit fixes to `main.go` (BUG-1 .. BUG-6, N-1, N-4) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §4.10.5 |
+
+> **Note**: BAK-1 / BAK-2 / BAK-3 / BAK-4 are **not** audit
+> corrections. They are data-preservation additions documented
+> in [SECURITY.md](SECURITY.md) §5.31. The Audit Corrections
+> Registry remains at #33.
+
 **Last Audit Correction**: #33 (v1.0.0)
-**Next expected**: #34 (v1.2.x)
+**Next expected**: #34 (v1.3.x)
 
 ---
 
-**Last updated**: 2026-09-26
-**Version**: v1.1.0
+**Last updated**: 2026-09-29
+**Version**: v1.2.0
 **Author**: gasciljh

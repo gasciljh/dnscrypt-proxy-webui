@@ -1,6 +1,13 @@
 {
-  "version": "v1.1.0",
-  "versionCode": 1010000,
-  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.1.0/dnscrypt-webui-1.1.0-module.zip",
-  "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md"
+  "version": "v1.2.0",
+  "versionCode": 1020000,
+  "versionName": "v1.2.0 (Global Edition)",
+  "releaseDate": "2026-09-29",
+  "minMagiskVersion": 20400,
+  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.2.0/dnscrypt-webui-1.2.0-module.zip",
+  "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md",
+  "changelogUrl": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md",
+  "homepageUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+  "supportUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/issues",
+  "donateUrl": ""
 }

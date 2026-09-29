@@ -1,23 +1,102 @@
 # ============================================================
 # DNSCrypt Smart Filter – Bug Report Template
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # GitHub Issue Forms (YAML-based) — the modern standard
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
 # ============================================================
-# v1.1.0 additions:
-#   • The "Latest version" checkbox now references v1.1.0 (was
-#     v1.0.0 in the previous template).
-#   • Added a new optional diagnostic field for v1.1.0's dynamic
+# v1.1.0 additions (kept):
+#   • The "Latest version" checkbox now references v1.1.0.
+#   • Added a new optional diagnostic field for the dynamic
 #     memory limit (profile_key + memory_limit_mb from
-#     runtime_info). This makes it easier to diagnose
-#     profile-related performance or crash issues.
+#     runtime_info).
 #   • runtime_info placeholder updated to include the two new
 #     fields exposed by main.go v1.1.0.
 #   • status.sh --json example updated to include memory
 #     diagnostics where applicable.
+#
+# ============================================================
+# v1.2.0 additions:
+#   • Version bumped to v1.2.0.
+#   • "Latest version" checkbox now references v1.2.0.
+#   • Added a new optional diagnostic section:
+#       "💾 v1.2.0 — Data Preservation Diagnostics"
+#     with four new fields:
+#       - Persistent backup state (count, latest, last_stable)
+#       - Recovery mode status (trigger file present?)
+#       - Orphan transaction count
+#       - Upgrade history log excerpt
+#     These are pulled from `status.sh --diagnose` and
+#     `status.sh --json` in v1.2.0.
+#   • Added a "Pre-flight: safe data check" checkbox, asking the
+#     reporter to confirm they have a backup before testing
+#     destructive operations.
+#   • Added a new optional "Manual backup taken?" dropdown to
+#     help diagnose data-loss reports.
+#   • runtime_info placeholder now includes the `backups` object
+#     with ALL SEVEN fields (v1.2.0 — BAK-1), not five.
+#   • The "Pre-flight checks" section now references the two
+#     new v1.2.0 guides:
+#       - docs/BACKUP.md
+#       - docs/EMERGENCY.md
+#   • Added a new explicit explanatory block that distinguishes
+#     between the SEVEN-field `runtime_info.backups` object
+#     (API surface) and the NINE-field `status.sh --json .backups`
+#     object (shell diagnostic surface). The two share seven
+#     fields; the shell tool adds `status` and
+#     `last_backup_age_seconds`.
+#   • The status.sh --json placeholder now displays all nine
+#     fields with a clear marker for the two shell-only fields.
+#   • All comments are English-only (global edition). No Arabic
+#     strings exist in this file.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# ============================================================
+# A pre-release audit of this file identified the following
+# issues. All of them are addressed in-place; no version bump.
+#
+#   🔧 ISS-1 (critical) — Several diagnostic hints told the user
+#     to run `curl -s http://127.0.0.1:9090/api?action=runtime_info`
+#     and `curl -s http://127.0.0.1:9091/api/metrics`. Both
+#     endpoints are behind authentication: `customize.sh` always
+#     generates credentials for `[monitoring_ui]`, and `main.go`'s
+#     `checkAuth` rejects unauthenticated requests with HTTP 401.
+#     A user pasting those commands would get:
+#         {"status":"error","message":"Unauthorized"}
+#     and would paste the error into the report, making it look
+#     like `runtime_info` was broken.
+#
+#     The fix replaces those hints with `status.sh --json`, which
+#     reads files directly on the device and does NOT need HTTP
+#     authentication. Where `curl` is genuinely required (e.g.
+#     reading /api/metrics), the hint now describes the manual
+#     browser-based copy (DevTools → Network tab) as the primary
+#     method and mentions Basic Auth as an alternative.
+#
+#   🔧 ISS-2 — The v1.2.0 block that distinguishes the two
+#     `backups` objects wrote:
+#         "The `status.sh --json .backups` object has NINE fields"
+#     That phrasing conflates a shell command with a JSONPath
+#     expression, as if `.backups` were part of the command. The
+#     text now reads "the `backups` object returned by
+#     `status.sh --json`", which is unambiguous.
+#
+#   🔧 ISS-3 — The `backup_count` field's description pointed at
+#     a `"Snapshots"` line in `status.sh --diagnose`. No such
+#     line exists: the actual output uses the phrase
+#     "N snapshot(s) available". The description now quotes the
+#     real wording, so a user searching the report for the
+#     reference will find it.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • docs/API.md §6.1.7  — runtime_info schema (7-field backups)
+#   • docs/API.md §10.6   — backup diagnostics examples
 # ============================================================
 
 name: 🐛 Bug Report
@@ -40,8 +119,10 @@ body:
 
         - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
         - Checked [docs/TROUBLESHOOTING.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md)
+        - Checked [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) (v1.2.0)
+        - Checked [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) (v1.2.0)
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue)
-        - Are running the **latest version** of the module (v1.1.0)
+        - Are running the **latest version** of the module (v1.2.0)
 
         ---
 
@@ -57,14 +138,16 @@ body:
       label: ✅ Pre-flight checks
       description: All items must be confirmed to continue
       options:
-        - label: I have read FAQ.md and TROUBLESHOOTING.md
+        - label: I have read FAQ.md, TROUBLESHOOTING.md, BACKUP.md, and EMERGENCY.md
           required: true
         - label: I searched existing Issues and did not find the same problem
           required: true
-        - label: I am running the latest version of the module (v1.1.0)
+        - label: I am running the latest version of the module (v1.2.0)
           required: true
         - label: This is not a security vulnerability (otherwise I would use Private Reporting)
           required: true
+        - label: I have taken a manual backup of my config (recommended before any destructive test)
+          required: false
 
   # ============================================================
   # [3] Problem description
@@ -76,7 +159,7 @@ body:
       description: A clear and concise description of the problem. What happened? What did you expect?
       placeholder: |
         Example:
-        After updating the module to v1.1.0, the WebUI stopped working.
+        After updating the module to v1.2.0, the WebUI stopped working.
         When opening http://127.0.0.1:9090, a blank page appears.
         I expected the main interface with the service status.
     validations:
@@ -91,7 +174,7 @@ body:
       label: 🔁 Steps to reproduce
       description: How can the problem be reproduced? Be as specific as possible.
       placeholder: |
-        1. Install the module v1.1.0 from Magisk
+        1. Install the module v1.2.0 from Magisk
         2. Reboot the device
         3. Open the WebUI from the Action button
         4. Click "Apply" for the PRO blocklist
@@ -161,8 +244,8 @@ body:
     id: module_version
     attributes:
       label: 🏷️ Module version
-      description: 'From `module.prop` or `status.sh` — example: v1.1.0'
-      placeholder: 'v1.1.0'
+      description: 'From `module.prop` or `status.sh` — example: v1.2.0'
+      placeholder: 'v1.2.0'
     validations:
       required: true
 
@@ -252,6 +335,13 @@ body:
   # ============================================================
   # [9] v1.1.0 — Memory limit diagnostics
   # ============================================================
+  # ISS-1 fix: the hint below no longer uses `curl` against the
+  # authenticated /api endpoint. It uses `status.sh --json`
+  # instead, which reads files directly on the device. The
+  # `curl` alternative is mentioned only as a footnote, with
+  # the credentials file path, so a user who prefers curl knows
+  # what to do without getting a silent 401.
+  # ============================================================
   - type: markdown
     attributes:
       value: |
@@ -265,7 +355,19 @@ body:
         >
         > You can obtain both values with:
         > ```bash
-        > curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.profile'
+        > ```
+        >
+        > ⚠️ The HTTP endpoint (`/api?action=runtime_info`) requires
+        > credentials. If you prefer to query it directly, use:
+        > ```bash
+        > # Read credentials from the module's credentials file:
+        > CREDS=/data/local/tmp/dnscrypt_credentials.txt
+        > USER=$(grep '^Username:' "$CREDS" | awk '{print $2}')
+        > PASS=$(grep '^Password:' "$CREDS" | awk '{print $2}')
+        > curl -s -u "$USER:$PASS" \
+        >   'http://127.0.0.1:9090/api?action=runtime_info' | \
+        >   jq '{profile_key, memory_limit_mb}'
         > ```
 
   - type: input
@@ -287,7 +389,100 @@ body:
       required: false
 
   # ============================================================
-  # [10] Logs (optional but very useful)
+  # [10] v1.2.0 — Data preservation diagnostics
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 💾 v1.2.0 — Data Preservation Diagnostics
+
+        > **New in v1.2.0**: The installer uses a 10-layer
+        > data-preservation architecture. If your issue relates to
+        > **lost settings**, **restore failures**, **upgrade
+        > problems**, **recovery mode**, or **orphan transactions**,
+        > please fill in the fields below.
+        >
+        > Obtain them with:
+        > ```bash
+        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+        > ```
+        > or, for machine-readable output:
+        > ```bash
+        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups'
+        > ```
+
+  - type: input
+    id: backup_count
+    attributes:
+      label: 💾 Persistent backup count
+      # ISS-3 fix: quote the actual wording produced by status.sh
+      # --diagnose ("N snapshot(s) available"), not a hypothetical
+      # "Snapshots" line that does not exist.
+      description: 'From `status.sh --diagnose` → the "N snapshot(s) available" line'
+      placeholder: '7'
+    validations:
+      required: false
+
+  - type: input
+    id: last_stable
+    attributes:
+      label: 🎯 Last stable snapshot
+      description: 'From `cat /sdcard/dnscrypt-webui-backup/.last_stable` — the recovery pointer'
+      placeholder: '20260926-095826-v1.2.0'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: recovery_mode_active
+    attributes:
+      label: 🚨 Recovery mode trigger
+      description: 'Is `/data/adb/modules/dnscrypt-proxy-webui/recovery` present?'
+      options:
+        - 'No — trigger file is NOT present'
+        - 'Yes — trigger file IS present'
+        - '❓ Not sure — did not check'
+    validations:
+      required: false
+
+  - type: input
+    id: orphan_txn_count
+    attributes:
+      label: 🗃️ Orphan transactions
+      description: 'From `ls /sdcard/dnscrypt-webui-backup/orphan-txn-* 2>/dev/null | wc -l`'
+      placeholder: '0'
+    validations:
+      required: false
+
+  - type: textarea
+    id: upgrade_history
+    attributes:
+      label: 📜 Upgrade history (optional)
+      description: 'Excerpt from `/sdcard/dnscrypt-webui-backup/.upgrade_history.json` (or `.txt` fallback)'
+      placeholder: |
+        ```json
+        {
+          "upgrades": [
+            {
+              "from": "v1.1.0",
+              "to": "v1.2.0",
+              "date": "2026-09-26T10:30:00Z",
+              "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
+              "files": 5
+            }
+          ]
+        }
+        ```
+      render: json
+    validations:
+      required: false
+
+  # ============================================================
+  # [11] Logs (optional but very useful)
+  # ============================================================
+  # ISS-1 + ISS-2 fix: the introductory text clarifies that
+  # `curl` against /api requires credentials and prefers
+  # `status.sh --json`; the `.backups` phrasing is now
+  # unambiguous.
   # ============================================================
   - type: markdown
     attributes:
@@ -296,6 +491,24 @@ body:
 
         > 💡 All of these fields are **optional** but greatly speed up diagnostics.
         > **Do not upload logs as images** — paste the text directly.
+        >
+        > **⚠️ Two distinct `backups` objects**:
+        > The `backups` object returned by the HTTP API
+        > (`/api?action=runtime_info`) has **SEVEN fields**.
+        > The `backups` object returned by `status.sh --json` has
+        > **NINE fields** — the same seven, plus two diagnostic-only
+        > fields (`status` and `last_backup_age_seconds`). Both
+        > shapes are shown in the placeholders below so you can
+        > paste the correct one.
+        >
+        > ⚠️ `curl` against any `/api` endpoint requires
+        > authentication. The module auto-generates credentials in
+        > `dnscrypt-proxy.toml [monitoring_ui]`. Prefer
+        > `status.sh --json`, which reads files directly and needs
+        > no auth:
+        > ```bash
+        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups'
+        > ```
 
   - type: textarea
     id: log_main
@@ -304,8 +517,11 @@ body:
       description: 'Last 50 lines from `/data/local/tmp/dnscrypt_main.log`'
       placeholder: |
         ```
-        [2026-09-26T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.1.0
+        [2026-09-26T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.2.0
         [2026-09-26T10:30:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+        [2026-09-26T10:30:00Z] 🆕 v1.2.0: data-preservation layers active (customize.sh + service.sh)
+        [2026-09-26T10:30:00Z] 🆕 v1.2.0: createAutoBackup on destructive operations
+        [2026-09-26T10:30:00Z] 💾 v1.2.0: persistent backup dir = /sdcard/dnscrypt-webui-backup
         [2026-09-26T10:30:01Z] 📋 LOG_LEVEL=info
         ...
         ```
@@ -316,19 +532,60 @@ body:
   - type: textarea
     id: status_json
     attributes:
-      label: 📊 `status.sh --json` output
-      description: 'Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"`'
+      label: 📊 `status.sh --json` output (v1.2.0 — NINE fields in `.backups`)
+      description: 'Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"` — the `backups` object has NINE fields (7 shared with the API + 2 shell-only)'
       placeholder: |
         ```json
         {
-          "version": "v1.1.0",
+          "version": "v1.2.0",
           "dns_engine": {"running": true, "port": 5354},
           "webui": {"running": true, "port": 9090},
           "profile": {"key": "pro", "name": "PRO", "memory_limit_mb": 120},
+          "backups": {
+            "status": "ok",
+            "available": 7,
+            "in_flight_txn": 0,
+            "orphan_txn": 0,
+            "last_backup": "2026-09-26 15:00:00",
+            "last_backup_name": "20260926-150000-manual",
+            "last_backup_age_seconds": 3600,
+            "last_stable": "20260926-095826-v1.2.0",
+            "path": "/sdcard/dnscrypt-webui-backup"
+          },
           ...
         }
         ```
       render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: status_diagnose
+    attributes:
+      label: 🩺 `status.sh --diagnose` output (v1.2.0)
+      description: 'Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"` — full report on user data, backups, and health'
+      placeholder: |
+        ```
+        ═════════════════════════════════════════════════════════════════
+          DNSCrypt Smart Filter — Diagnostic Report
+          Version: v1.2.0
+          Date:    2026-09-26 15:00:00 UTC
+        ═════════════════════════════════════════════════════════════════
+
+        ─── System Information ───
+          Android:      14 (API 34)
+          Device:       Pixel 6 Pro
+          ...
+        ─── Backups ───
+          ✅ 7 snapshot(s) available
+             Last backup: 20260926-150000-manual (1h ago)
+        ─── Health Checks ───
+          ✅ DNS engine listening on 5354/UDP
+          ✅ WebUI listening on port 9090
+          ✅ All 5 user data files present
+          ✅ Backup layer healthy (7 snapshot(s))
+        ```
+      render: shell
     validations:
       required: false
 
@@ -370,18 +627,43 @@ body:
   - type: textarea
     id: runtime_info
     attributes:
-      label: 🧭 Runtime Info (`runtime_info`)
-      description: 'Run: `curl -s http://127.0.0.1:9090/api?action=runtime_info | jq` — now includes profile_key + memory_limit_mb (v1.1.0)'
+      label: 🧭 Runtime Info — SEVEN-field `backups` object (API surface)
+      # ISS-1 fix: the previous description told the user to run
+      # `curl ... | jq`, which returns 401 without credentials.
+      # The description now points at status.sh --json first and
+      # mentions the credentials-based curl form only as an
+      # alternative.
+      description: |
+        Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq`
+        The `.backups` object in the API has SEVEN fields. (The shell
+        tool adds `status` and `last_backup_age_seconds`, for a
+        total of nine — see the dedicated field above.)
       placeholder: |
         ```json
         {
-          "version": "v1.1.0",
+          "version": "v1.2.0",
+          "commit": "a1b2c3d",
+          "build_time_human": "2026-09-26T10:00:00Z",
+          "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+          "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
+          "status_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status",
+          "pid_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.pid",
+          "progress_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/update_progress.txt",
+          "log_file": "/data/local/tmp/dnscrypt_main.log",
+          "bind_addr": "127.0.0.1",
           "webui_port": "9090",
           "dashboard_port": "9091",
-          "bind_addr": "127.0.0.1",
           "profile_key": "pro",
           "memory_limit_mb": 120,
-          ...
+          "backups": {
+            "available": 7,
+            "in_flight_txn": 0,
+            "orphan_txn": 0,
+            "last_backup": "2026-09-26 15:00:00",
+            "last_backup_name": "20260926-150000-manual",
+            "last_stable": "20260926-095826-v1.2.0",
+            "path": "/sdcard/dnscrypt-webui-backup"
+          }
         }
         ```
       render: json
@@ -392,7 +674,10 @@ body:
     id: dashboard_state
     attributes:
       label: 📈 Dashboard metrics (`/api/metrics`)
-      description: 'Run: `curl -s http://127.0.0.1:9091/api/metrics | head -20` — useful for verifying Fix #1'
+      # ISS-1 fix: /api/metrics is behind auth. The description
+      # now points at the browser DevTools as the primary method,
+      # which reuses the already-authenticated session cookie.
+      description: 'Open http://127.0.0.1:9091 in a browser and copy the JSON from DevTools → Network → the request to `/api/metrics` (the endpoint requires an authenticated session cookie)'
       placeholder: |
         ```json
         {
@@ -410,14 +695,14 @@ body:
     id: extra_logs
     attributes:
       label: 📁 Additional logs
-      description: 'Any other useful logs (dnscrypt-proxy.log, dnscrypt-blocked.log, etc.)'
+      description: 'Any other useful logs (dnscrypt-proxy.log, dnscrypt-blocked.log, dnscrypt_install.log, etc.)'
       placeholder: 'Paste only the relevant lines'
       render: shell
     validations:
       required: false
 
   # ============================================================
-  # [11] Additional context
+  # [12] Additional context
   # ============================================================
   - type: textarea
     id: additional
@@ -429,12 +714,15 @@ body:
         - Are you using a VPN or AdAway alongside the module?
         - Did the problem occur after changing certain settings?
         - Did the problem start after switching profiles (e.g. from pro to ultimate)?
+        - Did the problem occur during an upgrade from v1.1.0 to v1.2.0?
+        - Did you try recovery mode (`touch recovery && reboot`)?
+        - Did you inspect `/sdcard/dnscrypt-webui-backup/` manually?
         - Did you try any solutions? What worked and what did not?
     validations:
       required: false
 
   # ============================================================
-  # [12] Screenshots
+  # [13] Screenshots
   # ============================================================
   - type: textarea
     id: screenshots
@@ -446,7 +734,7 @@ body:
       required: false
 
   # ============================================================
-  # [13] Final confirmation
+  # [14] Final confirmation
   # ============================================================
   - type: checkboxes
     id: final_confirmation

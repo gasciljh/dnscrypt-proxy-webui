@@ -1,20 +1,25 @@
 # Contributor Covenant Code of Conduct
 
 **Project**: DNSCrypt Smart Filter
-**Version**: v1.1.0
+**Version**: v1.2.0
 **License**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
-**Last updated**: 2026-09-26
+**Last updated**: 2026-09-29
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • `Last updated` reflects the v1.1.0 release date.
->   • FAQ Q7 extended with the v1.1.0 **Memory Architect** badge.
->   • FAQ Q11 added — "What's new in v1.1.0 from a community
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • `Last updated` reflects the v1.2.0 release date.
+>   • FAQ Q7 extended with the v1.2.0 **Data Guardian** badge.
+>   • FAQ Q11 replaced — "What's new in v1.2.0 from a community
 >     perspective?".
->   • `Related Documents` table extended with `CHANGELOG.md`
->     (already linked in the FAQ, now surfaced at the top level).
+>   • `Related Documents` table extended with `docs/BACKUP.md` and
+>     `docs/EMERGENCY.md`.
+>   • **Global edition note**: the WebUI ships with English as the
+>     default language and an in-page toggle to switch to Arabic.
+>     The Code of Conduct remains English-only for legal clarity —
+>     this is consistent with the Contributor Covenant's canonical
+>     language policy.
 >   • Core Contributor Covenant text (Pledge / Standards / Scope /
 >     Enforcement / Reporting) is **unchanged** — this is a
 >     standard document.
@@ -223,9 +228,9 @@ This Code of Conduct is adapted from:
 
 ### Project Information
 
-- Project version: `v1.1.0`
+- Project version: `v1.2.0`
 - First release: `2026-09-24`
-- Latest release: `2026-09-26` (v1.1.0)
+- Latest release: `2026-09-29` (v1.2.0)
 - Maintainer: [@gasciljh](https://github.com/gasciljh)
 - License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
@@ -236,12 +241,14 @@ This Code of Conduct is adapted from:
 | Document | Content |
 |---|---|
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Full contribution guide |
-| [docs/SECURITY.md](docs/SECURITY.md) | Security policy + Threat Model |
+| [docs/SECURITY.md](docs/SECURITY.md) | Security policy + Threat Model (§5.31, §5.32, §5.33) |
 | [.github/SECURITY.md](.github/SECURITY.md) | Vulnerability reporting (short) |
 | [SECURITY.md](SECURITY.md) | Root security policy summary |
-| [docs/HALL_OF_FAME.md](docs/HALL_OF_FAME.md) | Contributors recognition |
+| [docs/HALL_OF_FAME.md](docs/HALL_OF_FAME.md) | Contributors recognition (Memory Architect + Data Guardian) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap |
-| [CHANGELOG.md](CHANGELOG.md) | Version history (including v1.1.0) |
+| [docs/BACKUP.md](docs/BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [docs/EMERGENCY.md](docs/EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [CHANGELOG.md](CHANGELOG.md) | Version history (including v1.2.0) |
 | [LICENSE](LICENSE) | Project license (MIT) |
 | [README.md](README.md) | Project overview |
 | [docs/BRANCHING.md](docs/BRANCHING.md) | Git branching strategy |
@@ -281,6 +288,10 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details:
 - Pull Request lifecycle
 - Build verification requirements
 - Coding standards
+- **v1.2.0**: backup-layer changes must update `docs/BACKUP.md` and
+  `docs/EMERGENCY.md`. See `docs/CONTRIBUTING.md` §8.9 and §9.5.
+- **v1.2.0**: any new user-facing string must supply both `en` and
+  `ar` entries. See `docs/CONTRIBUTING.md` §8.11 and §9.6.
 
 ### Q7: How is the Code enforced technically?
 
@@ -290,9 +301,10 @@ See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for details:
 | Anti-abuse | `detect-secrets` + code review before merge |
 | Transparency | All decisions are in public Issues / PRs |
 | Recognition | [HALL_OF_FAME.md](docs/HALL_OF_FAME.md) honors contributors |
-| Bilingual support | Arabic + English templates where applicable |
+| Bilingual support | WebUI bilingual (EN default + AR toggle) + AR Contributor Covenant linked in Q9 |
 | Newcomer protection | [docs/FAQ.md](docs/FAQ.md) with common questions |
-| **Memory research (v1.1.0)** | **Memory Architect badge for contributors who test dynamic memory limits across RAM tiers** |
+| Memory research (v1.1.0) | Memory Architect badge for contributors who test dynamic memory limits across RAM tiers |
+| **Data preservation research (v1.2.0)** | **Data Guardian badge for contributors who test the 10 defensive layers across devices, root solutions, and upgrade scenarios** |
 
 ### Q8: Does the Code conflict with my local laws?
 
@@ -303,35 +315,42 @@ No. The Code provides additional protection above the legal minimum. If a confli
 The Arabic version of the Contributor Covenant is available at:
 https://www.contributor-covenant.org/ar/version/2/1/code_of_conduct/
 
-**Note (v1.1.0)**: Although the project is released as a global English
-edition, the **project's own WebUI** remains bilingual (English / Arabic)
-for the benefit of Arabic-speaking users. The Code of Conduct itself is
-English-only for legal clarity, in line with the Contributor Covenant's
-recommendation.
+**Note (v1.2.0)**: The WebUI ships with **English as the default
+language** and an in-page toggle (`langToggle`) that switches to
+**Arabic**. The Code of Conduct itself is **English-only** for legal
+clarity, in line with the Contributor Covenant's recommendation.
+Documentation remains English-only by project convention — community
+translations are welcome as separate files
+(`docs/*.<lang>.md`).
 
 ### Q10: How do I report a violation in another project using Contributor Covenant?
 
 - GitHub Support: [Report abuse](https://github.com/contact/report-abuse)
 - Contributor Covenant Team: via their official website
 
-### Q11: What's new in v1.1.0 from a community perspective?
+### Q11: What's new in v1.2.0 from a community perspective?
 
 **Short answer**: Nothing that changes the Code of Conduct itself. The
-v1.1.0 release is a technical + documentation release. From a community
+v1.2.0 release is a **data-preservation** release. From a community
 perspective, the following additions are relevant:
 
 | Change | Impact on the community |
 |---|---|
-| **MEM-1 — Dynamic memory limit** | Users on low-RAM devices can now use `ultimate` without GC thrashing. This lowers the barrier for older devices. |
-| **Memory Architect badge** | New recognition path in `docs/HALL_OF_FAME.md` for contributors who test memory behavior across device tiers. |
-| **Expanded `docs/TROUBLESHOOTING.md`** | New diagnostics sections (§4.12, §5.14, §6.10, §15.13) make it easier for users to self-diagnose memory issues. |
-| **`docs/UPGRADE.md` §3.0** | Full v1.0.0 → v1.1.0 upgrade guide. Users can now read exactly what changes. |
-| **All documentation in English** | The project is now a global English edition. This aligns with the Contributor Covenant's canonical language. |
+| **Data preservation (10 defensive layers)** | Users' configuration is now preserved across upgrades, renames, reinstalls, and root-solution changes. The v1.1.0 data-loss bug is fixed. |
+| **Persistent backup directory** | A snapshot survives uninstall, so a reinstall restores your settings automatically. |
+| **Recovery mode** | Users can recover from a corrupted config with one command. No more "start from scratch". |
+| **New CLI tools** | `action.sh --backup` and `status.sh --diagnose` let users take snapshots and inspect the state without leaving the terminal. |
+| **Data Guardian badge** | New recognition path in `docs/HALL_OF_FAME.md` for contributors who test the backup/restore system across 3+ devices or root solutions. |
+| **Bilingual WebUI (EN + AR)** | English remains the default, and an in-page toggle switches to Arabic. The API remains language-neutral. |
+| **New documentation** | `docs/BACKUP.md` and `docs/EMERGENCY.md` give users a full reference and a step-by-step recovery guide. |
+| **All documentation in English** | The project is a global English edition. Arabic-speaking users benefit from the bilingual WebUI and the AR Contributor Covenant. |
 
-**Nothing was removed.** All v1.0.0 community features (bilingual WebUI,
-HALL_OF_FAME recognition, contribution guide) remain in place.
+**Nothing was removed.** All v1.0.0 and v1.1.0 community features
+(bilingual WebUI, HALL_OF_FAME recognition, contribution guide,
+Memory Architect badge) remain in place.
 
-See [CHANGELOG.md](CHANGELOG.md) for the full v1.1.0 changelog.
+See [CHANGELOG.md](CHANGELOG.md) §[v1.2.0] for the full v1.2.0
+changelog.
 
 ---
 
@@ -359,7 +378,7 @@ The project's own code and documentation are licensed under the [MIT License](LI
 
 ---
 
-*Last updated: 2026-09-26*
-*Version: v1.1.0*
+*Last updated: 2026-09-29*
+*Version: v1.2.0*
 *Maintainer: [@gasciljh](https://github.com/gasciljh)*
 *Author: gasciljh*

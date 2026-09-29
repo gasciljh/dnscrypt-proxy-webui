@@ -1,7 +1,83 @@
+# ============================================================
+# DNSCrypt Smart Filter – module.prop
+# Version: v1.2.0 (Global Edition)
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Magisk / KernelSU / APatch module definition file.
+#
+#   Read by the root manager during install and update.
+#   The `versionCode` drives update detection:
+#     newer versionCode → the manager offers an update.
+#
+# Fields:
+#   id                — unique module identifier (a-z, 0-9, -, _)
+#   name              — human-readable name (shown in the manager)
+#   version           — SemVer string (matches VERSION file)
+#   versionCode       — monotonic integer (see formula below)
+#   author            — maintainer handle
+#   description       — long description (shown in the manager)
+#   updateJson        — URL to update.json (auto-update metadata)
+#   minMagiskVersion  — minimum root-manager version (v1.2.0+)
+#   supportUrl        — issue tracker URL (v1.2.0+)
+#   donateUrl         — empty; the project accepts no donations
+#
+# versionCode formula:
+#   versionCode = MAJOR × 1,000,000
+#               + MINOR ×    10,000
+#               + PATCH ×       100
+#               + HOTFIX
+#
+#   For v1.2.0:
+#     MAJOR = 1, MINOR = 2, PATCH = 0, HOTFIX = 0
+#     → 1 × 1,000,000 + 2 × 10,000 + 0 × 100 + 0
+#     → 1,020,000
+#
+#   Updated automatically by scripts/release.sh (and
+#   scripts/release-patch.sh for PATCH releases). Do not edit
+#   manually — the release script verifies the change and
+#   rejects a mismatched versionCode.
+#
+# ⚠️ Warning:
+#   Do NOT add spaces around `=`.
+#   Do NOT add a trailing comment on the same line as a value.
+#   The Magisk parser is strict about this.
+#
+# ⚠️ Language policy (v1.2.0 — Global edition):
+#   This file's comments are English-only (project convention).
+#   The WebUI itself is bilingual (English default + Arabic
+#   toggle) — the `langToggle` button is present in all three
+#   HTML pages (index.html, dashboard.html, offline.html), and
+#   the user's preference is stored client-side in
+#   localStorage['dnscrypt-lang']. See the description field
+#   below for the exact wording used in the module manager.
+#
+# ⚠️ versionCode history (for reference):
+#   v1.0.0 → 1000000
+#   v1.1.0 → 1010000
+#   v1.2.0 → 1020000 (this release)
+#   v1.2.1 → 1020100 (next PATCH, if needed)
+#   v1.3.0 → 1030000 (next MINOR)
+#
+# Cross-references (v1.2.0):
+#   • VERSION            — Single Source of Truth for the module
+#                          version (read by release.sh)
+#   • update.json        — auto-update metadata (referenced by
+#                          updateJson below)
+#   • docs/BACKUP.md     — backup system reference
+#   • docs/EMERGENCY.md  — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • docs/API.md §6.1.7 — runtime_info schema (7-field backups)
+# ============================================================
+
 id=dnscrypt-proxy-webui
 name=DNSCrypt Proxy (Smart Filter)
-version=v1.1.0
-versionCode=1010000
+version=v1.2.0
+versionCode=1020000
 author=gasciljh
-description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), bilingual WebUI (EN/AR), separate monitoring Dashboard with JSON metrics, SSE live status, atomic writes, content-hash conflict detection, Watchdog with auto-restart, iptables/ip6tables/nftables Custom Chains, installable PWA. v1.1.0 adds dynamic per-profile memory limits (light=80MB → ultimate=220MB), extended shellQuote charset, and MONITORING_UI_PORT constant. Zero telemetry.
+description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile blocklists (HaGeZi Light → Ultimate), wildcard-aware Custom Rules, bilingual WebUI (EN/AR), JSON metrics Dashboard, atomic writes, conflict detection, Watchdog with auto-restart, nftables/iptables chains, installable PWA. v1.2.0 adds 10-layer user-data preservation: multi-source detection, persistent backup in /sdcard/dnscrypt-webui-backup, SHA256 verification, transactional upgrades with auto-rollback, recovery mode, SELinux preservation, auto-backup rotation (max 21 copies), upgrade history log, and a CLI diagnose tool. Zero telemetry.
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json
+minMagiskVersion=20400
+supportUrl=https://github.com/gasciljh/dnscrypt-proxy-webui/issues
+donateUrl=
