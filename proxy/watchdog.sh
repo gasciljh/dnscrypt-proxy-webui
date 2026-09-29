@@ -222,6 +222,14 @@
 #   Android ships supports it.
 # ============================================================
 
+# v1.2.1: --version flag (checked before any argument parsing)
+case "${1:-}" in
+	--version)
+		echo "$0: v1.2.1"
+		exit 0
+		;;
+esac
+
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
