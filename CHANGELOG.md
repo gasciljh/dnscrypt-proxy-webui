@@ -28,6 +28,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.2.1] - 2026-09-30
+
+> **Bug-fix release** — no new features, no breaking changes.
+
+### 🐛 Fixed
+
+- **`readLogFile` (main.go)** — the backward-seek fallback
+  previously returned the OLDEST N bytes instead of the newest
+  when `f.Seek(-N, io.SeekEnd)` failed. Now uses an
+  `io.LimitReader` + tail-slice so the user always sees the
+  most recent log entries.
+
+- **`checkPendingNotifications` (main.go)** — the pending
+  notification file is now validated before being forwarded to
+  `logEvent`:
+  - Non-`os.IsNotExist` read errors are logged at warn level.
+  - Oversized payloads (>4 KB) are truncated with rune-boundary
+    backoff (no multi-byte character is cut in half).
+  - Invalid UTF-8 is rejected with a clear warning.
+  - On read failure, a best-effort cleanup is attempted so a
+    stuck file cannot loop indefinitely.
+
+- **`rotate_backups` (functions.sh)** — retention counting now
+  ignores snapshot directories that are empty or missing
+  `.manifest.json`. Previously, partial/failed copies were
+  counted and could displace valid snapshots from the
+  retention window.
+
+- **`verify_backup_integrity` (functions.sh)** — added an
+  opt-in strict mode (`verify_backup_integrity <dir> 1`) that
+  turns several silent skips into explicit failures:
+  - Missing `.manifest.json` -> immediate return 1.
+  - `sha256sum` unavailable -> immediate return 1.
+  - Missing `sha256` entry in the manifest -> counted as error.
+  - `checked != files_count` (from manifest) -> counted as error.
+  Default behavior (strict=0) is unchanged and fully backward
+  compatible.
+
+- **`createAutoBackup` (main.go)** — on timeout, the partial
+  target directory is now cleaned up after a 500 ms grace
+  period, preventing accumulation of orphan snapshots on the
+  SD card. Cleanup failures are logged at debug level only
+  (non-fatal).
+
+### Added
+
+- **`--version` flag** on all six shell scripts
+  (`action.sh`, `service.sh`, `status.sh`, `uninstall.sh`,
+  `watchdog.sh`, `customize.sh`). Prints `<script>: v1.2.1`
+  and exits 0. Note: `status.sh` already uses `-V` as an alias
+  for `--verbose`, so only the long form is provided.
+
+- **Observability:** `verify_backup_integrity` now always logs
+  a `checked=N errors=M` summary line, regardless of mode.
+
+### Breaking Changes
+
+None. Fully backward-compatible with v1.2.0.
+
+### Notes
+
+- The Magisk installer copy of `verify_backup_integrity` in
+  `customize.sh` is duplicated for installer-context reasons
+  and was not updated in this release. It will be aligned in
+  a follow-up change.
+- A deeper `runShellWithTimeout` fix (process-group kill via
+  `SysProcAttr.Setpgid`) is planned for a future release.
+
+---
+
 ## [v1.2.0] - 2026-09-29
 
 > **Data-Preservation Release** — the biggest reliability improvement
