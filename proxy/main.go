@@ -4676,6 +4676,26 @@ func createAutoBackup(reason string) {
 		logWithLevel("warn", fmt.Sprintf(
 			"⚠️ auto-backup failed (reason=%s, took=%v): %v",
 			safeReason, elapsed, err))
+
+		// v1.2.1 fix: cleanup partial backup on failure
+		// The shell was SIGKILLed on timeout; children (cp,
+		// sha256sum) may briefly survive and finish writing to
+		// targetDir. Give them a short grace period, then remove
+		// the partial directory. rotate_backups already ignores
+		// manifest-less dirs (v1.2.1 change), but cleanup keeps
+		// the SD card tidy and the operator unconfused.
+		time.Sleep(500 * time.Millisecond)
+		if _, statErr := os.Stat(targetDir); statErr == nil {
+			if rmErr := os.RemoveAll(targetDir); rmErr != nil {
+				logWithLevel("debug", fmt.Sprintf(
+					"auto-backup cleanup: could not remove %s: %v",
+					filepath.Base(targetDir), rmErr))
+			} else {
+				logWithLevel("info", fmt.Sprintf(
+					"🧹 auto-backup cleanup: removed partial %s",
+					filepath.Base(targetDir)))
+			}
+		}
 		return
 	}
 
