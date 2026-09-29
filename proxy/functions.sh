@@ -1996,10 +1996,19 @@ rotate_backups() {
     fi
 
     local snapshots
+    # v1.2.1: skip empty / manifest-less snapshots
+    # A snapshot is counted for retention only if it is non-empty
+    # AND contains a .manifest.json. Partial/failed copies are
+    # ignored so they do not displace valid snapshots.
     snapshots=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
         ls -1d */ 2>/dev/null | \
         sed 's:/$::' | \
         grep -E '^[0-9]{8}-[0-9]{6}-' | \
+        while IFS= read -r _d; do
+            [ -z "$(ls -A "$_d" 2>/dev/null)" ] && continue
+            [ -f "$_d/.manifest.json" ] || continue
+            printf '%s\n' "$_d"
+        done | \
         sort -r)
 
     [ -z "$snapshots" ] && return 0
