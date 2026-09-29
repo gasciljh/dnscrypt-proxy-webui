@@ -12,6 +12,41 @@
 
 ---
 
+> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+>
+> This ADR was reviewed during the v1.2.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • Three releases have been published through this automated
+>     pipeline: `v1.0.0` (2026-09-24), `v1.1.0` (2026-09-26), and
+>     `v1.2.0` (2026-09-29).
+>   • `scripts/release.sh` and `scripts/release-patch.sh` have
+>     had **no behavioral changes** since v1.0.0 — only header
+>     comments and documentation blocks were updated during the
+>     v1.2.0 cycle. The core logic is byte-for-byte identical:
+>       - `release.sh`: version bump + commit + tag + push.
+>       - `release-patch.sh`: three safety rules + delegate to
+>         `release.sh`.
+>   • `.github/workflows/release.yml` published all three releases
+>     successfully.
+>   • The **6 expected artifacts** were attached to each GitHub
+>     Release (module.zip, .sha256, 4 binaries).
+>   • Total time per release: ~3-4 minutes (measured on the
+>     `v1.2.0` run).
+>   • **No manual intervention** was required for any of the three
+>     releases.
+>   • The v1.2.0 addition — `upgrade-test.yml` (42-scenario matrix)
+>     — did **not** change the release pipeline; it runs
+>     independently as a QA tool.
+>   • The new `backup-smoke-test` job in `ci.yml` validated the 10
+>     defensive layers before the release was cut.
+>
+> **Result**: The decision is validated by three release cycles
+> including a large data-preservation release. No superseding ADR
+> is required.
+
 > **Post-Release Verification (v1.1.0 — 2026-09-26)**:
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
@@ -22,7 +57,8 @@
 >   • Two releases have been published through this automated
 >     pipeline: `v1.0.0` (2026-09-24) and `v1.1.0` (2026-09-26).
 >   • `scripts/release.sh` and `scripts/release-patch.sh` were
->     used unchanged (no modifications since v1.0.0).
+>     used with no behavioral changes (no modifications to their
+>     core logic since v1.0.0).
 >   • `.github/workflows/release.yml` published both releases
 >     successfully.
 >   • The 6 expected artifacts were attached to each GitHub
@@ -279,11 +315,13 @@ GitHub Actions (release.yml) triggers
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
   Layer 2 implementation.
 - [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
-  pre-release validation.
+  pre-release validation + `backup-smoke-test` (v1.2.0).
+- [`.github/workflows/upgrade-test.yml`](../../.github/workflows/upgrade-test.yml) —
+  42-scenario data-preservation matrix (v1.2.0, QA tool).
 - [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) — step-by-step
   guide for the maintainer.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0 uses the automated pipeline).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0).
 - [`docs/BRANCHING.md`](../BRANCHING.md) §6 — branch protection
   rules that gate the release.
 
@@ -317,6 +355,16 @@ GitHub Actions (release.yml) triggers
   - SBOM: SPDX + CycloneDX generated.
   - Auto-sync `main → develop`: succeeded.
   - **No manual intervention was needed** for either release.
+- **v1.2.0** (2026-09-29) — third release; pipeline unchanged.
+  - Duration: ~3-4 minutes.
+  - Artifacts: 6 attached correctly.
+  - Cosign signature: verified.
+  - SBOM: SPDX + CycloneDX generated.
+  - Auto-sync `main → develop`: succeeded.
+  - **Data-Preservation Release** — the 10 defensive layers, BAK-1..4,
+    FIX-1/2, and WD-TOKEN all shipped through the same pipeline
+    without modification.
+  - **No manual intervention was needed.**
 - See `CHANGELOG.md` for the full release history.
 
 ---

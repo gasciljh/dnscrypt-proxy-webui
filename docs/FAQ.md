@@ -1,24 +1,45 @@
 # FAQ — Frequently Asked Questions
 
-> Quick answers to 120+ common questions.
+> Quick answers to 130+ common questions.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • Added a new section: "v1.1.0 Specific Questions" (Q111–Q120),
->     covering the dynamic per-profile memory limit and the two
->     new `runtime_info` fields.
->   • Updated Q8 (What's new) to also describe v1.1.0.
->   • Updated Q37 (Dashboard links), Q43 (performance), Q59 (auth
->     cache), Q60 (`runtime_info`), Q78 (version verification), and
->     Q88 (`runtime_info` example) for v1.1.0.
->   • The v1.0.0-specific section (Q78–Q89) is preserved as-is, with
->     the version numbers updated to reference the current release.
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Added a new section: **"v1.2.0 Specific Questions"** (Q121–Q130),
+>     covering the 10 data-preservation layers, the persistent
+>     backup directory, recovery mode, transactional upgrades,
+>     and the `runtime_info.backups` 7-field schema.
+>   • Updated Q8 (What's new) to also describe v1.2.0.
+>   • Updated Q43 (Performance improvements) with the v1.2.0
+>     backup layer's storage metrics.
+>   • Updated Q64 (Uninstall) — v1.2.0 preserves the backup
+>     directory on uninstall.
+>   • Updated Q66 (Rollback) with v1.2.0 caveats.
+>   • Updated Q73 (Settings lost) — v1.2.0 fixes the legacy
+>     bug via the 10 defensive layers.
+>   • Updated Q112 (Memory limit) with cross-reference to the
+>     v1.2.0 backup layer.
+>   • Preserved the v1.0.0-specific section (Q78–Q89) and the
+>     v1.1.0-specific section (Q111–Q120) as-is, with version
+>     numbers updated to reference the current release.
 >   • No questions were removed.
+>   • **Global edition — English default with Arabic toggle**:
+>     the WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+
+> **📖 Related documents**:
+> - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
+> - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
+> - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
+> - Branching strategy → [`docs/BRANCHING.md`](BRANCHING.md)
+> - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
 
 ---
 
@@ -35,6 +56,7 @@
 - [Problems & Solutions](#problems--solutions)
 - [v1.0.0 Specific Questions](#v100-specific-questions)
 - [v1.1.0 Specific Questions](#v110-specific-questions)
+- [v1.2.0 Specific Questions](#v120-specific-questions)
 - [For Developers](#for-developers)
 - [Contributing](#contributing)
 
@@ -53,12 +75,13 @@ A Magisk/KernelSU module that turns an Android device into a **system-wide encry
 | DNS-level blocking | ✅ | ✅ |
 | DNS encryption | ❌ | ✅ (DNSCrypt + DoH) |
 | HTTPS filtering | ❌ | ❌ |
-| Arabic WebUI | ❌ | ✅ |
+| WebUI (English + Arabic) | ❌ | ✅ |
 | Dashboard | ❌ | ✅ (JSON metrics) |
 | Auto-updated lists | ⚠️ | ✅ (5 sources) |
 | PWA | ❌ | ✅ |
 | Zero telemetry | ⚠️ | ✅ |
 | Dynamic memory limit | ❌ | ✅ (v1.1.0) |
+| **Data preservation** | ❌ | ✅ **(v1.2.0)** |
 
 ### 3. How is it different from NextDNS / AdGuard DNS?
 
@@ -85,39 +108,35 @@ The project does not connect to any analytics server, does not collect statistic
 - DNSCrypt/DoH (for DNS encryption).
 - Blocklist sources (e.g. HaGeZi via jsDelivr, for downloading lists).
 
-### 8. What's new in v1.1.0?
+### 8. What's new in v1.2.0?
 
-**Polish release — documentation + three runtime improvements.**
+**Data Preservation Release — the biggest reliability improvement since v1.0.0.**
 
-**No breaking changes.** All v1.0.0 clients and configurations
-continue to work without modification.
+**No breaking changes for users.** The WebUI remains bilingual
+(English default + Arabic toggle), exactly as in v1.1.0.
 
-**Runtime changes** (see Q111–Q120 for details):
+**The 10 defensive layers**:
 
-- **Dynamic memory limit per profile (MEM-1)** —
-  `debug.SetMemoryLimit` is now computed from the active
-  profile instead of being hardcoded to 80 MB. Prevents GC
-  thrashing on the `ultimate` profile.
-- **Extended `shellQuote` (MEM-2)** — the escape list grew from
-  20 to 24 characters (`{`, `}`, `\n`, `\t` added).
-- **`MONITORING_UI_PORT` constant (MEM-3)** — the metrics
-  handler no longer contains the hardcoded string `"8080"`.
+- **Multi-source detection** — searches 7 candidate locations for user data.
+- **Persistent backup** — `/sdcard/dnscrypt-webui-backup/` survives uninstall and `/data` reset.
+- **SHA256 integrity verification** — advisory check of every snapshot.
+- **Transactional upgrades** — atomic install with automatic rollback.
+- **Root-solution compatibility** — Magisk / KernelSU / APatch.
+- **SELinux preservation** — `restorecon` / `chcon` on every restore.
+- **Recovery mode** — a `recovery` trigger file restores last known-good config.
+- **Config migrations** — version-aware transformations.
+- **Auto-backup + rotation** — periodic (24 h) + pre-critical; max 21 snapshots.
+- **Observability** — `.upgrade_history.json`, `status.sh --diagnose`, 7-field `runtime_info.backups`.
 
-**Two new fields in `runtime_info`**:
+**What this fixes**: A **data-loss bug** in v1.1.0 that silently erased the 5 user config files on every in-place upgrade. Users no longer lose their settings.
 
-- `profile_key` — the active blocklist profile.
-- `memory_limit_mb` — the Go runtime soft memory limit for
-  that profile.
+**New tools**:
 
-**Documentation updates**:
+- `action.sh --backup` — trigger a manual backup.
+- `status.sh --diagnose` — full diagnostic report.
+- `runtime_info.backups` — 7-field observability object (see Q127).
 
-- New section in this FAQ (Q111–Q120).
-- Updated `docs/SECURITY.md` with §5.30, §14.22–14.24.
-- Updated `docs/ARCHITECTURE.md` with §3.9, §4.9, §11.22.
-- Updated `docs/TROUBLESHOOTING.md` with §4.12, §5.14, §6.10,
-  §15.13.
-
-See [CHANGELOG.md](../CHANGELOG.md) for details.
+See [CHANGELOG.md](../CHANGELOG.md) for details. See Q121–Q130 for the specifics.
 
 ### 9. What is the release cadence?
 
@@ -143,15 +162,25 @@ Yes — it supports:
 - **KernelSU** 0.9.0+
 - **APatch**
 
+**v1.2.0 addition**: Full support for APatch's module folder
+lifecycle (Layer 5). The installer checks `modules_update/` as a
+fallback source when APatch has already deleted the old module
+folder.
+
 ### 12. What is the oldest supported Android version?
 
 **Android 5.0** (API 21). Recommended: **Android 10+**.
+
+**v1.2.0 note**: On Android 5.x, the backup layer falls back to
+size checks if `sha256sum` is missing. See
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §5.5.
 
 ### 13. What are the minimum requirements?
 
 - Android 5.0+
 - 1 GB RAM
 - 20 MB storage
+- **10 MB on `/sdcard/`** (v1.2.0 backup)
 - Root (Magisk/KernelSU/APatch)
 - Kernel 3.10+
 
@@ -159,7 +188,7 @@ Yes — it supports:
 
 See [`INSTALL.md`](INSTALL.md). In short:
 
-1. Download `dnscrypt-webui-1.1.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
+1. Download `dnscrypt-webui-1.2.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
 2. Install via Magisk Manager → Modules.
 3. Reboot.
 4. Open `http://127.0.0.1:9090` from a browser.
@@ -175,7 +204,13 @@ You can use:
 
 ### 16. Are settings lost on upgrade?
 
-**No** — since v1.0.0. See [Q57](#57-what-is-readconfport-range-check).
+**No** — since v1.0.0, and greatly hardened in v1.2.0. See Q57,
+Q73, and Q121.
+
+**v1.2.0 difference**: The v1.0.0 mechanism used
+`/data/local/tmp/`, which was cleared on reboot. v1.2.0 uses
+`/sdcard/dnscrypt-webui-backup/`, which survives uninstall and
+factory reset of `/data`.
 
 ---
 
@@ -201,6 +236,9 @@ Or:
 su -c "grep -A2 '\[monitoring_ui\]' /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml"
 ```
 
+**v1.2.0 note**: The credentials are also in the persistent backup
+at `/sdcard/dnscrypt-webui-backup/current/dnscrypt-proxy.toml`.
+
 ### 19. How do I change the port?
 
 Edit `webui.conf`:
@@ -214,6 +252,9 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ⚠️ **Warning**: Do not use port 8080 (reserved for monitoring_ui). The system will refuse to start.
 
 ⚠️ **Fix NEW-3**: Invalid values (`0`, `99999`, `-1`, `abc`) → automatic fallback to default.
+
+**v1.2.0 note**: The new port is preserved by the 10 defensive
+layers on the next upgrade.
 
 ### 20. How do I temporarily stop protection?
 
@@ -238,6 +279,9 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
    *.example.com
    ```
 4. Press 💾 Save.
+
+**v1.2.0 addition**: A pre-critical backup is created
+automatically before every save. See Q124.
 
 ### 22. How do I block an additional site?
 
@@ -337,12 +381,12 @@ A separate monitoring panel on `http://127.0.0.1:9091` that displays:
 
 **Before v1.0.0**: This was a known issue (Dashboard broken) due to Prometheus text → JSON conversion.
 
-**Now**: In v1.1.0 (and v1.0.0), it works correctly. Verify:
+**Now**: In v1.2.0 (and v1.0.0+), it works correctly. Verify:
 
 ```bash
 # 1. Version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.1.0
+# Expected: version=v1.2.0
 
 # 2. Binary updated
 su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui 2>/dev/null | grep -q 'buildDashboardJSON' && echo 'OK'"
@@ -427,8 +471,10 @@ Full schema in [`API.md`](API.md).
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
 ```
 
-**v1.1.0 addition**: The System Info panel in both WebUI and
-Dashboard also shows the active profile and memory limit. See Q117.
+**v1.1.0+ addition**: The System Info panel shows profile + memory. See Q117.
+
+**v1.2.0 addition**: The System Info panel also shows backup state
+(6 user-facing fields). See Q127.
 
 ---
 
@@ -448,7 +494,7 @@ In normal use:
 - DNS Engine: ~5 MB
 - **Total**: ~20-25 MB only.
 
-**v1.1.0**: The WebUI now has a **dynamic soft memory limit**
+**v1.1.0+**: The WebUI now has a **dynamic soft memory limit**
 per profile. This is not the actual RSS usage; it is the ceiling
 at which the Go runtime starts GC more aggressively. See Q43 and
 Q111.
@@ -484,9 +530,9 @@ Yes:
 
 **Impact**: Less CPU, faster response, less disk I/O.
 
-### 43. What performance improvements came in v1.1.0?
+### 43. What performance improvements came in v1.1.0 and v1.2.0?
 
-**v1.1.0 introduces MEM-1 — dynamic memory limit per profile.**
+**v1.1.0 — MEM-1 (Dynamic memory limit per profile)**:
 
 **Before v1.1.0**: The Go runtime soft limit was hardcoded to
 80 MB. On the `ultimate` profile, actual working set approaches
@@ -516,14 +562,39 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit
 # Expected: 120 for pro, 220 for ultimate, etc.
 ```
 
-See Q111–Q120 for more details, and `TROUBLESHOOTING.md` §6.10
-for GC thrashing diagnostics.
+See Q111–Q120 for more details.
+
+**v1.2.0 — Backup layer storage metrics**:
+
+| Metric | Value |
+|---|---|
+| Size per snapshot | ~30–100 KB (5 config files) |
+| Total with rotation (21 snapshots) | ~2 MB max |
+| Backup duration | < 5 seconds |
+| Restore duration | < 3 seconds |
+| Rotation policy | Keep 21 newest by directory name |
+| Pre-critical backup frequency | On every destructive write |
+| Periodic backup interval | 24 h (service.sh) |
+
+**Impact**:
+- Negligible storage footprint (~2 MB max).
+- No measurable CPU or battery impact.
+- Pre-critical backups run in parallel with the user's action
+  and are bounded by `AUTO_BACKUP_TIMEOUT = 15 s`.
 
 **Does `rebuildMu` slow down rebuildBlocklist?**
 
 No. `rebuildBlocklist` takes ~200 ms (100K) or ~1 s (500K). The coarse-grained lock adds no noticeable overhead.
 
 **However**: When `updateProfile` + `saveAllowlist` run simultaneously, they serialize — may seem slightly slower (acceptable — rare operation).
+
+**Does `backupMu` slow down save operations?**
+
+No. `backupMu` serializes pre-critical backups, but each backup
+takes < 5 s and runs in parallel with the main write operation
+(both are best-effort). The user perceives no delay.
+
+See Q121–Q130 for the full v1.2.0 picture.
 
 ---
 
@@ -537,6 +608,10 @@ Yes.
 - Zero telemetry.
 - Credentials are generated with high entropy.
 
+**v1.2.0 addition**: Your **user configuration** is now preserved
+in a persistent backup at `/sdcard/dnscrypt-webui-backup/`. See
+Q123.
+
 ### 45. Can a malicious app steal my data?
 
 Very difficult for the following reasons:
@@ -549,6 +624,11 @@ Very difficult for the following reasons:
 - `/readyz` localhost-only (prevents reconnaissance).
 
 *Only exception*: Any app with full root privileges can read everything on the device.
+
+**v1.2.0 note**: The persistent backup directory is owned by root
+with mode `0700`. A malicious root app can still read it, but a
+non-root app cannot. See
+[`docs/BACKUP.md`](BACKUP.md) §12.
 
 ### 46. What is BIND_ADDR?
 
@@ -775,16 +855,32 @@ const AUTH_CACHE_TTL = 60 * time.Second
 }
 ```
 
+**v1.2.0 (BAK-1)** — the `backups` object with **7 fields**:
+
+```json
+{
+  "backups": {
+    "available": 5,
+    "in_flight_txn": 0,
+    "orphan_txn": 0,
+    "last_backup": "2026-09-26 15:00:00",
+    "last_backup_name": "20260926-150000-v1.2.0",
+    "last_stable": "20260926-150000-v1.2.0",
+    "path": "/sdcard/dnscrypt-webui-backup"
+  }
+}
+```
+
 **Benefits**:
 - HTML/JS updates links dynamically.
 - Supports LAN access.
 - Supports IPv6 loopback.
 - No broken links when ports change.
-- System Info panel shows profile + memory limit.
+- System Info panel shows profile + memory limit + backup state.
 
 **Constraint**: PWA shortcuts (`manifest.json`) do not read `runtime_info` — they stay static (documented).
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 + §5.31.4.
 
 ---
 
@@ -795,12 +891,29 @@ const AUTH_CACHE_TTL = 60 * time.Second
 1. **From Magisk**: Modules → DNSCrypt → Update (if auto-update is enabled).
 2. **Manually**: Download the new ZIP → install over the old one.
 
+**v1.2.0 note**: The installer now preserves all 5 user config
+files across the update. See Q123.
+
 ### 62. How do I update the lists?
 
 - **Automatically**: On every restart.
 - **Manually**: From the WebUI → choose the desired list → Apply.
 
 ### 63. How do I copy settings to another device?
+
+**v1.2.0 (recommended)**:
+
+```bash
+# 1. Export the persistent backup directory
+adb pull /sdcard/dnscrypt-webui-backup/ ./my-backup/
+
+# 2. On the new device, push the backup
+adb push ./my-backup/ /sdcard/dnscrypt-webui-backup/
+
+# 3. Install the module on the new device — it will auto-restore
+```
+
+**Legacy (still works)**:
 
 ```bash
 # Backup
@@ -820,24 +933,42 @@ su -c "cp /sdcard/backup/* /data/adb/modules/dnscrypt-proxy-webui/proxy/"
   su -c "rm -rf /data/adb/modules/dnscrypt-proxy-webui"
   ```
 
-**v1.1.0 note**: `uninstall.sh` no longer creates a backup
-directory. Any legacy backup from v1.0.0 is removed automatically.
+**v1.2.0 note**: `uninstall.sh` now **preserves** the persistent
+backup directory (`/sdcard/dnscrypt-webui-backup/`) so you can
+restore your settings if you reinstall later. See Q126.
+
+To remove the backup directory manually:
+
+```bash
+su -c "rm -rf /sdcard/dnscrypt-webui-backup"
+```
 
 ### 65. Are settings preserved on upgrade?
 
-**Yes** — since v1.0.0:
+**Yes** — since v1.0.0, and greatly hardened in v1.2.0:
+
 - ✅ `webui.conf` preserved.
 - ✅ `dnscrypt-proxy.toml` preserved.
 - ✅ `allowlist.txt` + `denylist.txt` preserved.
 - ✅ `selected_profile.txt` preserved.
 
-**How it works**:
-1. `customize.sh [8b]` — Backup before `unzip -o`.
-2. `customize.sh [9c]` — Restore after `unzip -o`.
+**How it works (v1.2.0)**:
 
-See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
+1. Layer 1 — multi-source detection finds the user data.
+2. Layer 2 — persistent backup to `/sdcard/`.
+3. Layer 3 — SHA256 verification.
+4. Layer 4 — transactional install with rollback.
+5. Layer 5 — root-solution compatibility (Magisk / KernelSU / APatch).
+6. Layer 6 — SELinux context preservation.
+7. Layer 7 — recovery mode (if triggered).
+8. Layer 8 — config migrations.
+9. Layer 9 — rotation (keep max 21 snapshots).
+10. Layer 10 — observability.
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #26.
+See [`docs/BACKUP.md`](BACKUP.md) §1.3 for the full model.
+
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #26 (v1.0.0
+mechanism, now superseded) + §5.31 (v1.2.0 model).
 
 ### 66. How do I roll back to a previous version?
 
@@ -851,15 +982,23 @@ su -c "reboot"
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
 ```
 
-**Note**: Settings are preserved on rollback (since v1.0.0).
+**Note**: Settings are preserved on rollback (since v1.0.0,
+hardened in v1.2.0).
 
-**Rollback caveats** (from v1.1.0 to v1.0.0):
-- ⚠️ Dynamic memory limit reverts to hardcoded 80 MB.
-- ⚠️ `runtime_info` will no longer include `profile_key` / `memory_limit_mb`.
-- ⚠️ System Info panel will not display profile / memory fields.
-- ⚠️ `shellQuote` reverts to the 20-character set.
+**Rollback caveats**:
 
-See [`UPGRADE.md`](UPGRADE.md) for details.
+- **From v1.2.0 to v1.1.0**:
+  - ⚠️ `runtime_info.backups` reverts to 5 fields.
+  - ⚠️ `action.sh --backup` stops working.
+  - ⚠️ `status.sh --diagnose` stops working.
+  - ⚠️ The `/sdcard/dnscrypt-webui-backup/` directory is preserved (not touched).
+- **From v1.1.0 to v1.0.0**:
+  - ⚠️ Dynamic memory limit reverts to hardcoded 80 MB.
+  - ⚠️ `runtime_info` loses `profile_key` / `memory_limit_mb`.
+  - ⚠️ `shellQuote` reverts to 20 chars.
+- **From v1.0.0 to pre-v1.0.0**: Not recommended (data loss possible).
+
+See [`UPGRADE.md`](UPGRADE.md) for the full upgrade path.
 
 ### 67. What is the versionCode for each version?
 
@@ -876,6 +1015,8 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.0.0 | 1000000 |
 | v1.0.1 | 1000001 |
 | v1.1.0 | 1010000 |
+| v1.2.0 | 1020000 |
+| v1.2.1 | 1020001 |
 | v2.0.0 | 2000000 |
 
 **Note**: `hotfix` must be ≤ 99 (because `patch` uses ×100).
@@ -893,6 +1034,10 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 2. If the DNS Engine is stopped → start it from the WebUI.
 3. If port `5354` is closed → restart.
 4. If `iptables` fails → see `TROUBLESHOOTING.md`.
+5. **v1.2.0**: Run the full diagnostic:
+   ```bash
+   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+   ```
 
 ### 69. WebUI does not open. What do I do?
 
@@ -916,11 +1061,14 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
    ```
 3. Reboot the device.
 
+**v1.2.0 alternative**: Use recovery mode (Q125) — it restores
+the last known-good config without reinstalling.
+
 ### 71. Dashboard does not display metrics. What do I do?
 
 - **Symptom**: The Dashboard (`:9091`) opens, but Metrics tables are empty.
 - **Cause (before v1.0.0)**: `metricsProxyHandler` returned Prometheus text with `Content-Type: application/json`.
-- **Solution**: Update to `v1.1.0` (or v1.0.0).
+- **Solution**: Update to `v1.2.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -935,7 +1083,7 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" | jq '.total_queries'
 
 - **Symptom**: DNS Engine crashes; Watchdog runs but does nothing.
 - **Cause (before v1.0.0)**: WebUI called `getStatus` every 10 seconds, and `getStatusUncached` wrote `STATUS_FILE = "OFF"` on crash.
-- **Solution**: Update to `v1.1.0` (or v1.0.0).
+- **Solution**: Update to `v1.2.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -951,26 +1099,39 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq .dns_eng
 ### 73. Settings were lost after upgrade. What do I do?
 
 - **Symptom**: After upgrading the module, `webui.conf` is reset.
-- **Cause (before v1.0.0)**: `unzip -o` extracted defaults over custom ones.
-- **Solution**: Update to `v1.1.0` (or v1.0.0).
+- **Cause (v1.1.0 only)**: A path-comparison check
+  (`$_EXISTING_MODULE != $MODPATH`) silently failed on in-place
+  upgrades. Result: the 5 user config files were lost on every
+  upgrade from v1.1.0.
+- **Solution**: Update to **v1.2.0** — the 10 defensive layers
+  replace the broken check with multi-source detection (Layer 1)
+  and persistent backup (Layer 2).
 
-**Immediate recovery**:
+**If you lost settings on v1.1.0**:
 
 ```bash
-# Find automatic backup (v1.0.0 only — v1.1.0 does not create backups)
+# v1.2.0 preserves the backup at /sdcard/dnscrypt-webui-backup/.
+# After installing v1.2.0, the installer will restore them automatically.
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+```
+
+**Legacy recovery** (v1.0.0-style automatic backup):
+
+```bash
+# Look for the old backup in /data/local/tmp/
 BACKUP=$(ls -dt /data/local/tmp/dnscrypt-upgrade-backup-* 2>/dev/null | head -1)
-su -c "cp $BACKUP/webui.conf /data/adb/modules/dnscrypt-proxy-webui/proxy/"
-su -c "cp $BACKUP/dnscrypt-proxy.toml /data/adb/modules/dnscrypt-proxy-webui/proxy/"
+[ -n "$BACKUP" ] && su -c "cp $BACKUP/webui.conf /data/adb/modules/dnscrypt-proxy-webui/proxy/"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
-See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
+See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §7.8.
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #26.
+**Reference**: [SECURITY.md](SECURITY.md) §5.31.1 (root cause) +
+[`BACKUP.md`](BACKUP.md) §1.1.
 
 ### 74. Basic Auth is too restricted after upgrade. What do I do?
 
-- **Symptom**: After upgrading to v1.1.0, Basic Auth fails after 5 attempts.
+- **Symptom**: After upgrading to v1.2.0, Basic Auth fails after 5 attempts.
 - **Cause**: Intentional — Basic Auth is rate-limited.
 - **Solution**:
   - ✅ **Solution 1**: Use correct credentials (will not be locked).
@@ -1026,7 +1187,7 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 - **Symptom**: Some sites remain blocked even after being added to the allowlist.
 - **Cause (before v1.0.0)**: `rebuildBlocklist` was not protected by a mutex → race condition with `updateProfile`.
-- **Solution**: Update to `v1.1.0` (or v1.0.0).
+- **Solution**: Update to `v1.2.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -1043,14 +1204,14 @@ grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1 pr
 > **Note**: This section documents the v1.0.0 features and
 > verifications. It is preserved for historical reference and for
 > users upgrading from pre-v1.0.0 releases. Current version
-> verification is in the next section (v1.1.0).
+> verification is in the next sections (v1.1.0 and v1.2.0).
 
 ### 78. How do I know a version contains v1.0.0?
 
 Verify:
 
-1. `VERSION` file = `v1.0.0` (for v1.0.0) / `v1.1.0` (for v1.1.0).
-2. `module.prop` → `version=v1.0.0` / `version=v1.1.0`.
+1. `VERSION` file = `v1.0.0` (for v1.0.0) / `v1.2.0` (for v1.2.0).
+2. `module.prop` → `version=v1.0.0` / `version=v1.2.0`.
 3. `runtime_info` endpoint:
    ```bash
    curl -s http://127.0.0.1:9090/api/runtime_info | jq .version
@@ -1134,9 +1295,25 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
 }
 ```
 
+**v1.2.0**: **`backups` object** with 7 fields added:
+
+```json
+{
+  "backups": {
+    "available": 5,
+    "in_flight_txn": 0,
+    "orphan_txn": 0,
+    "last_backup": "2026-09-26 15:00:00",
+    "last_backup_name": "20260926-150000-v1.2.0",
+    "last_stable": "20260926-150000-v1.2.0",
+    "path": "/sdcard/dnscrypt-webui-backup"
+  }
+}
+```
+
 All previous fields remain (`version`, `commit`, `run_dir`, ...).
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 + §5.31.4.
 
 ### 81. Did `/api/metrics` change its format?
 
@@ -1175,6 +1352,10 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 - **Before**: `proxy/run/` (result: `.gitkeep` was not uploaded).
 - **After**: `proxy/run/*` + `!proxy/run/.gitkeep` (works correctly).
 
+**v1.2.0 addition**: New pattern for data-preservation test
+artifacts (`/tmp/dnscrypt-*`, backup staging files, `txn-*/` for
+local testing). See `.gitignore` §[19].
+
 **Impact on users**: None (developers only).
 
 ### 84. Are there new sections in SECURITY.md?
@@ -1202,22 +1383,36 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 |---|---|
 | #530 | v1.1.0 runtime changes (MEM-1, MEM-2, MEM-3) |
 
+**v1.2.0 adds**:
+
+| Anchor | Topic |
+|---|---|
+| #531 | Data Preservation Security Model (10 layers + `backupMu`) |
+| #532 | Recovery Mode Correctness Fix (§[8a] → §[9]) |
+
 **See** [`docs/SECURITY.md`](SECURITY.md) for full details.
 
 ### 85. What's new in `.pre-commit-config.yaml`?
 
-**Updated** to support v1.1.0 checks. See the file itself for the exact hook list.
+**Updated** to support v1.2.0 checks. See the file itself for the exact hook list.
+
+**Note**: No new hook was added in v1.2.0 — the existing
+`shellcheck-py`, `go-fmt`, and `go-build` hooks already cover the
+data-preservation changes.
 
 ### 86. What's new in the Makefile?
 
-The Makefile is intentionally minimal:
+The Makefile gained **3 new targets** in v1.2.0:
 
 ```bash
-make build      # Build all 4 architectures
-make package    # Build + package
-make clean      # Clean outputs
-make version    # Show version
-make help       # Show help
+make build          # Build all 4 architectures
+make package        # Build + package
+make clean          # Clean outputs
+make version        # Show version
+make help           # Show help
+make check-backup   # Validate backup shell functions (v1.2.0)
+make check-all      # Run all local validations (v1.2.0)
+make diagnose-help  # Show device-side diagnostics (v1.2.0)
 ```
 
 ### 87. How do I run all v1.0.0 checks?
@@ -1232,7 +1427,7 @@ Use grep-based verification:
 
 `runtime_info` is an API endpoint that returns build info + runtime paths + actual ports.
 
-**v1.1.0 example**:
+**v1.2.0 example**:
 
 ```bash
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
@@ -1240,7 +1435,7 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 
 ```json
 {
-  "version": "v1.1.0",
+  "version": "v1.2.0",
   "commit": "a1b2c3d",
   "build_time": "1726987200",
   "build_time_human": "2026-09-26T10:00:00Z",
@@ -1254,7 +1449,16 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
   "webui_port": "9090",
   "dashboard_port": "9091",
   "profile_key": "pro",
-  "memory_limit_mb": 120
+  "memory_limit_mb": 120,
+  "backups": {
+    "available": 5,
+    "in_flight_txn": 0,
+    "orphan_txn": 0,
+    "last_backup": "2026-09-26 15:00:00",
+    "last_backup_name": "20260926-150000-v1.2.0",
+    "last_stable": "20260926-150000-v1.2.0",
+    "path": "/sdcard/dnscrypt-webui-backup"
+  }
 }
 ```
 
@@ -1321,6 +1525,11 @@ thrashing on `ultimate`, no wasted RAM on `light`.
 - WebUI responds, but every action takes 2-5 seconds.
 - CPU on the WebUI process > 30% while idle.
 - Battery drains faster.
+
+**v1.2.0 note**: The memory limit is preserved by the 10
+defensive layers via `selected_profile.txt`, which is one of the
+5 backed-up files. If you restore from a backup, the restored
+profile determines the memory limit at startup.
 
 **Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §6.10.
 
@@ -1451,16 +1660,21 @@ panel:
 - **Profile**: `pro` (for example)
 - **Memory limit**: `120 MB` (for example)
 
-The rows were added to the existing list (version, commit, build
-time, ports, etc.). They are populated from the `runtime_info`
-response — no extra API call.
+**v1.2.0 additions**: The System Info panel now also displays
+**6 backup fields**:
+
+- **Backups** — snapshot count
+- **Latest Backup** — newest snapshot name
+- **Last Stable** — pointer content
+- **In-flight Txn** — number of `txn-*` dirs
+- **Orphan Txn** — number of `orphan-txn-*` dirs
+- **Backup Path** — `/sdcard/dnscrypt-webui-backup`
 
 **To see them**:
 
 1. Open the WebUI at `http://127.0.0.1:9090`.
 2. Scroll to "System Info".
 3. Expand the section.
-4. Look for the "Profile" and "Memory limit" rows.
 
 **Reference**: [ARCHITECTURE.md](ARCHITECTURE.md) §16.7.
 
@@ -1544,6 +1758,427 @@ identical. Clients see no difference.
 
 ---
 
+## v1.2.0 Specific Questions
+
+> **Note**: This section covers the v1.2.0 changes: the 10
+> defensive layers, the persistent backup directory, recovery
+> mode, transactional upgrades, and the `runtime_info.backups`
+> 7-field schema.
+
+### 121. What is new in v1.2.0?
+
+**v1.2.0 is the Data Preservation Release** — the biggest
+reliability improvement since v1.0.0.
+
+**What it fixes**: A **data-loss bug** in v1.1.0 that silently
+erased the 5 user config files on every in-place upgrade. This
+was caused by a path-comparison check
+(`$_EXISTING_MODULE != $MODPATH`) that always failed on
+in-place upgrades, so the installer thought it was a fresh
+install and overwrote the configs.
+
+**What it adds** — the 10 defensive layers (see Q122).
+
+**No breaking changes for users**: v1.2.0 remains **fully
+backward compatible** with v1.1.0.
+
+- The WebUI stays bilingual (English default + Arabic toggle).
+- The API stays identical (the `backups` object is strictly
+  additive — 2 new fields).
+- The 5 preserved config files keep their format.
+- The `runtime_info` response only gains fields.
+
+**Two important correctness fixes** (in addition to the 10
+layers):
+
+1. **Recovery-mode reorder** — the ZIP extraction step no longer
+   overwrites the two restored files at risk (see Q125).
+2. **Service Worker update banner** — the [Reload] button now
+   sends `SKIP_WAITING` to the correct worker.
+
+**New tools**:
+
+- `action.sh --backup` — trigger a manual backup.
+- `status.sh --diagnose` — full diagnostic report.
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.2.0];
+[`docs/BACKUP.md`](BACKUP.md); [`docs/UPGRADE.md`](UPGRADE.md) §3.1.
+
+### 122. What are the 10 defensive layers?
+
+The 10 layers protect the **5 user config files**:
+
+- `webui.conf`
+- `dnscrypt-proxy.toml`
+- `selected_profile.txt`
+- `allowlist.txt`
+- `denylist.txt`
+
+| # | Layer | What it does |
+|:-:|---|---|
+| 1 | **Multi-source detection** | Searches 7 candidate locations for user data — in-place, standard, legacy, APatch, persistent `current/`, persistent flat, tmp fallback |
+| 2 | **Persistent backup** | Snapshots to `/sdcard/dnscrypt-webui-backup/`, which survives reboot + uninstall + `/data` reset |
+| 3 | **SHA256 integrity verification** | Advisory check: every snapshot records per-file SHA256 in `.manifest.json` |
+| 4 | **Transactional upgrades** | Atomic install with rollback — either fully succeeds or fully rolls back |
+| 5 | **Root-solution compatibility** | Detects Magisk / KernelSU / APatch and adapts the candidate list |
+| 6 | **SELinux context preservation** | `restorecon` (or `chcon` fallback) on every restored file |
+| 7 | **Recovery mode** | A `recovery` trigger file restores the last known-good config on next boot |
+| 8 | **Config migrations** | Version-aware transformations (e.g. `MEMORY_LIMIT_HINT=auto` added for v1.0.0 → v1.2.0) |
+| 9 | **Automation + rotation** | Periodic (24 h) + pre-critical backups; rotation keeps max 21 snapshots |
+| 10 | **Observability** | `.upgrade_history.json` + `status.sh --diagnose` + 7-field `runtime_info.backups` |
+
+**Full details**: [`docs/BACKUP.md`](BACKUP.md) §1.3;
+[`docs/SECURITY.md`](SECURITY.md) §5.31.
+
+### 123. Where are backups stored?
+
+**Location**: `/sdcard/dnscrypt-webui-backup/`
+
+**Structure**:
+
+```text
+/sdcard/dnscrypt-webui-backup/
+├── current/                         ← live snapshot, always up to date
+├── 20260926-095826-v1.2.0/          ← historical snapshot
+├── 20260926-140000-auto/            ← periodic snapshot
+├── 20260926-150000-manual/          ← manual or pre-critical snapshot
+├── txn-<timestamp>-<pid>/           ← in-flight transaction
+├── orphan-txn-<timestamp>-<pid>/    ← preserved interrupted install
+├── .last_stable                     ← pointer to last known-good
+├── .last_auto_backup                ← periodic marker (mtime)
+├── .upgrade_history.json            ← full upgrade log
+├── .upgrade_history.txt             ← fallback log
+└── README.md                        ← user guide
+```
+
+**Why this location?** It survives:
+- ✅ Rebooting.
+- ✅ Module uninstall.
+- ✅ Factory reset of `/data`.
+- ✅ Module renames.
+
+**You can inspect it** with any file manager or over USB (MTP).
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §3.
+
+### 124. Do I need to backup manually?
+
+**No, but it is recommended before major upgrades.**
+
+**Automatic backups happen**:
+
+- **At install time** — every upgrade creates a snapshot
+  (`<timestamp>-<version>/`).
+- **On every boot** — if the last auto-backup is older than
+  24 hours, `service.sh` creates a new one.
+- **Before destructive operations** — every destructive write
+  (profile change, allowlist/denylist save, etc.) triggers a
+  pre-critical backup. See BAK-2 in
+  [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.10.2.
+
+**Manual backup** (v1.2.0):
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+```
+
+This creates a snapshot at:
+```
+/sdcard/dnscrypt-webui-backup/<timestamp>-manual/
+```
+
+**When to take a manual backup**:
+
+- ✅ Before a major upgrade (e.g. v1.2.0 → v1.3.0).
+- ✅ Before a factory reset of `/data`.
+- ✅ Before uninstalling the module.
+- ✅ Before any destructive test.
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §4, §7.
+
+### 125. What is recovery mode?
+
+**Recovery mode** restores the last known-good configuration
+from the persistent backup, triggered by an explicit file.
+
+**Use it when**:
+
+- The module is unbootable but you can run commands via ADB.
+- Data is corrupted but the backup directory is intact.
+- You want a "one-shot" recovery without manual file copying.
+
+**Procedure**:
+
+```bash
+# 1. Create the trigger file (module-specific)
+su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
+
+# Or, if the module folder is inaccessible (external trigger)
+su -c "touch /data/adb/dnscrypt-recovery"
+
+# 2. Reboot
+su -c "reboot"
+
+# 3. Wait for boot (~30-60 seconds)
+
+# 4. Verify the recovery
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+
+# 5. Confirm the trigger file is gone
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>/dev/null"
+# Expected: (no output)
+```
+
+**Recovery source priority**:
+
+| Priority | Source |
+|:--------:|--------|
+| 1 | `$PERSISTENT_BACKUP/<.last_stable>/` |
+| 2 | `$PERSISTENT_BACKUP/current/` |
+| 3 | In-place `proxy/` directory |
+
+**What recovery does NOT do**:
+- ❌ Does not reinstall the module from scratch.
+- ❌ Does not rebuild the firewall.
+- ❌ Does not restart the DNS engine.
+
+After recovery, you may need to reboot again (or restart the
+service) for the changes to take effect.
+
+**Full guide**: [`docs/EMERGENCY.md`](EMERGENCY.md) §9.
+
+### 126. Does the backup survive uninstall?
+
+**Yes.** The v1.2.0 `uninstall.sh` **preserves** the persistent
+backup directory at `/sdcard/dnscrypt-webui-backup/`.
+
+**Why?** So you can reinstall the module later and recover your
+settings automatically (via the multi-source detection in
+Layer 1).
+
+**What is preserved on uninstall**:
+
+- ✅ `current/` directory.
+- ✅ All `<timestamp>-<version>/` snapshots.
+- ✅ `orphan-txn-*` directories.
+- ✅ `.last_stable` pointer.
+- ✅ `.upgrade_history.json`.
+- ✅ `README.md`.
+
+**What is cleaned up on uninstall**:
+
+- 🗑️ `txn-*` directories with `.state=COMMIT` or `.state=ROLLBACK`.
+- 🗑️ The legacy v1.0.0 backup directory
+  (`/data/local/tmp/dnscrypt_backup_uninstall/`).
+
+**What is renamed on uninstall**:
+
+- 🔄 `txn-*` with `.state=START` → renamed to `orphan-txn-*` and
+  preserved.
+
+**To remove the backup directory manually**:
+
+```bash
+su -c "rm -rf /sdcard/dnscrypt-webui-backup"
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §5.6;
+[`docs/EMERGENCY.md`](EMERGENCY.md) §4.5.
+
+### 127. What is `runtime_info.backups`?
+
+It is a JSON object with **7 fields** describing the backup
+state. Accessible via:
+
+```bash
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
+```
+
+**Schema**:
+
+```json
+{
+  "available": 5,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-26 15:00:00",
+  "last_backup_name": "20260926-150000-v1.2.0",
+  "last_stable": "20260926-150000-v1.2.0",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+```
+
+**Field meanings**:
+
+| Field | Type | Description |
+|---|---|---|
+| `available` | int | Snapshot count (excludes `current/`, `txn-*`, `orphan-txn-*`) |
+| `in_flight_txn` | int | Number of `txn-*` directories |
+| `orphan_txn` | int | Number of `orphan-txn-*` directories |
+| `last_backup` | string \| null | Timestamp of the newest snapshot |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot |
+| `last_stable` | string \| null | Content of `.last_stable` pointer |
+| `path` | string | Absolute path of the backup directory |
+
+**Compatibility with `status.sh --json`**: The two endpoints
+agree on all 7 shared fields. `status.sh --json` additionally
+exposes two diagnostic-only fields (`status` and
+`last_backup_age_seconds`) that are not part of the API surface.
+See [`docs/API.md`](API.md) §6.1.7 and §10.6.
+
+**How to detect a degraded backup layer**:
+
+```bash
+# Non-zero in_flight_txn or orphan_txn means attention is needed
+curl -s http://127.0.0.1:9090/api?action=runtime_info \
+    | jq 'select(.backups.in_flight_txn > 0 or .backups.orphan_txn > 0)'
+```
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §8.1.
+
+### 128. What are `txn-*` and `orphan-txn-*`?
+
+**`txn-*` — In-flight transaction directory**:
+
+- Created by `customize.sh` (Layer 4) during every install.
+- Format: `txn-<timestamp>-<pid>/`.
+- Contains a `.state` file: `START`, `COMMIT`, or `ROLLBACK`.
+- Also contains the copied user files (for rollback).
+- Short-lived.
+
+**`orphan-txn-*` — Preserved interrupted install**:
+
+- Created by `uninstall.sh` renaming a `txn-*` with
+  `.state=START`.
+- Signals that an install was interrupted mid-flight.
+- The directory may contain the **only copy** of the user's data.
+- **Preserved on purpose**. Inspect before deleting.
+
+**How to inspect**:
+
+```bash
+# 1. Read the state
+su -c "cat /sdcard/dnscrypt-webui-backup/txn-*/.state"
+su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.state"
+
+# 2. Read the contents
+su -c "ls -la /sdcard/dnscrypt-webui-backup/txn-*/"
+su -c "ls -la /sdcard/dnscrypt-webui-backup/orphan-txn-*/"
+
+# 3. Read the manifest
+su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.manifest.json 2>/dev/null | jq"
+```
+
+**Handling**:
+
+| State | Action |
+|---|---|
+| `COMMIT` | Safe to remove (main.go does this at startup) |
+| `ROLLBACK` | Safe to remove |
+| `START` | **Preserve** — inspect manually before deleting |
+| `orphan-txn-*` | **Preserve** — user-managed |
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §5.6, §10.5;
+[`docs/EMERGENCY.md`](EMERGENCY.md) §4.5.
+
+### 129. How do I earn the Data Guardian badge?
+
+**Data Guardian** is a recognition badge for contributors who
+test the backup/restore system across devices, root solutions,
+and upgrade scenarios.
+
+**Acceptance criteria** (from
+[`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md)):
+
+- ✅ Test the 10 data-preservation layers on **3+ devices** or
+  **3+ root solutions** (Magisk / KernelSU / APatch).
+- ✅ Verify that all 5 user config files survive an in-place
+  upgrade.
+- ✅ Verify that recovery mode restores all 5 files.
+- ✅ Report the 7-field `backups` object before/after each
+  scenario.
+- ✅ Report any mismatch with concrete evidence (logs +
+  reproduction steps).
+
+**Recommended scenarios to test**:
+
+| Scenario | Expected result |
+|---|---|
+| Fresh install | 5 files created; no backup (first install) |
+| In-place upgrade from v1.1.0 | 5 files preserved; snapshot created |
+| In-place upgrade from v1.0.0 | 5 files preserved; `MEMORY_LIMIT_HINT=auto` added |
+| Reinstall after uninstall | 5 files restored from `/sdcard/` backup |
+| Recovery mode | 5 files restored; trigger file consumed |
+| Renamed module folder | 5 files found via multi-source detection |
+| APatch install | 5 files found via `modules_update/` fallback |
+| Concurrency | Two rapid `save_allowlist` calls → no corrupted snapshot |
+
+**How to report**: Open an Issue titled `[Hall of Fame] Data
+Guardian: <your name>` with:
+- The scenarios tested.
+- The 7-field `backups` object for each.
+- The `status.sh --diagnose` output.
+- The `dnscrypt_install.log` excerpts.
+
+**Reference**: [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) — Data
+Guardian; [`docs/BACKUP.md`](BACKUP.md) §12.
+
+### 130. How is v1.2.0 backup different from v1.1.0?
+
+**v1.1.0 backup** (legacy mechanism):
+
+- Location: `/data/local/tmp/dnscrypt-upgrade-backup-$$`.
+- Deleted on reboot.
+- **Lost on uninstall.**
+- No SHA256 verification.
+- No transactions.
+- No recovery mode.
+- No rotation.
+- No history log.
+- **Bug**: silently erased user data on every in-place upgrade
+  due to the path-comparison check.
+
+**v1.2.0 backup** (current mechanism):
+
+- Location: `/sdcard/dnscrypt-webui-backup/`.
+- **Survives reboot.**
+- **Survives uninstall.**
+- **Survives factory reset of `/data`.**
+- SHA256 verification (advisory).
+- Transactional install with rollback.
+- Recovery mode via trigger file.
+- Rotation (max 21 snapshots).
+- Full history log (`.upgrade_history.json`).
+- **Fixed the data-loss bug** via multi-source detection.
+
+**Side-by-side**:
+
+| Aspect | v1.1.0 | v1.2.0 |
+|---|---|---|
+| Location | `/data/local/tmp/` | `/sdcard/dnscrypt-webui-backup/` |
+| Survives reboot | ❌ | ✅ |
+| Survives uninstall | ❌ | ✅ |
+| Survives `/data` reset | ❌ | ✅ |
+| SHA256 verification | ❌ | ✅ |
+| Transactions with rollback | ❌ | ✅ |
+| Recovery mode | ❌ | ✅ |
+| Rotation | ❌ | ✅ (21 snapshots) |
+| History log | ❌ | ✅ |
+| Multi-source detection | ❌ | ✅ (7 candidates) |
+| Root-solution detection | ❌ | ✅ |
+| SELinux preservation | ❌ | ✅ |
+| **Data-loss bug** | ✅ Bug present | ✅ Bug fixed |
+
+**Migration**: Upgrading from v1.1.0 to v1.2.0 is automatic.
+On the next boot after install, `service.sh` runs
+`auto_backup_if_needed` and creates the first persistent snapshot.
+See [`docs/UPGRADE.md`](UPGRADE.md) §3.1.
+
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §1.1, §1.4;
+[`docs/SECURITY.md`](SECURITY.md) §5.31.1.
+
+---
+
 ## For Developers
 
 ### 90. How do I build from source?
@@ -1579,13 +2214,13 @@ cd proxy && go build -buildvcs=false -trimpath -o /tmp/test-main main.go
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ Fix #12"
 ```
 
-### 93. How do I verify v1.1.0 correctness?
+### 93. How do I verify v1.2.0 correctness?
 
 ```bash
 # v1.0.0 checks (see Q78 for full list)
 grep -q 'func buildDashboardJSON' proxy/main.go && echo "✅ Fix #1 (JSON)"
 grep -q 'func getSystemShell' proxy/main.go && echo "✅ Fix #2 (shell)"
-grep -q 'BACKUP_TMP' proxy/customize.sh && echo "✅ Fix #3 (settings preserved)"
+grep -q 'BACKUP_TMP' proxy/customize.sh && echo "✅ Fix #3 (legacy settings preserved)"
 grep -q 'recordLoginAttempt(ip, false)' proxy/main.go && echo "✅ Fix #8 (Basic Auth rate limit)"
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ Fix #12 (exact matching)"
 grep -q 'hasEndpoint(r.URL.Path, "auth/login")' proxy/main.go && echo "✅ NEW-1 (POST-only)"
@@ -1605,12 +2240,25 @@ grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2 (bra
 grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
 grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ MEM-1 (field)"
 grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"profile_key"' && echo "✅ MEM-1 (field)"
+
+# v1.2.0 checks (new)
+grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2 (function)"
+grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 (mutex)"
+grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
+grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1 (in_flight_txn)"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ BAK-1 (orphan_txn)"
 ```
 
 ### 94. What are the new Make targets?
 
-None. The Makefile remains minimal:
-- `make all`, `make help`, `make version`, `make build`, `make package`, `make clean`.
+**3 new targets were added in v1.2.0**:
+
+- `make check-backup` — validate the backup shell functions.
+- `make check-all` — run all local validations.
+- `make diagnose-help` — print device-side diagnostic commands.
+
+See [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) §9 for details.
 
 ### 95. How do I diagnose Dashboard problems?
 
@@ -1677,6 +2325,9 @@ grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
 
 # 4. v1.1.0 memory fields
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
+
+# 5. v1.2.0 backups object
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
 
 **Reference**: [SECURITY.md](SECURITY.md).
@@ -1710,7 +2361,11 @@ curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.webui_port'
 curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'
 # Expected: {"profile_key": "pro", "memory_limit_mb": 120}
 
-# 4. Restore original
+# 4. Backups object (v1.2.0 — 7 fields)
+curl -s http://127.0.0.1:8081/api?action=runtime_info | jq '.backups | keys'
+# Expected: ["available","in_flight_txn","last_backup","last_backup_name","last_stable","orphan_txn","path"]
+
+# 5. Restore original
 su -c "sed -i 's/^PORT=8081/PORT=9090/' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
@@ -1729,9 +2384,21 @@ Do not open a public Issue. Use **GitHub Private Vulnerability Reporting**. See 
 
 ### 103. How do I translate the project?
 
-- **README**: Add `README.<lang>.md`.
-- **WebUI**: Add the required language in the `translations object` inside `index.html` and `dashboard.html`.
-- **Docs**: Add `docs/<name>.<lang>.md`.
+**v1.2.0 — Global edition (English default + Arabic toggle)**:
+
+- The **WebUI** ships bilingual (English default + Arabic toggle).
+  Adding or changing strings requires updating **both** the `en`
+  and `ar` entries in all three HTML files. See
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) §4.6.
+- **Documentation translation is welcome** as separate files
+  (`docs/*.<lang>.md`).
+- **Additional WebUI languages** (FR, DE, ES, RU, ZH, ...) are
+  deferred to v1.4.0 — see [`ROADMAP.md`](ROADMAP.md) §6.
+- **Community forks** with additional languages are permitted
+  (the MIT license allows this).
+
+See [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) §FAQ Q9 for
+the full language policy.
 
 ### 104. Is there a badge for contributors?
 
@@ -1742,15 +2409,16 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 - 🔥 Top Contributor
 - 🛡️ Security Researcher
 - 📖 Documentation
-- 🌐 Translator
+- 🌐 Translator (documentation + WebUI EN/AR contributions)
 - 🧪 Testing Hero
 - 💎 Compatibility Champ
 - 🔍 Auditor
 - 🔧 Platform Fixer
 - 📊 Metrics Wizard
-- ⚙️ Concurrency Guardian
+- ⚙️ Concurrency Guardian (now covers `backupMu` too in v1.2.0)
 - 🔌 Port Architect
 - 🧠 Memory Architect (v1.1.0)
+- 🛡️ **Data Guardian (v1.2.0)** — see Q129
 
 ### 105. How do I add a question to the FAQ?
 
@@ -1768,11 +2436,15 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 ### 106. How do I know the next Audit Correction number?
 
 - Last Audit Correction: **#33** (runtime_info ports).
-- Next expected: **#34** (v1.2.x).
+- Next expected: **#34** (v1.3.x).
 
-**Note**: v1.1.0 did not add audit corrections. It introduced
-three runtime improvements (MEM-1/2/3) that are documented
-separately in SECURITY.md §17.1.
+**Note**:
+- v1.1.0 did not add audit corrections. It introduced three
+  runtime improvements (MEM-1/2/3) documented in SECURITY.md §5.30.
+- v1.2.0 did not add audit corrections either. It introduced 10
+  data-preservation layers + 4 runtime additions (BAK-1..BAK-4)
+  + 2 correctness fixes (FIX-1/2), documented in SECURITY.md
+  §5.31 and §5.32.
 
 **See**: [`CHANGELOG.md`](../CHANGELOG.md).
 
@@ -1785,6 +2457,9 @@ Use grep-based verification in the CI workflow (`.github/workflows/ci.yml`).
 - **Build verification**: `go build -buildvcs=false -trimpath -o /tmp/main main.go`
 - **Runtime check**: `curl -s http://127.0.0.1:9090/api?action=X | jq`
 
+**v1.2.0 note**: The `backup-smoke-test` job in `ci.yml` uses
+the same pattern for the 10 defensive layers.
+
 ### 108. How do I add a RACE-1 verification?
 
 ```bash
@@ -1792,6 +2467,14 @@ Use grep-based verification in the CI workflow (`.github/workflows/ci.yml`).
 grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ mutex declared"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'rebuildMu.Lock()' && echo "✅ Lock"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock()' && echo "✅ Unlock"
+```
+
+**v1.2.0 addition** — for `backupMu`:
+
+```bash
+grep -q 'backupMu' proxy/main.go && echo "✅ backupMu declared"
+grep -A10 'func createAutoBackup' proxy/main.go | grep -q 'backupMu.Lock()' && echo "✅ Lock"
+grep -A15 'func createAutoBackup' proxy/main.go | grep -q 'defer backupMu.Unlock()' && echo "✅ Unlock"
 ```
 
 ### 109. How do I add a PORT-2 verification?
@@ -1806,7 +2489,14 @@ grep -q 'data.dashboard_port' web/index.html && echo "✅ index.html"
 grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
 ```
 
-### 110. What is the difference between "Fix #N" and "NEW-N"?
+**v1.2.0 addition** — for the `backups` object:
+
+```bash
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ in_flight_txn"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ orphan_txn"
+```
+
+### 110. What is the difference between "Fix #N", "NEW-N", "MEM-N", "BAK-N", and "FIX-N"?
 
 **Fix #N** (N=1..12): v1.0.0 **original** fixes (Dashboard JSON, Shell fallback, Preserve settings, ..., CodeQL config).
 
@@ -1828,8 +2518,20 @@ grep -q 'data.webui_port' web/dashboard.html && echo "✅ dashboard.html"
 - MEM-2: Extended `shellQuote` character set.
 - MEM-3: `MONITORING_UI_PORT` in metrics handler.
 
+**BAK-N** (N=1..4): v1.2.0 **runtime additions** (not audit
+corrections):
+- BAK-1: 7-field `runtime_info.backups`.
+- BAK-2: `createAutoBackup` + `backupMu`.
+- BAK-3: `cleanupOldTransactions`.
+- BAK-4: `checkPendingNotifications`.
+
+**FIX-N** (N=1..2): v1.2.0 **correctness fixes** (not audit
+corrections):
+- FIX-1: Recovery-mode reorder.
+- FIX-2: Service Worker update-banner.
+
 **Full numbering**: Fix #1-#12 + NEW-1..NEW-6 + RACE-1 + PORT-2 +
-MEM-1/2/3.
+MEM-1/2/3 + BAK-1..BAK-4 + FIX-1/2.
 
 ---
 
@@ -1838,22 +2540,24 @@ MEM-1/2/3.
 - [README.md](../README.md) — Overview
 - [docs/INSTALL.md](INSTALL.md) — Installation guide
 - [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
-- [docs/SECURITY.md](SECURITY.md) — Security policy + Audit Corrections
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — System architecture
-- [docs/API.md](API.md) — HTTP API reference
+- [docs/SECURITY.md](SECURITY.md) — Security policy + Audit Corrections (§5.31, §5.32)
+- [docs/BACKUP.md](BACKUP.md) — **Backup system reference (v1.2.0)**
+- [docs/EMERGENCY.md](EMERGENCY.md) — **Emergency recovery (v1.2.0)**
+- [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide (§3.0, §3.1)
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — System architecture (§3.10, §4.10)
+- [docs/API.md](API.md) — HTTP API reference (§6.1.7)
 - [docs/DEVELOPMENT.md](DEVELOPMENT.md) — Developer guide
 - [docs/DNS_BINARIES.md](DNS_BINARIES.md) — DNS binaries management
-- [docs/UPGRADE.md](UPGRADE.md) — Upgrade guide
-- [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix
+- [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix (§5.4, §5.5)
 - [docs/CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guide
 - [docs/GLOSSARY.md](GLOSSARY.md) — Glossary
-- [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Contributors recognition
+- [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Contributors recognition (Data Guardian)
 - [docs/ROADMAP.md](ROADMAP.md) — Project plan
-- [CHANGELOG.md](../CHANGELOG.md) — Version history
+- [CHANGELOG.md](../CHANGELOG.md) — Version history (v1.0.0 → v1.2.0)
 - [GitHub Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues)
 
 ---
 
-*Last updated: 2026-09-26*
-*Version: v1.1.0*
+*Last updated: 2026-09-29*
+*Version: v1.2.0*
 *Author: gasciljh*

@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Dependabot Configuration
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -82,10 +82,20 @@
 #     • Dependency PRs are small and low-risk; they can go
 #       straight to the stable branch.
 #
-#   This is consistent with the project's documented policy that
-#   `main` accepts PRs from `release/*` and `hotfix/*` only —
-#   except for automation that explicitly opts into main. See
-#   docs/adr/0001-two-branch-model.md for the branch model.
+#   ⚠️ Policy note: this is an EXPLICIT EXCEPTION to the general
+#      rule in README.md §Development ("Never commit to `main`
+#      directly — open a PR against `develop`"). The exception
+#      is scoped to automation only — human contributors must
+#      still open PRs against `develop`.
+#
+#      If the README is updated in a future release, its
+#      "Branching" paragraph should mention this exception
+#      explicitly, so that a reader does not see a contradiction
+#      between the two files.
+#
+#   This is also consistent with the branch model in
+#   docs/adr/0001-two-branch-model.md, which allows
+#   non-feature PRs (like dependency bumps) to target `main`.
 #
 # ⚠️ If the project grows to multiple maintainers or the
 #    codebase expands significantly, consider switching the
@@ -105,7 +115,8 @@
 #   This aligns with Conventional Commits and keeps the commit
 #   log scannable.
 #
-# v1.1.0 changes:
+# ============================================================
+# v1.1.0 changes (kept):
 #   • Version bumped to v1.1.0 (documentation only — no behavior
 #     changes since v1.0.0).
 #   • Added an "Ecosystem coverage" table for quick scanning.
@@ -116,6 +127,94 @@
 #     main is targeted and referencing ADR-0001.
 #   • Moved the long inline comments from the YAML body into the
 #     header to keep the file itself short and readable.
+#
+# ============================================================
+# v1.2.0 changes:
+#   • Version bumped to v1.2.0 (documentation only — no behavior
+#     changes to any of the three ecosystems).
+#   • No new package ecosystems were added. The v1.2.0 release is
+#     a data-preservation release; it introduces new shell logic
+#     (the 10 defensive layers in proxy/*.sh) and new documentation
+#     (docs/BACKUP.md, docs/EMERGENCY.md, docs/UPGRADE.md §3.1),
+#     but does NOT add any new external dependency.
+#   • Confirmed: proxy/go.mod still declares `go 1.22` and no
+#     external modules. Therefore the `gomod` section below is
+#     still forward-looking (no actual updates to fetch).
+#   • Confirmed: proxy/dnscrypt-proxy.version stays at `2.1.18`.
+#     Dependabot does NOT track this file — it is a project-owned
+#     single source of truth for the DNS engine version, managed
+#     by scripts/fetch_dns_binaries.sh. It is updated manually
+#     when the upstream dnscrypt-proxy project ships a new
+#     release (see docs/DNS_BINARIES.md §10).
+#   • Added a "What Dependabot does NOT track" section below,
+#     listing the three files that look like dependencies but
+#     are actually project-owned:
+#       - proxy/dnscrypt-proxy.version (DNS engine version)
+#       - VERSION (module version)
+#       - module.prop (Magisk version + versionCode)
+#   • Cross-referenced docs/BACKUP.md and docs/EMERGENCY.md for
+#     readers who land here from a data-preservation context.
+#   • Global English edition: all comments and messages are
+#     English-only. No Arabic strings exist in this file.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# ============================================================
+# A pre-release audit of this file found NO implementation
+# issues. The YAML body, the schedules, the grouping rules,
+# the labels, the commit-message prefixes, and the
+# `target-branch: main` settings are all correct and
+# internally consistent.
+#
+# One documentation-only clarification was added:
+#
+#   🔧 DB-1 — The "target-branch decision" section stated
+#     that targeting `main` "is consistent with the project's
+#     documented policy that `main` accepts PRs from
+#     `release/*` and `hotfix/*` only — except for automation
+#     that explicitly opts into main." That phrasing was
+#     slightly stronger than what the current README actually
+#     documents: README.md §Development says only "Never
+#     commit to `main` directly — open a PR against
+#     `develop`", without listing automation as an exception.
+#     The section now:
+#       • Frames the Dependabot behavior explicitly as an
+#         EXCEPTION to the README's general rule.
+#       • Cross-references docs/adr/0001 (two-branch model).
+#       • Recommends that a future README update mention the
+#         exception explicitly, so the two files do not
+#         appear to contradict each other.
+#     No behavior change. No YAML change.
+#
+# ============================================================
+# What Dependabot does NOT track:
+# ============================================================
+# There are three files in this repository that contain a
+# "version" string but are NOT dependency manifests. Dependabot
+# will never open a PR against them. This is intentional.
+#
+#   1. proxy/dnscrypt-proxy.version
+#      ─ The upstream dnscrypt-proxy version (e.g. "2.1.18").
+#      ─ Managed by scripts/fetch_dns_binaries.sh, which reads
+#        it as the Single Source of Truth.
+#      ─ Updated manually when the upstream DNSCrypt project
+#        ships a new release. See docs/DNS_BINARIES.md §10.
+#
+#   2. VERSION
+#      ─ The module version (e.g. "v1.2.0").
+#      ─ Managed by scripts/release.sh (and release-patch.sh).
+#      ─ Updated automatically at each release.
+#
+#   3. module.prop
+#      ─ The Magisk / KernelSU module definition.
+#      ─ Contains `version=v1.2.0` and `versionCode=1020000`.
+#      ─ Both fields are updated together by scripts/release.sh.
+#
+# If you ever see a Dependabot PR that touches one of these
+# three files, it is a false positive. Close the PR and open an
+# Issue — the .github/dependabot.yml configuration may need a
+# `directory` / `package-ecosystem` adjustment.
+#
 # ============================================================
 
 version: 2
@@ -131,6 +230,7 @@ version: 2
 #   • .github/workflows/ci.yml
 #   • .github/workflows/codeql.yml
 #   • .github/workflows/release.yml
+#   • .github/workflows/upgrade-test.yml   ← v1.2.0
 #   • any new workflow
 #
 # Example automatic PR:
@@ -178,6 +278,13 @@ updates:
   # Current state:
   #   • go.mod: contains `module dnscrypt-webui` + `go 1.22`
   #   • go.sum: absent (no dependencies)
+  #
+  # v1.2.0 note:
+  #   The v1.2.0 data-preservation release adds no new imports
+  #   to main.go. All new code (createAutoBackup, notifications,
+  #   cleanupOldTransactions) uses only the Go standard library
+  #   (os, filepath, strings, fmt, time) — all already imported
+  #   in v1.1.0. The dependency-free policy is preserved.
   #
   # Future benefit:
   #   • If a package is added (e.g. golang.org/x/sys), Dependabot
@@ -275,6 +382,11 @@ updates:
 # immediately cut a PATCH release with scripts/release-patch.sh
 # rather than waiting for the next scheduled release. See
 # docs/RELEASE_PROCESS.md §2.3 for the PATCH release flow.
+#
+# v1.2.0 cross-references:
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
 #
 # ============================================================
 # How to verify the configuration

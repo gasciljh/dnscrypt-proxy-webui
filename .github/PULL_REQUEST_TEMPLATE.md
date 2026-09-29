@@ -1,6 +1,6 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Pull Request Template
-     Version: v1.1.0
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -8,16 +8,22 @@
      Fill every section — delete what does not apply.
      Reference: docs/CONTRIBUTING.md#6 and docs/BRANCHING.md
      ============================================================
-     v1.1.0 additions:
-       • New MEM-1 / MEM-2 / MEM-3 grep verifications for the
-         v1.1.0 changes in main.go (dynamic memory limit, extended
-         shellQuote, MONITORING_UI_PORT usage in metrics handler).
-       • runtime_info now exposes memory_limit_mb and profile_key —
-         added a verification for those fields.
-       • Header, version, and reminder sections updated to v1.1.0.
-       • The Audit Corrections Registry below remains at #13–#33
-         (the v1.0.0 record). v1.1.0 does not add new audit
-         corrections — it is a polish release.
+     v1.2.0 additions:
+       • New v1.2.0 grep verifications for the data-preservation
+         release (10 defensive layers, BAK-1..BAK-4, FIX-1/FIX-2,
+         WD-TOKEN).
+       • New "Data-preservation checklist" section — mandatory for
+         any PR that touches customize.sh, functions.sh,
+         service.sh, status.sh, uninstall.sh, or main.go backup
+         helpers.
+       • New "Global edition (EN + AR)" checklist item — any PR that
+         adds a user-facing string must supply both `en` and `ar`
+         entries.
+       • New "Backup shell verification" grep block.
+       • New "runtime_info.backups" verification.
+       • Audit Corrections Registry below remains at #33 (the v1.0.0
+         record). v1.1.0 and v1.2.0 do not add new audit
+         corrections.
      ============================================================ -->
 
 > ## 🚨 Before You Start
@@ -116,8 +122,9 @@ Closes #
 - [ ] 🎨 **Style/UI** — style or interface
 - [ ] 🔧 **Chore/Build** — routine tasks or build system
 - [ ] ⚙️ **CI/CD** — CI workflows
-- [ ] 🌐 **Translation** — translation
+- [ ] 🌐 **Translation** — translation (EN/AR)
 - [ ] 📋 **ADR** — Architecture Decision Record (see §📖 Documentation)
+- [ ] 💾 **Data preservation** — touches the 10 defensive layers (see §🔒)
 
 ---
 
@@ -154,12 +161,15 @@ Closes #
   │  #33     runtime_info dynamic ports          v1.0.0     │
   └─────────────────────────────────────────────────┘
 
-  ⚠️ v1.1.0 does NOT add new audit corrections. It is a
-     documentation + polish release. The registry above remains
-     the authoritative record through v1.0.0.
+  ⚠️ v1.1.0 does NOT add new audit corrections (polish release).
+  ⚠️ v1.2.0 does NOT add new audit corrections (data-preservation
+     release). Its additions (BAK-1..BAK-4, FIX-1, FIX-2, WD-TOKEN)
+     are runtime additions + correctness fixes, documented in
+     docs/SECURITY.md §5.31, §5.32, §5.33 — not audit corrections.
 
-  If your PR fixes a new security/architecture issue, this PR
-  should be the FIRST to add a new entry (starting at #34).
+  The registry above remains the authoritative record through
+  v1.0.0. If your PR fixes a new security/architecture issue, this
+  PR should be the FIRST to add a new entry (starting at #34).
 
   Example:
     Number: #34
@@ -196,6 +206,8 @@ Closes #
 - [ ] `gofmt -l proxy/` is empty (no unformatted files)
 - [ ] `shellcheck --severity=warning proxy/*.sh scripts/*.sh` is clean
 - [ ] No hardcoded secrets (`detect-secrets` clean)
+- [ ] **v1.2.0**: `make check-backup` passes (if `customize.sh` or
+      `functions.sh` changed)
 
 ### 🆕 Core fix verifications (v1.0.0)
 
@@ -271,62 +283,116 @@ Closes #
   grep -q 'MEMORY_LIMIT_ULTIMATE' proxy/main.go && echo "✅"
   # Verify main() no longer uses the hardcoded 80MB call
   ! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ no hardcoded limit"
-  # Verify updateProfile applies the new limit
-  grep -A3 'atomicWriteFile(SELECTED_FILE' proxy/main.go | grep -q 'applyMemoryLimit' || \
-    grep -B2 -A2 'applyMemoryLimit(key)' proxy/main.go | grep -q 'SELECTED_FILE' && echo "✅"
   ```
 
 - [ ] **MEM-2 — Extended shellQuote (main.go)**
   ```bash
-  # The v1.1.0 shellQuote must include {, }, \n, \t
   grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ braces"
-  grep -A5 'func shellQuote' proxy/main.go | grep -q "'}'" && echo "✅ braces"
   grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
   grep -A8 'func shellQuote' proxy/main.go | grep -q "r == '\\\\t'" && echo "✅ tab"
   ```
 
 - [ ] **MEM-3 — MONITORING_UI_PORT used in metrics handler (main.go)**
   ```bash
-  # Verify the constant is defined and used in the metrics proxy
   grep -q 'MONITORING_UI_PORT = "8080"' proxy/main.go && echo "✅ const"
   grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ used"
-  # Verify no hardcoded ":8080/api/metrics" remains in the handler
   ! grep -q '"http://127.0.0.1:8080/api/metrics"' proxy/main.go && echo "✅ no hardcoded URL"
   ```
 
 - [ ] **v1.1.0 — runtime_info new fields (main.go + web/*.html)**
   ```bash
-  # Backend
   grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ backend memory_limit_mb"
   grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"profile_key"' && echo "✅ backend profile_key"
-  # Frontend — English + Arabic keys
   grep -q "riMemoryLimit" web/index.html && echo "✅ index.html"
   grep -q "riMemoryLimit" web/dashboard.html && echo "✅ dashboard.html"
   ```
 
-- [ ] **v1.1.0 — shell-level memory hint helpers**
+### 🆕 v1.2.0 additions — Data Preservation
+
+<!--
+  Run these if the PR touches:
+    • customize.sh, functions.sh, service.sh, status.sh, uninstall.sh,
+      action.sh, watchdog.sh
+    • main.go (backup helpers only)
+    • docs/BACKUP.md, docs/EMERGENCY.md
+
+  v1.2.0 introduced the 10 defensive layers. Any change to them must
+  be verified by this block.
+-->
+
+- [ ] **v1.2.0 — 10 defensive layers present in customize.sh**
   ```bash
-  # functions.sh must expose the read-only memory hint
-  grep -q 'func get_profile_memory_hint' proxy/functions.sh 2>/dev/null || \
-    grep -q 'get_profile_memory_hint()' proxy/functions.sh && echo "✅ functions.sh"
-  # service.sh / action.sh / status.sh / watchdog.sh should each
-  # provide an inline fallback for environments without functions.sh
-  grep -q '_inline_get_profile_memory_hint' proxy/service.sh && echo "✅ service.sh fallback"
-  grep -q '_inline_get_profile_memory_hint' proxy/action.sh && echo "✅ action.sh fallback"
-  grep -q '_inline_get_profile_memory_hint' proxy/status.sh && echo "✅ status.sh fallback"
-  grep -q '_wd_get_profile_memory_hint' proxy/watchdog.sh && echo "✅ watchdog.sh fallback"
+  for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
+           begin_transaction detect_root_solution copy_with_context \
+           RECOVERY_TRIGGER migrate_config; do
+      grep -q "$L" proxy/customize.sh && echo "✅ $L" || echo "❌ $L"
+  done
   ```
 
-- [ ] **v1.1.0 — version bump sanity**
+- [ ] **v1.2.0 — Backup helpers present in functions.sh**
   ```bash
-  # VERSION, module.prop, and web/*.html should all agree
-  V=$(cat VERSION)
-  echo "VERSION: $V"
-  grep -q "^version=$V" module.prop && echo "✅ module.prop"
-  grep -q "\"version\": \"${V#v}\"" web/manifest.json && echo "✅ manifest.json"
-  grep -q "CACHE_VERSION = '$V'" web/sw.js && echo "✅ sw.js"
-  grep -q "var VERSION = '$V'" web/index.html && echo "✅ index.html"
-  grep -q "var VERSION = '$V'" web/dashboard.html && echo "✅ dashboard.html"
+  for H in auto_backup_if_needed rotate_backups backup_user_files \
+           restore_user_files cleanup_old_transactions get_backup_dir \
+           ensure_backup_dir get_last_backup_time copy_with_context \
+           verify_backup_integrity write_manifest get_watchdog_token; do
+      grep -q "$H" proxy/functions.sh && echo "✅ $H" || echo "❌ $H"
+  done
+  ```
+
+- [ ] **v1.2.0 — main.go backup additions**
+  ```bash
+  grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2 createAutoBackup"
+  grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 backupMu"
+  grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
+  grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
+  grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1 function"
+  ```
+
+- [ ] **v1.2.0 — 7-field backups schema (BAK-1)**
+  ```bash
+  grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ in_flight_txn"
+  grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ orphan_txn"
+  # Runtime check (if service is running):
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
+  # Expected: 7
+  ```
+
+- [ ] **v1.2.0 — Watchdog token (WD-TOKEN)**
+  ```bash
+  grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ token loader"
+  grep -q 'verifyWatchdogToken' proxy/main.go && echo "✅ verify"
+  grep -q 'X-Watchdog-Token' proxy/main.go && echo "✅ header name"
+  grep -q 'subtle.ConstantTimeCompare' proxy/main.go && echo "✅ constant-time"
+  grep -q 'watchdog_token' proxy/watchdog.sh && echo "✅ watchdog reads"
+  grep -q 'X-Watchdog-Token' proxy/watchdog.sh && echo "✅ watchdog sends"
+  ```
+
+- [ ] **v1.2.0 — FIX-1 (recovery-mode reorder)**
+  ```bash
+  grep -A5 'RECOVERY_MODE" = "1"' proxy/customize.sh | \
+    grep -qE 'webui.conf|dnscrypt-proxy.toml' && echo "✅ FIX-1 present"
+  ```
+
+- [ ] **v1.2.0 — FIX-2 (Service Worker update-banner)**
+  ```bash
+  grep -q 'swRegistration.waiting' web/index.html && echo "✅ index.html"
+  grep -q 'swRegistration.waiting' web/dashboard.html && echo "✅ dashboard.html"
+  grep -q 'id="swUpdateBanner"' web/dashboard.html && echo "✅ banner in dashboard.html"
+  ```
+
+- [ ] **v1.2.0 — Bilingual WebUI (EN + AR)**
+  ```bash
+  for f in index.html dashboard.html offline.html; do
+      grep -q 'id="langToggle"' web/$f && echo "✅ $f toggle"
+      grep -q 'en:' web/$f && grep -q 'ar:' web/$f && echo "✅ $f en+ar"
+      grep -q "dnscrypt-lang" web/$f && echo "✅ $f localStorage"
+      grep -q '\[dir="rtl"\]' web/$f && echo "✅ $f RTL"
+  done
+  ```
+
+- [ ] **v1.2.0 — Data-preservation test artifacts (`.gitignore` §[19])**
+  ```bash
+  grep -q 'dnscrypt-webui-backup' .gitignore && echo "✅ backup patterns"
   ```
 
 ### Custom tests (as applicable)
@@ -351,14 +417,16 @@ Closes #
 
 **If the change is in the WebUI:**
 - [ ] Opened WebUI and confirmed no JS errors
-- [ ] Tested in both Arabic and English
+- [ ] Tested in both Arabic and English (bilingual)
 - [ ] Tested PWA install / reload
 - [ ] Tested SSE live updates
 - [ ] Tested dynamic links (with custom PORT / DASHBOARD_PORT)
+- [ ] Tested SW update-banner (both `index.html` and `dashboard.html`)
 
 **If the change is in shell scripts:**
 - [ ] Confirmed no new `shellcheck` warnings
 - [ ] Tested on a real device (if possible)
+- [ ] **v1.2.0**: Ran `make check-backup`
 
 **If the change is in the firewall:**
 - [ ] Checked `iptables -t nat -L DNSCRYPT_OUT -n`
@@ -406,7 +474,7 @@ Closes #
 - [ ] Tested concurrency manually (update + save simultaneously)
 - [ ] Confirmed no deadlock (30 s timeout is enough)
 
-**If the change is in `buildRuntimeInfo` or `runtime_info` (PORT-2 + v1.1.0):**
+**If the change is in `buildRuntimeInfo` or `runtime_info` (PORT-2 + MEM-1 + BAK-1):**
 - [ ] Confirmed `webui_port` + `dashboard_port` present in JSON response:
   ```bash
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
@@ -417,7 +485,11 @@ Closes #
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb, .profile_key'
   # Expected: a number, and a profile key string
   ```
-- [ ] Tested with custom ports (PORT=8081, DASHBOARD_PORT=8082)
+- [ ] **v1.2.0**: Confirmed `backups` object with 7 fields:
+  ```bash
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
+  # Expected: 7
+  ```
 - [ ] Confirmed `index.html` uses `data.dashboard_port`
 - [ ] Confirmed `dashboard.html` uses `data.webui_port`
 
@@ -434,23 +506,74 @@ Closes #
   ```
 - [ ] Tested Dashboard in browser (no "Cannot fetch data")
 
-**If the change is in the memory limit logic (v1.1.0 MEM-1):**
+**If the change is in the memory limit logic (MEM-1):**
 - [ ] Confirmed the limit adjusts when profile changes:
   ```bash
-  # Start with light
   echo "light" > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
   sleep 5
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
   # Expected: 80
-
-  # Switch to ultimate
-  echo "ultimate" > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
-  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
-  sleep 5
-  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
-  # Expected: 220
   ```
+
+**If the change is in the backup layer (v1.2.0 — 10 defensive layers):**
+- [ ] Ran the backup flow end-to-end on a test device:
+  ```bash
+  # 1. Take a manual snapshot
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+
+  # 2. Verify the snapshot was created
+  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available'"
+  # Expected: >= 1
+
+  # 3. Simulate damage — change the profile
+  su -c "echo 'light' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+
+  # 4. Restore from the newest snapshot
+  SNAP=$(su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
+         grep -vE '/(current|txn-|orphan-txn-)' | head -1" | tr -d '\r')
+  su -c "cp $SNAP/selected_profile.txt /data/adb/modules/dnscrypt-proxy-webui/proxy/"
+  su -c "restorecon /data/adb/modules/dnscrypt-proxy-webui/proxy/"
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+
+  # 5. Verify the profile was restored
+  su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+  # Expected: original profile
+  ```
+- [ ] Verified the persistent backup directory survives uninstall:
+  ```bash
+  su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+  ```
+- [ ] Verified `status.sh --diagnose` produces a complete report
+- [ ] Verified the watchdog token file exists with mode `0600`:
+  ```bash
+  su -c "stat -c '%a' /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  # Expected: 600
+  ```
+
+**If the change is in the recovery mode (v1.2.0 — Layer 7):**
+- [ ] Tested recovery trigger on a test device:
+  ```bash
+  # 1. Note the original profile
+  ORIG=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
+
+  # 2. Change the profile
+  su -c "echo 'light' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+
+  # 3. Trigger recovery
+  su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
+  su -c "reboot"
+
+  # 4. After boot (~60s), verify
+  sleep 60
+  NEW=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
+  [ "$NEW" = "$ORIG" ] && echo "✅ Recovery restored"
+  ```
+- [ ] Confirmed the trigger file is consumed after a successful restore
+- [ ] Verified the FIX-1 reorder (`webui.conf` and
+      `dnscrypt-proxy.toml` are not overwritten by the ZIP extraction)
 
 ---
 
@@ -476,6 +599,8 @@ Closes #
 - [ ] Used `getClientIP(r)` to extract IP (not `strings.Split`)
 - [ ] Made `/api/auth/login` and `/api/auth/logout` POST-only (if applicable)
 - [ ] If a new rate limit was added, registered attempts in `loginAttempts`
+- [ ] **v1.2.0**: If adding an endpoint that needs watchdog auth,
+      used `X-Watchdog-Token` + `verifyWatchdogToken()`
 
 ### Input Validation
 
@@ -490,11 +615,17 @@ Closes #
 - [ ] Confirmed `--wait` on every `iptables` / `ip6tables` invocation
 - [ ] Tested `_legacy_cleanup_*` after upgrade from an older version
 
-### Concurrency (RACE-1)
+### Concurrency (RACE-1 + BAK-2)
 
 - [ ] Any operation modifying `ALLOWLIST` / `DENYLIST` / `BLOCKLIST` calls `rebuildBlocklist`
 - [ ] `rebuildBlocklist` is protected by `rebuildMu.Lock()` + `defer Unlock()`
 - [ ] No nested deadlock (never calls a function that locks the same mutex)
+- [ ] **v1.2.0**: Any new destructive operation on user data calls
+      `createAutoBackup(reason)` first
+- [ ] **v1.2.0**: `backupMu` is used only via `createAutoBackup` —
+      do NOT add a second mutex
+- [ ] **v1.2.0**: `backupMu` is held for at most
+      `AUTO_BACKUP_TIMEOUT = 15 s`
 
 ### Memory (v1.1.0)
 
@@ -504,6 +635,28 @@ Closes #
 - [ ] If adding a new profile, updated `webui.conf` template in `customize.sh`
 - [ ] If adding a new profile, updated `web/index.html` `<select id="profileSelect">`
 
+### Data Preservation (v1.2.0)
+
+- [ ] If adding a new preserved file:
+  - [ ] Updated the `USER_FILES` list in **all 5** scripts:
+        `customize.sh`, `functions.sh`, `service.sh`, `status.sh`,
+        `uninstall.sh`
+  - [ ] Updated the "5 Preserved Files" table in `README.md`
+  - [ ] Updated `docs/BACKUP.md` §2
+- [ ] If changing the rotation policy:
+  - [ ] Updated the constant in **all 4** scripts:
+        `customize.sh`, `functions.sh`, `service.sh`, `action.sh`
+  - [ ] Updated `docs/BACKUP.md` §6
+- [ ] If changing the `runtime_info.backups` schema:
+  - [ ] Updated `buildBackupInfo()` in `main.go`
+  - [ ] Kept `status.sh --json` in sync
+  - [ ] Updated `docs/API.md` §6.1.7
+- [ ] If adding a config migration:
+  - [ ] Added it to `migrate_config()` in `customize.sh`
+  - [ ] Updated `docs/UPGRADE.md`
+- [ ] Confirmed the 10 defensive layers are still orthogonal to the
+      firewall (see `docs/COMPATIBILITY.md` §6.6)
+
 ### For security fixes
 
 - [ ] Updated `docs/SECURITY.md` (Attack Vectors section + §5.X)
@@ -512,6 +665,16 @@ Closes #
 - [ ] Added the Audit Correction #XX in the commit footer
 - [ ] Added HTML anchor `<a name="XXX"></a>` (if a new section was created)
 - [ ] Updated the Audit Corrections Registry in `docs/SECURITY.md`
+
+### Global Edition (v1.2.0 — EN + AR)
+
+- [ ] Any new user-facing string in the WebUI is present in **both**
+      `translations.en` and `translations.ar`
+- [ ] The default language on first load is still **English**
+- [ ] The language preference is stored only in
+      `localStorage['dnscrypt-lang']` — never sent to the server
+- [ ] RTL layout verified (Chrome 88+, Firefox 92+, Samsung Internet 16+)
+- [ ] No API endpoint accepts or returns a language identifier
 
 ---
 
@@ -533,8 +696,12 @@ Closes #
 - [ ] Added or updated an ADR in `docs/adr/` (if a non-trivial decision)
 - [ ] If reversing an ADR, created a new one that supersedes it (never edit the old)
 - [ ] Added / updated code comments (Go docstrings, shell comments)
-- [ ] **v1.1.0** — if a new field was added to `runtime_info`, updated both
+- [ ] If a new field was added to `runtime_info`, updated both
       `web/index.html` and `web/dashboard.html` translation tables (en + ar)
+- [ ] **v1.2.0**: If a backup-layer change, updated `docs/BACKUP.md`
+      **and** `docs/EMERGENCY.md`
+- [ ] **v1.2.0**: If a language-toggle change, updated
+      `docs/ARCHITECTURE.md` §6.7 and `docs/API.md` §10.8
 
 ---
 
@@ -557,6 +724,7 @@ Closes #
   - Examples: `feat(webui): add dark mode`, `fix(proxy): resolve race condition`
   - For security fixes: `security(iptables): implement Custom Chains`
   - For ADRs: `docs(adr): add ADR-0007 for webhook notifications`
+  - For v1.2.0 data preservation: `feat(backup): add pre-critical auto-backup before destructive ops`
 - [ ] Commit messages are clear and useful (no "WIP" or "fix stuff")
 - [ ] Reasonable number of commits (no 50 commits for a small PR)
 - [ ] No merge commits (`Merge branch 'main'`) — used `rebase` instead
@@ -577,6 +745,7 @@ Closes #
 - [ ] `bash -n` clean on modified shell scripts
 - [ ] No hardcoded `/system/bin/sh` (use `getSystemShell()`)
 - [ ] No hardcoded `127.0.0.1` in HTML (use `window.location.hostname`)
+- [ ] **v1.2.0**: `make check-backup` passes (if backup layer touched)
 
 ### Documentation
 
@@ -591,6 +760,8 @@ Closes #
 - [ ] No `.DS_Store` or `Thumbs.db` files
 - [ ] Reviewed `git diff` before pushing (no unintended changes)
 - [ ] Confirmed no leftover `*.tmp_*` from `atomicWriteFile`
+- [ ] **v1.2.0**: No leftover `txn-*` / `orphan-txn-*` in the
+      committed backup directory (those belong to runtime)
 
 ---
 
@@ -600,6 +771,9 @@ Closes #
   If the PR relates to the UI, attach images or GIFs.
   For bug fixes: attach "before" and "after" images if possible.
   For logic changes: no images needed.
+
+  v1.2.0: If the change touches the bilingual UI, attach BOTH
+  English and Arabic screenshots.
 -->
 
 
@@ -628,6 +802,9 @@ Closes #
   Example:
     - @gasciljh: review the Custom Chains logic in functions.sh
     - @reviewer: check the queries in main.go
+
+  v1.2.0: If the change touches the backup layer, consider requesting
+  a review from a Data Guardian badge holder (see docs/HALL_OF_FAME.md).
 -->
 
 
@@ -663,6 +840,7 @@ Closes #
        bash -n proxy/*.sh scripts/*.sh     # shell syntax check
        gofmt -l proxy/                     # Go format check
        shellcheck --severity=warning proxy/*.sh scripts/*.sh
+       make check-backup                   # v1.2.0: backup shell validation
 
      🎯 v1.1.0 extra checks (if main.go changed):
 
@@ -670,16 +848,30 @@ Closes #
        grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2"
        grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
 
+     🎯 v1.2.0 extra checks (if backup layer changed):
+
+       grep -q 'CANDIDATE_SOURCES' proxy/customize.sh && echo "✅ Layer 1"
+       grep -q 'PERSISTENT_BACKUP' proxy/customize.sh && echo "✅ Layer 2"
+       grep -q 'begin_transaction' proxy/customize.sh && echo "✅ Layer 4"
+       grep -q 'copy_with_context' proxy/customize.sh && echo "✅ Layer 6"
+       grep -q 'RECOVERY_TRIGGER' proxy/customize.sh && echo "✅ Layer 7"
+       grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2"
+       grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1"
+       grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
+       grep -q 'swRegistration.waiting' web/index.html && echo "✅ FIX-2"
+
      📖 Documentation references:
 
        docs/BRANCHING.md        - Branch strategy
        docs/RELEASE_PROCESS.md  - Release process
        docs/adr/README.md       - Architecture Decision Records
        docs/CONTRIBUTING.md     - Contribution guide
-       docs/SECURITY.md         - Security policy
+       docs/SECURITY.md         - Security policy (§5.31, §5.32, §5.33)
+       docs/BACKUP.md           - Backup system reference (v1.2.0)
+       docs/EMERGENCY.md        - Emergency recovery (v1.2.0)
 
-     Current version: v1.1.0
-     Last updated: 2026-09-26
+     Current version: v1.2.0
+     Last updated: 2026-09-29
 
      🎉 Thanks for your contribution! Every PR improves the project.
      ============================================================ -->

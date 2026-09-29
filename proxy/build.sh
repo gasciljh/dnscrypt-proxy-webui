@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – build.sh
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -51,18 +51,162 @@
 #   • -buildid= removes random build IDs.
 #   • Result: same commit → same SHA-256.
 #
-# v1.1.0 notes:
-#   • The Go runtime soft memory limit is now set dynamically by
-#     main.go at startup based on the active blocklist profile
-#     (light → 80MB, ultimate → 220MB). This does NOT affect the
-#     build system — the memory limit is a runtime concern.
-#   • No new build flags are required for v1.1.0.
-#   • The module remains dependency-free (Go stdlib only), which
-#     keeps the build reproducible and small.
-#   • BuildVersion injected via -X main.BuildVersion is read by
-#     main.go and used to populate the runtime_info endpoint.
-#     The value comes from VERSION (not hardcoded here).
+# ============================================================
+# v1.2.0 — No build-system changes
+# ============================================================
+# The v1.2.0 release is a data-preservation release. It does
+# NOT touch the build system. Specifically:
 #
+#   ┌────────────────────────┬──────────────────────┐
+#   │ Aspect                     │ Status                   │
+#   ├────────────────────────┼──────────────────────┤
+#   │ New Go source files        │ None                     │
+#   │ New build tags             │ None                     │
+#   │ New linker flags           │ None                     │
+#   │ New runtime dependencies   │ None                     │
+#   │ New toolchain requirements │ None                     │
+#   │ BuildVersion value         │ v1.2.0 (from VERSION)    │
+#   └────────────────────────┴──────────────────────┘
+#
+# The 10 defensive layers introduced by v1.2.0 live entirely
+# in existing shell scripts (customize.sh, service.sh,
+# status.sh, uninstall.sh, functions.sh, watchdog.sh) and
+# in main.go. None of those changes require any modification
+# to the build pipeline.
+#
+# ============================================================
+# v1.2.0 (Global Edition) — POST-AUDIT FIXES (this file)
+# ============================================================
+# A pre-release audit identified the following issues in this
+# script. All of them are addressed in-place; no version bump.
+# The build pipeline is functionally identical to v1.1.0; the
+# fixes below are strictly correctness, robustness, and
+# portability improvements.
+#
+#   🔧 BLD-1 — Several helper functions used a `local_*`
+#     prefix on variables that are NOT local (they are at
+#     script scope). The prefix was misleading, suggesting
+#     shell `local` semantics that do not apply. All such
+#     variables have been renamed (e.g. `local_checksum_tool`
+#     → `CHECKSUM_TOOL`, `local_files_to_zip` →
+#     `FILES_TO_ZIP`, `local_size` → `SIZE_DISPLAY`,
+#     `local_type` → `TYPE_DISPLAY`). No behavioural change.
+#
+#   🔧 BLD-2 — `EXPECTED_ARCH_COUNT` was hardcoded to 4 while
+#     `ALL_ARCHS` was a separate string. Adding a 5th
+#     architecture would have required editing two places,
+#     and forgetting one would produce a misleading "success
+#     count less than expected" warning. The count is now
+#     derived from `ALL_ARCHS` via word-splitting, keeping a
+#     single source of truth. A `--single` build still
+#     overrides the count to 1.
+#
+#   🔧 BLD-3 — The `timeout 300` wrapper around `go build`
+#     assumed the GNU coreutils `timeout(1)` is available. On
+#     macOS (without coreutils) and on some minimal Termux
+#     installs, it is not. A `command -v timeout` check now
+#     falls back to running `go build` without a timeout,
+#     with a warning logged. On the CI and Termux
+#     environments the timeout still applies.
+#
+#   🔧 BLD-4 — When `SOURCE_DATE_EPOCH=0` (git unavailable),
+#     `checksums.txt` printed `1970-01-01 00:00:00 UTC` as
+#     the build date. That is technically correct but
+#     confusing for a human reader. The header now prints
+#     `unknown (SOURCE_DATE_EPOCH=0)` in that case while
+#     keeping the machine-readable `# Reproducible:`
+#     comment unchanged.
+#
+#   🔧 BLD-5 — `--enable-upx` was accepted, then checked,
+#     then disabled if `upx` was missing. The order was
+#     slightly confusing (the option appeared to be honoured
+#     before being rejected). The check now happens as part
+#     of argument parsing, and the user is told immediately
+#     if the tool is not installed.
+#
+#   🔧 BLD-6 — Some `$(...)` command substitutions were
+#     accidentally followed by a backtick-style capture in
+#     comments and messages; this file is now uniformly
+#     `$()`-based, matching the rest of the codebase. No
+#     behavioural change.
+#
+#   🔧 BLD-7 — `VERSION_NO_V` was computed inline at the
+#     point of use. It is now computed once at the top
+#     (right after `SCRIPT_VERSION`) so that any future
+#     consumer can reference it without re-deriving. No
+#     behavioural change.
+#
+#   🔧 BLD-8 — When `go.mod` was missing and `go mod init`
+#     failed, the script continued silently (the failure was
+#     suppressed by `|| true`). The `go build` step would
+#     then fail with a less informative error. A clear
+#     diagnostic message is now printed if `go mod init`
+#     fails AND `go.mod` still does not exist afterwards.
+# ============================================================
+# BuildVersion ↔ VERSION — how it works
+# ============================================================
+# The `BuildVersion` variable in main.go is injected at build
+# time via the -X linker flag. Its value comes from the VERSION
+# file (single source of truth), NOT from a hardcoded string
+# in this script or in main.go.
+#
+# Flow:
+#   1. read_version() reads VERSION (e.g. "v1.2.0").
+#   2. SCRIPT_VERSION is set to that value.
+#   3. LDFLAGS includes: -X main.BuildVersion=${SCRIPT_VERSION}
+#   4. At runtime, main.go reports BuildVersion via the
+#      /api?action=runtime_info endpoint.
+#
+# Other build-time variables injected the same way:
+#   • main.BuildCommit   — short git hash (+ -dirty if applicable)
+#   • main.BuildTime     — SOURCE_DATE_EPOCH (for reproducibility)
+#   • main.ProjectURL    — canonical repository URL
+#
+# ⚠️ Do NOT hardcode the version anywhere in this script. The
+#    value must always come from the VERSION file. This is what
+#    makes scripts/release.sh able to bump the version in ONE
+#    place and have it propagate automatically to the binary.
+# ============================================================
+# Relation to other scripts in the repository
+# ============================================================
+# This script is one of four build-related scripts. Their
+# responsibilities are deliberately separated:
+#
+#   ┌───────────────────────────┬────────────────────────┐
+#   │ Script                         │ Responsibility             │
+#   ├───────────────────────────┼────────────────────────┤
+#   │ scripts/release.sh             │ Bump VERSION + tag         │
+#   │ scripts/package_module.sh      │ Create the Magisk ZIP      │
+#   │ scripts/fetch_dns_binaries.sh  │ Download dnscrypt-proxy    │
+#   │ proxy/build.sh (this file)     │ Cross-compile WebUI        │
+#   └───────────────────────────┴────────────────────────┘
+#
+# This script does NOT:
+#   • Download dnscrypt-proxy (that is fetch_dns_binaries.sh)
+#   • Create the Magisk ZIP (that is package_module.sh)
+#   • Modify VERSION, module.prop, or update.json
+#     (that is release.sh)
+#
+# It ONLY produces the 4 WebUI binaries in proxy/build/.
+# The other scripts consume those binaries.
+# ============================================================
+# UPX + PIE warning
+# ============================================================
+# Android 5+ requires PIE (Position-Independent Executable).
+# UPX compression strips the ELF segments that Android uses to
+# verify PIE-ness, so a UPX-compressed binary will NOT run on
+# Android 5+.
+#
+# If --enable-upx is passed AND the `upx` binary is installed,
+# the script applies `upx --best --lzma` to the output. The
+# final PIE verification step will report non-PIE for the
+# affected binaries.
+#
+# ⚠️ Recommendation: do NOT use --enable-upx for release
+#    builds. It is provided for size-constrained test scenarios
+#    only.
+#
+# ============================================================
 # Examples:
 #   ./build.sh --clean --parallel
 #   ./build.sh --single arm64
@@ -105,9 +249,17 @@ REQUIRED_GO_MAJOR=1
 REQUIRED_GO_MINOR=22
 NDK_API_LEVEL="21"
 USE_UPX=0
-EXPECTED_ARCH_COUNT=4
 ALL_ARCHS="arm64 arm amd64 386"
 KEEP_LOGS=0
+
+# BLD-2: derive the expected count from the single source of
+# truth instead of hard-coding it. A --single build overrides
+# this value to 1 further below.
+EXPECTED_ARCH_COUNT=0
+for _a in $ALL_ARCHS; do
+    EXPECTED_ARCH_COUNT=$((EXPECTED_ARCH_COUNT + 1))
+done
+unset _a
 
 # ------------------------------------------------------------
 # ProjectURL (customizable)
@@ -116,6 +268,13 @@ PROJECT_URL="${PROJECT_URL:-https://github.com/gasciljh/dnscrypt-proxy-webui}"
 
 # ------------------------------------------------------------
 # [4] Read VERSION
+# ------------------------------------------------------------
+# VERSION is the single source of truth for the module version.
+# The value read here is injected into main.go via the
+# -X main.BuildVersion linker flag (see [19] for LDFLAGS).
+#
+# Format expected: v<MAJOR>.<MINOR>.<PATCH>[-<prerelease>]
+# Example: "v1.2.0"
 # ------------------------------------------------------------
 read_version() {
     if [ ! -f "$VERSION_FILE" ]; then
@@ -135,10 +294,22 @@ read_version() {
 }
 
 SCRIPT_VERSION=$(read_version)
+
+# BLD-7: VERSION_NO_V is computed once, right after
+# SCRIPT_VERSION, so that any future consumer can reference it
+# without re-deriving.
 VERSION_NO_V="${SCRIPT_VERSION#v}"
 
 # ------------------------------------------------------------
 # [5] Reproducible build vars
+# ------------------------------------------------------------
+# SOURCE_DATE_EPOCH is used by the Go toolchain and by `touch`
+# to produce deterministic timestamps. It is extracted from the
+# last git commit so that:
+#   same commit → same build output → same SHA-256
+#
+# If git is not available (e.g. building from a tarball), the
+# value falls back to 0.
 # ------------------------------------------------------------
 if command -v git >/dev/null 2>&1 && \
    git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
@@ -174,6 +345,10 @@ detect_environment() {
 
 # ------------------------------------------------------------
 # [7] NDK detection
+# ------------------------------------------------------------
+# Tries several common environment variables and paths, in
+# order of preference. A path is accepted only if it contains
+# both /toolchains/llvm AND a usable prebuilt/bin directory.
 # ------------------------------------------------------------
 detect_ndk() {
     local var val
@@ -303,6 +478,20 @@ Examples:
   ./build.sh --single arm64
   ./build.sh --output-dir /tmp/my-build
   PROJECT_URL=https://github.com/MyUser/MyRepo ./build.sh --clean
+
+Notes:
+  • Version is read from VERSION (single source of truth).
+    It is injected into main.go as BuildVersion via -X.
+  • UPX (--enable-upx) strips ELF metadata and breaks PIE.
+    Do NOT use it for release builds.
+  • The output directory can be overridden by --output-dir or
+    by the BUILD_DIR environment variable.
+
+References:
+  scripts/release.sh            Bump VERSION + tag
+  scripts/package_module.sh     Create the Magisk ZIP
+  scripts/fetch_dns_binaries.sh Download dnscrypt-proxy
+  proxy/main.go                 Consumer of BuildVersion
 EOF
     exit 0
 }
@@ -322,6 +511,7 @@ print_info() {
     echo -e "  🔗 Project URL: ${CYAN}${PROJECT_URL}${NC}"
     echo -e "  📁 BUILD_DIR:   ${DIM}${BUILD_DIR}${NC}"
     echo -e "  ⏱️  SOURCE_DATE: ${SOURCE_DATE_EPOCH}"
+    echo -e "  🧩 Expected:    ${EXPECTED_ARCH_COUNT} architectures"
     echo ""
 
     local ndk_path
@@ -353,6 +543,13 @@ print_info() {
         echo -e "  📦 NDK:         ${RED}❌ NOT FOUND${NC}"
         echo -e "  ${YELLOW}⚠️  Will build with CGO_ENABLED=0${NC}"
     fi
+
+    echo ""
+    if command -v timeout >/dev/null 2>&1; then
+        echo -e "  ⏱️  timeout(1):   ${GREEN}available${NC}"
+    else
+        echo -e "  ⏱️  timeout(1):   ${YELLOW}not available (build will not be time-bounded)${NC}"
+    fi
     echo ""
     exit 0
 }
@@ -363,6 +560,7 @@ print_info() {
 print_archs() {
     print_header
     echo -e "  Architectures: ${CYAN}${ALL_ARCHS}${NC}"
+    echo -e "  Count:         ${EXPECTED_ARCH_COUNT}"
     echo ""
     exit 0
 }
@@ -426,6 +624,23 @@ if [ "$DO_PARALLEL" = "1" ] && [ -n "$SINGLE_ARCH" ]; then
     DO_PARALLEL=0
 fi
 
+# BLD-5: verify UPX is installed at argument-parsing time so the
+# user is told immediately rather than after the build starts.
+if [ "$USE_UPX" = "1" ]; then
+    if ! command -v upx >/dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  --enable-upx requested but 'upx' not found — disabling UPX${NC}" >&2
+        USE_UPX=0
+    fi
+fi
+
+# BLD-3: check whether `timeout` is available. If not, the
+# build runs without a hard time limit and logs a warning.
+if command -v timeout >/dev/null 2>&1; then
+    HAS_TIMEOUT=1
+else
+    HAS_TIMEOUT=0
+fi
+
 # ------------------------------------------------------------
 # [16] Header + Go check
 # ------------------------------------------------------------
@@ -456,6 +671,12 @@ if [ "$GO_MAJOR" -lt "$REQUIRED_GO_MAJOR" ] || \
     exit 1
 fi
 
+if [ "$HAS_TIMEOUT" = "1" ]; then
+    echo -e "${GREEN}✅ timeout:${NC} available (build will be time-bounded)"
+else
+    echo -e "${YELLOW}⚠️  timeout:${NC} not available (build will NOT be time-bounded)"
+fi
+
 # ------------------------------------------------------------
 # [17] Check main.go
 # ------------------------------------------------------------
@@ -471,7 +692,17 @@ cd "$SCRIPT_DIR"
 
 if [ ! -f "go.mod" ]; then
     echo -e "${DIM}→ go mod init dnscrypt-webui${NC}"
-    go mod init dnscrypt-webui >/dev/null 2>&1 || true
+    # BLD-8: don't silently swallow the failure. If go.mod still
+    # does not exist after the init attempt, the subsequent
+    # `go build` will fail with a confusing error; we print a
+    # clear diagnostic here instead.
+    if ! go mod init dnscrypt-webui >/dev/null 2>&1; then
+        if [ ! -f "go.mod" ]; then
+            echo -e "${RED}❌ 'go mod init' failed and go.mod is still missing${NC}" >&2
+            echo -e "${DIM}   Check that the current directory is writable and that 'go' is functional.${NC}" >&2
+            exit 1
+        fi
+    fi
 fi
 
 if [ -f "go.mod" ] && [ -f "go.sum" ]; then
@@ -484,7 +715,14 @@ fi
 # ------------------------------------------------------------
 # BuildVersion is injected into main.go via -X. main.go reads it
 # at startup and exposes it via /api?action=runtime_info. The
-# value comes from VERSION (Single Source of Truth), not hardcoded.
+# value comes from VERSION (single source of truth), not hardcoded.
+#
+# For v1.2.0:
+#   • VERSION contains "v1.2.0" → -X main.BuildVersion=v1.2.0
+#   • The v1.2.0 data-preservation features (customize.sh,
+#     functions.sh, service.sh, status.sh, uninstall.sh,
+#     watchdog.sh) do NOT affect this step. Only the Go source
+#     (main.go) is compiled here.
 #
 # Other injected variables:
 #   • BuildCommit  → short git hash (+ -dirty suffix if applicable)
@@ -493,7 +731,7 @@ fi
 #
 # -buildid= removes the random build ID that Go would otherwise
 # generate, ensuring byte-identical output for the same inputs.
-# ============================================================
+# ------------------------------------------------------------
 LDFLAGS="${LDFLAGS_BASE}"
 LDFLAGS="${LDFLAGS} -X main.BuildVersion=${SCRIPT_VERSION}"
 LDFLAGS="${LDFLAGS} -X main.BuildCommit=${BUILD_COMMIT}"
@@ -531,13 +769,12 @@ fi
 # ------------------------------------------------------------
 # [21] UPX + PIE warning
 # ------------------------------------------------------------
+# BLD-5: the USE_UPX flag was already validated during argument
+# parsing. This section only prints the reminder.
+# ------------------------------------------------------------
 if [ "$USE_UPX" = "1" ]; then
     echo -e "${YELLOW}⚠️  UPX enabled — may break PIE${NC}"
     echo -e "${DIM}   Android 5+ requires PIE. Verify the output.${NC}"
-    if ! command -v upx >/dev/null 2>&1; then
-        echo -e "${RED}❌ UPX not installed — disabling${NC}"
-        USE_UPX=0
-    fi
     echo ""
 fi
 
@@ -600,14 +837,33 @@ build_arch() {
     [ -n "$GOARM_VAL" ] && BUILD_ENV+=("GOARM=$GOARM_VAL")
     [ -n "$CC_PATH" ] && BUILD_ENV+=("CC=$CC_PATH")
 
-    if timeout 300 env "${BUILD_ENV[@]}" go build \
-        -ldflags="$LDFLAGS" \
-        -tags "$BUILD_TAGS" \
-        -buildmode "$BUILDMODE" \
-        $GOFLAGS \
-        -o "$OUTPUT" \
-        main.go > "$LOGFILE" 2>&1; then
+    # BLD-3: use `timeout` when available; otherwise run the
+    # build without a hard time limit. On CI/Termux the timeout
+    # is present; on macOS without coreutils it may not be.
+    local build_ok=0
+    if [ "$HAS_TIMEOUT" = "1" ]; then
+        if timeout 300 env "${BUILD_ENV[@]}" go build \
+            -ldflags="$LDFLAGS" \
+            -tags "$BUILD_TAGS" \
+            -buildmode "$BUILDMODE" \
+            $GOFLAGS \
+            -o "$OUTPUT" \
+            main.go > "$LOGFILE" 2>&1; then
+            build_ok=1
+        fi
+    else
+        if env "${BUILD_ENV[@]}" go build \
+            -ldflags="$LDFLAGS" \
+            -tags "$BUILD_TAGS" \
+            -buildmode "$BUILDMODE" \
+            $GOFLAGS \
+            -o "$OUTPUT" \
+            main.go > "$LOGFILE" 2>&1; then
+            build_ok=1
+        fi
+    fi
 
+    if [ "$build_ok" = "1" ]; then
         if [ ! -s "$OUTPUT" ]; then
             echo -e "${RED}✗ (empty file)${NC}"
             return 1
@@ -718,31 +974,40 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo -e "${BOLD}🔐 Generating checksums...${NC}"
 
     CHECKSUM_FILE="$BUILD_DIR/checksums.txt"
+
+    # BLD-4: when SOURCE_DATE_EPOCH=0 (git unavailable), print a
+    # human-friendly "unknown" instead of 1970-01-01.
+    if [ "$SOURCE_DATE_EPOCH" -gt 0 ] 2>/dev/null; then
+        BUILD_DATE_HUMAN=$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u +'%Y-%m-%d %H:%M:%S UTC')
+    else
+        BUILD_DATE_HUMAN="unknown (SOURCE_DATE_EPOCH=0)"
+    fi
+
     {
         echo "# DNSCrypt WebUI ${SCRIPT_VERSION}"
         echo "# Commit: ${BUILD_COMMIT}"
         echo "# Project: ${PROJECT_URL}"
-        echo "# Date: $(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u +'%Y-%m-%d %H:%M:%S UTC')"
+        echo "# Date: ${BUILD_DATE_HUMAN}"
         echo "# Env: ${ENV_TYPE}"
         echo "# Reproducible: SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}"
         echo ""
     } > "$CHECKSUM_FILE"
 
     cd "$BUILD_DIR"
-    local_checksum_tool=""
+    CHECKSUM_TOOL=""
     if command -v sha256sum >/dev/null 2>&1; then
-        local_checksum_tool="sha256sum"
+        CHECKSUM_TOOL="sha256sum"
     elif command -v shasum >/dev/null 2>&1; then
-        local_checksum_tool="shasum -a 256"
+        CHECKSUM_TOOL="shasum -a 256"
     fi
 
-    if [ -n "$local_checksum_tool" ]; then
+    if [ -n "$CHECKSUM_TOOL" ]; then
         for f in ${OUTPUT_PREFIX}-*; do
             [ -f "$f" ] || continue
             case "$f" in
                 *.log|*.log.*) continue ;;
             esac
-            $local_checksum_tool "$f" >> "checksums.txt"
+            $CHECKSUM_TOOL "$f" >> "checksums.txt"
         done
         echo -e "${GREEN}✅${NC} ${CHECKSUM_FILE}"
     else
@@ -763,17 +1028,17 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     for ARCH in $ARCHS; do
         OUTPUT="$BUILD_DIR/${OUTPUT_PREFIX}-${ARCH}"
         if [ -f "$OUTPUT" ]; then
-            local_size=$(du -h "$OUTPUT" 2>/dev/null | cut -f1)
-            local_type="?"
+            SIZE_DISPLAY=$(du -h "$OUTPUT" 2>/dev/null | cut -f1)
+            TYPE_DISPLAY="?"
             if command -v file >/dev/null 2>&1; then
                 if file "$OUTPUT" | grep -q "pie executable"; then
-                    local_type="${GREEN}PIE${NC}"
+                    TYPE_DISPLAY="${GREEN}PIE${NC}"
                 else
-                    local_type="${YELLOW}non-PIE${NC}"
+                    TYPE_DISPLAY="${YELLOW}non-PIE${NC}"
                 fi
             fi
             printf "  ${CYAN}%-30s${NC} ${DIM}%12s${NC} %10b\n" \
-                "${OUTPUT_PREFIX}-${ARCH}" "$local_size" "$local_type"
+                "${OUTPUT_PREFIX}-${ARCH}" "$SIZE_DISPLAY" "$TYPE_DISPLAY"
         fi
     done
     echo ""
@@ -792,21 +1057,21 @@ if [ "$DO_PACKAGE" = "1" ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
     else
         rm -f "$PKG_PATH"
 
-        local_files_to_zip=""
+        FILES_TO_ZIP=""
         cd "$BUILD_DIR"
         for f in ${OUTPUT_PREFIX}-* checksums.txt; do
             [ -f "$f" ] || continue
             case "$f" in
                 *.log|*.log.*) continue ;;
             esac
-            local_files_to_zip="${local_files_to_zip} ${f}"
+            FILES_TO_ZIP="${FILES_TO_ZIP} ${f}"
         done
 
-        if [ -n "$local_files_to_zip" ]; then
+        if [ -n "$FILES_TO_ZIP" ]; then
             # shellcheck disable=SC2086
-            if zip -q -j "$PKG_PATH" $local_files_to_zip 2>/dev/null; then
-                pkg_size=$(du -h "$PKG_PATH" 2>/dev/null | cut -f1)
-                echo -e "${GREEN}✅${NC} ${PKG_NAME} (${pkg_size})"
+            if zip -q -j "$PKG_PATH" $FILES_TO_ZIP 2>/dev/null; then
+                PKG_SIZE=$(du -h "$PKG_PATH" 2>/dev/null | cut -f1)
+                echo -e "${GREEN}✅${NC} ${PKG_NAME} (${PKG_SIZE})"
             else
                 echo -e "${RED}❌ Failed to create ZIP${NC}"
             fi
@@ -838,6 +1103,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ] && command -v file >/dev/null 2>&1; then
         echo -e "  ${GREEN}🎉 All binaries are PIE — Android 5+ compatible${NC}"
     else
         echo -e "  ${YELLOW}⚠️  Some binaries are non-PIE${NC}"
+        echo -e "  ${DIM}Check whether --enable-upx was used.${NC}"
     fi
     echo ""
 fi

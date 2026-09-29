@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Issue Templates Configuration
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,7 +12,7 @@
 # Reference:
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
 # ============================================================
-# v1.1.0 additions:
+# v1.1.0 additions (kept):
 #   • Added three new contact links covering the workflow docs
 #     added during the v1.0.0 cycle:
 #       - docs/BRANCHING.md        (Git workflow)
@@ -21,12 +21,54 @@
 #     These are essential for contributors who want to submit
 #     PRs but are unsure about branch/PR policy.
 #   • Reordered contact links so the most commonly-needed ones
-#     appear first (FAQ → Troubleshooting → Discussions →
-#     Security → Install → Workflow → ADRs → Compatibility →
-#     Changelog → Roadmap).
+#     appear first.
 #   • Expanded the documentation for each field so a future
 #     maintainer can understand the intent without cross-checking
 #     multiple GitHub pages.
+#
+# ============================================================
+# v1.2.0 additions:
+#   • Version bumped from v1.1.0 to v1.2.0.
+#   • Added three new v1.2.0-specific contact links, placed
+#     immediately after the troubleshooting link:
+#       - docs/BACKUP.md      — Backup system reference
+#       - docs/EMERGENCY.md   — Emergency recovery guide
+#       - docs/UPGRADE.md     — Version upgrade guide
+#     These are the first things a user should read if they
+#     suspect data loss, restore failure, or an upgrade problem.
+#   • Reordered the full contact list to reflect the v1.2.0
+#     priorities (FAQ → Troubleshooting → Backup → Emergency →
+#     Upgrade → Discussions → Security → Install → Branching →
+#     Release Process → ADRs → Compatibility → Changelog →
+#     Roadmap).
+#   • Expanded the "about" text for the backup and emergency
+#     links to explain the recovery trigger (`recovery` file)
+#     and the persistent backup directory
+#     (`/sdcard/dnscrypt-webui-backup/`).
+#   • All text is English-only (global edition). No Arabic
+#     strings exist in this file.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# ============================================================
+# A pre-release audit of this file identified the following
+# issues. All of them are addressed in-place; no version bump.
+#
+#   🔧 ISS-4 — Every `about:` field was a multi-line block
+#     scalar (`|`) containing 3–6 lines of text. GitHub renders
+#     the `about` string in a small card next to the link name,
+#     with a very limited vertical budget (roughly two lines).
+#     A block scalar that long is either visually truncated or
+#     forces the card to scroll — neither of which is what the
+#     reader expects. All `about:` values have been rewritten as
+#     two-line summaries. The detail that was removed from each
+#     card still lives in the linked document itself, which is
+#     where a reader who follows the link will see it.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
 # ============================================================
 
 # ============================================================
@@ -45,6 +87,11 @@
 # Our choice: false (strict) — the project receives bug reports
 # from a wide range of devices/ROMs/kernels, and unstructured
 # reports would slow down triage significantly.
+#
+# v1.2.0 note: the strictness is even more important now, because
+# data-loss reports REQUIRE the v1.2.0 diagnostic block
+# (backup count, last_stable, recovery mode, orphan txn). A blank
+# issue would silently lose that context.
 # ============================================================
 blank_issues_enabled: false
 
@@ -53,20 +100,27 @@ blank_issues_enabled: false
 # ============================================================
 # Appear below "New Issue" — guide the user to the correct channel.
 #
-# Ordering rationale:
+# Ordering rationale (v1.2.0):
 #   Links are listed in decreasing order of how often they are
 #   needed by first-time visitors:
 #     1. FAQ                 — before asking anything
 #     2. Troubleshooting     — before opening a bug
-#     3. Discussions         — general questions
-#     4. Security            — private vulnerability reports
-#     5. Install             — installation questions
-#     6. Branching           — before opening a PR
-#     7. Release Process     — how releases are cut
-#     8. ADRs                — architectural decisions
-#     9. Compatibility       — "will it work on my device?"
-#    10. Changelog           — "what's new?"
-#    11. Roadmap             — "will feature X be added?"
+#     3. Backup reference    — for data-loss / restore questions
+#     4. Emergency recovery  — for bootloop / lost-data scenarios
+#     5. Upgrade guide       — for version-to-version questions
+#     6. Discussions         — general questions
+#     7. Security            — private vulnerability reports
+#     8. Install             — installation questions
+#     9. Branching           — before opening a PR
+#    10. Release Process     — how releases are cut
+#    11. ADRs                — architectural decisions
+#    12. Compatibility       — "will it work on my device?"
+#    13. Changelog           — "what's new?"
+#    14. Roadmap             — "will feature X be added?"
+#
+# ISS-4 fix: all `about` values below are two-line summaries.
+# GitHub renders them in a narrow card; multi-line block scalars
+# (used previously) were visually truncated or forced scroll.
 # ============================================================
 contact_links:
 
@@ -76,8 +130,8 @@ contact_links:
   - name: ❓ Frequently Asked Questions (FAQ)
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md
     about: |
-      Common questions with detailed answers (90+ entries).
-      Suitable for: "How do I do X?" — the answer may already be here.
+      Common questions with detailed answers (Q1–Q130).
+      Read this first — the answer may already be here.
 
   # ------------------------------------------------------------
   # [2.2] Troubleshooting guide
@@ -85,87 +139,113 @@ contact_links:
   - name: 🆘 Troubleshooting guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md
     about: |
-      Comprehensive diagnostic guide with multiple sections (DNS, WebUI, Firewall, ...).
-      Suitable for: "X does not work" — start here before opening an Issue.
+      Comprehensive diagnostics for DNS, WebUI, firewall, and backup issues.
+      Read this before opening an Issue.
 
   # ------------------------------------------------------------
-  # [2.3] General discussions (questions, ideas, discussions)
+  # [2.3] Backup system reference (v1.2.0)
+  # ------------------------------------------------------------
+  - name: 💾 Backup system reference
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md
+    about: |
+      The 5 preserved files, the 10 defensive layers, directory layout,
+      rotation, and manual restore. Backup dir: /sdcard/dnscrypt-webui-backup/
+
+  # ------------------------------------------------------------
+  # [2.4] Emergency recovery guide (v1.2.0)
+  # ------------------------------------------------------------
+  - name: 🚨 Emergency recovery guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md
+    about: |
+      Step-by-step recovery for bootloop, lost data, broken DNS, or firewall.
+      Recovery trigger: touch recovery && reboot.
+
+  # ------------------------------------------------------------
+  # [2.5] Upgrade guide (v1.2.0)
+  # ------------------------------------------------------------
+  - name: ⬆️ Version upgrade guide
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/UPGRADE.md
+    about: |
+      Upgrade paths v1.0.0 → v1.1.0 → v1.2.0, settings preservation,
+      and rollback. Read before upgrading across versions.
+
+  # ------------------------------------------------------------
+  # [2.6] General discussions (questions, ideas, discussions)
   # ------------------------------------------------------------
   - name: 💬 Questions and Discussions
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
     about: |
-      Ask questions, share ideas, or discuss the project with the community.
-      Suitable for: general questions, usage tips, initial suggestions.
+      General questions, usage tips, and community discussions.
+      Not for bug reports — use the Issue templates instead.
 
   # ------------------------------------------------------------
-  # [2.4] Security reports (Private Vulnerability Reporting)
+  # [2.7] Security reports (Private Vulnerability Reporting)
   # ------------------------------------------------------------
   - name: 🔒 Report a security vulnerability
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
     about: |
-      Do not open a public Issue for security vulnerabilities!
-      Use this link for a private and confidential report.
-      Suitable for: XSS, CSRF, auth bypass, data leakage.
+      Private and confidential reports only.
+      Do NOT open a public Issue for security vulnerabilities.
 
   # ------------------------------------------------------------
-  # [2.5] Installation guide
+  # [2.8] Installation guide
   # ------------------------------------------------------------
   - name: 📘 Installation guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/INSTALL.md
     about: |
-      Full step-by-step installation guide for Magisk / KernelSU / APatch.
-      Suitable for: installation issues, system requirements, initial setup.
+      Step-by-step installation for Magisk / KernelSU / APatch.
+      Includes a manual backup procedure for before-uninstall.
 
   # ------------------------------------------------------------
-  # [2.6] Git branching strategy (v1.1.0 — new link)
+  # [2.9] Git branching strategy
   # ------------------------------------------------------------
   - name: 🌿 Git branching & PR guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BRANCHING.md
     about: |
       Branch types, naming rules, PR target rules, and protection policy.
-      Suitable for: before opening a PR — explains which base branch to use.
+      Read before opening a PR.
 
   # ------------------------------------------------------------
-  # [2.7] Release process guide (v1.1.0 — new link)
+  # [2.10] Release process guide
   # ------------------------------------------------------------
   - name: 🚀 Release process guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/RELEASE_PROCESS.md
     about: |
       How releases are prepared, tagged, published, and synced.
-      Suitable for: understanding release.sh / release-patch.sh and the CI pipeline.
+      Covers release.sh and release-patch.sh.
 
   # ------------------------------------------------------------
-  # [2.8] Architecture Decision Records (v1.1.0 — new link)
+  # [2.11] Architecture Decision Records
   # ------------------------------------------------------------
   - name: 📐 Architecture Decision Records
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md
     about: |
-      The "why" behind major architectural and process decisions.
-      Suitable for: understanding why the project works the way it does.
+      The "why" behind major architectural decisions (6 ADRs).
+      Read before proposing changes to core design.
 
   # ------------------------------------------------------------
-  # [2.9] Compatibility matrix
+  # [2.12] Compatibility matrix
   # ------------------------------------------------------------
   - name: ✅ Compatibility matrix
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/COMPATIBILITY.md
     about: |
-      Comprehensive compatibility table: Android, ROMs, Kernels, Chipsets, Root solutions.
-      Suitable for: "Will it work on my device?" — the answer is here.
+      Compatibility by Android version, ROM, kernel, chipset, and root solution.
+      Also covers v1.1.0 memory profiles and v1.2.0 backup support.
 
   # ------------------------------------------------------------
-  # [2.10] Changelog
+  # [2.13] Changelog
   # ------------------------------------------------------------
   - name: 📋 Changelog
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md
     about: |
-      All notable changes, sorted by version.
-      Suitable for: "What is new in v1.1.0?" — the answer is here.
+      All notable changes from v1.0.0 through v1.2.0.
+      See what's new in the latest release.
 
   # ------------------------------------------------------------
-  # [2.11] Roadmap
+  # [2.14] Roadmap
   # ------------------------------------------------------------
   - name: 🗺️ Project roadmap
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md
     about: |
-      What is coming in v1.2.0, v1.3.0, v2.0.0?
-      Suitable for: "Will feature X be added?" — check first.
+      What is planned for v1.3.0, v1.4.0, and v2.0.0.
+      Check here before proposing a feature.

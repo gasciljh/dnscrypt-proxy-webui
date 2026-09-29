@@ -1,6 +1,6 @@
 # ============================================================
 # EditorConfig for DNSCrypt Smart Filter
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://editorconfig.org
@@ -13,17 +13,65 @@
 #   Rules are defined only for file types that actually exist
 #   in this repository. No speculative or defensive patterns.
 #
-# v1.1.0 notes:
+# v1.1.0 notes (kept):
 #   • Go 1.22 is the current toolchain (go.mod).
-#   • Two files were added in the v1.0.0 → v1.1.0 cycle that
-#     are covered by existing patterns:
-#       - web/icon-192.svg, web/icon-512.svg → [*.svg]
-#       - web/manifest.json → [*.json]
-#     No new patterns were required.
-#   • `[*.go]` no longer sets `indent_size` — see the comment
-#     in that section for the rationale.
+#   • `[*.go]` does not set `indent_size` — editors ignore the
+#     numeric value when `indent_style = tab`; keeping it would
+#     be misleading.
 #   • `.secrets.baseline` and `.pre-commit-config.yaml` are
-#     covered by existing patterns (`.yaml` / no extension).
+#     covered by existing patterns (`.json` / `*.yaml`).
+#
+# ============================================================
+# v1.2.0 changes:
+#   • Version bumped from v1.1.0 to v1.2.0.
+#   • Confirmed that all files added during the v1.0.0 → v1.2.0
+#     cycles are covered by existing patterns — no new file
+#     extensions were introduced. Specifically:
+#
+#       - web/icon-maskable.svg (planned for v1.3.0, not yet)
+#         → would be covered by [*.svg] when added
+#
+#       - docs/BACKUP.md, docs/EMERGENCY.md, docs/UPGRADE.md
+#         → covered by [*.md]
+#
+#       - docs/adr/0004-0006.md, docs/adr/README.md
+#         → covered by [*.md]
+#
+#       - .github/workflows/upgrade-test.yml
+#         → covered by [*.{yml,yaml}]
+#
+#       - .github/PULL_REQUEST_TEMPLATE/release.md
+#         → covered by [*.md]
+#
+#       - scripts/release-patch.sh
+#         → covered by [*.{sh,bash}]
+#
+#   • Added an explicit `[Makefile]` note: the v1.2.0 Makefile
+#     added two new targets (`check-backup`, `check-all`) that
+#     use tabs inside recipe lines — no EditorConfig change was
+#     needed because `[Makefile]` already enforced tabs.
+#
+#   • Added `[proxy/run/*.tmp_*]` pattern for the atomic-write
+#     temp files created by main.go (e.g. from atomicWriteFile).
+#     These are the `*.tmp_*` files that appear briefly during a
+#     write and are renamed atomically. No final newline should
+#     be enforced on them.
+#
+#   • Added a "Data preservation (v1.2.0)" note in the runtime
+#     files section, confirming that no new runtime file was
+#     introduced by the backup system. The backup directory
+#     (/sdcard/dnscrypt-webui-backup/) lives OUTSIDE the
+#     repository, so EditorConfig does not apply to it.
+#
+#   • Global English edition: all comments are English-only.
+#     No Arabic strings exist in this file.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • Makefile            — `make check-docs` verifies the
+#                           presence of the three v1.2.0 docs
 # ============================================================
 
 root = true
@@ -34,10 +82,17 @@ root = true
 # Applied to every file unless a more specific section below
 # overrides a given property.
 #
-#   charset      — UTF-8 (no BOM)
-#   end_of_line  — LF on every platform (Android/Linux/macOS/WSL)
-#   insert_final_newline — POSIX-friendly for shell scripts
+#   charset                  — UTF-8 (no BOM)
+#   end_of_line              — LF on every platform
+#                              (Android / Linux / macOS / WSL2)
+#   insert_final_newline     — POSIX-friendly for shell scripts
 #   trim_trailing_whitespace — removes invisible noise
+#
+# ⚠️ Important: EditorConfig properties are HIERARCHICAL.
+#    A property set here is INHERITED by every section below
+#    unless that section explicitly overrides it.
+#    See the [*.go] section for a concrete example of why the
+#    inheritance matters.
 # ============================================================
 [*]
 charset = utf-8
@@ -54,15 +109,36 @@ indent_size = 4
 # by gofmt (which CI runs via `gofmt -l proxy/`).
 #
 # ⚠️ indent_size is INTENTIONALLY OMITTED here.
-#    Most editors ignore indent_size when indent_style = tab —
-#    the numeric value would be misleading. Editors that need a
-#    visual tab width use their own display preference.
+#
+#    EditorConfig inheritance in detail:
+#
+#      1. The [*] section above sets `indent_size = 4`.
+#      2. This [*.go] section sets only `indent_style = tab`.
+#      3. EditorConfig rules are hierarchical, so the
+#         `indent_size = 4` value is INHERITED from [*].
+#      4. However, when `indent_style = tab`, most editors
+#         IGNORE the numeric `indent_size` value.
+#
+#    Why we do NOT explicitly set `indent_size` here:
+#      • Setting it to any number (e.g. 4) would suggest that
+#        Go code should be visually rendered at 4-space tabs.
+#        That is a display preference, not a formatting rule.
+#      • Setting it to `tab` is not valid EditorConfig syntax.
+#      • The inheritance from [*] is harmless: editors that
+#        correctly handle `indent_style = tab` will ignore the
+#        inherited `indent_size` value.
+#      • Editors that DO use `indent_size` even with tabs (e.g.
+#        for soft-tab operations) will use 4, which matches
+#        the project's default indent width.
+#
+#    If a specific editor renders Go files incorrectly, adjust
+#    the editor's own display preference (not this file).
 #
 # See: https://go.dev/doc/effective_go#formatting
 # ============================================================
 [*.go]
 indent_style = tab
-# indent_size is intentionally omitted — see comment above.
+# indent_size is intentionally NOT overridden — see comment above.
 
 # ============================================================
 # Shell Scripts
@@ -77,6 +153,17 @@ indent_style = tab
 #
 # ShellCheck is run separately via pre-commit (see
 # .pre-commit-config.yaml and proxy/*.sh).
+#
+# ⚠️ v1.2.0 note: scripts/release-patch.sh and scripts/release.sh
+#    are covered by this pattern. No new shell formatting rule
+#    was required — the v1.2.0 release did not change shell
+#    indentation conventions.
+#
+# ⚠️ v1.2.0 POSIX note: all proxy/*.sh scripts use `local`
+#    inside their helper functions. The `local` keyword is NOT
+#    part of POSIX sh, but every shell Android ships (mksh,
+#    busybox ash) supports it. This does not affect EditorConfig
+#    — it is documented in the header of each shell script.
 # ============================================================
 [*.{sh,bash}]
 indent_style = space
@@ -93,7 +180,7 @@ switch_case_indent = true
 #   • .secrets.baseline  (detect-secrets baseline)
 #
 # 2-space indentation matches common JSON formatting and
-# minimize diff noise on regeneration.
+# minimizes diff noise on regeneration.
 # ============================================================
 [*.{js,json}]
 indent_style = space
@@ -104,6 +191,7 @@ indent_size = 2
 # ============================================================
 # Applies to:
 #   • .github/workflows/*.yml
+#     — including upgrade-test.yml (v1.2.0, 42-scenario matrix)
 #   • .github/dependabot.yml
 #   • .github/ISSUE_TEMPLATE/*.yml
 #   • .pre-commit-config.yaml
@@ -118,7 +206,12 @@ indent_size = 2
 # ============================================================
 # Markdown
 # ============================================================
-# Applies to every .md file in the repository.
+# Applies to every .md file in the repository, including:
+#   • docs/BACKUP.md      (v1.2.0)
+#   • docs/EMERGENCY.md   (v1.2.0)
+#   • docs/UPGRADE.md     (v1.2.0)
+#   • docs/adr/*.md       (ADRs 0001-0006)
+#   • .github/PULL_REQUEST_TEMPLATE/release.md
 #
 # `trim_trailing_whitespace = false` is DELIBERATE:
 # some Markdown dialects use two trailing spaces to force a
@@ -138,6 +231,11 @@ trim_trailing_whitespace = false
 # Applies to:
 #   • web/index.html, dashboard.html, offline.html
 #   • web/icon-192.svg, icon-512.svg
+#   • web/icon-maskable.svg  (planned for v1.3.0 — will be
+#                             covered automatically when added)
+#
+# `scss` is included for future-proofing (the project does not
+# currently use SCSS, but the pattern is harmless).
 #
 # 2-space indentation is standard for web markup and matches
 # the format generated by the icon generation pipeline.
@@ -153,10 +251,24 @@ indent_size = 2
 # Make and cannot be overridden. The `SHELL` variable inside
 # the Makefile uses tabs for command blocks.
 #
-# `indent_size` is intentionally omitted (same rationale as Go).
+# `indent_size` is intentionally omitted (same rationale as Go:
+# the numeric value would be misleading when indent_style = tab,
+# and the inherited value from [*] is ignored by GNU Make).
+#
+# v1.2.0 note: the Makefile gained three new targets —
+#   • check-backup   (validate backup shell functions)
+#   • check-all      (run all local validations)
+#   • check-docs     (verify v1.2.0 documentation presence)
+#   • diagnose-help  (print device-side diagnostics commands)
+# All use tabs in their recipe bodies. No EditorConfig change
+# was required — the `[Makefile]` rule already enforces tabs
+# for every recipe line.
 # ============================================================
 [Makefile]
 indent_style = tab
+# indent_size is intentionally NOT overridden — same rationale
+# as [*.go]: the inherited value from [*] is ignored by GNU Make
+# because tabs are mandatory.
 
 # ============================================================
 # TOML / Conf / Prop
@@ -176,6 +288,10 @@ indent_size = 2
 # ============================================================
 # Git config
 # ============================================================
+# .gitattributes is a machine-read file — no final newline is
+# needed (though it is harmless). .gitignore is human-edited
+# and benefits from a final newline.
+# ============================================================
 [.gitattributes]
 insert_final_newline = false
 
@@ -187,10 +303,17 @@ insert_final_newline = true
 # ============================================================
 # go.mod and go.sum are formatted by the `go mod` tooling.
 # The Go toolchain uses tabs.
+#
+# v1.2.0 note: proxy/go.mod is unchanged from v1.1.0. No new
+# imports were added by the data-preservation release.
+#
+# ⚠️ indent_size is intentionally NOT overridden here for the
+#    same reason as [*.go]: the inherited value from [*] is
+#    ignored when indent_style = tab.
 # ============================================================
 [{go.mod,go.sum}]
 indent_style = tab
-indent_size = 4
+# indent_size is intentionally NOT overridden — see [*.go] note.
 
 # ============================================================
 # Dockerfile
@@ -208,6 +331,11 @@ indent_size = 4
 # Redundant with [*.{yml,yaml}] above, but kept explicit so
 # that the intent (2-space YAML) is obvious when reading this
 # file in isolation.
+#
+# v1.2.0 note: the pre-commit config added no new hooks for
+# v1.2.0 — the existing shellcheck + go-fmt + go-build hooks
+# already cover the data-preservation layers (see the file's
+# own header for the full three-layer validation model).
 # ============================================================
 [.pre-commit-config.yaml]
 indent_style = space
@@ -232,8 +360,15 @@ indent_size = 4
 #
 # Note (v1.1.0): proxy/run/ does NOT contain a
 # `memory_limit_mb` file — the limit is held in memory
-# (currentMemLimit in main.go). The files below are the only
-# ones that exist in run/.
+# (currentMemLimit in main.go).
+#
+# Data preservation (v1.2.0):
+#   No new runtime file was introduced by the backup system.
+#   The persistent backup directory lives OUTSIDE the
+#   repository, at:
+#       /sdcard/dnscrypt-webui-backup/
+#   EditorConfig rules apply to files in this repository only.
+#   Therefore no rule is needed for the backup directory.
 # ============================================================
 [proxy/run/*.status]
 insert_final_newline = false
@@ -242,6 +377,30 @@ insert_final_newline = false
 insert_final_newline = false
 
 [proxy/run/.bootstrap_cache]
+insert_final_newline = false
+
+# ============================================================
+# Atomic-write temp files
+# ============================================================
+# main.go uses atomicWriteFile / atomicWriteStream, which create
+# a temporary file (e.g. `webui.conf.tmp_XXXX`) and rename it
+# atomically. These temp files are short-lived but may appear
+# on disk briefly during a write.
+#
+# No final newline should be enforced on them — they are
+# byte-level copies of the target file.
+#
+# Two patterns are used:
+#   • `[*.tmp_*]`            — global catch-all (any directory)
+#   • `[proxy/run/*.tmp_*]`  — explicit for the runtime dir
+#
+# Both are harmless together; the more specific one wins if
+# they ever differ.
+# ============================================================
+[*.tmp_*]
+insert_final_newline = false
+
+[proxy/run/*.tmp_*]
 insert_final_newline = false
 
 # ============================================================
@@ -258,10 +417,15 @@ insert_final_newline = false
 insert_final_newline = false
 
 # ============================================================
-# CodeQL config (within .github/workflows/)
+# CI workflows (explicit)
 # ============================================================
-# Redundant with [*.{yml,yaml}] above, but kept explicit for
-# the same reason as .pre-commit-config.yaml.
+# Redundant with [*.{yml,yaml}] above, but kept explicit so
+# that the 2-space YAML convention is obvious when reading
+# this file in isolation.
+#
+# v1.2.0 note: .github/workflows/upgrade-test.yml (the
+# 42-scenario data-preservation matrix) is covered by this
+# pattern automatically.
 # ============================================================
 [.github/workflows/*.yml]
 indent_style = space

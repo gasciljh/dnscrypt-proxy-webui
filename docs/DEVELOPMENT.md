@@ -2,39 +2,85 @@
 
 > Developer guide: environment setup, building, debugging, and releasing.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • `Last updated` reflects the v1.1.0 release date.
->   • `§1.2 Architectural Principles` gained 3 entries: MEM-1
->     (dynamic memory limit), MEM-2 (extended shellQuote),
->     MEM-3 (MONITORING_UI_PORT constant).
->   • `§5.4 Commit Examples` gained 3 examples for MEM-1/2/3.
->   • `§8.10` (new) — v1.1.0 Memory Limit Debugging — static
->     audit and runtime checks for `memoryLimitForProfile` /
->     `applyMemoryLimit`.
->   • `§8.11` (new) — Testing all profiles — one-shot script
->     to verify all 5 profiles return the correct limit.
->   • `§9 Make Targets` extended with `release`,
->     `release-patch`, and `sync` targets (introduced in the
->     v1.0.0 cycle, now documented here).
->   • `§10 v1.0.0 Contributor Notes` renamed to `§10 v1.1.0
->     Contributor Notes`, with a new Golden Rule #21 (memory
->     observability) and updated examples.
->   • Release examples updated from `v1.1.0` to `v1.2.0`
->     (stable) and `v1.1.1` (PATCH).
->   • `Related documents` box now includes `docs/UPGRADE.md`.
->   • `§10.12 Full References` extended with `docs/UPGRADE.md`.
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • `Last updated` reflects the v1.2.0 release date.
+>   • `§1.2 Architectural Principles` gained 5 entries for the
+>     v1.2.0 data-preservation release:
+>       - Multi-Source Discovery (Layer 1)
+>       - Persistent Backup (Layer 2)
+>       - Transactional Upgrade with rollback (Layer 4)
+>       - Recovery Mode (Layer 7)
+>       - Bilingual WebUI (EN default + AR toggle)
+>   • `§4.3 (v1.0.0 / v1.1.0 File Changes)` extended with a
+>     v1.2.0 column documenting every file changed during the
+>     data-preservation cycle.
+>   • `§5.4 Commit Examples` gained 5 examples for the v1.2.0
+>     additions:
+>       - BAK-1 (7-field `runtime_info.backups`)
+>       - BAK-2 (`createAutoBackup` + `backupMu`)
+>       - BAK-3 (`cleanupOldTransactions`)
+>       - BAK-4 (`checkPendingNotifications`)
+>       - FIX-1 (recovery-mode reorder)
+>       - FIX-2 (Service Worker update banner)
+>   • `§7 CI/CD` updated:
+>       - `ci.yml` now runs a `backup-smoke-test` job.
+>       - `release.yml` unchanged (no pipeline changes in v1.2.0).
+>       - New `.github/workflows/upgrade-test.yml` documented.
+>   • `§8 Debugging` extended:
+>       - **§8.12 (new)** — v1.2.0 Backup Debugging.
+>       - **§8.13 (new)** — Testing the 42-scenario matrix
+>         locally.
+>       - **§8.14 (new)** — v1.2.0 Bilingual WebUI Debugging.
+>   • `§9 Make Targets` extended with three v1.2.0 targets:
+>       - `check-backup` — validate the backup shell functions.
+>       - `check-all` — run all local validations.
+>       - `diagnose-help` — print device-side diagnostic commands.
+>   • `§10.8 Golden Rules` gained **Rule #22** — v1.2.0 backup
+>     observability requirement — and **Rule #23** — bilingual
+>     WebUI string requirement.
+>   • `§10.12 Full References` extended with the three new
+>     documentation files:
+>       - [`docs/BACKUP.md`](BACKUP.md)
+>       - [`docs/EMERGENCY.md`](EMERGENCY.md)
+>       - [`docs/UPGRADE.md`](UPGRADE.md)
+>   • Release examples updated from `v1.2.0` to `v1.3.0`
+>     (stable) and `v1.1.1` to `v1.2.1` (PATCH), since v1.2.0 is
+>     now the current release.
+>   • **Bilingual WebUI note**: the WebUI ships with English as the
+>     default language and an in-page toggle (`langToggle`) that
+>     switches to Arabic. The user's choice is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+
+> **v1.2.0 (Global Edition) — Corrections in this revision**:
+>   • 🔧 **FIX-1 description in §5.4** — The FIX-1 commit example
+>     previously described a "reorder + exclude" strategy. The
+>     actual implementation in `customize.sh` uses a
+>     **snapshot-and-reapply** strategy (`§[8a]` + `§[9]` +
+>     `§[9b2]`). The description has been corrected to match the
+>     shipped code. See `docs/ARCHITECTURE.md` §3.10 for the flow
+>     diagram.
+>   • 🔧 **Reason string in §5.4 (BAK-2)** — The BAK-2 commit
+>     example previously listed `pre-append-denylist` for the
+>     `appendDenylist` call site. The actual reason string
+>     recorded by `main.go` is `pre-denylist-save`, because
+>     `appendDenylist` delegates to `saveDenylist` (which is
+>     where the pre-critical backup is triggered). The example
+>     has been corrected.
 
 > **📖 Branching, Release & Decisions**:
 > - Git workflow → [`docs/BRANCHING.md`](BRANCHING.md)
 > - Publishing a release → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
 > - Architecture Decision Records → [`docs/adr/README.md`](adr/README.md)
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
+> - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
+> - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
 
 ---
 
@@ -49,7 +95,7 @@
 7. [CI/CD](#7-cicd)
 8. [Debugging](#8-debugging)
 9. [Make Targets](#9-make-targets)
-10. [v1.1.0 — Contributor Notes](#10-v110--contributor-notes)
+10. [v1.2.0 — Contributor Notes](#10-v120--contributor-notes)
 
 ---
 
@@ -96,6 +142,11 @@
 - **Dynamic Memory Limit (v1.1.0 — MEM-1)** — `memoryLimitForProfile()` sets the Go soft memory limit per blocklist profile. Prevents GC thrashing on heavy profiles.
 - **Extended `shellQuote` Charset (v1.1.0 — MEM-2)** — covers `{`, `}`, `\n`, `\t` in addition to the 20-char set.
 - **Reserved Port Constant (v1.1.0 — MEM-3)** — `MONITORING_UI_PORT` used in the metrics handler, no hardcoded `"8080"`.
+- **Multi-Source Discovery (v1.2.0 — Layer 1)** — the installer searches 7 candidate locations for user data. It never asks "is this an upgrade?" — it always asks "where is the user data?".
+- **Persistent Backup (v1.2.0 — Layer 2)** — all user config files are snapshotted to `/sdcard/dnscrypt-webui-backup/`, which survives reboot, uninstall, and `/data` reset.
+- **Transactional Upgrade (v1.2.0 — Layer 4)** — every install runs inside a `txn-*` directory. On failure, an automatic rollback restores the previous state.
+- **Recovery Mode (v1.2.0 — Layer 7)** — a trigger file (`recovery`) restores the last known-good config on next boot.
+- **Bilingual WebUI (v1.2.0)** — the WebUI ships with English as the default language and an in-page toggle that switches to Arabic. The user's preference is stored client-side in `localStorage['dnscrypt-lang']`. Documentation remains English-only by project convention.
 
 ### 1.3 Architecture Decisions
 
@@ -111,6 +162,13 @@ The decisions that shaped this project are documented as **ADRs**:
 | [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md) | Rename `hotfix.sh` → `release-patch.sh` |
 
 **Current ADR count**: 6 (5 accepted + 1 superseded).
+
+**v1.2.0 note**: No new ADR was added in the v1.2.0 cycle. The
+10 defensive layers and 4 runtime additions (BAK-1..BAK-4) are
+documented as runtime improvements in
+[`docs/SECURITY.md`](SECURITY.md) §5.31 and §17.2, not as
+architectural decisions. See
+[`docs/adr/README.md`](adr/README.md) §3.3 for the criteria.
 
 Full index: [`docs/adr/README.md`](adr/README.md).
 
@@ -308,9 +366,9 @@ proxy/build/
 - `-buildid=` to remove random signatures.
 - **Result**: same commit → same SHA-256.
 
-### 3.5 Build with v1.1.0
+### 3.5 Build with v1.2.0
 
-Before building, verify the v1.0.0 + v1.1.0 fixes are present:
+Before building, verify the v1.0.0 + v1.1.0 + v1.2.0 features are present:
 
 ```bash
 cd proxy
@@ -346,6 +404,28 @@ grep -A8 'func shellQuote' main.go | grep -q "r == '\\\\n'" && echo "✅ MEM-2 (
 # --- v1.1.0 — MEM-3 ---
 grep -A5 'func metricsProxyHandler' main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
 
+# --- v1.2.0 — BAK-1 (7-field backups) ---
+grep -A30 'func buildBackupInfo' main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1 in_flight_txn"
+grep -A30 'func buildBackupInfo' main.go | grep -q 'orphan_txn' && echo "✅ BAK-1 orphan_txn"
+
+# --- v1.2.0 — BAK-2 (createAutoBackup + backupMu) ---
+grep -q 'func createAutoBackup' main.go && echo "✅ BAK-2 createAutoBackup"
+grep -q 'backupMu' main.go && echo "✅ BAK-2 backupMu"
+
+# --- v1.2.0 — BAK-3 (cleanupOldTransactions) ---
+grep -q 'func cleanupOldTransactions' main.go && echo "✅ BAK-3"
+
+# --- v1.2.0 — BAK-4 (checkPendingNotifications) ---
+grep -q 'func checkPendingNotifications' main.go && echo "✅ BAK-4"
+
+# --- v1.2.0 — Layer presence in shell scripts ---
+for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
+         begin_transaction rollback_transaction commit_transaction \
+         detect_root_solution copy_with_context RECOVERY_TRIGGER \
+         migrate_config; do
+    grep -q "$L" customize.sh && echo "✅ $L" || echo "❌ $L"
+done
+
 # --- Build ---
 ./build.sh --clean --parallel
 
@@ -371,16 +451,17 @@ dnscrypt-proxy-webui/
 ├── LICENSE                          # MIT License
 ├── Makefile                         # Unified commands
 ├── module.prop                      # Magisk/KernelSU definition
-├── README.md                        # Overview (EN)
+├── README.md                        # Overview
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.1.0)
+├── VERSION                          # Single source of truth (v1.2.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
-│   │   ├── ci.yml                   # Build matrix for 4 architectures
+│   │   ├── ci.yml                   # Build matrix for 4 architectures + backup-smoke-test
 │   │   ├── codeql.yml               # Security scanning (SAST)
-│   │   └── release.yml              # Signed release + sync main → develop
+│   │   ├── release.yml              # Signed release + sync main → develop
+│   │   └── upgrade-test.yml         # 42-scenario data-preservation matrix (v1.2.0)
 │   │
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.yml           # Bug report template
@@ -407,22 +488,22 @@ dnscrypt-proxy-webui/
 │   └── release-patch.sh             # PATCH-only (hotfix) automation
 │
 ├── proxy/                           # Backend (Go + Shell)
-│   ├── action.sh                    # Magisk Action button handler
+│   ├── action.sh                    # Magisk Action button handler (--backup, --diagnose)
 │   ├── build.sh                     # 4-arch cross-compile
-│   ├── customize.sh                 # Magisk installer (with backup/restore)
+│   ├── customize.sh                 # Magisk installer (10 data-preservation layers)
 │   ├── dnscrypt-proxy.toml          # DNSCrypt engine config
 │   ├── dnscrypt-proxy.version       # DNS binary version (2.1.18)
-│   ├── functions.sh                 # Shared shell library
+│   ├── functions.sh                 # Shared shell library (backup helpers)
 │   ├── go.mod                       # Go module definition
 │   ├── main.go                      # HTTP server
 │   ├── post-fs-data.sh              # Early boot cleanup
-│   ├── service.sh                   # Boot service + Watchdog launcher
-│   ├── status.sh                    # Status display (4 modes)
-│   ├── uninstall.sh                 # Cleanup on removal
+│   ├── service.sh                   # Boot service + periodic auto-backup
+│   ├── status.sh                    # Status display (5 modes incl. --diagnose)
+│   ├── uninstall.sh                 # Cleanup + orphan txn preservation
 │   ├── watchdog.sh                  # Standalone watchdog process
 │   └── webui.conf                   # WebUI/Dashboard config
 │
-├── web/                             # Frontend (PWA)
+├── web/                             # Frontend (bilingual: EN default + AR toggle)
 │   ├── apple-touch-icon.png         # iOS icon (180×180)
 │   ├── dashboard.html               # Monitoring dashboard
 │   ├── favicon.ico                  # IE + bookmarks
@@ -432,20 +513,22 @@ dnscrypt-proxy-webui/
 │   ├── icon-192.svg                 # PWA icon (SVG, modern browsers)
 │   ├── icon-512.png                 # PWA icon (maskable PNG)
 │   ├── icon-512.svg                 # PWA icon (maskable SVG)
-│   ├── index.html                   # Main UI (FSM + SW Update)
-│   ├── manifest.json                # PWA manifest
+│   ├── index.html                   # Main UI (FSM + SW Update + EN/AR toggle)
+│   ├── manifest.json                # PWA manifest (lang=en, dir=ltr defaults)
 │   ├── offline.html                 # Offline fallback page
-│   └── sw.js                        # Service Worker (v1.1.0)
+│   └── sw.js                        # Service Worker
 │
-└── docs/                            # Documentation (23 files)
+└── docs/                            # Documentation (21 files + 7 ADRs)
     ├── adr/                         # Architecture Decision Records (7 files)
     ├── API.md                       # HTTP API reference
     ├── ARCHITECTURE.md              # System architecture
+    ├── BACKUP.md                    # Backup system reference (v1.2.0)
     ├── BRANCHING.md                 # Git branching strategy
     ├── COMPATIBILITY.md             # Device compatibility matrix
     ├── CONTRIBUTING.md              # Contribution guide
     ├── DEVELOPMENT.md               # This file
     ├── DNS_BINARIES.md              # DNS binaries management
+    ├── EMERGENCY.md                 # Emergency recovery (v1.2.0)
     ├── FAQ.md                       # Common questions
     ├── GLOSSARY.md                  # Terms & abbreviations
     ├── HALL_OF_FAME.md              # Contributors recognition
@@ -461,46 +544,70 @@ dnscrypt-proxy-webui/
 
 | File | Size | Purpose |
 |---|---|---|
-| `proxy/main.go` | ~90 KB | HTTP server + task manager (Backend) |
-| `proxy/functions.sh` | ~22 KB | Shared shell library (with Custom Chains) |
-| `proxy/watchdog.sh` | ~14 KB | Service state monitor |
-| `web/index.html` | ~135 KB | Main UI |
-| `web/dashboard.html` | ~78 KB | Monitoring dashboard |
+| `proxy/main.go` | ~95 KB | HTTP server + task manager (Backend) + auto-backup |
+| `proxy/functions.sh` | ~30 KB | Shared shell library (backup helpers) |
+| `proxy/customize.sh` | ~55 KB | Installer (10 data-preservation layers) |
+| `proxy/watchdog.sh` | ~16 KB | Service state monitor |
+| `web/index.html` | ~135 KB | Main UI (bilingual EN/AR) |
+| `web/dashboard.html` | ~78 KB | Monitoring dashboard (bilingual EN/AR) |
 
-### 4.3 v1.0.0 / v1.1.0 File Changes
+### 4.3 v1.0.0 / v1.1.0 / v1.2.0 File Changes
 
-| File | What changed |
-|---|---|
-| `proxy/main.go` | v1.0.0: Fix #1, #2, #5, #6, #7, #8, #10, #11, #12 + NEW-1..NEW-6 + RACE-1 + PORT-2. v1.1.0: MEM-1, MEM-2, MEM-3 |
-| `proxy/customize.sh` | v1.0.0: backup/restore. v1.1.0: Port collision fix + memory hint |
-| `proxy/functions.sh` | v1.0.0: `fuser` PID parsing. v1.1.0: `get_profile_memory_hint()` + `SELECTED_PROFILE_FILE` |
-| `proxy/watchdog.sh` | v1.0.0: section header with comment + DNS backoff. v1.1.0: profile + memory hint at startup |
-| `proxy/service.sh` | v1.1.0: profile + memory hint at boot |
-| `proxy/action.sh` | v1.1.0: `--check` reports profile + memory |
-| `proxy/status.sh` | v1.1.0: `--check`, `--json`, default output extended |
-| `web/index.html` | v1.0.0: PORT-2 dynamic links. v1.1.0: profile + memory in System Info |
-| `web/dashboard.html` | v1.0.0: PORT-2 dynamic links. v1.1.0: profile + memory in System Info |
-| `web/offline.html` | v1.1.0: **CRITICAL** — removed restrictive CSP meta |
-| `web/manifest.json` | v1.0.0: version + port notes. v1.1.0: x-note-memory, x-note-runtime-info, x-note-icon-source |
-| `web/sw.js` | v1.0.0: PNG icons in precache. v1.1.0: CACHE_VERSION bump + comment cleanup |
-| `web/icon-192.svg` | v1.1.0: header clarified (purpose: any, not maskable) |
-| `web/icon-512.svg` | v1.1.0: header corrected (source for 4 PNGs, not all) |
-| `.pre-commit-config.yaml` | v1.0.0: golangci-lint v2. v1.1.0: + shellcheck-py hook |
-| `.gitignore` | v1.0.0: `proxy/run/*`. v1.1.0: removed 2 no-op negations |
-| `.gitattributes` | v1.0.0: `merge=union` for CHANGELOG + VERSION |
-| `.github/workflows/ci.yml` | v1.0.0: + `develop` in triggers |
-| `.github/workflows/codeql.yml` | v1.0.0: + `develop` in triggers |
-| `.github/workflows/release.yml` | v1.0.0: + `Sync main → develop` step |
-| `scripts/release.sh` | 🆕 v1.0.0 |
-| `scripts/release-patch.sh` | 🆕 v1.0.0 (renamed from draft `hotfix.sh`) |
-| `.github/PULL_REQUEST_TEMPLATE.md` | v1.0.0: + Target Branch section |
-| `.github/PULL_REQUEST_TEMPLATE/release.md` | 🆕 v1.0.0 |
-| `.github/CODEOWNERS` | v1.0.0: + `docs/adr/`, `release-patch.sh`, `PULL_REQUEST_TEMPLATE/` |
-| `docs/BRANCHING.md` | 🆕 v1.0.0 |
-| `docs/RELEASE_PROCESS.md` | 🆕 v1.0.0 |
-| `docs/UPGRADE.md` | 🆕 v1.1.0 (with §3.0 v1.0.0 → v1.1.0 guide) |
-| `docs/adr/README.md` | 🆕 v1.0.0 |
-| `docs/adr/0001` → `0006` | 🆕 v1.0.0 (ADR-0004 superseded by ADR-0005) |
+| File | v1.0.0 | v1.1.0 | v1.2.0 |
+|---|---|---|---|
+| `proxy/main.go` | Fix #1, #2, #5, #6, #7, #8, #10, #11, #12, NEW-1..NEW-6, RACE-1, PORT-2 | MEM-1, MEM-2, MEM-3 | BAK-1 (7-field backups), BAK-2 (`createAutoBackup` + `backupMu`), BAK-3 (`cleanupOldTransactions`), BAK-4 (`checkPendingNotifications`) |
+| `proxy/customize.sh` | Backup/restore (legacy) | Port collision fix + memory hint | 10 defensive layers (multi-source, persistent backup, integrity, transactions, root detection, SELinux, recovery mode, migrations, rotation, history) |
+| `proxy/functions.sh` | `fuser` PID parsing | `get_profile_memory_hint()` + `SELECTED_PROFILE_FILE` | `backup_user_files`, `restore_user_files`, `rotate_backups`, `auto_backup_if_needed`, `cleanup_old_transactions`, `copy_with_context`, `verify_backup_integrity`, `write_manifest`, `get_backup_dir`, `ensure_backup_dir`, `get_last_backup_time` |
+| `proxy/service.sh` | — | Profile + memory hint at boot | `auto_backup_if_needed(86400)`, `rotate_backups(21)`, `cleanup_old_transactions`, reads `.pending_notification`, backup summary logging |
+| `proxy/status.sh` | — | `--check`, `--json`, default output extended | New `--diagnose` mode (Layer 10), 7-field `backups` in `--json`, "Backup & Recovery" section in default output |
+| `proxy/action.sh` | — | `--check` reports profile + memory | New `--backup` flag, new `--diagnose` flag, "Backup & Recovery" section in `--check` |
+| `proxy/uninstall.sh` | — | No auto-backup | Preserves `/sdcard/dnscrypt-webui-backup/`, cleans legacy v1.0.0 backup dir, renames `txn-*` (START) to `orphan-txn-*` |
+| `proxy/watchdog.sh` | — | Profile + memory hint at startup | **Read-only** backup snapshot in startup banner (does not modify the backup layer) |
+| `web/index.html` | PORT-2 dynamic links | Profile + memory in System Info | Bilingual (EN default + AR toggle), backup state in System Info, SW update-banner fix |
+| `web/dashboard.html` | PORT-2 dynamic links | Profile + memory in System Info | Bilingual (EN default + AR toggle), backup state in System Info, SW update-banner fix |
+| `web/offline.html` | — | **CRITICAL** — removed restrictive CSP meta | Bilingual (EN default + AR toggle), "Your data is safe" info box, recovery mode hint |
+| `web/manifest.json` | Version + port notes | `x-note-memory`, `x-note-runtime-info`, `x-note-icon-source` | `lang=en` (default), `dir=ltr` (default), `x-note-backup`, `x-note-backup-paths`, `x-note-recovery`, `x-note-language`, `x-note-docs` |
+| `web/sw.js` | PNG icons in precache | `CACHE_VERSION` bump + comment cleanup | `CACHE_VERSION` bump to v1.2.0, documented SW independence from the backup layer |
+| `web/icon-192.svg` | — | Header clarified | Header expanded with design decisions |
+| `web/icon-512.svg` | — | Header corrected | Header expanded with maskable-safe-zone math |
+| `.pre-commit-config.yaml` | golangci-lint v2 | + shellcheck-py hook | No new hooks (existing cover v1.2.0) |
+| `.gitignore` | `proxy/run/*` | Removed 2 no-op negations | Backup staging patterns in §[19] |
+| `.gitattributes` | `merge=union` for CHANGELOG + VERSION | — | `proxy/dnscrypt-proxy.version` rule added |
+| `.editorconfig` | — | — | `[proxy/run/*.tmp_*]` pattern added |
+| `.github/workflows/ci.yml` | + `develop` in triggers | — | + `backup-smoke-test` job |
+| `.github/workflows/codeql.yml` | + `develop` in triggers | — | Documentation updates only |
+| `.github/workflows/release.yml` | + `Sync main → develop` step | — | Documentation updates only |
+| `.github/workflows/upgrade-test.yml` | — | — | **NEW** — 42-scenario data-preservation matrix |
+| `scripts/release.sh` | 🆕 v1.0.0 | Documentation only | Documentation only |
+| `scripts/release-patch.sh` | 🆕 v1.0.0 (renamed) | Documentation only | Documentation only |
+| `.github/PULL_REQUEST_TEMPLATE.md` | + Target Branch section | — | + Data-preservation checklist, bilingual WebUI check |
+| `.github/PULL_REQUEST_TEMPLATE/release.md` | 🆕 v1.0.0 | — | + v1.2.0 data-preservation checks |
+| `.github/CODEOWNERS` | + `docs/adr/`, `release-patch.sh` | — | + data-preservation files enumerated |
+| `docs/BRANCHING.md` | 🆕 v1.0.0 | Rulesets UI fix | v1.2.0 changes block + version examples |
+| `docs/RELEASE_PROCESS.md` | 🆕 v1.0.0 | v1.1.0 update | v1.2.0 changes block |
+| `docs/UPGRADE.md` | — | 🆕 v1.1.0 (§3.0) | §3.1 (v1.1.0 → v1.2.0) added |
+| `docs/BACKUP.md` | — | — | **NEW** — backup system reference |
+| `docs/EMERGENCY.md` | — | — | **NEW** — emergency recovery guide |
+| `docs/adr/README.md` | 🆕 v1.0.0 | v1.1.0 update | v1.2.0 changes block |
+| `docs/adr/0001` → `0006` | 🆕 v1.0.0 | Post-release verification | Post-release verification |
+| `docs/ARCHITECTURE.md` | — | v1.1.0 update | §3.10 (backup flow), §4.10 (BAK-1..BAK-4), §8.4 (META-INF), §6.7 (bilingual WebUI) |
+| `docs/API.md` | — | v1.1.0 update | 7-field `backups` schema, §10.6 (backup diagnostics), §10.7 (recovery mode), §10.8 (language-neutral API) |
+| `docs/SECURITY.md` | — | §5.30 (MEM-1/2/3) | §5.31 (Data Preservation Security Model), §5.32 (Recovery Mode Correctness Fix) |
+| `docs/TROUBLESHOOTING.md` | — | v1.1.0 update | §4.12 (memory), §4.13 (SW banner), §4.14 (recovery data loss), §5.14, §5.15, §6.10, §7.8–§7.11, §15.13–§15.15 |
+| `docs/GLOSSARY.md` | — | v1.1.0 update | 13 new terms + 4 abbreviations |
+| `docs/HALL_OF_FAME.md` | — | Memory Architect badge | Data Guardian badge |
+| `docs/FAQ.md` | — | Q111–Q120 | Q121–Q130 (backup questions) |
+| `docs/INSTALL.md` | — | v1.1.0 update | §10.5 (manual backup before uninstall) |
+| `docs/CONTRIBUTING.md` | — | v1.1.0 update | §8.9 (backup testing), §8.11 (bilingual testing), Golden Rule #22/#23, Data Guardian badge |
+| `docs/COMPATIBILITY.md` | — | v1.1.0 update | §5.5 (backup compatibility), §8.4 (v1.2.0 issues), §1.6 (bilingual) |
+| `docs/DEVELOPMENT.md` | — | v1.1.0 update | §8.12 (backup debugging), §8.13 (matrix testing), §8.14 (bilingual debugging), Golden Rule #22/#23 |
+| `docs/DNS_BINARIES.md` | — | v1.1.0 update | v1.2.0 changes block |
+| `docs/ROADMAP.md` | — | v1.1.0 update | v1.2.0 delivered section |
+| `docs/HALL_OF_FAME.md` | — | Memory Architect badge | Data Guardian badge (v1.2.0) |
+| `CHANGELOG.md` | — | `[v1.1.0]` section | `[v1.2.0]` section |
+| `README.md` | — | v1.1.0 badge + RAM-by-profile table | v1.2.0 badge + 10-layer description + Data Preservation section |
+| `SECURITY.md` | — | v1.1.0 update | v1.2.0 changes + BAK-1..BAK-4 summary |
+| `.github/SECURITY.md` | — | — | v1.2.0 changes summary |
 
 ---
 
@@ -539,6 +646,12 @@ bash -n proxy/*.sh scripts/*.sh
 # Format
 gofmt -w proxy/
 shfmt -w -i 4 -ci proxy/*.sh scripts/*.sh
+
+# (v1.2.0) Verify backup shell functions
+make check-backup
+
+# (v1.2.0) Run all local validations
+make check-all
 ```
 
 ### 5.4 Commit
@@ -548,7 +661,7 @@ git add proxy/main.go
 git commit -m "feat(proxy): add new endpoint"
 ```
 
-**v1.0.0 / v1.1.0 commit patterns**:
+**v1.0.0 / v1.1.0 / v1.2.0 commit patterns**:
 
 ```bash
 # Architectural fix (Audit Correction)
@@ -606,7 +719,7 @@ URLs using window.location.hostname.
 Audit Correction #33
 Refs: docs/SECURITY.md"
 
-# Security fix (Login POST-only)
+# Login POST-only fix (NEW-1)
 git commit -m "security(auth): enforce POST-only on login/logout
 
 GET /api/auth/login?username=X&password=Y was accepted, creating
@@ -652,16 +765,163 @@ for the reserved port.
 Behavior is unchanged.
 
 Refs: docs/SECURITY.md §5.30.3"
+
+# v1.2.0 — BAK-1 (7-field backups schema)
+git commit -m "feat(api): extend runtime_info.backups to 7 fields
+
+runtime_info.backups returned 5 fields:
+  available, last_backup, last_backup_name, last_stable, path
+
+The status.sh --json tool has always returned 7 fields. This
+asymmetry forced API clients to special-case the two endpoints.
+
+Added:
+  in_flight_txn  — count of txn-* directories
+  orphan_txn     — count of orphan-txn-* directories
+
+The two endpoints now produce identical JSON on the 7 shared
+fields. This is an additive change.
+
+Refs: docs/SECURITY.md §5.31
+Refs: docs/API.md §6.1.7
+Refs: docs/BACKUP.md §8.1
+Refs: docs/ARCHITECTURE.md §4.10.1"
+
+# v1.2.0 — BAK-2 (createAutoBackup + backupMu)
+git commit -m "feat(backup): add pre-critical auto-backup before destructive ops
+
+The 5 user config files were only snapshotted at install time. A
+user who edited their allowlist after install had no way to roll
+back a mistake.
+
+Added createAutoBackup(reason) called from 5 destructive endpoints,
+but only 4 distinct reason strings because appendDenylist delegates
+to saveDenylist:
+
+  - updateProfile           → 'pre-profile-change'
+  - saveAllowlist           → 'pre-allowlist-save'
+  - saveDenylist            → 'pre-denylist-save'
+  - saveCustomRulesCombined → 'pre-custom-rules-save'
+  - appendDenylist(content) → (no own reason — delegates to
+                               saveDenylist, which uses
+                               'pre-denylist-save')
+
+Serialized by a new sync.Mutex (backupMu).
+
+Best-effort: a failed backup logs a warning but never blocks
+the user's action.
+
+Refs: docs/SECURITY.md §5.31.3
+Refs: docs/BACKUP.md §4.3, §12.5
+Refs: docs/ARCHITECTURE.md §4.10.2"
+
+# v1.2.0 — BAK-3 (cleanupOldTransactions)
+git commit -m "feat(backup): clean up leftover COMMIT'd transactions at startup
+
+The transaction system (Layer 4) creates txn-* directories during
+install. After a successful commit, customize.sh removes its own
+txn dir. But if the installer was killed AFTER writing COMMIT and
+BEFORE the removal step, a COMMIT'd txn dir is left behind
+indefinitely.
+
+Added cleanupOldTransactions() called at startup from main().
+It removes txn-* dirs with .state == 'COMMIT' and PRESERVES:
+  - START    (may contain the only copy of user data)
+  - ROLLBACK (already applied, safe to keep for audit)
+  - orphan-txn-* (user-managed)
+
+Refs: docs/ARCHITECTURE.md §4.10.3
+Refs: docs/BACKUP.md §5.6"
+
+# v1.2.0 — BAK-4 (checkPendingNotifications)
+git commit -m "feat(backup): read .pending_notification at startup
+
+customize.sh writes .pending_notification after a successful
+restore during an upgrade. Without a reader, the message was
+never surfaced to the user.
+
+Added checkPendingNotifications() called once at startup from
+main(). It reads the file, logs the content via logEvent, and
+removes the file.
+
+Idempotent: missing file → no-op. Empty file → removed silently.
+
+Refs: docs/ARCHITECTURE.md §4.10.4
+Refs: docs/BACKUP.md §5.5"
+
+# v1.2.0 — FIX-1 (Recovery-mode correctness via snapshot-and-reapply)
+git commit -m "fix(installer): use snapshot-and-reapply in recovery mode
+
+In an early v1.2.0 draft, the ZIP extraction step (customize.sh
+§[9]) ran AFTER the recovery restore (§[8a]) and overwrote
+webui.conf + dnscrypt-proxy.toml with the ZIP's defaults. The
+subsequent restore step (§[9c]) was skipped in recovery mode, so
+2 of the 5 restored files were silently lost.
+
+Fixed with a snapshot-and-reapply strategy that keeps the
+extraction logic of §[9] untouched and does not depend on
+knowing the ZIP's contents:
+
+  §[8a]  Restore the 5 files into \$MODPATH/proxy/ AND copy each
+         one to \$MODPATH/.recovery_snapshot/.
+  §[9]   Extract the ZIP normally. This overwrites webui.conf
+         and dnscrypt-proxy.toml with the ZIP's defaults —
+         unavoidable without knowing the ZIP's contents.
+  §[9b2] Re-apply the 5 files from \$MODPATH/.recovery_snapshot/
+         back into \$MODPATH/proxy/.
+  §[9c]  Skipped when RECOVERY_MODE=1 — already handled by A+D.
+
+Partial re-application preserves the snapshot directory at
+\$MODPATH/.recovery_snapshot/ for manual recovery.
+
+All 5 files now survive recovery mode. The normal-install path
+is byte-for-byte identical to the pre-recovery behavior.
+
+Refs: docs/SECURITY.md §5.32.1
+Refs: docs/ARCHITECTURE.md §3.10
+Refs: docs/EMERGENCY.md §9.6
+Refs: docs/BACKUP.md §7.5"
+
+# v1.2.0 — FIX-2 (Service Worker update banner)
+git commit -m "fix(webui): send SKIP_WAITING to the correct worker
+
+The [Reload] button in the SW update banner sent SKIP_WAITING to
+navigator.serviceWorker.controller (the OLD worker), which
+ignored it. The new worker stayed in the 'waiting' state, so the
+banner reappeared on every page reload → infinite loop.
+
+Fixed by:
+  1. Sending SKIP_WAITING to swRegistration.waiting (new worker).
+  2. Reloading on the 'controllerchange' event.
+  3. Guarding double-clicks with a pendingReload flag.
+
+Scope: the v1.1.0 fix applied only to index.html. The v1.2.0
+release completes the fix in dashboard.html as well.
+
+Refs: docs/SECURITY.md §5.32.2
+Refs: docs/EMERGENCY.md §9.7"
+
+# v1.2.0 — Language: Add an EN/AR string pair
+git commit -m "feat(webui): add string X in EN + AR
+
+Added the new user-facing string X to all three HTML pages:
+  - web/index.html      → translations.en + translations.ar
+  - web/dashboard.html  → translations.en + translations.ar
+  - web/offline.html    → translations.en + translations.ar
+
+The default language remains English. Verified both LTR and RTL
+rendering with the langToggle button.
+
+Refs: docs/ARCHITECTURE.md §6.7
+Refs: docs/CONTRIBUTING.md §8.11"
 ```
 
-**Rule**: Any security/architectural fix must:
-1. Mention `Audit Correction #XX` in the footer (v1.0.0 fixes).
-2. Reference `docs/SECURITY.md#...`.
-3. Explain **why** (not just what).
-
-**Rule for v1.1.0 runtime improvements**: MEM-1 / MEM-2 / MEM-3 are
-**not** audit corrections. Use `Refs: docs/SECURITY.md §5.30.N`
-instead.
+**Rules**:
+- **v1.0.0 fixes**: Mention `Audit Correction #XX` in the footer.
+- **v1.1.0 runtime improvements**: Use `Refs: docs/SECURITY.md §5.30.N` (not an audit number).
+- **v1.2.0 additions**: Use `Refs: docs/SECURITY.md §5.31` (BAK-N) or `§5.32` (FIX-N).
+- **WebUI language changes**: Always mention **both** languages were updated.
+- Reference `docs/SECURITY.md#...` and explain **why**, not just what.
 
 ### 5.5 Push and Open a PR
 
@@ -697,6 +957,8 @@ as an **ADR**:
 | New architectural decision | Create `docs/adr/NNNN-title.md` |
 | Reversing a previous decision | Create a new ADR that supersedes the old one (never edit the old ADR) |
 | Simple bug fix / refactor | Regular PR (no ADR) |
+| **v1.2.0**: runtime improvement that does NOT change architecture | Regular PR + SECURITY.md note (no ADR) |
+| **v1.2.0**: adding an EN/AR string pair | Regular PR (no ADR) |
 
 **Full methodology**: [`docs/adr/README.md`](adr/README.md) §3 and §7.
 
@@ -723,13 +985,13 @@ available:
 **Stable release** (from `develop`):
 
 ```bash
-./scripts/release.sh v1.2.0
+./scripts/release.sh v1.3.0
 ```
 
 **PATCH-only release** (from `main`):
 
 ```bash
-./scripts/release-patch.sh v1.1.1
+./scripts/release-patch.sh v1.2.1
 ```
 
 Both scripts:
@@ -752,9 +1014,10 @@ Both scripts:
 v<MAJOR>.<MINOR>.<PATCH>[-prerelease]
 
 v1.0.0        ← first stable release
-v1.1.0        ← second stable (current)
-v1.1.1        ← next patch (hotfix)
-v1.2.0        ← next minor (feature)
+v1.1.0        ← second stable (polish)
+v1.2.0        ← third stable (current — data preservation)
+v1.2.1        ← next patch (hotfix) if needed
+v1.3.0        ← next minor (feature)
 v2.0.0        ← next major (breaking)
 ```
 
@@ -771,6 +1034,7 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.1.0 | 1010000 |
 | v1.1.1 | 1010001 |
 | v1.2.0 | 1020000 |
+| v1.2.1 | 1020001 |
 | v2.0.0 | 2000000 |
 
 **Constraint**: `PATCH` ≤ 99, `HOTFIX` ≤ 99.
@@ -797,7 +1061,7 @@ PRs targeting `main` (from `release/*` or `hotfix/*`) use the
 release-specific template:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.2.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
 ```
 
 **Full decision**: [ADR-0005](adr/0005-release-specific-pr-template.md).
@@ -812,11 +1076,11 @@ git checkout develop
 git pull origin develop
 
 # 2. Update VERSION
-echo "v1.2.0" > VERSION
+echo "v1.3.0" > VERSION
 
 # 3. Update module.prop
-sed -i 's/^version=.*/version=v1.2.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
+sed -i 's/^version=.*/version=v1.3.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1030000/' module.prop
 
 # 4. Update update.json
 $EDITOR update.json
@@ -826,10 +1090,10 @@ $EDITOR CHANGELOG.md
 
 # 6. Commit + tag + push
 git add VERSION module.prop update.json CHANGELOG.md
-git commit -m "release: v1.2.0"
-git tag -a v1.2.0 -m "Release v1.2.0"
+git commit -m "release: v1.3.0"
+git tag -a v1.3.0 -m "Release v1.3.0"
 git push origin develop
-git push origin v1.2.0
+git push origin v1.3.0
 ```
 
 ### 6.7 Full Details
@@ -846,6 +1110,7 @@ See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for:
 
 See [`docs/UPGRADE.md`](UPGRADE.md) for:
 - The `v1.0.0 → v1.1.0` upgrade path (§3.0).
+- The `v1.1.0 → v1.2.0` upgrade path (§3.1).
 - Settings preservation across upgrades.
 - Rollback procedures.
 - Emergency recovery.
@@ -858,6 +1123,7 @@ See [`docs/UPGRADE.md`](UPGRADE.md) for:
 
 Runs on **push / PR to `main` or `develop`**:
 
+**Build job** (4 architectures):
 1. VERSION validation.
 2. DNS version validation.
 3. Consistency check.
@@ -871,7 +1137,14 @@ Runs on **push / PR to `main` or `develop`**:
 11. Scripts syntax validation (`bash -n`).
 12. Build matrix (4 archs).
 
-**Total**: 12+ steps.
+**v1.2.0 — `backup-smoke-test` job** (new):
+1. `bash -n` on 8 shell scripts.
+2. `shellcheck --severity=warning` on 5 scripts.
+3. Function-presence checks for all 10 defensive layers.
+4. `PERSISTENT_BACKUP` path consistency.
+5. v1.2.0 documentation reference checks.
+
+**Total**: 12+ steps in the build job + 5 steps in the backup job.
 
 **Triggers**:
 
@@ -899,13 +1172,36 @@ On tag push `v*`:
 6. Release.
 7. **Sync `main → develop`** (post-release, per [ADR-0003](adr/0003-post-release-sync.md)).
 
+**v1.2.0 note**: `release.yml` is **unchanged** from v1.1.0. The
+data-preservation layers ship inside existing files, so the
+release pipeline did not need any modification. The bilingual
+WebUI is served as static assets and needs no pipeline change.
+
 ### 7.3 `.github/workflows/codeql.yml`
 
 - Full analysis (SAST).
 - `queries: security-extended`.
 - **Triggers**: push/PR to `main` or `develop` + weekly.
+- **v1.2.0 note**: Documentation updates only — no workflow changes.
 
-### 7.4 Local CI Simulation
+### 7.4 `.github/workflows/upgrade-test.yml` (v1.2.0 — new)
+
+- **42-scenario matrix**: 3 root solutions × 2 source versions × 7 scenarios.
+- **Trigger**: manual (`workflow_dispatch`) + weekly schedule.
+- **Purpose**: validate the 10 defensive layers across the
+  combinations that matter most.
+- **Runs in**: ~10 minutes.
+- **Not part of the release pipeline** — it is a QA tool.
+
+**Matrix definition**:
+
+| Dimension | Values |
+|---|---|
+| Root solution | Magisk, KernelSU, APatch |
+| Source version | v1.0.0, v1.1.0 |
+| Scenario | fresh-install, in-place-upgrade, rename-folder, reinstall-after-uninstall, recovery-mode, interrupted-install, custom-ports |
+
+### 7.5 Local CI Simulation
 
 ```bash
 # Go build
@@ -922,9 +1218,18 @@ for f in proxy/*.sh scripts/*.sh; do bash -n "$f" || echo "❌ $f"; done
 
 # Build
 make build
+
+# (v1.2.0) Backup shell functions
+make check-backup
+
+# (v1.2.0) All local validations
+make check-all
+
+# (v1.2.0) Verify the upgrade-test matrix is present
+test -f .github/workflows/upgrade-test.yml && echo "✅ upgrade-test.yml present"
 ```
 
-### 7.5 CI Troubleshooting
+### 7.6 CI Troubleshooting
 
 **If CI fails**:
 
@@ -953,12 +1258,18 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
 - Verify: `grep -q 'func getSystemShell' proxy/main.go`.
 - Verify `runShell`: `grep -n 'getSystemShell()' proxy/main.go`.
 
-### 7.6 Branch Protection
+**If `backup-smoke-test` fails (v1.2.0)**:
+- Verify the layer function names in `customize.sh` and
+  `functions.sh`.
+- Run locally: `make check-backup`.
+- Check `docs/BACKUP.md` and `docs/EMERGENCY.md` are present.
+
+### 7.7 Branch Protection
 
 Recommended settings for the repository:
 
-- **`main`**: Require PR + 1 approval + passing CI + CodeQL.
-- **`develop`**: Require passing CI + CodeQL.
+- **`main`**: Require PR + 1 approval + passing CI + CodeQL + Backup Smoke Test.
+- **`develop`**: Require passing CI + CodeQL + Backup Smoke Test.
 - **Tags `v*`**: Restrict who can create/delete.
 
 **Full details**: [`docs/BRANCHING.md`](BRANCHING.md) §6.
@@ -1070,7 +1381,7 @@ curl http://127.0.0.1:9090/readyz
 # Metrics
 curl -s http://127.0.0.1:9091/api/metrics | jq
 
-# runtime_info (PORT-2 + MEM-1)
+# runtime_info (PORT-2 + MEM-1 + BAK-1)
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 ```
 
@@ -1093,6 +1404,15 @@ console.log(window.currentStatus);
 
 // PORTS (v1.0.0)
 console.log(window.PORTS);
+
+// v1.2.0 — verify bilingual state
+document.documentElement.lang  // → "en" (default) or "ar"
+document.documentElement.dir   // → "ltr" (default) or "rtl"
+localStorage.getItem('dnscrypt-lang')  // → "en" | "ar" | null
+
+// v1.2.0 — check SW update banner state
+console.log(window.pendingReload);
+console.log(swRegistration && swRegistration.waiting);
 ```
 
 ### 8.8 v1.0.0 Specific Debugging
@@ -1266,7 +1586,7 @@ One-shot verification script for all 5 profiles:
 
 ```bash
 #!/system/bin/sh
-# test-all-profiles.sh — v1.1.0
+# test-all-profiles.sh — v1.1.0+
 # Verifies that each profile sets the correct memory_limit_mb.
 
 PROFILES="light normal pro proplus ultimate"
@@ -1308,46 +1628,321 @@ nano /sdcard/test-all-profiles.sh
 su -c "sh /sdcard/test-all-profiles.sh"
 ```
 
+### 8.12 v1.2.0 Backup Debugging (new)
+
+#### Static Audit — Layer presence
+
+```bash
+# All 10 layers present in customize.sh
+for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
+         begin_transaction rollback_transaction commit_transaction \
+         detect_root_solution copy_with_context RECOVERY_TRIGGER \
+         migrate_config; do
+    grep -q "$L" proxy/customize.sh && echo "✅ $L" || echo "❌ $L"
+done
+
+# Backup helpers in functions.sh
+for H in auto_backup_if_needed rotate_backups backup_user_files \
+         restore_user_files cleanup_old_transactions \
+         get_backup_dir ensure_backup_dir get_last_backup_time \
+         copy_with_context verify_backup_integrity write_manifest; do
+    grep -q "$H" proxy/functions.sh && echo "✅ $H" || echo "❌ $H"
+done
+
+# main.go additions
+grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2 createAutoBackup"
+grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 backupMu"
+grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
+grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
+
+# 7-field backups schema
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1 in_flight_txn"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ BAK-1 orphan_txn"
+```
+
+#### Runtime Audit — Backup state
+
+```bash
+# 1. Backup directory exists and is well-formed
+su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+
+# 2. Counts and metadata
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+
+# 3. Cross-check with status.sh --json
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | jq '.backups'"
+
+# 4. Verify the 5 files exist in current/
+su -c "ls /sdcard/dnscrypt-webui-backup/current/"
+
+# 5. Read the .last_stable pointer
+su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+
+# 6. Read the upgrade history
+su -c "cat /sdcard/dnscrypt-webui-backup/.upgrade_history.json | jq"
+```
+
+#### Diagnose mode (Layer 10)
+
+```bash
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+```
+
+**Expected sections**:
+- ✅ System Information
+- ✅ Module Information
+- ✅ Service Status
+- ✅ Recovery & Notifications
+- ✅ User Data Files (all 5 present)
+- ✅ Backups (count + latest)
+- ✅ Health Checks
+- ✅ Diagnosis (✅ All systems operational)
+
+#### Common backup issues
+
+| Symptom | Diagnosis | Fix |
+|---|---|---|
+| `backups.available == 0` | No snapshot yet | Wait for first boot, or run `action.sh --backup` |
+| `backups.last_backup_name == null` | No snapshot exists | Same as above |
+| `backups.in_flight_txn > 0` | Install in progress or interrupted | Wait, or inspect `txn-*` manually |
+| `backups.orphan_txn > 0` | Interrupted install preserved | Inspect `orphan-txn-*` before deleting |
+| `backups.path` empty | `PERSISTENT_BACKUP` unset | Should never happen — check `main.go` global |
+| Backup directory missing on device | `/sdcard/` not mounted at install time | Reboot (`service.sh` creates it) |
+
+#### Manual verification of Layer 4 (transactions)
+
+```bash
+# Inspect any in-flight transaction
+su -c "ls -la /sdcard/dnscrypt-webui-backup/txn-*/"
+su -c "cat /sdcard/dnscrypt-webui-backup/txn-*/.state"
+su -c "cat /sdcard/dnscrypt-webui-backup/txn-*/.pid"
+
+# Verify no COMMIT'd txn leftovers (should be 0 after startup)
+su -c "ls -d /sdcard/dnscrypt-webui-backup/txn-*/ 2>/dev/null | \
+       while read d; do [ \"\$(cat \$d/.state 2>/dev/null)\" = 'COMMIT' ] && echo \$d; done"
+```
+
+#### Manual verification of Layer 7 (recovery mode)
+
+See [`docs/EMERGENCY.md`](EMERGENCY.md) §9.6 for the full
+procedure. The short version:
+
+```bash
+# 1. Set a distinctive value
+su -c "sed -i 's/^PORT=9090/PORT=9191/' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
+
+# 2. Take a backup
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+
+# 3. Trigger recovery
+su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
+su -c "reboot"
+
+# 4. After reboot, verify PORT=9191 is still present
+su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
+```
+
+### 8.13 Testing the 42-scenario Matrix Locally (new)
+
+The `.github/workflows/upgrade-test.yml` file defines a
+**42-scenario matrix** (3 root solutions × 2 source versions ×
+7 scenarios). You can trigger it locally via the GitHub CLI or
+reproduce a subset by hand.
+
+#### Full matrix via GitHub CLI
+
+```bash
+# 1. Trigger the workflow
+gh workflow run upgrade-test.yml
+
+# 2. List the run
+gh run list --workflow=upgrade-test.yml --limit 1
+
+# 3. Watch it
+gh run watch
+
+# 4. View the results
+gh run view
+```
+
+#### Reproduce a single scenario by hand
+
+Example: **in-place upgrade from v1.1.0 to v1.2.0 on Magisk**.
+
+```bash
+# 1. Install v1.1.0 on a test device
+# (Download v1.1.0 ZIP from GitHub Releases, install via Magisk)
+
+# 2. Configure some settings
+# (Change profile to 'ultimate', add an allowlist entry)
+
+# 3. Take a baseline snapshot
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" \
+    > /sdcard/diagnose-before.txt
+
+# 4. Install v1.2.0 ZIP over v1.1.0 via Magisk
+
+# 5. Reboot and wait 60 s
+
+# 6. Verify the result
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" \
+    > /sdcard/diagnose-after.txt
+
+diff /sdcard/diagnose-before.txt /sdcard/diagnose-after.txt
+# Focus on: profile, ports, allowlist count, backup state
+
+# 7. Verify the 5 preserved files
+su -c "ls /sdcard/dnscrypt-webui-backup/current/"
+su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+```
+
+#### Emulation limitation
+
+The matrix runs in a container, not on a real device. It cannot
+fully emulate:
+- **SELinux contexts** (`restorecon` / `chcon` are stubbed).
+- **The Magisk/KernelSU/APatch module folder lifecycle.**
+- **Real FUSE mount behavior on `/sdcard/`.**
+
+For the FULL test, use a real device — see §8.12.
+
+### 8.14 v1.2.0 Bilingual WebUI Debugging (new)
+
+#### Static Audit — Language toggle presence
+
+```bash
+# Toggle button present in all three pages
+grep -q 'id="langToggle"' web/index.html && echo "✅ index toggle"
+grep -q 'id="langToggle"' web/dashboard.html && echo "✅ dashboard toggle"
+grep -q 'id="langToggle"' web/offline.html && echo "✅ offline toggle"
+
+# Both language objects present
+grep -q 'en:' web/index.html && grep -q 'ar:' web/index.html && echo "✅ index en+ar"
+grep -q 'en:' web/dashboard.html && grep -q 'ar:' web/dashboard.html && echo "✅ dashboard en+ar"
+grep -q 'en:' web/offline.html && grep -q 'ar:' web/offline.html && echo "✅ offline en+ar"
+
+# localStorage key used
+grep -q "dnscrypt-lang" web/index.html && echo "✅ index localStorage"
+grep -q "dnscrypt-lang" web/dashboard.html && echo "✅ dashboard localStorage"
+grep -q "dnscrypt-lang" web/offline.html && echo "✅ offline localStorage"
+
+# RTL CSS rules present
+grep -q '\[dir="rtl"\]' web/index.html && echo "✅ index RTL"
+grep -q '\[dir="rtl"\]' web/dashboard.html && echo "✅ dashboard RTL"
+grep -q '\[dir="rtl"\]' web/offline.html && echo "✅ offline RTL"
+
+# manifest.json defaults
+grep -q '"lang": "en"' web/manifest.json && echo "✅ manifest lang=en"
+grep -q '"dir": "ltr"' web/manifest.json && echo "✅ manifest dir=ltr"
+```
+
+#### Runtime Audit — In-browser state
+
+Open the WebUI in Chrome DevTools Console:
+
+```javascript
+// 1. Initial state (before any toggle)
+document.documentElement.lang  // → "en"
+document.documentElement.dir   // → "ltr"
+localStorage.getItem('dnscrypt-lang')  // → null (or whatever was last stored)
+
+// 2. Click the langToggle button, then re-check
+document.documentElement.lang  // → "ar"
+document.documentElement.dir   // → "rtl"
+localStorage.getItem('dnscrypt-lang')  // → "ar"
+
+// 3. Verify no network activity
+// (Check the Network tab — clicking the toggle should NOT
+//  produce any fetch/XHR/SSE requests.)
+
+// 4. Reload the page
+// → The page should still show Arabic
+document.documentElement.lang  // → "ar"
+```
+
+#### Common issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Toggle button missing | HTML markup deleted | Restore `<button id="langToggle">` in the header |
+| `t('someKey')` returns the raw key name | Missing translation | Add the key to both `translations.en` and `translations.ar` |
+| Text doesn't flip to RTL | Missing `[dir="rtl"]` CSS rules | Restore the RTL CSS block |
+| Preference not persisted | `localStorage` read/write broken | Check `toggleLanguage()` |
+| Arabic text renders as boxes (□□□) | Browser font missing Arabic glyphs | Use Chrome 88+, Firefox 92+, or Samsung Internet 16+ |
+| Toggle causes page reload | Event handler bound incorrectly | Verify `addEventListener('click', ...)` not `onclick` |
+| Toggle sends network requests | Server-side state was added | Revert to client-side only (`localStorage`) |
+
+#### Verify no server-side impact
+
+```bash
+# The API is language-neutral — no lang-related fields
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq | grep -i lang
+# Expected: no output
+
+curl -s http://127.0.0.1:9090/api?action=status | jq
+# Expected: {"status": "ON"} (or OFF) — no language field
+```
+
+#### Verify the SW cache is language-neutral
+
+```bash
+# The SW caches the HTML once (with both language objects inline).
+# Inspect web/sw.js for CACHE_VERSION and the precache list.
+grep -A20 'PRECACHE' web/sw.js | head -25
+# The list should include index.html, dashboard.html, offline.html,
+# and the icons. No language-specific variants.
+```
+
 ---
 
 ## 9. Make Targets
 
 ### 9.1 Available Targets
 
-| Target | Description |
-|--------|-------------|
-| `make all` | Alias for `make build` |
-| `make help` | Show help |
-| `make version` | Show current version |
-| `make build` | Build all 4 architectures |
-| `make package` | Build all 4 architectures (same as build) |
-| `make clean` | Remove `proxy/build/` and `dist/` |
-| `make release VERSION=vX.Y.Z` | Stable / Prerelease release |
-| `make release-patch VERSION=vX.Y.Z` | PATCH-only release |
-| `make sync` | Sync `develop` with `main` |
+| Target | Description | Version |
+|--------|-------------|---|
+| `make all` | Alias for `make build` | v1.0.0 |
+| `make help` | Show help | v1.0.0 |
+| `make version` | Show current version | v1.0.0 |
+| `make build` | Build all 4 architectures | v1.0.0 |
+| `make package` | Build all 4 architectures (same as build) | v1.0.0 |
+| `make clean` | Remove `proxy/build/` and `dist/` | v1.0.0 |
+| **`make check-backup`** | **Validate the backup shell functions** | **v1.2.0** |
+| **`make check-all`** | **Run all local validations** | **v1.2.0** |
+| **`make diagnose-help`** | **Show how to run `status.sh --diagnose` on a device** | **v1.2.0** |
+| `make release VERSION=vX.Y.Z` | Stable / Prerelease release | v1.0.0 |
+| `make release-patch VERSION=vX.Y.Z` | PATCH-only release | v1.0.0 |
+| `make sync` | Sync `develop` with `main` | v1.0.0 |
 
 ### 9.2 Examples
 
 ```bash
 # Show version
 make version
-# Expected: v1.1.0
+# Expected: v1.2.0
 
 # Show help
 make help
 # Expected:
 #   DNSCrypt Smart Filter
 #
-#     VERSION: v1.1.0
+#     VERSION: v1.2.0
 #
-#     make build                          - Build all architectures
-#     make package                        - Build + ZIP
-#     make clean                          - Clean outputs
-#     make version                        - Show current version
+#     Build:
+#       make build                          - Build all architectures
+#       make package                        - Build + ZIP
+#       make clean                          - Clean outputs
+#       make version                        - Show current version
 #
-#     make release VERSION=vX.Y.Z         - Stable release (from develop)
-#     make release-patch VERSION=vX.Y.Z   - PATCH release (from main)
-#     make sync                           - Sync develop with main
+#     Validation:
+#       make check-backup                   - Validate backup shell functions
+#       make check-all                      - Run all local validations
+#       make diagnose-help                  - How to run diagnose on a device
+#
+#     Release:
+#       make release VERSION=vX.Y.Z         - Stable release (from develop)
+#       make release-patch VERSION=vX.Y.Z   - PATCH release (from main)
+#       make sync                           - Sync develop with main
 
 # Build
 make build
@@ -1358,11 +1953,20 @@ make package
 # Clean
 make clean
 
+# (v1.2.0) Backup shell validation
+make check-backup
+
+# (v1.2.0) All local validations
+make check-all
+
+# (v1.2.0) Device-side diagnostics help
+make diagnose-help
+
 # Stable release
-make release VERSION=v1.2.0
+make release VERSION=v1.3.0
 
 # PATCH release
-make release-patch VERSION=v1.1.1
+make release-patch VERSION=v1.2.1
 
 # Sync after PATCH release
 make sync
@@ -1375,8 +1979,8 @@ make sync
 ```text
 ❌ No version specified.
 
-   Usage: make release VERSION=v1.2.0
-   Current file VERSION: v1.1.0
+   Usage: make release VERSION=v1.3.0
+   Current file VERSION: v1.2.0
 
    See docs/RELEASE_PROCESS.md for details.
 ```
@@ -1385,7 +1989,61 @@ make sync
 
 **`make sync`** — fetches `origin/main` and `origin/develop`, then fast-forwards `develop` (or falls back to a regular merge), and pushes to `origin`.
 
-### 9.4 Where to Add New Targets
+### 9.4 `make check-backup` (v1.2.0 — new)
+
+**What it does**:
+1. `bash -n` syntax check on 5 scripts:
+   - `proxy/customize.sh`
+   - `proxy/service.sh`
+   - `proxy/functions.sh`
+   - `proxy/status.sh`
+   - `proxy/uninstall.sh`
+2. If `shellcheck` is available: `shellcheck --severity=warning`
+   on the same 5 scripts.
+3. Prints a summary.
+
+**What it does NOT do**:
+- Does NOT run the scripts.
+- Does NOT need a device.
+- Does NOT download anything.
+
+**When to run**:
+- ✅ Before every commit that touches the backup layer.
+- ✅ Before opening a PR.
+- ✅ After any change to `functions.sh` or `customize.sh`.
+
+**Example output**:
+
+```text
+━━━ Validating backup shell functions ━━━
+
+  [1/2] bash -n syntax check...
+    ✔ customize.sh
+    ✔ service.sh
+    ✔ functions.sh
+    ✔ status.sh
+    ✔ uninstall.sh
+
+  [2/2] shellcheck (if available)...
+    ✔ shellcheck clean
+
+✅ Backup shell validation complete
+```
+
+### 9.5 `make check-all` (v1.2.0 — new)
+
+Runs:
+1. `bash -n` on **all** shell scripts (`proxy/*.sh`, `scripts/*.sh`).
+2. `shellcheck --severity=warning` on all shell scripts.
+3. `gofmt -l proxy/` — must be empty.
+4. `make check-backup` — the backup-specific validation.
+
+**When to run**:
+- ✅ Before pushing to your feature branch.
+- ✅ As a final sanity check before opening a PR.
+- ✅ When CI is green but you want to verify locally.
+
+### 9.6 Where to Add New Targets
 
 If you add a new target:
 
@@ -1396,7 +2054,7 @@ If you add a new target:
 
 ---
 
-## 10. v1.1.0 — Contributor Notes
+## 10. v1.2.0 — Contributor Notes
 
 ### 10.1 Branch Policy Reminder
 
@@ -1410,6 +2068,7 @@ If you add a new target:
 | Maintenance | `chore/*` | `develop` | Default | No |
 | Refactor | `refactor/*` | `develop` | Default | If architectural |
 | Tests | `test/*` | `develop` | Default | No |
+| WebUI string change (EN + AR) | `feature/*` or `fix/*` | `develop` | Default | No |
 | Release prep | `release/*` | `main` | `?template=release.md` | No |
 | Emergency fix | `hotfix/*` | `main` | `?template=release.md` | No |
 
@@ -1438,9 +2097,29 @@ If you add a new target:
     `customize.sh`.
 16. ✅ **(v1.1.0)** If adding a `runtime_info` field: update
     `buildRuntimeInfo()`, `web/index.html`, and
-    `web/dashboard.html` (with `en` + `ar` translations).
+    `web/dashboard.html`.
 17. ✅ **(v1.1.0)** Never hardcode `"8080"` — always use
     `MONITORING_UI_PORT`.
+18. ✅ **(v1.2.0)** If adding a new destructive operation on user
+    data: call `createAutoBackup(reason)` first, and document the
+    new reason in `docs/BACKUP.md` §4.3.
+19. ✅ **(v1.2.0)** If adding a new preserved file: update the
+    `USER_FILES` list in **all 5** scripts (`customize.sh`,
+    `functions.sh`, `service.sh`, `status.sh`, `uninstall.sh`),
+    the "5 Preserved Files" table in `README.md`, and
+    `docs/BACKUP.md` §2.
+20. ✅ **(v1.2.0)** If changing the rotation policy: update the
+    constant in **all 4** scripts (`customize.sh`,
+    `functions.sh`, `service.sh`, `action.sh`) and
+    `docs/BACKUP.md` §6.
+21. ✅ **(v1.2.0)** If changing the `runtime_info.backups` schema:
+    update `buildBackupInfo()` in `main.go` and keep
+    `status.sh --json` in sync. See `docs/API.md` §6.1.7.
+22. ✅ **(v1.2.0)** If adding a user-facing string: update
+    `translations.en` **and** `translations.ar` in all three HTML
+    files (`index.html`, `dashboard.html`, `offline.html`).
+23. ✅ **(v1.2.0)** If touching the language toggle: verify RTL
+    layout in Chrome 88+, Firefox 92+, and Samsung Internet 16+.
 
 ### 10.3 When Fixing a Bug
 
@@ -1452,7 +2131,14 @@ If you add a new target:
 6. ✅ If the fix is concurrency-related → add `defer rebuildMu.Unlock()` and verify.
 7. ✅ If the fix is port-related → verify `runtime_info` output.
 8. ✅ If the fix is memory-limit-related (v1.1.0) → test all 5 profiles.
-9. ✅ **Target `develop` in your PR**.
+9. ✅ **(v1.2.0)** If the fix is backup-related → run §8.12 in full.
+10. ✅ **(v1.2.0)** If the fix is recovery-mode-related → verify the
+    `§[8a] → §[9] → §[9b2]` snapshot-and-reapply flow in
+    `customize.sh` still preserves all 5 files. See
+    `docs/ARCHITECTURE.md` §3.10.
+11. ✅ **(v1.2.0)** If the fix touches a user-facing string →
+    verify both English and Arabic render correctly (§8.14).
+12. ✅ **Target `develop` in your PR**.
 
 ### 10.4 When Editing Shell Scripts
 
@@ -1464,6 +2150,16 @@ If you add a new target:
 6. ✅ Test on both Android + Linux (via devcontainer).
 7. ✅ **(v1.1.0)** For profile-related scripts, use the
    `get_profile_memory_hint()` helper (or its inline fallback).
+8. ✅ **(v1.2.0)** Use `copy_with_context` instead of a bare `cp -f`
+   for any user file — it restores SELinux context and sets mode
+   `0600`.
+9. ✅ **(v1.2.0)** Reference the `PERSISTENT_BACKUP` global; never
+   hardcode `/sdcard/dnscrypt-webui-backup`.
+10. ✅ **(v1.2.0)** Reference the `USER_FILES` global; never hardcode
+    the 5-file list.
+11. ✅ **(v1.2.0)** For rotation, sort by **directory name**, not
+    `mtime`. This is what keeps the ordering stable across
+    `rsync` copies.
 
 ### 10.5 When Editing Concurrency
 
@@ -1473,6 +2169,12 @@ If you add a new target:
 4. ✅ Verify with `go run -race main.go`.
 5. ✅ **(v1.1.0)** `currentMemLimit` and `currentProfile` are only
    accessed while holding `memLimitMu`.
+6. ✅ **(v1.2.0)** Any call to `createAutoBackup` is serialized by
+   `backupMu`. Do NOT add a second mutex; if you need
+   serialization, use the existing one.
+7. ✅ **(v1.2.0)** `backupMu` is held for the entire shell
+   invocation (`AUTO_BACKUP_TIMEOUT = 15 s`). Do NOT perform
+   long operations while holding it.
 
 ### 10.6 When Editing Frontend
 
@@ -1483,6 +2185,19 @@ If you add a new target:
 5. ✅ Use `textContent` instead of `innerHTML` where possible.
 6. ✅ **(v1.1.0)** Display `profile_key` + `memory_limit_mb` in the
    System Info panel (with `"unknown"` fallback for older servers).
+7. ✅ **(v1.2.0)** Display the 6 user-facing backup fields in the
+   System Info panel (`available`, `last_backup_name`,
+   `last_stable`, `in_flight_txn`, `orphan_txn`, `path`).
+8. ✅ **(v1.2.0)** Any new user-facing string must be added to
+   **both** `translations.en` and `translations.ar` in all three
+   HTML files. The default language must remain English.
+9. ✅ **(v1.2.0)** Never send the language preference to the
+   server. It lives only in `localStorage['dnscrypt-lang']`.
+10. ✅ **(v1.2.0)** Respect `[dir="rtl"]` CSS rules for any new
+    layout element.
+11. ✅ **(v1.2.0)** For the SW update banner, send `SKIP_WAITING` to
+    `swRegistration.waiting`, not to
+    `navigator.serviceWorker.controller`.
 
 ### 10.7 When Publishing a Release
 
@@ -1490,7 +2205,12 @@ If you add a new target:
 2. ✅ **PATCH-only** → `./scripts/release-patch.sh vX.Y.Z` from `main`.
 3. ✅ Use the release PR template (`?template=release.md`).
 4. ✅ After PATCH release → `make sync`.
-5. ✅ See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for details.
+5. ✅ **(v1.2.0)** Run `make check-backup` before tagging.
+6. ✅ **(v1.2.0)** Verify the `upgrade-test.yml` matrix is green
+   (see §8.13).
+7. ✅ **(v1.2.0)** Verify the bilingual WebUI is intact
+   (§8.14, Static Audit).
+8. ✅ See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for details.
 
 ### 10.8 Golden Rules
 
@@ -1536,7 +2256,27 @@ If you add a new target:
 >
 > **21.** **(v1.1.0)** Never hardcode the memory limit — always use
 > `memoryLimitForProfile(key)` and expose the effective value via
-> `runtime_info.memory_limit_mb`.
+> `runtime_info.memory_limit_mb`. Any new profile must be added to
+> **five** places: `MEMORY_LIMIT_*`, `memoryLimitForProfile()`, the
+> inline fallback in `functions.sh`, the inline fallback in
+> `service.sh`/`action.sh`/`status.sh`/`watchdog.sh`, and the profile
+> table in `customize.sh`.
+>
+> **22.** **(v1.2.0)** Never remove a user data file without a backup.
+> Any destructive operation on user data must call
+> `createAutoBackup(reason)` first (or be routed through
+> `copy_with_context` for restore). Any change to the 10 defensive
+> layers must update **all** of: `docs/BACKUP.md`,
+> `docs/EMERGENCY.md`, `docs/SECURITY.md` §5.31, and
+> `docs/ARCHITECTURE.md` §3.10.
+>
+> **23.** **(v1.2.0)** Never add a user-facing string to the WebUI
+> without the matching **Arabic** entry. Every new key must appear
+> in `translations.en` **and** `translations.ar` of `index.html`,
+> `dashboard.html`, and `offline.html`. The default must remain
+> English. The language preference lives in
+> `localStorage['dnscrypt-lang']` and is **never** sent to the
+> server.
 
 ### 10.9 Reference Map
 
@@ -1544,6 +2284,7 @@ If you add a new target:
 |---------|------|
 | v1.0.0 fixes | `CHANGELOG.md` §[v1.0.0] |
 | v1.1.0 features | `CHANGELOG.md` §[v1.1.0] |
+| v1.2.0 features | `CHANGELOG.md` §[v1.2.0] |
 | Branch workflow | `docs/BRANCHING.md` |
 | Release process | `docs/RELEASE_PROCESS.md` |
 | ADR system | `docs/adr/README.md` |
@@ -1564,10 +2305,19 @@ If you add a new target:
 | Contribution guide | `docs/CONTRIBUTING.md` |
 | Commit convention | `docs/CONTRIBUTING.md` §5 |
 | PR process | `docs/CONTRIBUTING.md` §6 |
-| **v1.1.0 Memory limit (MEM-1)** | **`docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9** |
-| **v1.1.0 shellQuote (MEM-2)** | **`docs/SECURITY.md` §5.30.2** |
-| **v1.1.0 Monitoring port (MEM-3)** | **`docs/SECURITY.md` §5.30.3** |
+| v1.1.0 Memory limit (MEM-1) | `docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9 |
+| v1.1.0 shellQuote (MEM-2) | `docs/SECURITY.md` §5.30.2 |
+| v1.1.0 Monitoring port (MEM-3) | `docs/SECURITY.md` §5.30.3 |
+| **v1.2.0 Backup system** | **`docs/BACKUP.md`** |
+| **v1.2.0 Emergency recovery** | **`docs/EMERGENCY.md`** |
+| **v1.2.0 Data-preservation model** | **`docs/SECURITY.md` §5.31** |
+| **v1.2.0 Recovery-mode fix** | **`docs/SECURITY.md` §5.32** |
+| **v1.2.0 Backup & restore flow** | **`docs/ARCHITECTURE.md` §3.10** |
+| **v1.2.0 BAK-1..BAK-4** | **`docs/ARCHITECTURE.md` §4.10** |
+| **v1.2.0 7-field backups schema** | **`docs/API.md` §6.1.7** |
+| **v1.2.0 Bilingual WebUI** | **`docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8** |
 | **v1.0.0 → v1.1.0 upgrade** | **`docs/UPGRADE.md` §3.0** |
+| **v1.1.0 → v1.2.0 upgrade** | **`docs/UPGRADE.md` §3.1** |
 | Release scripts | `scripts/release.sh`, `scripts/release-patch.sh` |
 
 ### 10.10 Script Comparison
@@ -1598,19 +2348,21 @@ If you add a new target:
 
 | Document | Purpose |
 |---|---|
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture + Trade-offs |
-| [`docs/SECURITY.md`](SECURITY.md) | Audit Corrections Registry |
-| [`docs/API.md`](API.md) | HTTP API Reference |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture + Trade-offs + §3.10, §4.10, §6.7 |
+| [`docs/SECURITY.md`](SECURITY.md) | Audit Corrections Registry + §5.31, §5.32 |
+| [`docs/API.md`](API.md) | HTTP API Reference + §6.1.7, §10.8 |
 | [`docs/BRANCHING.md`](BRANCHING.md) | Git branching strategy |
 | [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) | Release process guide |
 | [`docs/adr/README.md`](adr/README.md) | Architecture Decision Records index |
 | [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution guide |
-| [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting |
-| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix |
+| [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting (§7.8–§7.11 for backups) |
+| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix + §5.5 |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries (Level 4) |
-| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide |
-| [`docs/FAQ.md`](FAQ.md) | Common questions |
-| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary |
+| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1) |
+| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [`docs/FAQ.md`](FAQ.md) | Common questions (Q121–Q130 = v1.2.0) |
+| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary (BAK/MEM terms) |
 | [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
 | [`docs/ROADMAP.md`](ROADMAP.md) | Roadmap |
 | [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
@@ -1636,6 +2388,8 @@ If you add a new target:
 - [docs/BRANCHING.md](BRANCHING.md) — Branching strategy
 - [docs/RELEASE_PROCESS.md](RELEASE_PROCESS.md) — Release process
 - [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide
+- [docs/BACKUP.md](BACKUP.md) — Backup system reference (v1.2.0)
+- [docs/EMERGENCY.md](EMERGENCY.md) — Emergency recovery (v1.2.0)
 - [docs/adr/README.md](adr/README.md) — ADR system
 - [docs/CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guide
 - [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
@@ -1644,8 +2398,8 @@ If you add a new target:
 
 <div align="center">
 
-**Last updated**: 2026-09-26
-**Version**: v1.1.0
+**Last updated**: 2026-09-29
+**Version**: v1.2.0
 **Author**: gasciljh
 
 </div>

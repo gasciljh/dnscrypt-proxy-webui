@@ -2,8 +2,9 @@
   "id": "dnscrypt-proxy-webui",
   "name": "DNSCrypt Proxy",
   "short_name": "DNS Proxy",
-  "description": "Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354 with per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), bilingual EN/AR interface, separate monitoring Dashboard with JSON metrics, SSE live updates, and offline-capable PWA. Zero telemetry. v1.1.0 adds dynamic per-profile memory limits (light=80MB → ultimate=220MB), extended shellQuote charset, and MONITORING_UI_PORT constant.",
-  "version": "1.1.0",
+  "description": "Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354 with per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), WebUI (English default + Arabic toggle), separate monitoring Dashboard with JSON metrics, SSE live updates, and offline-capable PWA. Zero telemetry. v1.1.0 added dynamic per-profile memory limits (light=80MB to ultimate=220MB), extended shellQuote charset, and the MONITORING_UI_PORT constant. v1.2.0 adds comprehensive user-data preservation: multi-source smart detection (7 candidate locations — 9 on APatch, which adds two modules_update paths), persistent backup in /sdcard/dnscrypt-webui-backup, SHA256 integrity verification, transactional atomic upgrades with auto-rollback, recovery mode via trigger file, root-solution compatibility (Magisk/KernelSU/APatch), SELinux context preservation, periodic and pre-critical auto-backup, backup rotation (max 21 copies), upgrade history log, and a CLI diagnose tool.",
+
+  "version": "1.2.0",
 
   "author": "gasciljh",
   "developer": {
@@ -18,10 +19,10 @@
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
 
-  "categories": ["utilities", "security", "productivity"],
+  "categories": ["utilities", "security"],
   "prefer_related_applications": false,
   "launch_handler": {
     "client_mode": "focus-existing"
@@ -67,49 +68,80 @@
     {
       "name": "Control Panel",
       "short_name": "WebUI",
-      "description": "Open the main control panel",
-      "url": "http://127.0.0.1:9090/?source=shortcut_webui",
+      "description": "Open the WebUI landing page (same origin as the manifest)",
+      "url": "/?source=shortcut_webui",
       "icons": [
         {
           "src": "/icon-192.png",
           "sizes": "192x192",
-          "type": "image/png"
+          "type": "image/png",
+          "purpose": "any"
         },
         {
           "src": "/icon-192.svg",
           "sizes": "192x192",
-          "type": "image/svg+xml"
+          "type": "image/svg+xml",
+          "purpose": "any"
         }
       ]
     },
     {
       "name": "Monitoring Dashboard",
       "short_name": "Dashboard",
-      "description": "Open the monitoring dashboard",
-      "url": "http://127.0.0.1:9091/?source=shortcut_dashboard",
+      "description": "Open the Dashboard landing page (same origin as the manifest)",
+      "url": "/?source=shortcut_dashboard",
       "icons": [
         {
           "src": "/icon-192.png",
           "sizes": "192x192",
-          "type": "image/png"
+          "type": "image/png",
+          "purpose": "any"
         },
         {
           "src": "/icon-192.svg",
           "sizes": "192x192",
-          "type": "image/svg+xml"
+          "type": "image/svg+xml",
+          "purpose": "any"
         }
       ]
     }
   ],
 
-  "x-note-shortcuts": "Shortcut URLs use the DEFAULT ports: 9090 for WebUI, 9091 for Dashboard. If you change PORT or DASHBOARD_PORT in webui.conf, these shortcuts will continue using the default ports. This is a fundamental limitation of the static PWA manifest format (it cannot read runtime configuration).",
+  "x-note-shortcuts": "Per the PWA spec, shortcut URLs MUST be same-origin with the manifest's start_url. Because the WebUI (default port 9090) and Dashboard (default port 9091) are DIFFERENT origins, a single manifest CANNOT provide cross-origin shortcuts. Both shortcuts therefore use RELATIVE URLs (/?source=shortcut_webui and /?source=shortcut_dashboard) that resolve to the manifest's CURRENT origin. Consequence: when the PWA is installed from port 9090, both shortcuts open the WebUI; when installed from port 9091, both shortcuts open the Dashboard. The shortcut LABEL may therefore not match the page that opens. For reliable cross-origin navigation, the WebUI provides a dynamic Dashboard link built from /api?action=runtime_info (fields webui_port, dashboard_port) — see the v1.0.0 PORT-2 fix in index.html and dashboard.html. Users who want a Dashboard-specific PWA shortcut should install the PWA from port 9091 separately, which gives the Dashboard its own app icon and shortcuts. Prior versions used absolute URLs (http://127.0.0.1:9090 and :9091) which are cross-origin and are silently rejected by browsers that enforce the PWA spec. Full rationale: docs/ARCHITECTURE.md §6.6.",
+
   "x-note-port-limitation": "For dynamic port handling, the WebUI/Dashboard HTML/JS read the actual ports from /api?action=runtime_info (fields: webui_port, dashboard_port) and construct URLs dynamically. However, PWA shortcuts (this section) are evaluated by the browser BEFORE any JS runs, so they cannot benefit from runtime_info. See v1.0.0 PORT-2 fix in index.html and dashboard.html for the dynamic link implementation.",
+
   "x-note-ports": "Default ports: WebUI=9090, Dashboard=9091. Monitoring UI (internal): 8080. DNS Engine: 5354. All ports are configurable in webui.conf except 8080 (reserved for dnscrypt-proxy's monitoring_ui).",
+
   "x-note-screenshots": "The 'screenshots' array was intentionally removed in v1.0.0. Per PWA spec, screenshots should be actual app screenshots (not icons). Add real screenshots in a future release to enable Chrome's richer install UI.",
-  "x-note-maskable": "The 'maskable' purpose currently reuses /icon-512.png. The maskable safe zone is a circle of radius 40% of the canvas (≈205 px in a 512 canvas). The shield extends from y=52 to y=448 — right at the top boundary (51.2). Horizontal extent (x=96 to x=416) is safely inside. Result: renders fine on most Android launchers, but may be clipped on devices with aggressive circular masks (45%+). A future release may ship a purpose-built maskable SVG/PNG with a wider safe-zone margin. See web/icon-512.svg header for the full analysis.",
-  "x-note-version": "The 'version' field is not standard in PWA manifest spec but is used here for documentation/troubleshooting. It mirrors the VERSION file for consistency.",
-  "x-note-runtime-info": "As of v1.1.0, /api?action=runtime_info returns two additional fields: 'profile_key' (light/normal/pro/proplus/ultimate) and 'memory_limit_mb' (the Go runtime soft memory limit set by main.go for that profile). Both are displayed in the WebUI and Dashboard System Info panels.",
+
+  "x-note-maskable": "The 'maskable' purpose currently reuses /icon-512.png. The maskable safe zone is a circle of radius 40% of the canvas (approximately 205 px in a 512 canvas). The shield extends from y=52 to y=448 — right at the top boundary (51.2). Horizontal extent (x=96 to x=416) is safely inside. Result: renders fine on most Android launchers, but may be clipped on devices with aggressive circular masks (45%+). A future release (v1.3.0) will ship a purpose-built maskable SVG/PNG with a wider safe-zone margin. See web/icon-512.svg header for the full analysis and docs/ROADMAP.md §5.1 for tracking. M-1 note (v1.2.0): the duplicate /icon-512.png entry above (one 'any', one 'maskable') is intentional and spec-compliant; it will be replaced by a dedicated /icon-maskable.png when v1.3.0 lands.",
+
+  "x-note-version": "The 'version' field is not standard in the PWA manifest spec but is used here for documentation/troubleshooting. It mirrors the VERSION file for consistency. As of v1.2.0 it is '1.2.0' (no 'v' prefix, per PWA convention). This value is checked by .github/workflows/ci.yml → 'Verify version consistency' step.",
+
+  "x-note-runtime-info": "The /api?action=runtime_info endpoint returns the following schema. Build info (since v1.0.0): 'version', 'commit', 'build_time', 'build_time_human', 'project_url'. Runtime paths (v1.0.0): 'run_dir', 'status_file', 'pid_file', 'progress_file', 'log_file'. Network (v1.0.0): 'bind_addr'. Dynamic ports (v1.0.0, PORT-2): 'webui_port', 'dashboard_port'. Memory profile (v1.1.0, MEM-1): 'profile_key' (light/normal/pro/proplus/ultimate), 'memory_limit_mb' (Go runtime soft memory limit for that profile). Backups (v1.2.0, BAK-1): a nested 'backups' object with SEVEN fields — see x-note-backup-schema below for the exact schema.",
+
+  "x-note-backup-schema": "The 'backups' object returned by /api?action=runtime_info contains SEVEN fields (v1.2.0, BAK-1). This aligns main.go's schema with the one already produced by status.sh --json, so both endpoints can be consumed by clients using the same field names: (1) 'available' — int, number of snapshots excluding current/, txn-*, and orphan-txn-*; (2) 'in_flight_txn' — int, number of txn-* directories (install in progress or interrupted); (3) 'orphan_txn' — int, number of orphan-txn-* directories (preserved interrupted installs, user-managed); (4) 'last_backup' — string|null, timestamp of the newest snapshot in 'YYYY-MM-DD HH:MM:SS' format; (5) 'last_backup_name' — string|null, directory name of the newest snapshot (e.g. '20260926-150000-manual-12345-a1b2'); (6) 'last_stable' — string|null, content of the .last_stable pointer file; (7) 'path' — string, absolute path of the persistent backup directory ('/sdcard/dnscrypt-webui-backup'). Note: status.sh --json additionally exposes two diagnostic-only fields ('status' and 'last_backup_age_seconds') that are NOT part of the API surface. The WebUI and Dashboard System Info panels display six of the seven fields (all except 'last_backup', the raw timestamp).",
+
   "x-note-memory": "As of v1.1.0, main.go sets the Go runtime soft memory limit dynamically based on the active blocklist profile: light=80MB, normal=100MB, pro=120MB, proplus=160MB, ultimate=220MB. debug.SetMemoryLimit is a SOFT limit: the runtime prefers running GC more aggressively over OOMing. The manifest itself is unaffected by this behavior.",
-  "x-note-icon-source": "Icon generation pipeline (verified against scripts/generate-icons.sh): icon-192.svg → icon-192.png (192×192); icon-512.svg → icon-512.png (512×512), apple-touch-icon.png (180×180), favicon-32x32.png (32×32), favicon-16x16.png (16×16); favicon-16.png + favicon-32.png → favicon.ico (multi-size). IMPORTANT: icon-192.png is generated from icon-192.svg, NOT from icon-512.svg. Prior documentation incorrectly claimed icon-512.svg was the source for all PNGs — corrected in v1.1.0 in both icon-512.svg header and this note.",
-  "x-note-v1": "Updated in v1.1.0: (1) version field bumped to 1.1.0. (2) description mentions v1.1.0 dynamic memory limits + extended shellQuote + MONITORING_UI_PORT constant. (3) Added x-note-icon-source to document the authoritative SVG→PNG pipeline. (4) Refined x-note-maskable with the honest safe-zone assessment from icon-512.svg. (5) Added x-note-memory and x-note-runtime-info to document the new v1.1.0 runtime behavior. Prior v1.0.0 changes: fixed two critical shortcut bugs (Control Panel was opening Dashboard due to relative URL), removed non-compliant screenshots, added version field, documented port limitations."
+
+  "x-note-backup": "As of v1.2.0, the installer (customize.sh) and runtime (service.sh, main.go) preserve the 5 user config files (webui.conf, dnscrypt-proxy.toml, selected_profile.txt, allowlist.txt, denylist.txt) across upgrades, renames, reinstalls, and uninstalls. Backups are stored at /sdcard/dnscrypt-webui-backup/ and survive module removal. The manifest does not need to know about this — it is a runtime concern on the device. See docs/BACKUP.md and docs/EMERGENCY.md for the full model.",
+
+  "x-note-backup-paths": "Persistent backup directory: /sdcard/dnscrypt-webui-backup/. Subdirectories (all include a PID suffix added in v1.2.0 to prevent second-level timestamp collisions): 'current/' (live snapshot, always up to date), '<timestamp>-<version>-<pid>/' (historical snapshots written by customize.sh during install — BUG-CS-C fix), '<timestamp>-manual-<pid>/' (pre-critical snapshots written by functions.sh:backup_user_files — FSH-10 fix), '<timestamp>-manual-<pid>-<rand4>/' (pre-critical snapshots written by main.go:createAutoBackup with an additional random suffix — BUG-E fix), '<timestamp>-auto-<pid>/' (periodic snapshots written by service.sh via functions.sh:auto_backup_if_needed — FSH-10 fix), 'txn-<timestamp>-<pid>/' (in-flight transactions, cleaned up automatically), 'orphan-txn-<timestamp>-<pid>/' (preserved interrupted installs, user-managed). Metadata files: '.last_stable' (pointer to the last known good snapshot), '.upgrade_history.json' (full upgrade log, written when jq is available), '.upgrade_history.txt' (fallback log when jq is unavailable), '.last_auto_backup' (mtime marker for the periodic 24-hour auto-backup), '.pending_notification' (transient message written by customize.sh after a restore, read and deleted by main.go at startup), 'README.md' (user guide). Rotation caps at 21 snapshots by directory name.",
+
+  "x-note-recovery": "As of v1.2.0, a recovery mode can be triggered by creating a file at /data/adb/modules/dnscrypt-proxy-webui/recovery (or /data/adb/dnscrypt-recovery) and rebooting. The installer will restore the last known good configuration from the persistent backup. The recovery priority is: (1) .last_stable pointer, (2) current/ live snapshot, (3) in-place data. The in-module trigger (recovery) is deleted by customize.sh after a successful recovery; the external trigger (/data/adb/dnscrypt-recovery) is also removed by uninstall.sh (UNI-1 fix). See docs/EMERGENCY.md for step-by-step instructions.",
+
+  "x-note-icon-source": "Icon generation pipeline (verified against scripts/generate-icons.sh): icon-192.svg produces icon-192.png (192x192); icon-512.svg produces icon-512.png (512x512), apple-touch-icon.png (180x180), favicon-32x32.png (32x32), and favicon-16x16.png (16x16); favicon-16x16.png + favicon-32x32.png produce favicon.ico (multi-size). IMPORTANT: icon-192.png is generated from icon-192.svg, NOT from icon-512.svg. Prior documentation incorrectly claimed icon-512.svg was the source for all PNGs — corrected in v1.1.0 in both icon-512.svg header and this note. HARD-MF-02 note (v1.2.0): the full filenames favicon-16x16.png and favicon-32x32.png are used here (parity with scripts/generate-icons.sh, HARD-GIC-02).",
+
+  "x-note-language": "The WebUI ships with English as the DEFAULT language and an in-page toggle (langToggle) that switches to Arabic. This is the 'global edition' policy: a single canonical default (English) plus first-class access for Arabic-speaking users without requiring a fork. The 'lang' field of this manifest defaults to 'en' and 'dir' to 'ltr'; the in-page toggle switches them to 'ar'/'rtl' at runtime. The user's preference is stored client-side in localStorage['dnscrypt-lang'] and is NEVER transmitted to the server. Documentation remains English-only by project convention; community translations are welcome as separate files (docs/*.<lang>.md). Additional WebUI languages (FR, DE, ES, RU, ZH, ...) are deferred to v1.4.0 — see docs/ROADMAP.md §6.",
+
+  "x-note-docs": "Key documentation references: docs/BACKUP.md (backup system reference, v1.2.0), docs/EMERGENCY.md (emergency recovery guide, v1.2.0), docs/UPGRADE.md §3.0 (v1.0.0 to v1.1.0 upgrade path), docs/UPGRADE.md §3.1 (v1.1.0 to v1.2.0 upgrade path), docs/API.md §6.1.7 (runtime_info schema), docs/ARCHITECTURE.md (system architecture, §3.10 backup flow, §4.10 BAK-1..BAK-4, §6.6 dual-origin limitation, §6.7 bilingual WebUI), docs/SECURITY.md (threat model + Audit Corrections Registry, §5.31 data preservation, §5.32 recovery fix), docs/TROUBLESHOOTING.md (backup diagnostics §7.8-§7.10, memory diagnostics §6.10, bilingual WebUI §4.15), docs/ROADMAP.md §5.1 (maskable icon plan for v1.3.0).",
+
+  "x-note-v120": "Updated in v1.2.0: (1) version field set to '1.2.0'. (2) description extended with the v1.2.0 data-preservation feature set, now stating '7 candidate locations — 9 on APatch, which adds two modules_update paths' (Layer 1). (3) x-note-runtime-info rewritten to reference the new x-note-backup-schema field instead of inlining a stale 5-field list. (4) NEW: x-note-backup-schema added, documenting all SEVEN fields of the 'backups' object (available, in_flight_txn, orphan_txn, last_backup, last_backup_name, last_stable, path) with types and semantics. (5) x-note-language corrected — it previously claimed the WebUI was 'English-only' and that the 'previous bilingual mode was removed'. That claim did not match the shipped WebUI, which retains translations.ar, the langToggle button, and full RTL support on all three pages (index.html, dashboard.html, offline.html). The field now correctly describes the global-edition policy: English default + Arabic toggle (client-side only). (6) x-note-backup-paths extended with the orphan-txn-* subdirectory and the mandatory PID suffix on all snapshot names (BUG-CS-C, BUG-E, FSH-10, ACT-5 fixes). (7) Prior v1.1.0 changes: version field set to '1.1.0'; description mentioned v1.1.0 dynamic memory limits + extended shellQuote + MONITORING_UI_PORT constant; added x-note-icon-source to document the authoritative SVG→PNG pipeline; refined x-note-maskable with the honest safe-zone assessment from icon-512.svg; added x-note-memory and x-note-runtime-info. Prior v1.0.0 changes: fixed two critical shortcut bugs (Control Panel was opening Dashboard due to relative URL), removed non-compliant screenshots, added version field, documented port limitations.",
+
+  "x-note-pre-release-audit-v120": "A pre-release audit of the manifest identified the following issues, all addressed in-place without a version bump. (1) MAN-1: x-note-backup-paths was missing '.pending_notification' from its list of metadata files. That file is written by customize.sh after a successful restore during an upgrade and read/deleted by main.go at boot; it is part of the documented backup-directory structure in customize.sh §22, functions.sh, and ARCHITECTURE.md §8.1. The field now lists it. (2) MAN-2 + MAN-3: both PWA shortcuts (Control Panel, Monitoring Dashboard) used ABSOLUTE URLs pointing to http://127.0.0.1:9090 and http://127.0.0.1:9091 respectively. Per the PWA spec, shortcut URLs MUST be same-origin with the manifest's start_url. Because WebUI (9090) and Dashboard (9091) are different origins, the Dashboard shortcut was cross-origin and would be silently rejected by browsers that enforce the spec. Even on browsers that tolerate it, the shortcut would open a hardcoded 127.0.0.1 address that fails when the user accesses the WebUI via a LAN IP (e.g. 192.168.1.5:9090). Both shortcuts have been changed to RELATIVE URLs (/?source=shortcut_webui and /?source=shortcut_dashboard) which resolve to the manifest's current origin. The known consequence — both shortcuts open the current origin's landing page, which may not match the label when installed from port 9091 — is now documented explicitly in x-note-shortcuts. For reliable cross-origin navigation between WebUI and Dashboard, the WebUI's dashboardLink already reads /api?action=runtime_info and builds the correct URL dynamically (v1.0.0 PORT-2 fix). (3) x-note-shortcuts was rewritten to describe the same-origin requirement, the new relative URLs, the label/page-may-mismatch caveat, the LAN-IP scenario, and the recommended workaround (install a second PWA from port 9091 for a Dashboard-specific shortcut).",
+
+  "x-note-global-edition-v120": "Global Edition additions to the manifest (same release, no version bump). (1) HARD-MF-01: x-note-backup-paths now explicitly lists the PID suffix on every snapshot directory name, matching the actual on-device naming produced by customize.sh (BUG-CS-C), main.go (BUG-E), functions.sh (FSH-10), and action.sh (ACT-5). (2) HARD-MF-02: x-note-icon-source now uses the full filenames favicon-16x16.png and favicon-32x32.png instead of the abbreviated favicon-16.png / favicon-32.png (parity with the same correction in scripts/generate-icons.sh, HARD-GIC-02). (3) HARD-MF-03: the description field now states '9 on APatch' in addition to '7 candidate locations', matching the actual candidate list in customize.sh [8] (parity with README.md). (4) L-1 (cleanup): 'browser' was removed from display_override — including it would have overridden 'standalone' as the effective fallback, defeating the purpose of the field. (5) L-3 (cleanup): 'productivity' was removed from categories — a DNS proxy is a network utility / security tool, not a productivity app. (6) L-5 (cleanup): this section and x-note-pre-release-audit-v120 were split into two separate x-note fields to end the previous numbering confusion (MAN-3 appeared twice under a single list).",
+
+  "x-note-future-work": "Deferred to v1.3.0 / v1.4.0 (documented here so the reasoning is not lost): (a) M-1: ship a purpose-built /icon-maskable.png and /icon-maskable.svg to replace the current 'maskable' reuse of /icon-512.png; the maskable safe zone needs a wider margin than the standard shield provides. (b) M-2: move the bulk of the x-note-* documentation to docs/MANIFEST_NOTES.md and keep only short pointers here, reducing manifest.json from ~20 KB to ~3 KB. (c) M-3: shorten the description field to a one-line summary once the detailed feature matrix lives in docs/. (d) Add real 'screenshots' entries to unlock Chrome's richer install UI. (e) Add WebUI languages FR/DE/ES/RU/ZH (see x-note-language)."
 }

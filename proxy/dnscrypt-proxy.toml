@@ -1,31 +1,59 @@
 # ============================================================
 # DNSCrypt Smart Filter — dnscrypt-proxy.toml
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 #
 # General notes:
-#   • This file controls the DNSCrypt engine (launched by the WebUI).
-#   • Do not edit [monitoring_ui] manually unless you know what you are doing.
-#   • Credentials are generated automatically during installation.
+#   • This file controls the DNSCrypt engine (launched by the
+#     WebUI via main.go's startService()).
+#   • Do not edit [monitoring_ui] manually unless you know what
+#     you are doing. Credentials are generated automatically
+#     during installation by customize.sh.
+#   • This file is part of the module ZIP and is preserved
+#     across upgrades by customize.sh (Layer 1 + Layer 2).
 #
 # Security hardening:
-#   • No default admin/admin (must be set by customize.sh).
+#   • No default admin/admin — customize.sh aborts if the
+#     replacement fails (v1.0.0 — Audit Correction #15).
 #   • Port 8080 is reserved for monitoring_ui (see [13] below).
-#   • Credentials are read from [monitoring_ui] only (section-restricted).
+#   • Credentials are read from [monitoring_ui] only
+#     (section-restricted parsing — Audit Correction #21).
 #
-# v1.1.0 coordination:
+# v1.1.0 additions (kept):
 #   • Memory limits are set by main.go at runtime (per profile).
 #     See section [14] for the exact values.
 #   • The reserved port definition lives in:
-#       main.go → MONITORING_UI_PORT
-#       functions.sh → _MONITORING_UI_PORT
-#       customize.sh → _MONITORING_UI_PORT
-#       action.sh → _MONITORING_UI_PORT
-#       service.sh → _MONITORING_UI_PORT (implicit via functions.sh)
-#       status.sh → _MONITORING_UI_PORT
-#     Any change to the reserved port requires updating all of them.
+#       main.go         → MONITORING_UI_PORT
+#       functions.sh    → _MONITORING_UI_PORT
+#       customize.sh    → _MONITORING_UI_PORT
+#       action.sh       → _MONITORING_UI_PORT
+#       service.sh      → (via functions.sh)
+#       status.sh       → _MONITORING_UI_PORT
+#       watchdog.sh     → (uses TOML directly)
+#     Any change to the reserved port requires updating all of
+#     them.
+#
+# v1.2.0 additions:
+#   • Data preservation: the module now preserves 5 user config
+#     files (including THIS file) across upgrades, renames,
+#     reinstalls, and uninstalls. See section [14] and
+#     docs/BACKUP.md.
+#   • The persistent backup directory is:
+#       /sdcard/dnscrypt-webui-backup/
+#     This file is snapshotted there at every upgrade and at
+#     every pre-critical operation.
+#   • No DNS-engine configuration value changed in v1.2.0. All
+#     v1.1.0 behavior is retained byte-for-byte.
+#   • runtime_info now exposes a `backups` object with SEVEN
+#     fields (see section [14] for the exact schema).
+#
+# ⚠️ IMPORTANT: Two independent versions coexist
+#   • DNS version (upstream): proxy/dnscrypt-proxy.version = 2.1.18
+#   • Module version (this project): VERSION = v1.2.0
+#   They are independent. A module release does NOT necessarily
+#   change the DNS version.
 # ============================================================
 
 # ============================================================
@@ -34,14 +62,19 @@
 # The engine listens on localhost only — the firewall (iptables /
 # nftables) redirects DNS queries here.
 #
-# ⚠️ Do not change these addresses unless you know what you are doing.
-#    Changing to 0.0.0.0 exposes the engine to the network.
+# ⚠️ Do not change these addresses unless you know what you are
+#    doing. Changing to 0.0.0.0 exposes the engine to the network.
 #
 # ⚠️ Custom Chains:
 #    Redirection happens inside dedicated chains:
-#      • DNSCRYPT_OUT  (IPv4)
-#      • DNSCRYPT_OUT6 (IPv6)
+#      • DNSCRYPT_OUT  (IPv4)  → created by functions.sh
+#      • DNSCRYPT_OUT6 (IPv6)  → created by functions.sh
 #    This prevents orphans when bootstrap_resolvers change.
+#    See functions.sh [17] and [18] for the creation logic, and
+#    customize.sh / post-fs-data.sh / uninstall.sh for cleanup.
+#
+# ⚠️ Port 5354 is bound to both 127.0.0.1 and [::1] on purpose,
+#    so that IPv4 and IPv6 DNS queries are both served locally.
 # ============================================================
 listen_addresses = ['127.0.0.1:5354', '[::1]:5354']
 max_clients = 250
@@ -64,15 +97,16 @@ odoh_servers = false
 #   true  = require DNSSEC certificate (slower, more secure)
 #
 #   ⚠️ Enabling this reduces the number of available servers.
-# ============================================================
+# ------------------------------------------------------------
 require_dnssec = false
 
 # ------------------------------------------------------------
 # require_nolog / require_nofilter:
 #   true = select only servers that do not log or filter
 #
-#   ⚠️ true here means higher privacy — there is no reason to change it.
-# ============================================================
+#   ⚠️ true here means higher privacy — there is no reason to
+#      change it.
+# ------------------------------------------------------------
 require_nolog = true
 require_nofilter = true
 
@@ -89,7 +123,7 @@ require_nofilter = true
 #     disabled_server_names = ['cloudflare', 'google', 'quad9-doh-ip4-port443-filter-pri']
 #
 #   Leave empty to use all servers compatible with require_*.
-# ============================================================
+# ------------------------------------------------------------
 disabled_server_names = []
 
 # ============================================================
@@ -107,7 +141,7 @@ force_tcp = false
 #
 #   ⚠️ On Android mobile networks, UDP on port 443 may be
 #      blocked, so http3_probe = false gives a better experience.
-# ============================================================
+# ------------------------------------------------------------
 http3 = true
 http3_probe = false
 
@@ -115,7 +149,7 @@ http3_probe = false
 # timeout: milliseconds. 5000 = 5 seconds.
 #   - Less than 3000: may fail on slow networks
 #   - Greater than 8000: noticeable delay when a server fails
-# ============================================================
+# ------------------------------------------------------------
 timeout = 5000
 keepalive = 30
 
@@ -128,13 +162,13 @@ keepalive = 30
 #   'random'       = Random (not recommended)
 #
 #   'wp2' provides the best balance between performance and stability.
-# ============================================================
+# ------------------------------------------------------------
 lb_strategy = 'wp2'
 
 # ------------------------------------------------------------
 # lb_estimator:
 #   true = dynamic estimation of response time (better distribution)
-# ============================================================
+# ------------------------------------------------------------
 lb_estimator = true
 
 # ------------------------------------------------------------
@@ -147,14 +181,14 @@ lb_estimator = true
 #   Recommended default: 0.75
 #   Higher (0.9) = more tolerance for slow servers
 #   Lower (0.5)  = faster exclusion of bad servers
-# ============================================================
+# ------------------------------------------------------------
 timeout_load_reduction = 0.75
 
 # ------------------------------------------------------------
 # enable_hot_reload:
 #   true = automatically reload blocklists when they change
 #   ⚠️ WebUI uses SIGHUP instead (ensures instant updates)
-# ============================================================
+# ------------------------------------------------------------
 enable_hot_reload = true
 
 # ============================================================
@@ -182,7 +216,7 @@ log_file_latest = true
 #   max_backups = 1 backup copy
 #
 #   Values tuned for memory-constrained Android devices.
-# ============================================================
+# ------------------------------------------------------------
 log_files_max_size = 6
 log_files_max_age = 3
 log_files_max_backups = 1
@@ -194,22 +228,33 @@ log_files_max_backups = 1
 # server list (public-resolvers.md) — after download, they are
 # not used.
 #
-# ⚠️ We use DoH (1.1.1.1) where possible because bootstrap over
-#    traditional DNS may be vulnerable to MITM.
+# ⚠️ Port 53 is used here for compatibility. The four IPs below
+#    (9.9.9.9, 8.8.8.8, 1.1.1.1, 1.0.0.1) are a SUBSET of the
+#    legacy cleanup list used by customize.sh / post-fs-data.sh
+#    / uninstall.sh. Those three scripts additionally try to
+#    remove RETURN rules for three historical IPs that older
+#    versions of this file used:
+#      8.8.4.4, 208.67.222.222, 208.67.220.220
+#    The extra entries in the shell cleanup list are harmless
+#    no-ops if the rules never existed.
+#
+#    ⚠️ If you change the list here, also update those three
+#       scripts so the legacy cleanup stays in sync.
 #
 # ⚠️ Custom Chains:
 #    These addresses are excluded from redirection via RETURN
-#    rules inside DNSCRYPT_OUT / DNSCRYPT_OUT6 (not directly in OUTPUT).
-#    Changing them is safe — Custom Chains are fully rebuilt on every
-#    startService/stopService. No orphans.
+#    rules inside DNSCRYPT_OUT / DNSCRYPT_OUT6 (not directly in
+#    OUTPUT). Changing them is safe — Custom Chains are fully
+#    rebuilt on every startService/stopService. No orphans.
 # ============================================================
 bootstrap_resolvers = ['9.9.9.9:53', '8.8.8.8:53', '1.1.1.1:53', '1.0.0.1:53']
 
 # ------------------------------------------------------------
 # netprobe_timeout:
 #   Seconds. Maximum time to wait for the network before starting.
-#   120 seconds is enough for phones that boot slowly (Android on 4G).
-# ============================================================
+#   120 seconds is enough for phones that boot slowly (Android
+#   on 4G).
+# ------------------------------------------------------------
 netprobe_timeout = 120
 netprobe_address = '9.9.9.9:53'
 
@@ -220,34 +265,34 @@ netprobe_address = '9.9.9.9:53'
 # block_ipv6:
 #   true = reject AAAA (IPv6) requests with an immediate empty reply
 #
-#   ⚠️ Note: this does not cause a timeout; it returns an immediate
-#   empty reply. The goal: prevent ad leakage over IPv6 that might
-#   bypass the firewall.
+#   ⚠️ Note: this does not cause a timeout; it returns an
+#   immediate empty reply. The goal: prevent ad leakage over
+#   IPv6 that might bypass the firewall.
 #
-#   If you experience slowness in certain apps (e.g. Meta) due to
-#   their repeated IPv6 attempts, this is the reason — but the
-#   security benefit is greater.
-# ============================================================
+#   If you experience slowness in certain apps (e.g. Meta) due
+#   to their repeated IPv6 attempts, this is the reason — but
+#   the security benefit is greater.
+# ------------------------------------------------------------
 block_ipv6 = true
 
 # ------------------------------------------------------------
 # block_unqualified:
 #   true = block unqualified requests (no dot), such as "router"
 #   Prevents DNS leaks via NetBIOS/mDNS.
-# ============================================================
+# ------------------------------------------------------------
 block_unqualified = true
 
 # ------------------------------------------------------------
 # block_undelegated:
 #   true = block undelegated domains (such as .local, .localhost)
 #   Prevents DNS leaks via internal domains.
-# ============================================================
+# ------------------------------------------------------------
 block_undelegated = true
 
 # ------------------------------------------------------------
 # reject_ttl:
 #   TTL for rejected replies (seconds). 10 = short for quick updates.
-# ============================================================
+# ------------------------------------------------------------
 reject_ttl = 10
 
 # ------------------------------------------------------------
@@ -256,7 +301,7 @@ reject_ttl = 10
 #   'hinfo'    = reply with host information
 #   'a:0.0.0.0'= reply with an empty IPv4 address
 #   'nxdomain' = domain does not exist
-# ============================================================
+# ------------------------------------------------------------
 blocked_query_response = 'refused'
 
 # ============================================================
@@ -276,12 +321,17 @@ cache = true
 #
 #   ⚠️ Each entry consumes roughly 200 bytes on average.
 #
-#   ⚠️ v1.1.0 note:
+#   ⚠️ v1.1.0+ note:
 #      The Go runtime soft memory limit is set by main.go based on
 #      the active blocklist profile (see section [14] below). The
 #      DNS engine (this file) is a separate process with its own
 #      memory footprint — the two are independent.
-# ============================================================
+#
+#   ⚠️ Custom Chains:
+#      DNS queries are redirected to 127.0.0.1:5354 by the Custom
+#      Chains. The cache is populated by the engine's own
+#      responses, not by the redirect.
+# ------------------------------------------------------------
 cache_size = 10240
 
 # ------------------------------------------------------------
@@ -290,7 +340,7 @@ cache_size = 10240
 #   max_ttl     = 86400 (24 hours) — maximum
 #   neg_min_ttl = 60 (1 minute) — for negative errors
 #   neg_max_ttl = 600 (10 minutes) — for negative errors
-# ============================================================
+# ------------------------------------------------------------
 cache_min_ttl = 2400
 cache_max_ttl = 86400
 cache_neg_min_ttl = 60
@@ -306,28 +356,28 @@ cert_refresh_delay = 240
 # cert_ignore_timestamp:
 #   false = verify certificate validity (secure)
 #   true  = ignore timestamp (use only for diagnostics)
-# ============================================================
+# ------------------------------------------------------------
 cert_ignore_timestamp = false
 
 # ------------------------------------------------------------
 # dnscrypt_ephemeral_keys:
 #   false = use a fixed key per session (faster)
 #   true  = new key per query (slower, more private)
-# ============================================================
+# ------------------------------------------------------------
 dnscrypt_ephemeral_keys = false
 
 # ------------------------------------------------------------
 # pqdnscrypt:
 #   true = support Post-Quantum DNSCrypt (future-proof)
 #   No impact on performance today.
-# ============================================================
+# ------------------------------------------------------------
 pqdnscrypt = true
 
 # ------------------------------------------------------------
 # tls_disable_session_tickets:
 #   false = enable session tickets (faster)
 #   true  = disable them (higher privacy, lower performance)
-# ============================================================
+# ------------------------------------------------------------
 tls_disable_session_tickets = false
 
 # ============================================================
@@ -336,15 +386,19 @@ tls_disable_session_tickets = false
 #
 # Note: do not edit these files manually.
 # Use the WebUI at http://127.0.0.1:9090
-# because the WebUI updates them atomically with conflict detection.
+# because the WebUI updates them atomically with conflict
+# detection.
 #
 # ⚠️ WebUI uses streaming I/O to write blocklist.txt
-#     (2 MB RAM peak instead of 150 MB in older versions).
+#    (2 MB RAM peak instead of 150 MB in older versions).
 #
 # File structure:
 #   blocklist.raw → Fixed source (downloaded from the internet)
 #   blocklist.txt → Final output (after applying Allow/Deny)
 #                   This is what dnscrypt-proxy actually reads
+#
+# ⚠️ The three files below are preserved across upgrades by
+#    customize.sh. See docs/BACKUP.md §2 for the exact list.
 # ============================================================
 
 [blocked_names]
@@ -405,28 +459,31 @@ tls_disable_session_tickets = false
 #   Do not expose this port externally — it is for local use only,
 #   queried via an internal proxy in main.go (dashboard.html).
 #
-# ⚠️ Port 8080 (listen_address below) is reserved for monitoring_ui.
+# ⚠️ Port 8080 (listen_address below) is RESERVED for
+#    monitoring_ui. Every component in the project agrees on
+#    this:
 #
-#    ✅ main.go refuses to start if:
-#         • PORT=8080
-#         • DASHBOARD_PORT=8080
-#
-#    ✅ customize.sh refuses to write if:
-#         • TEMP_PORT=8080
-#         • TEMP_DASHBOARD_PORT=8080
-#
-#    ✅ functions.sh rejects in:
-#         • get_webui_port / get_dashboard_port
+#      • main.go refuses to start if:
+#           PORT=8080 OR DASHBOARD_PORT=8080
+#      • customize.sh refuses to write if:
+#           TEMP_PORT=8080 OR TEMP_DASHBOARD_PORT=8080
+#      • functions.sh rejects in:
+#           get_webui_port / get_dashboard_port
+#      • action.sh, service.sh, status.sh, watchdog.sh all
+#        check for 8080 before using any configured port.
 #
 #    ⚠️ Do not attempt to use 8080 for any other purpose.
 #
-# ⚠️ The username and password fields below are the sole source for:
-#      • main.go → getMonitoringAuth (section-restricted)
-#      • functions.sh → read_toml_credentials (section-restricted)
-#      • watchdog.sh → credentials reading (section-restricted)
+# ⚠️ The username and password fields below are the sole source
+#    for:
+#      • main.go        → getMonitoringAuth (section-restricted)
+#      • functions.sh   → read_toml_credentials (section-restricted)
+#      • watchdog.sh    → credentials reading (section-restricted)
+#      • customize.sh   → read_toml_credentials (section-restricted)
 #
 #    Reading is restricted to [monitoring_ui] only — no linear scan.
 #    Any other section containing username/password is ignored.
+#    This is Audit Correction #21 (Section-Restricted TOML).
 #
 # ⚠️ Metrics path documentation:
 #
@@ -437,18 +494,19 @@ tls_disable_session_tickets = false
 #    main.go handles both:
 #      - JSON response → passed through as-is
 #      - Prometheus text → converted to JSON via parsePrometheus
+#        + buildDashboardJSON
 #
 #    Flow:
 #      dashboard.html (9091)
 #        → GET /api/metrics (main.go dashboard server)
 #          → metricsProxyHandler
-#            → GET http://127.0.0.1:8080/api/metrics
+#            → GET http://127.0.0.1:<MONITORING_UI_PORT>/api/metrics
 #              → monitoring_ui
 #
-#    v1.1.0: metricsProxyHandler builds the upstream URL using the
-#    MONITORING_UI_PORT constant (defined in main.go) instead of a
-#    hardcoded "8080". Changing the reserved port requires editing
-#    both this file and the constant.
+#    v1.1.0 (MEM-3): metricsProxyHandler builds the upstream URL
+#    using the MONITORING_UI_PORT constant (defined in main.go)
+#    instead of a hardcoded "8080". Changing the reserved port
+#    requires editing both this file and the constant.
 #
 # ------------------------------------------------------------
 # Credentials (username / password):
@@ -466,7 +524,8 @@ tls_disable_session_tickets = false
   enabled = true
 
   # ⚠️ This address is reserved (8080). Do not change it.
-  # main.go refuses to start if PORT/DASHBOARD_PORT conflicts with it.
+  # main.go refuses to start if PORT/DASHBOARD_PORT conflicts
+  # with it.
   listen_address = '127.0.0.1:8080'
 
   # --- Credentials ---
@@ -474,7 +533,8 @@ tls_disable_session_tickets = false
   # Any username/password in another section is ignored.
   #
   # ⚠️ Must be filled by customize.sh before startup.
-  # If left empty, the Dashboard will not work (but the WebUI will).
+  # If left empty, the Dashboard will not work (but the WebUI
+  # will).
   username = ''
   password = ''
 
@@ -498,22 +558,52 @@ tls_disable_session_tickets = false
   privacy_level = 1
 
 # ============================================================
-# [14] Runtime notes
+# [14] Runtime notes (v1.2.0)
 # ============================================================
 #
 # 📁 Runtime files (from main.go):
 #   • status_file:   proxy/run/dnscrypt.status
-#                    ← "User Intent" — written only by startService/stopService
+#                    ← "User Intent" — written only by
+#                      startService/stopService
 #   • pid_file:      proxy/run/dnscrypt.pid
 #   • progress_file: proxy/run/update_progress.txt
 #   • log_file:      /data/local/tmp/dnscrypt_main.log
+#
+# 💾 Data preservation (v1.2.0):
+#
+#   The installer (customize.sh) and runtime (service.sh, main.go)
+#   preserve 5 user config files across every upgrade, rename,
+#   reinstall, and uninstall:
+#
+#     • webui.conf             — WebUI + Dashboard settings
+#     • dnscrypt-proxy.toml    — THIS FILE
+#     • selected_profile.txt   — Active blocklist profile
+#     • allowlist.txt          — User-defined allowlist
+#     • denylist.txt           — User-defined denylist
+#
+#   The persistent backup directory is:
+#     /sdcard/dnscrypt-webui-backup/
+#
+#   Structure:
+#     current/                — live snapshot, always up to date
+#     <timestamp>-<version>/  — historical snapshot per upgrade
+#     txn-<timestamp>-<pid>/  — in-flight transaction (short-lived)
+#     orphan-txn-*            — preserved interrupted install
+#     .last_stable            — pointer to last known good
+#     .upgrade_history.json   — full upgrade log (with jq)
+#     .upgrade_history.txt    — fallback log (without jq)
+#     .last_auto_backup       — marker for periodic auto-backup
+#
+#   Retention: 21 snapshots (5 daily + 4 weekly + 12 monthly).
+#   See docs/BACKUP.md and docs/EMERGENCY.md.
 #
 # 🔍 Diagnostics:
 #   curl http://127.0.0.1:9090/healthz
 #   curl http://127.0.0.1:9090/readyz
 #   curl http://127.0.0.1:9090/api?action=runtime_info
+#   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 #
-# 🧠 Memory usage (v1.1.0):
+# 🧠 Memory usage (v1.1.0+):
 #
 #   The WebUI (main.go) adjusts the Go runtime soft memory limit
 #   dynamically based on the active blocklist profile:
@@ -536,12 +626,79 @@ tls_disable_session_tickets = false
 #     • Idle WebUI:        ~15 MB RSS
 #     • rebuildBlocklist:  ~2 MB peak (streaming I/O)
 #
-# 🔒 Security:
-#   • main.go sets CSP + X-Frame-Options + nosniff on all HTTP responses
+#   Verification:
+#     curl -s http://127.0.0.1:9090/api?action=runtime_info \
+#         | jq '{profile_key, memory_limit_mb}'
+#     # → {"profile_key": "pro", "memory_limit_mb": 120}
+#
+# 📡 runtime_info schema (v1.2.0) — SEVEN-field backups object:
+#
+#   {
+#     "version":          "v1.2.0",
+#     "commit":           "<short-hash>",
+#     "build_time":       "<epoch>",
+#     "build_time_human": "<RFC3339>",
+#     "project_url":      "https://github.com/gasciljh/...",
+#     "run_dir":          "<path>",
+#     "status_file":      "<path>",
+#     "pid_file":         "<path>",
+#     "progress_file":    "<path>",
+#     "log_file":         "<path>",
+#     "bind_addr":        "127.0.0.1",
+#     "webui_port":       "9090",
+#     "dashboard_port":   "9091",
+#     "profile_key":      "pro",
+#     "memory_limit_mb":  120,
+#     "backups": {
+#       "available":        5,
+#       "in_flight_txn":    0,
+#       "orphan_txn":       0,
+#       "last_backup":      "2026-09-26 10:30:00",
+#       "last_backup_name": "20260926-103000-v1.2.0",
+#       "last_stable":      "20260926-103000-v1.2.0",
+#       "path":             "/sdcard/dnscrypt-webui-backup"
+#     }
+#   }
+#
+#   The `backups` object has EXACTLY SEVEN fields (v1.2.0, BAK-1):
+#
+#     1. available        — int. Number of snapshots. Excludes
+#                           current/, txn-*, and orphan-txn-*.
+#     2. in_flight_txn    — int. Number of txn-* directories
+#                           (install in progress or interrupted).
+#     3. orphan_txn       — int. Number of orphan-txn-* directories
+#                           (preserved interrupted installs,
+#                           user-managed).
+#     4. last_backup      — string|null. Timestamp of the newest
+#                           snapshot, formatted as
+#                           "YYYY-MM-DD HH:MM:SS".
+#     5. last_backup_name — string|null. Directory name of the
+#                           newest snapshot (e.g.
+#                           "20260926-150000-manual").
+#     6. last_stable      — string|null. Content of the
+#                           .last_stable pointer file.
+#     7. path             — string. Absolute path of the persistent
+#                           backup directory
+#                           ("/sdcard/dnscrypt-webui-backup").
+#
+#   ⚠️ status.sh --json produces a DIFFERENT object with NINE
+#      fields. It contains the same seven fields listed above,
+#      plus two shell-only diagnostic fields:
+#        • status                 — "ok" | "empty" | "missing"
+#        • last_backup_age_seconds — numeric age for scripting
+#
+#      The two diagnostic-only fields are NOT part of the API
+#      surface. Clients that consume runtime_info should use the
+#      seven fields above.
+#
+# 🔒 Security summary:
+#   • main.go sets CSP + X-Frame-Options + nosniff on all HTTP
+#     responses
 #   • handleLogin uses subtle.ConstantTimeCompare
 #   • handleAPI limits POST body to 5 MB
 #   • /readyz validates configuration on startup
-#   • STATUS_FILE = User Intent (not written from read-only functions)
+#   • STATUS_FILE = User Intent (not written from read-only
+#     functions)
 #   • Custom Chains: DNSCRYPT_OUT / DNSCRYPT_OUT6 (no orphans)
 #   • IPv6-safe rate limiting (getClientIP)
 #   • Port Guard 8080 (main.go + 6 shell scripts)
@@ -554,10 +711,19 @@ tls_disable_session_tickets = false
 #   • rebuildMu mutex (RACE-1)
 #   • Auth cache 60s
 #
+# 🌐 Global edition (v1.2.0):
+#   The WebUI ships with English as the default language and an
+#   in-page toggle (langToggle) that switches to Arabic. The
+#   user's choice is stored client-side in
+#   localStorage['dnscrypt-lang'] and is never transmitted to
+#   the server. Documentation remains English-only; community
+#   translations are welcome as separate files
+#   (docs/*.<lang>.md).
+#
 # ⚠️ Port constraints:
-#   • PORT (webui.conf)          → 9090 default
+#   • PORT (webui.conf)           → 9090 default
 #   • DASHBOARD_PORT (webui.conf) → 9091 default
-#   • monitoring_ui (this file)  → 8080 ← RESERVED!
+#   • monitoring_ui (this file)   → 8080 ← RESERVED!
 #   • listen_addresses (this file) → 5354
 #
 #   main.go refuses to start if:
@@ -567,12 +733,17 @@ tls_disable_session_tickets = false
 #
 # ⚠️ Architectural note:
 #   Custom Chains are created/destroyed in:
-#     • startService() / stopService() → manage_firewall via runShell
+#     • startService() / stopService() → manage_firewall via
+#       runShell
 #     • manage_iptables / manage_ip6tables in functions.sh
 #
 #   When changing bootstrap_resolvers above:
 #     • DNSCRYPT_OUT is fully flushed (-F + -X)
 #     • DNSCRYPT_OUT is rebuilt with the new IPs
 #     • No orphans (regardless of how many times TOML changes)
+#
+# ⚠️ Do NOT change the [monitoring_ui] section manually unless
+#    you understand the section-restricted parsing. A malformed
+#    section can break the entire auth flow.
 #
 # ============================================================

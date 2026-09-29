@@ -1,13 +1,13 @@
 # ============================================================
 # DNSCrypt Smart Filter – Feature Request Template
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # GitHub Issue Forms (YAML-based) — the modern standard
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
 # ============================================================
-# v1.1.0 additions:
+# v1.1.0 additions (kept):
 #   • Pre-flight checklist now requires checking docs/adr/ for
 #     existing architectural decisions on the same topic.
 #   • Added "ADR proposal" as a request_type option — feature
@@ -19,7 +19,68 @@
 #   • Updated pre-flight to reference docs/BRANCHING.md and
 #     docs/RELEASE_PROCESS.md for process-related ideas.
 #   • ROADMAP reference updated to mention the version numbers
-#     currently tracked (v1.2.0, v1.3.0, v2.0.0).
+#     currently tracked.
+#
+# ============================================================
+# v1.2.0 additions:
+#   • Version bumped to v1.2.0.
+#   • Pre-flight checklist now also requires checking:
+#       - docs/BACKUP.md      (backup system reference)
+#       - docs/EMERGENCY.md   (emergency recovery guide)
+#     Any feature that touches user data, backups, or
+#     restoration MUST be discussed in light of these two
+#     documents first.
+#   • Added a new "Data-preservation impact" section with four
+#     options to declare how the proposal interacts with the
+#     10 defensive layers:
+#       - No interaction
+#       - Extends existing layer(s)
+#       - Adds a new layer (11th)
+#       - Changes existing behavior (needs a migration path)
+#     This makes the reasoning explicit from the very first
+#     discussion.
+#   • Added "Data Guardian (v1.2.0)" to the "willing to
+#     contribute" options — mirroring the new badge introduced
+#     in docs/HALL_OF_FAME.md.
+#   • The "Request type" dropdown gained a new option:
+#       - "💾 Backup / data preservation improvement (v1.2.0)"
+#   • ROADMAP reference updated to mention v1.3.0 and v2.0.0 as
+#     the currently-tracked future versions.
+#   • Cross-references at the bottom updated:
+#       - docs/BACKUP.md
+#       - docs/EMERGENCY.md
+#       - docs/UPGRADE.md §3.1
+#   • All text is English-only (global edition). No Arabic
+#     strings exist in this file.
+#
+# ============================================================
+# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# ============================================================
+# A pre-release audit of this file identified the following
+# issues. All of them are addressed in-place; no version bump.
+#
+#   🔧 ISS-5 — The last item of the "Pre-flight checks" section
+#     asked the proposer to confirm that their idea "aligns with
+#     the project philosophy (Zero-Telemetry, Localhost-Only,
+#     Data-Preservation-First)". The first two terms are defined
+#     in README.md and ARCHITECTURE.md §1.2. The third —
+#     "Data-Preservation-First" — appears nowhere else in the
+#     project. A proposer who searches for it would find no
+#     definition, which makes the checkbox effectively
+#     un-answerable.
+#
+#     The term has been replaced with a lowercase descriptive
+#     phrase — "user-data preservation" — which conveys the same
+#     intent (respect for the 10 defensive layers) without
+#     inventing a capitalized proper noun. The corresponding
+#     details live in docs/BACKUP.md, which the pre-flight
+#     already requires the proposer to read.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md       — backup system reference
+#   • docs/EMERGENCY.md    — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • docs/HALL_OF_FAME.md — Data Guardian badge
 # ============================================================
 
 name: ✨ Feature Request
@@ -42,6 +103,8 @@ body:
 
         - Read [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md)
         - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
+        - Read [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) (v1.2.0)
+        - Read [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) (v1.2.0)
         - Checked [docs/adr/](https://github.com/gasciljh/dnscrypt-proxy-webui/tree/main/docs/adr) for existing architectural decisions
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue) and [Discussions](https://github.com/gasciljh/dnscrypt-proxy-webui/discussions)
         - The feature aligns with the [project philosophy](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/README.md)
@@ -55,9 +118,19 @@ body:
         > - Avoid vague requests ("improve performance").
         > - If your idea **changes** an existing architectural decision,
         >   consider proposing it as an **ADR** (see request type below).
+        > - If your idea **touches user data, backups, or restoration**,
+        >   fill in the "Data-preservation impact" section below.
+        >   v1.2.0 encodes a strict contract here — see
+        >   [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md).
 
   # ============================================================
   # [2] Pre-flight checks
+  # ============================================================
+  # ISS-5 fix: replaced the undefined term
+  # "Data-Preservation-First" with the lowercase descriptive
+  # phrase "user-data preservation". The intent (respect for
+  # the 10 defensive layers) is unchanged; the capitalization
+  # that made it look like a proper noun is removed.
   # ============================================================
   - type: checkboxes
     id: preflight
@@ -67,13 +140,15 @@ body:
       options:
         - label: I have read ROADMAP.md and FAQ.md
           required: true
+        - label: I have read BACKUP.md and EMERGENCY.md (v1.2.0)
+          required: true
         - label: I checked docs/adr/ for existing architectural decisions on this topic
           required: true
         - label: I searched Issues and Discussions and did not find the same idea
           required: true
         - label: This feature has not been rejected before (I checked closed Issues)
           required: true
-        - label: This idea aligns with the project philosophy (Zero-Telemetry, Localhost-Only, etc.)
+        - label: This idea aligns with the project philosophy (Zero-Telemetry, Localhost-Only, user-data preservation)
           required: true
 
   # ============================================================
@@ -95,6 +170,7 @@ body:
         - 🛠️ Dev tooling
         - ♻️ Refactor
         - 🐳 Deployment / Docker
+        - 💾 Backup / data preservation improvement (v1.2.0)
         - 📋 ADR proposal (reverses or amends an existing decision)
         - 🔄 Other
     validations:
@@ -228,7 +304,66 @@ body:
       required: true
 
   # ============================================================
-  # [10] Willing to contribute?
+  # [10] Data-preservation impact (v1.2.0)
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 💾 Data-preservation impact (v1.2.0)
+
+        > **New in v1.2.0**: The installer uses a 10-layer
+        > data-preservation architecture. If your proposal
+        > touches user data, backups, restoration, upgrade
+        > behavior, or uninstall behavior, please fill in the
+        > section below.
+        >
+        > This is not a gate — it is a **planning aid**. It
+        > ensures the discussion starts with the right context.
+        >
+        > See [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md)
+        > for the full reference.
+
+  - type: dropdown
+    id: data_preservation_impact
+    attributes:
+      label: 💾 How does this proposal interact with the 10 defensive layers?
+      description: |
+        The 10 layers are documented in docs/BACKUP.md §1.3.
+        Choose the option that best describes your proposal.
+      options:
+        - 'No interaction — the proposal does not touch user data, backups, or restore logic'
+        - 'Extends an existing layer — adds a new case to an existing layer (e.g. a new candidate source path)'
+        - 'Adds a new layer (11th) — introduces a new defensive mechanism'
+        - 'Changes existing behavior — modifies how a layer works today (needs a migration path)'
+        - '❓ Not sure — I need guidance on how this interacts'
+    validations:
+      required: false
+
+  - type: textarea
+    id: data_preservation_details
+    attributes:
+      label: 💾 Data-preservation details (optional)
+      description: |
+        If your proposal touches data preservation, describe:
+        - Which of the 5 preserved files are affected
+          (webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
+           allowlist.txt, denylist.txt)
+        - Whether a new file should be added to the preserved set
+        - Whether the .manifest.json schema needs to change
+        - Whether existing backups would still be valid
+        - Whether a migration is needed for users upgrading from v1.1.0
+      placeholder: |
+        Example:
+        - Affected file: allowlist.txt (extension of Layer 2)
+        - No schema change to .manifest.json
+        - Existing backups remain valid
+        - Migration: none needed; v1.2.0 already handles 5 files
+        - Uninstall behavior: unchanged (backup dir preserved)
+    validations:
+      required: false
+
+  # ============================================================
+  # [11] Willing to contribute?
   # ============================================================
   - type: dropdown
     id: willing_to_contribute
@@ -242,12 +377,13 @@ body:
         - 🤝 Yes, but I need guidance
         - 🧪 I can help with testing
         - 📖 I can help with documentation
+        - 💾 I can help with backup testing across devices (v1.2.0)
         - 👀 Sadly no — I leave it to the maintainer
     validations:
       required: false
 
   # ============================================================
-  # [11] Mockups / Screenshots
+  # [12] Mockups / Screenshots
   # ============================================================
   - type: textarea
     id: mockups
@@ -261,7 +397,7 @@ body:
       required: false
 
   # ============================================================
-  # [12] Examples from other projects (optional)
+  # [13] Examples from other projects (optional)
   # ============================================================
   - type: textarea
     id: examples
@@ -277,12 +413,12 @@ body:
       required: false
 
   # ============================================================
-  # [13] ADR-related features (v1.1.0)
+  # [14] ADR-related features
   # ============================================================
   - type: markdown
     attributes:
       value: |
-        ## 📐 ADR-related features (v1.1.0)
+        ## 📐 ADR-related features
 
         > If your proposal **changes** or **reverses** an existing
         > architecture decision, please fill in the section below.
@@ -323,7 +459,7 @@ body:
       required: false
 
   # ============================================================
-  # [14] Technical considerations
+  # [15] Technical considerations
   # ============================================================
   - type: textarea
     id: technical_notes
@@ -348,7 +484,7 @@ body:
       required: false
 
   # ============================================================
-  # [15] Additional context
+  # [16] Additional context
   # ============================================================
   - type: textarea
     id: additional
@@ -358,13 +494,14 @@ body:
       placeholder: |
         - Related links
         - Articles or discussions
-        - Assumed timeline (aligned with which ROADMAP version?)
+        - Assumed timeline (aligned with which ROADMAP version —
+          v1.3.0, v2.0.0, or later?)
         - Any other information
     validations:
       required: false
 
   # ============================================================
-  # [16] Final confirmation
+  # [17] Final confirmation
   # ============================================================
   - type: checkboxes
     id: final_confirmation
@@ -377,3 +514,20 @@ body:
           required: true
         - label: I am ready to accept rejection of the feature if it does not align with the project philosophy
           required: true
+
+  # ============================================================
+  # [18] References (footer)
+  # ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## 📚 References
+
+        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.3.0 and v2.0.0 are the currently-tracked future versions
+        - [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) — backup system reference (v1.2.0)
+        - [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) — emergency recovery guide (v1.2.0)
+        - [docs/UPGRADE.md §3.1](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/UPGRADE.md) — v1.1.0 → v1.2.0 upgrade path
+        - [docs/HALL_OF_FAME.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/HALL_OF_FAME.md) — Data Guardian badge (v1.2.0)
+        - [docs/adr/README.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md) — ADR system and index

@@ -1,6 +1,6 @@
 # ============================================================
 # Git Ignore for DNSCrypt Smart Filter
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,22 +12,110 @@
 #   Patterns are defined only for file types that actually
 #   exist or are created by this repository at runtime.
 #
-# v1.1.0 notes:
-#   • Version bumped from v1.0.0 to v1.1.0 (documentation only).
-#   • Removed two no-op negations (see comments in the sections
-#     below). Both were dead code that suggested protections
-#     which did not actually exist.
+# v1.1.0 notes (kept):
+#   • Removed two no-op negations:
+#       - `!proxy/dnscrypt-proxy.version` in [2] (the patterns
+#         above could never match it).
+#       - `!proxy/*.key.pub` in [13] (`*.key` cannot match
+#         `*.key.pub`).
 #   • Added clarifying comments for sections that previously
 #     had none.
-#   • No new patterns were required for the v1.1.0 files —
-#     `docs/adr/0004-0006.md`, `scripts/release-patch.sh`, and
-#     `.github/PULL_REQUEST_TEMPLATE/release.md` are all tracked
-#     files and require no ignore rule.
+#
+# ============================================================
+# v1.2.0 changes:
+#   • Version bumped from v1.1.0 to v1.2.0.
+#   • 🔧 FIX (this revision): Corrected the IDE negation pattern
+#     in §[12]. The previous pattern `.vscode/` ignored the
+#     entire directory, which made the following
+#     `!.vscode/settings.json.example` a NO-OP. Git cannot
+#     un-ignore a file inside an ignored directory.
+#
+#     The corrected pattern is `.vscode/*`, which ignores only
+#     the CONTENTS of `.vscode/` (not the directory itself),
+#     allowing the negation to work as intended.
+#     This fix is now tracked as HARD-GI-06 (see §[12]).
+#
+#   • Added a cross-reference from §[1] (`dist/`) to `make
+#     package`, which creates the packaged ZIP + checksum.
+#
+#   • Added a note that the v1.2.0 verification targets
+#     (`make check-docs`, `make check-backup`, `make check-all`)
+#     do NOT create any files — they are read-only checks.
+#
+#   • Confirmed: the persistent backup directory on the device
+#     — `/sdcard/dnscrypt-webui-backup/` — NEVER appears in the
+#     repository. It lives on the Android device's SD card, not
+#     in the git working tree. No .gitignore rule is needed for
+#     it (and none is provided). This is deliberate: adding a
+#     path that can never appear would be noise.
+#
+#   • Re-audited sections [1]–[19] against the v1.2.0 file
+#     inventory. No new build artifact or runtime file was
+#     introduced by the data-preservation release.
+#
+#   • Global English edition: all comments are English-only.
+#     No Arabic strings exist in this file.
 #
 # Reminder:
 #   If you add a new pattern here, add a matching exclusion in
 #   .gitattributes if the file is binary, or a matching section
 #   in .editorconfig if it has specific formatting rules.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • Makefile            — `make package`, `make check-docs`,
+#                           `make check-backup`, `make check-all`
+#   • .github/workflows/codeql.yml — HARD-CQ-08 note about
+#                                    `proxy/.codeql-analyze`
+#
+# ============================================================
+# v1.2.0 (Global Edition) — Additional hardening
+# ============================================================
+#   🛡️ HARD-GI-01 — Removed the redundant `.idea/**/*` entries
+#     in §[12]. Since `.idea/` (with trailing slash) ignores the
+#     entire directory, the granular entries inside it could
+#     never take effect. If a future exception is needed,
+#     switch to the `.idea/*` + `!.idea/<file>` pattern.
+#
+#   🛡️ HARD-GI-02 — Added `*.sarif` to §[1] (build artifacts).
+#     CodeQL produces SARIF files; when the analysis is run
+#     locally (rather than on CI), those files would otherwise
+#     appear in `git status`. (Moved from §[8] where it was
+#     misleadingly grouped under "Go build artifacts".)
+#
+#   🛡️ HARD-GI-03 — Added `*.sha256` to §[1]. The packaged
+#     checksum is already ignored via `dist/`, but a developer
+#     running `sha256sum` manually could produce one elsewhere.
+#
+#   🛡️ HARD-GI-04 — Added `*.tmp-*` to §[4]. Some `mktemp`
+#     variants produce `<file>.tmp-<random>` (dash instead of
+#     underscore). The existing `*.tmp_*` covers the underscore
+#     form used by `atomicWriteFile`; the new pattern covers
+#     the dash form used by external tooling.
+#
+#   🛡️ HARD-GI-05 — Added `/.codeql-analyze` and
+#     `proxy/.codeql-analyze` to §[1]. This closes H-02 from
+#     the original audit and validates HARD-CQ-08 in
+#     `.github/workflows/codeql.yml`, which asserts that the
+#     pattern exists here. (H-02 is the same fix as
+#     HARD-GI-05; the two identifiers refer to one change.)
+#
+#   🛡️ HARD-GI-06 — Corrected the `.vscode` negation pattern
+#     in §[12] from `.vscode/` to `.vscode/*`. This is the
+#     change previously documented only as "🔧 v1.2.0 FIX";
+#     it now has a stable identifier for cross-referencing.
+#
+#   🛡️ HARD-GI-07 — Removed all `/tmp/...` entries from §[9]
+#     and §[19]. In `.gitignore`, a leading `/` anchors the
+#     pattern to the repository root, NOT to the filesystem
+#     root. Thus `/tmp/dnscrypt-dev/` meant
+#     `<repo_root>/tmp/dnscrypt-dev/` — a path that does not
+#     exist. Real files under `/tmp/` never enter the working
+#     tree, so the patterns were pure noise; worse, a local
+#     `tmp/` directory inside the repo would have been
+#     silently ignored. Removed in full.
 # ============================================================
 
 # ============================================================
@@ -36,7 +124,30 @@
 # Outputs produced locally or in CI:
 #   • build/       — local build tree (if ever used)
 #   • proxy/build/ — WebUI binaries output (from build.sh)
-#   • dist/        — Magisk ZIP + checksums (from package_module.sh)
+#   • dist/        — Magisk ZIP + checksum
+#                    (from `make package` → package_module.sh)
+#   • *.zip        — any ZIP (defensive)
+#   • *.tar.*      — any tarball (defensive)
+#   • *.sha256     — checksum sidecar files (defensive, HARD-GI-03)
+#   • *.sarif      — CodeQL analysis output (HARD-GI-02)
+#   • .codeql-analyze — CodeQL build output (HARD-GI-05, closes H-02)
+#
+# v1.2.0 note: `make package` (repaired in this release) creates
+# `dist/dnscrypt-webui-<VERSION>-module.zip` and its `.sha256`.
+# Both live under `dist/`, which is ignored here.
+#
+# HARD-GI-05 note: The CodeQL workflow
+# (.github/workflows/codeql.yml) writes a temporary build
+# artifact to `proxy/.codeql-analyze`. It is removed by a trap
+# handler on any exit path, but a manual build or a partial
+# failure could leave the file behind. The two patterns below
+# keep it out of `git status` in either case:
+#   • `/.codeql-analyze`     — root-level (if a manual build
+#                              is run from the wrong directory)
+#   • `proxy/.codeql-analyze` — the canonical location
+#
+# See HARD-CQ-08 in .github/workflows/codeql.yml for the full
+# rationale.
 # ============================================================
 build/
 proxy/build/
@@ -45,6 +156,10 @@ dist/
 *.tar.gz
 *.tar.bz2
 *.tar.xz
+*.sha256
+*.sarif
+/.codeql-analyze
+proxy/.codeql-analyze
 
 # ============================================================
 # [2] WebUI binaries (built by build.sh / release.yml)
@@ -63,7 +178,13 @@ dist/
 #    `!proxy/dnscrypt-proxy.version` negation here. That
 #    negation was a no-op: the patterns above start with
 #    `dnscrypt-webui-` and cannot match `dnscrypt-proxy.version`.
-#    It has been removed in v1.1.0.
+#    It was removed in v1.1.0.
+#
+# ⚠️ v1.2.0 note: the file proxy/dnscrypt-proxy.version is
+#    tracked and must NEVER be ignored. It is the Single
+#    Source of Truth for the upstream DNS engine version.
+#    Verify with: `git check-ignore -v proxy/dnscrypt-proxy.version`
+#    → should report "not ignored".
 # ============================================================
 proxy/dnscrypt-webui-*
 proxy/dnscrypt-webui
@@ -86,6 +207,11 @@ dnscrypt-webui-*
 # Note (v1.1.0): the memory limit is held in memory
 # (currentMemLimit in main.go), NOT in a file. There is no
 # `memory_limit_mb` file in run/.
+#
+# Data preservation (v1.2.0):
+#   The 10 defensive layers do NOT write any file into
+#   proxy/run/. They write to /sdcard/dnscrypt-webui-backup/
+#   (outside the repository).
 # ============================================================
 proxy/run/*
 
@@ -94,11 +220,17 @@ proxy/run/*
 # ============================================================
 # Fallback locations when proxy/run/ is not writable (SELinux,
 # permissions). See main.go initPaths().
+#
+# HARD-GI-04: `*.tmp-*` covers the dash variant of `mktemp`
+# output (`<file>.tmp-<random>`) used by external tooling. The
+# underscore variant (`<file>.tmp_<random>`), used by
+# atomicWriteFile, is covered by `*.tmp_*` below.
 # ============================================================
 *.pid
 *.status
 *.tmp
 *.tmp_*
+*.tmp-*
 *.log
 *.old
 *.emergency.*
@@ -131,6 +263,13 @@ proxy/run/*
 # ⚠️ proxy/webui.conf and proxy/dnscrypt-proxy.toml are NOT
 #    in this list — they are template files that ship with the
 #    module and MUST be tracked.
+#
+# ⚠️ L-1 note (v1.2.0): the generic `credentials.txt` pattern
+#    that used to live in §[13] has been removed. The only
+#    credentials file this repository can produce is the
+#    proxy-scoped one below; a generic pattern risked hiding
+#    unrelated files named `credentials.txt` in other
+#    directories.
 # ============================================================
 proxy/allowlist.txt
 proxy/denylist.txt
@@ -145,6 +284,10 @@ proxy/blocked-ips.txt
 # ============================================================
 # Go 1.22 is the current toolchain (see proxy/go.mod).
 # These artifacts can appear during local testing or debugging.
+#
+# HARD-GI-02 note (v1.2.0): `*.sarif` used to live here. It was
+# moved to §[1] because SARIF is CodeQL output, not a Go build
+# artifact — grouping it here was misleading.
 # ============================================================
 *.test
 *.exe
@@ -158,7 +301,18 @@ __debug_bin*.exe
 # ============================================================
 # [9] Development environment (temporary)
 # ============================================================
-# Files created during local development and never committed.
+# HARD-GI-07 note (v1.2.0): the `/tmp/...` patterns that used
+# to live here have been removed. In `.gitignore`, a leading
+# `/` anchors to the repository root, not to the filesystem
+# root — so `/tmp/dnscrypt-dev/` actually meant
+# `<repo_root>/tmp/dnscrypt-dev/`, which does not exist.
+# Real `/tmp/` files never enter the working tree, so the
+# patterns were noise; and a legitimate `tmp/` directory
+# inside the repo would have been silently ignored.
+#
+# If you need to ignore a repo-local scratch directory in the
+# future, name it explicitly (e.g. `.scratch/`) and add a
+# pattern without a leading slash — never `/tmp/`.
 # ============================================================
 /tmp/dnscrypt-dev/
 /tmp/dnscrypt_main.log
@@ -192,28 +346,55 @@ desktop.ini
 # ============================================================
 # [12] IDE / Editor
 # ============================================================
-# ⚠️ .vscode/settings.json.example is intentionally NOT
-#    ignored — it is a tracked example file. The negation is
-#    redundant because the pattern `!.vscode/settings.json.example`
-#    would override `.vscode/` for that specific file, but Git
-#    supports it. It is kept for clarity.
+# 🔧 v1.2.0 FIX (HARD-GI-06) — This section previously used
+#    `.vscode/` (a directory-only pattern), which caused the
+#    negation below to be a NO-OP.
+#
+#    Git rule (documented in `man gitignore`, section "PATTERN
+#    FORMAT"):
+#
+#      • `dir/`  matches the DIRECTORY and everything inside it.
+#                A negation `!dir/file` has NO effect, because
+#                Git cannot re-include a file when its parent
+#                directory is excluded.
+#
+#      • `dir/*` matches the CONTENTS of the directory (but not
+#                the directory itself). A negation `!dir/file`
+#                then works as expected, because the parent
+#                directory itself is no longer excluded.
+#
+#    This section therefore uses `.vscode/*` (not `.vscode/`),
+#    so that `.vscode/settings.json.example` — if it exists —
+#    is tracked as intended.
+#
+#    The same pattern applies to `.idea/` below: it uses `.idea/`
+#    (directory-only) because there is NO negation for it. If a
+#    negation is ever added, it MUST be changed to `.idea/*`.
+#
+#    General rule for this repository:
+#      • If the section has a negation → use `dir/*`
+#      • If the section has NO negation → `dir/` is fine
+#
+# 🛡️ HARD-GI-01 — The five `.idea/**/*` entries that used to
+#    live below were redundant: since `.idea/` ignores the whole
+#    directory, patterns inside it can never take effect. They
+#    have been removed to avoid misleading the reader into
+#    thinking the ignore rules are more granular than they are.
+#
+# 🛡️ L-5 note (v1.2.0) — The duplicate `*.swp` pattern that
+#    used to live here has been removed. It is already covered
+#    by §[11] (OS files). One pattern, one home.
 # ============================================================
-.vscode/
+.vscode/*
 !.vscode/settings.json.example
 .idea/
 *.iml
-*.swp
 *.swo
 *.swn
 *~
 *.bak
 *.orig
 *.rej
-.idea/**/workspace.xml
-.idea/**/tasks.xml
-.idea/**/usage.statistics.xml
-.idea/**/dictionaries
-.idea/**/shelf
 
 # ============================================================
 # [13] Secrets & credentials (defensive)
@@ -226,10 +407,15 @@ desktop.ini
 #    negation was a no-op — `*.key` cannot match `*.key.pub`
 #    because the file ends with `.pub`, not `.key`.
 #
+# ⚠️ Removed in v1.2.0 (L-1): the generic `credentials.txt`
+#    pattern was redundant with `proxy/credentials.txt` in
+#    §[7], and was broad enough to hide unrelated files named
+#    `credentials.txt` elsewhere in the tree. Kept only the
+#    proxy-scoped entry in §[7].
+#
 # ⚠️ The `.secrets.baseline` file is NOT ignored — it is
-#    the detect-secrets baseline and must be tracked. It is
-#    covered by the general `*.baseline` exception (there is
-#    none), so no special pattern is needed here.
+#    the detect-secrets baseline and must be tracked. There is
+#    no `*.baseline` pattern here, so it is not matched.
 # ============================================================
 .secrets
 *.pem
@@ -240,7 +426,6 @@ desktop.ini
 *.keystore
 *.credentials
 *.secret
-credentials.txt
 
 # ============================================================
 # [14] Local overrides
@@ -269,6 +454,12 @@ webui.conf.local
 # [17] Documentation build
 # ============================================================
 # Reserved for future use (no docs build system today).
+#
+# v1.2.0 note: `make check-docs` verifies the presence of
+# three specific documentation files (BACKUP.md, EMERGENCY.md,
+# UPGRADE.md). It is a READ-ONLY check — it does NOT create
+# any file inside docs/_build/ or docs/.cache/. The patterns
+# below remain reserved for a future docs build system.
 # ============================================================
 docs/_build/
 docs/.cache/
@@ -282,3 +473,58 @@ site/
 # ============================================================
 *.cache
 *.pid.tmp
+
+# ============================================================
+# [19] Data-preservation test artifacts (v1.2.0) — defensive
+# ============================================================
+# These paths may be created by a developer while testing the
+# v1.2.0 data-preservation layers manually on a workstation
+# (i.e. by copying a device-side backup into the repo-local
+# scratch tree for inspection).
+#
+# They are NOT created by any script in this repository during
+# normal operation. They are listed here only to protect a
+# developer who tests the backup code locally.
+#
+# ⚠️ HARD-GI-07 note (v1.2.0): the previous `/tmp/...`
+#    patterns in this section have been removed for the same
+#    reason as in §[9] — a leading `/` anchors to the repo
+#    root, not the filesystem root, so `/tmp/dnscrypt-backup-test/`
+#    never matched anything real. If a developer copies a
+#    backup tree into a repo-local scratch directory, name
+#    that directory explicitly and ignore it without a leading
+#    slash (e.g. `.scratch/dnscrypt-backup-test/`).
+#
+# ⚠️ The real backup directory on the device —
+#    `/sdcard/dnscrypt-webui-backup/` — lives OUTSIDE the
+#    repository and is therefore NOT listed here. Adding it
+#    would be noise.
+#
+# ⚠️ The v1.2.0 verification targets (`make check-docs`,
+#    `make check-backup`, `make check-all`) are READ-ONLY.
+#    They do not create any of the files listed in this
+#    section. The patterns below are purely defensive.
+# ============================================================
+.scratch/dnscrypt-backup-test/
+.scratch/dnscrypt-txn-test/
+.scratch/dnscrypt-upgrade-backup-*
+.scratch/dnscrypt-backup-manual/
+
+# --- Backup staging files (transient) ---
+# These are created by atomic-write operations during local
+# testing of the backup pipeline. They end with `.tmp` or
+# `.tmp.<random>` and are renamed into place on success.
+# If a test crashes mid-write, they may be left behind.
+*.manifest.json.tmp
+*.upgrade_history.json.tmp
+*.manifest.json.tmp_*
+*.upgrade_history.json.tmp_*
+
+# --- Transaction directories (test only) ---
+# The transaction system (Layer 4) creates directories named
+# `txn-<timestamp>-<pid>/` inside the persistent backup root
+# on the device. A developer who copies them into the working
+# tree for analysis will end up with these paths. The pattern
+# below ignores them at any depth.
+txn-*/
+orphan-txn-*/

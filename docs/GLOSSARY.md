@@ -3,28 +3,81 @@
 > Comprehensive reference for all terms and abbreviations used
 > in DNSCrypt Smart Filter.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • §5 Project-Specific Terms gained 6 new entries:
->     MEM-1 (Dynamic memory limit), MEM-2 (Extended shellQuote),
->     MEM-3 (MONITORING_UI_PORT constant), `profile_key`,
->     `memory_limit_mb`, and "Soft limit".
->   • §6 Go & Shell Terms gained 2 new entries:
->     `debug.SetMemoryLimit` and `memLimitMu`.
->   • §8 Metrics & Abstraction Terms gained a v1.1.0 note
->     about the `runtime_info` additions.
->   • §10 Common Abbreviations gained 4 entries:
->     GC, RSS, OOM, LMK.
->   • §11 Fixes Index gained a new section for the v1.1.0
->     Runtime Improvements (MEM-1 / MEM-2 / MEM-3).
->   • The Audit Corrections Registry remains at #33 — v1.1.0
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']` and is never transmitted to
+>     the server. Documentation remains English-only by project
+>     convention.
+>   • §5 Project-Specific Terms gained **20+ new entries** for
+>     the v1.2.0 data-preservation release:
+>       - Persistent Backup (v1.2.0)
+>       - Transactional Upgrade (v1.2.0)
+>       - `txn-*` directory (v1.2.0)
+>       - `orphan-txn-*` directory (v1.2.0)
+>       - `.last_stable` pointer (v1.2.0)
+>       - `.last_backup` marker (v1.2.0)
+>       - `.upgrade_history.json` (v1.2.0)
+>       - `.pending_notification` (v1.2.0)
+>       - Multi-Source Detection (v1.2.0)
+>       - Recovery Mode Trigger (v1.2.0)
+>       - `runtime_info.backups` (v1.2.0)
+>       - `backupMu` (v1.2.0)
+>       - `createAutoBackup` (v1.2.0)
+>       - `cleanupOldTransactions` (v1.2.0)
+>       - `checkPendingNotifications` (v1.2.0)
+>       - `copy_with_context` (v1.2.0)
+>       - `write_manifest` (v1.2.0)
+>       - `verify_backup_integrity` (v1.2.0)
+>       - Data Guardian (v1.2.0)
+>       - Root-Solution Detection (v1.2.0)
+>   • §6 Go & Shell Terms gained **4 new entries**:
+>       - `sync.Mutex` (`backupMu`)
+>       - `runShellWithTimeout`
+>       - `AUTO_BACKUP_TIMEOUT`
+>       - `META-INF/update-binary`
+>   • §8 Metrics & Abstraction Terms gained a v1.2.0 note
+>     about the 7-field `runtime_info.backups` object.
+>   • §9 Advanced Security Terms gained **4 new entries**:
+>       - 7-field Backups Schema
+>       - Recovery Mode Correctness Fix
+>       - Service Worker Update-Banner Fix
+>       - Language Toggle (client-side only)
+>   • §10 Common Abbreviations gained **4 new entries**:
+>     FBE, MTP, FUSE, OTA.
+>   • §11 Fixes Index gained a new section for the v1.2.0
+>     Data-Preservation additions (BAK-1 / BAK-2 / BAK-3 / BAK-4)
+>     and correctness fixes (FIX-1 / FIX-2), **plus** a new
+>     note on the `HARD-*` file-scoped identifier family
+>     (see §11 "Note on HARD-* identifiers").
+>   • The Audit Corrections Registry remains at #33 — v1.2.0
 >     does not extend it (see `docs/SECURITY.md` §17).
->   • §12 References updated with v1.1.0 additions.
+>   • §12 References updated with v1.2.0 additions
+>     (`BACKUP.md`, `EMERGENCY.md`, `UPGRADE.md`).
+
+> **v1.2.0 (Global Edition) — Corrections in this revision**:
+>   • 🔧 **FIX-1 description** — §5 "Recovery Mode Trigger" and
+>     §9 "Recovery Mode Correctness Fix" previously described
+>     FIX-1 as a "reorder + exclude" strategy. The actual
+>     implementation in `customize.sh` uses a
+>     **snapshot-and-reapply** strategy (`§[8a]` + `§[9]` +
+>     `§[9b2]`), which keeps the extraction logic of `§[9]`
+>     untouched. The descriptions have been corrected to match
+>     the shipped code.
+>   • 🔧 **Reason string** — §5 "`createAutoBackup`" previously
+>     listed `pre-append-denylist` for the `appendDenylist` call
+>     site. The actual reason string recorded by `main.go` is
+>     `pre-denylist-save`, because `appendDenylist` delegates to
+>     `saveDenylist` (which is where the pre-critical backup is
+>     triggered). The entry has been corrected.
 
 ---
 
@@ -164,8 +217,9 @@ using the ISP's DNS).
 
 **Managed by**: `main.go` via `startService()` / `stopService()`.
 
-**⚠️ v1.1.0 note**: The DNS version (2.1.18) is **separate** from the
-module version (v1.1.0). See §5 "DNS Version" for the distinction.
+**⚠️ v1.2.0 note**: The DNS version (2.1.18) is **separate** from the
+module version (v1.2.0). See §5 "DNS Version vs Module Version" for
+the distinction.
 
 ---
 
@@ -307,6 +361,7 @@ time** → unexpected results.
 **Test**: `go run -race main.go`.
 
 **v1.0.0 — RACE-1**: `rebuildMu` protects `rebuildBlocklist`.
+**v1.2.0 — BAK-2**: `backupMu` serializes pre-critical backups.
 
 ---
 
@@ -350,6 +405,9 @@ func rebuildBlocklist() error {
 
 **In the project**: Works on `http://127.0.0.1:9090`.
 
+**v1.2.0 note**: `manifest.json` `lang` defaults to `en` and `dir`
+to `ltr`. The in-page toggle updates both at runtime.
+
 ---
 
 ### ⚙️ Service Worker (SW)
@@ -365,6 +423,10 @@ func rebuildBlocklist() error {
 
 **⚠️ dual-origin limitation**: SW is bound to a single origin (9090 ≠
 9091).
+
+**v1.2.0**: The SW caches the HTML **once**, language-neutral. The
+`[dir="rtl"]` CSS rules are applied client-side. See §9
+"Service Worker Update-Banner Fix".
 
 ---
 
@@ -525,19 +587,23 @@ user into clicking.
 
 **Another alternative** combining KernelSU and kernel patching.
 
-**In the project**: Supported (latest).
+**In the project**: Supported (latest). See §5
+"Root-Solution Detection".
 
 ---
 
 ### 📦 Module
 
-**ZIP package** installed via Magisk/KernelSU.
+**ZIP package** installed via Magisk/KernelSU/APatch.
 
 **Components**:
 - `module.prop` — description and version.
 - `customize.sh` — installation script.
 - `service.sh` — runs at boot.
 - Module files.
+
+**Bootstrap**: `META-INF/com/google/android/update-binary` — the root
+manager's entry point. See §6.
 
 ---
 
@@ -631,6 +697,11 @@ backoff.
 
 **v1.1.0**: Logs active profile + memory hint at startup.
 
+**v1.2.0**: Sends `X-Watchdog-Token` header to
+`/api/ensure_running_service`. Reads the token from
+`$RUN_DIR/.watchdog_token` on every call (no cache). Read-only with
+respect to the backup directory.
+
 ---
 
 ### 🎯 Audit Correction
@@ -659,6 +730,10 @@ backoff.
 **v1.1.0 does NOT add audit corrections.** The registry remains at
 #33. See §5 "MEM-1 / MEM-2 / MEM-3" for v1.1.0 runtime improvements.
 
+**v1.2.0 does NOT add audit corrections either.** See §5 "BAK-1" ..
+"BAK-4" and §5 "FIX-1 / FIX-2" for v1.2.0 runtime additions and
+correctness fixes. The registry remains at #33.
+
 ---
 
 ### 🩹 Hotfix
@@ -667,8 +742,8 @@ backoff.
 
 **Format**: `vX.Y.Z-hotfixN` (major.minor.patch-hotfixN).
 
-**In v1.1.0 context**: A hotfix from `v1.1.0` would be `v1.1.1` (PATCH
-release via `scripts/release-patch.sh`).
+**In v1.2.0 context**: A hotfix from `v1.2.0` would be `v1.2.1`
+(PATCH release via `scripts/release-patch.sh`).
 
 ---
 
@@ -683,6 +758,8 @@ s.youtube.com
 *.whatsapp.net
 ```
 
+**v1.2.0**: A pre-critical backup is created before each save (BAK-2).
+
 ---
 
 ### ❌ Denylist
@@ -694,6 +771,8 @@ s.youtube.com
 facebook.com
 tiktok.com
 ```
+
+**v1.2.0**: A pre-critical backup is created before each save (BAK-2).
 
 ---
 
@@ -708,6 +787,10 @@ tiktok.com
 - `proplus` — ~350K, 160 MB soft limit (v1.1.0).
 - `ultimate` — ~500K, 220 MB soft limit (v1.1.0).
 
+**v1.2.0**: The profile choice is preserved by the 10 defensive
+layers (it lives in `selected_profile.txt`, one of the 5 preserved
+files). See §5 "Setting Preservation" and "Persistent Backup".
+
 ---
 
 ### 🔐 Credentials
@@ -719,6 +802,9 @@ tiktok.com
 **Saved in**: `[monitoring_ui]` in `dnscrypt-proxy.toml`.
 
 **v1.0.0 — Fix NEW-6**: Auth cache 60s.
+
+**v1.2.0**: Also present in the persistent backup at
+`/sdcard/dnscrypt-webui-backup/current/dnscrypt-proxy.toml`.
 
 ---
 
@@ -778,6 +864,11 @@ tiktok.com
 
 **v1.0.0 — RACE-1**: Protected by `rebuildMu`.
 
+**v1.2.0**: Called by the delegated `saveDenylist` path after a
+pre-critical backup. The `appendDenylist` endpoint now requires a
+`content` parameter (BUG-A fix) and returns `"Processed N rules"` or
+`"No changes detected"`.
+
 ---
 
 ### 🔢 `runtime_info` Ports
@@ -799,6 +890,10 @@ tiktok.com
 
 **⚠️ v1.0.0 — PORT-2.**
 
+**v1.1.0**: Also returns `profile_key` and `memory_limit_mb`.
+**v1.2.0**: Also returns `backups` (7 fields). See §5
+"`runtime_info.backups`".
+
 ---
 
 ### 💾 Setting Preservation (Fix #3)
@@ -818,6 +913,10 @@ lost.
 
 **⚠️ v1.0.0 — Fix #3.**
 
+**v1.2.0 supersedes**: The v1.0.0 mechanism (`BACKUP_TMP` in
+`/data/local/tmp/`) is **superseded** by the v1.2.0 10-layer
+architecture. See §5 "Persistent Backup" and "Multi-Source Detection".
+
 ---
 
 ### 📊 Single Source of Truth
@@ -825,8 +924,9 @@ lost.
 **Architectural concept** — one source of truth.
 
 **In the project**:
-- `VERSION` — module version (v1.1.0).
+- `VERSION` — module version (v1.2.0).
 - `proxy/dnscrypt-proxy.version` — DNS version (2.1.18).
+- `MONITORING_UI_PORT` — reserved port (8080).
 
 **⚠️ Level 4.**
 
@@ -988,19 +1088,500 @@ light profiles or starves the heavy ones.
 
 **Two independent versions** coexist in the project:
 
-| Version | Source file | v1.1.0 value |
+| Version | Source file | v1.2.0 value |
 |---|---|:---:|
 | **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
-| **Module version** (this project) | `VERSION` | `v1.1.0` |
+| **Module version** (this project) | `VERSION` | `v1.2.0` |
 
 - The **DNS version** changes only when upstream ships a new
   `dnscrypt-proxy` release.
 - The **module version** changes with each project release.
-- The two are **independent**. v1.1.0 did **not** bump the DNS version.
+- The two are **independent**. v1.2.0 did **not** bump the DNS version.
 
 **Common confusion**: Both are called "version" in the codebase.
 
 **Reference**: `docs/DNS_BINARIES.md` §1.1.
+
+---
+
+### 🆕 Persistent Backup (v1.2.0)
+
+**Layer 2** of the 10 defensive layers. All 5 user config files are
+snapshotted to `/sdcard/dnscrypt-webui-backup/`.
+
+**Why this location**:
+- ✅ Survives reboot.
+- ✅ Survives module uninstall.
+- ✅ Survives factory reset of `/data`.
+- ✅ Visible from any file manager + over USB (MTP).
+
+**Rotation**: Keep the 21 newest snapshots, sorted by directory name.
+
+**Reference**: `docs/BACKUP.md` §1.3, §3.
+
+---
+
+### 🆕 Transactional Upgrade (v1.2.0)
+
+**Layer 4** of the 10 defensive layers. Every install runs inside a
+`txn-*` directory.
+
+**State machine**:
+- `START` — install in progress or interrupted.
+- `COMMIT` — install succeeded, cleanup skipped.
+- `ROLLBACK` — rollback applied.
+
+**Behavior**:
+- On failure, an automatic rollback restores the previous state.
+- Leftover `COMMIT`'d transactions are cleaned by
+  `cleanupOldTransactions()` at startup.
+- `START` transactions are preserved as `orphan-txn-*` on uninstall.
+
+**Reference**: `docs/ARCHITECTURE.md` §3.10; `docs/BACKUP.md` §5.
+
+---
+
+### 🆕 `txn-*` directory (v1.2.0)
+
+**In-flight transaction directory** created by `customize.sh` during
+every install.
+
+**Format**: `txn-<timestamp>-<pid>/`.
+
+**Contents**:
+- `.state` — `START` | `COMMIT` | `ROLLBACK`.
+- `.pid` — installer PID (optional).
+- Copied user files (for rollback).
+
+**Lifetime**: Short-lived (removed after commit or rollback).
+
+**Reference**: `docs/BACKUP.md` §3.2, §11.6.
+
+---
+
+### 🆕 `orphan-txn-*` directory (v1.2.0)
+
+**Preserved interrupted transaction**.
+
+**Created by**: `uninstall.sh` renaming a `txn-*` with
+`.state=START`.
+
+**Meaning**: A previous install was interrupted mid-flight. The
+directory may contain the **only copy** of the user's data.
+
+**Action**: **Preserve** — inspect manually before deleting.
+
+**Reference**: `docs/BACKUP.md` §10.5; `docs/EMERGENCY.md` §4.5.
+
+---
+
+### 🆕 `.last_stable` pointer (v1.2.0)
+
+**File containing the directory name** (not path) of the last
+known-good snapshot.
+
+**Content**: e.g. `20260926-095826-v1.2.0-12345`.
+
+**Updated when**: A snapshot is created by `customize.sh` and
+verification passes.
+
+**Read by**:
+- `customize.sh` §[8a] (recovery mode).
+- `main.go:buildBackupInfo()` (as `runtime_info.backups.last_stable`).
+- `status.sh --json`.
+- `status.sh --diagnose`.
+
+**Note**: This file is **not** updated by runtime backups
+(`main.go`, `service.sh`, `action.sh`). Only install-time
+snapshots update `.last_stable`.
+
+**Reference**: `docs/BACKUP.md` §5.2.
+
+---
+
+### 🆕 `.last_backup` marker (v1.2.0)
+
+**Empty marker file** whose **mtime** is used as the "last
+auto-backup timestamp".
+
+**Actually named**: `.last_auto_backup`.
+
+**Created/updated by**: `functions.sh:auto_backup_if_needed`.
+
+**Read by**:
+```sh
+stat -c %Y "$PERSISTENT_BACKUP/.last_auto_backup" \
+  || stat -f %m "$PERSISTENT_BACKUP/.last_auto_backup" \
+  || echo 0
+```
+
+If the marker is missing, the age is treated as 0 → backup runs
+immediately.
+
+**Reference**: `docs/BACKUP.md` §5.3.
+
+---
+
+### 🆕 `.upgrade_history.json` (v1.2.0)
+
+**Append-only JSON log** recording every install / upgrade.
+
+**Structure**:
+```json
+{
+  "upgrades": [
+    {
+      "from": "v1.1.0",
+      "to": "v1.2.0",
+      "date": "2026-09-29T10:30:00Z",
+      "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
+      "root": "magisk",
+      "files": 5
+    }
+  ]
+}
+```
+
+**Written by**: `customize.sh:log_upgrade()` when `jq` is available.
+
+**Fallback** (no `jq`): plain-text `.upgrade_history.txt`.
+
+**Not rotated** — grows slowly (~200 bytes per upgrade).
+
+**Reference**: `docs/BACKUP.md` §5.4.
+
+---
+
+### 🆕 `.pending_notification` (v1.2.0)
+
+**Transient single-line file** written by `customize.sh` after a
+successful restore during an upgrade.
+
+**Read by**: `main.go:checkPendingNotifications()` at startup.
+
+**Action**: Content is logged, then the file is deleted by
+`main.go` (only).
+
+**Typical content**:
+```text
+Restored 5 user files from backup
+```
+
+**Reference**: `docs/BACKUP.md` §5.5; `docs/ARCHITECTURE.md`
+§4.10.4.
+
+---
+
+### 🆕 Multi-Source Detection (v1.2.0)
+
+**Layer 1** of the 10 defensive layers.
+
+**Philosophy**: *"Search for user data everywhere — do not guess
+whether this is an upgrade."*
+
+**Candidates (7)**:
+1. `$MODPATH/proxy` (in-place)
+2. `/data/adb/modules/dnscrypt-proxy-webui/proxy` (standard)
+3. `/data/adb/modules/DNSCrypt-Proxy-Webui/proxy` (legacy)
+4. `/data/adb/modules/DNSCrypt-Proxy-WebUI/proxy` (variant)
+5. `$PERSISTENT_BACKUP/current` (persistent)
+6. `$PERSISTENT_BACKUP` (flat)
+7. `/data/local/tmp/dnscrypt-webui-backup` (tmp fallback)
+
+**On APatch**: two `modules_update/` paths are prepended to the
+list.
+
+**Selection rule**: The first candidate with **≥ 3 valid files**
+wins.
+
+**Reference**: `docs/BACKUP.md` §1.2, §11.1.
+
+---
+
+### 🆕 Recovery Mode Trigger (v1.2.0)
+
+**Layer 7** of the 10 defensive layers.
+
+**Trigger files**:
+- `$MODPATH/recovery` (module-specific).
+- `/data/adb/dnscrypt-recovery` (external, survives module folder
+  loss).
+
+**Either one activates recovery mode** on the next boot.
+
+**Recovery source priority**:
+1. `$PERSISTENT_BACKUP/.last_stable`.
+2. `$PERSISTENT_BACKUP/current/`.
+3. In-place data (fallback).
+
+**Both trigger files are removed** after a successful restore.
+
+**v1.2.0 correctness fix (snapshot-and-reapply)**: The recovery-mode
+flow uses a **snapshot-and-reapply** strategy. `§[8a]` restores the
+5 files into `$MODPATH/proxy/` **and** copies each one to
+`$MODPATH/.recovery_snapshot/`. `§[9]` extracts the ZIP normally —
+this overwrites `webui.conf` and `dnscrypt-proxy.toml` with the
+ZIP's defaults. `§[9b2]` re-applies the 5 files from the snapshot.
+The extraction logic of `§[9]` is deliberately left untouched, so
+the normal-install path is byte-for-byte identical. See §9 for the
+full analysis and `docs/ARCHITECTURE.md` §3.10 for the flow diagram.
+
+**Reference**: `docs/EMERGENCY.md` §9; `docs/SECURITY.md` §5.32.1.
+
+---
+
+### 🆕 `runtime_info.backups` (v1.2.0)
+
+**7-field JSON object** in `runtime_info` describing the backup
+state.
+
+**Schema**:
+```json
+{
+  "available": 5,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-29 15:00:00",
+  "last_backup_name": "20260929-150000-v1.2.0",
+  "last_stable": "20260929-095826-v1.2.0",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+```
+
+**Purpose**: Observability + System Info panel display + API
+verification.
+
+**Compatibility**: `status.sh --json` also exposes 2 diagnostic-only
+fields (`status`, `last_backup_age_seconds`) that are not part of
+the API surface.
+
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+
+---
+
+### 🆕 `backupMu` (v1.2.0)
+
+**`sync.Mutex` in `main.go`** that serializes pre-critical backups.
+
+**Protected**: The entire shell invocation of `createAutoBackup`.
+
+**Timeout**: `AUTO_BACKUP_TIMEOUT = 15 s`.
+
+**Rationale**: Two rapid user actions (e.g. two `save_allowlist`
+requests) could each trigger `createAutoBackup` on the same source
+directory. Without serialization, this could corrupt a snapshot.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.3, §4.10.2;
+`docs/BACKUP.md` §12.5.
+
+---
+
+### 🆕 `createAutoBackup` (v1.2.0)
+
+**Go function** in `main.go` that snapshots the 5 user config files
+before a destructive operation.
+
+**Called from 5 destructive endpoints, but only 4 distinct reason
+strings** (because `appendDenylist` delegates to `saveDenylist`):
+
+| Endpoint | Reason string |
+|---|---|
+| `POST /api/update_profile` | `"pre-profile-change"` |
+| `POST /api/save_allowlist` | `"pre-allowlist-save"` |
+| `POST /api/save_denylist` | `"pre-denylist-save"` |
+| `POST /api/save_custom_rules` | `"pre-custom-rules-save"` |
+| `POST /api/append_denylist` | (no own reason — delegates to `saveDenylist`, which uses `"pre-denylist-save"`) |
+
+**Corrected in this revision**: The `appendDenylist` entry
+previously listed `pre-append-denylist` — that string does **not**
+exist in the code. `appendDenylist` delegates to `saveDenylist`, so
+the recorded reason is `pre-denylist-save`.
+
+**Semantics**:
+- **Best-effort** — a failed backup never blocks the user's action.
+- **Serialized** by `backupMu`.
+- **Delegated** to `functions.sh:backup_user_files` via
+  `runShellWithTimeout`.
+- **Rotation**: after success, `rotate_backups 21` is invoked in
+  the same shell call.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.10.2; `docs/BACKUP.md` §4.3.
+
+---
+
+### 🆕 `cleanupOldTransactions` (v1.2.0)
+
+**Go function** in `main.go` that removes leftover `COMMIT`'d
+transaction directories at startup.
+
+**Logic**:
+1. Read `$PERSISTENT_BACKUP`.
+2. For each `txn-*` directory, read `.state`:
+   - `COMMIT` → remove the directory.
+   - `START` / `ROLLBACK` / missing → **preserve**.
+3. Log the number of removed directories.
+
+**Non-goals**:
+- Does not touch `orphan-txn-*` directories.
+- Does not touch `current/` or any `<timestamp>-...` snapshot.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.10.3.
+
+---
+
+### 🆕 `checkPendingNotifications` (v1.2.0)
+
+**Go function** in `main.go` that reads `.pending_notification` at
+startup, logs its content, and removes the file.
+
+**File location**: `$PERSISTENT_BACKUP/.pending_notification`.
+
+**Producer**: `customize.sh` (writes after a successful restore).
+
+**Semantics**:
+- Missing file → no-op (common case).
+- Empty file → removed silently (debug log).
+- Non-empty file → logged via `logEvent("📢 " + msg)`, then removed.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.10.4.
+
+---
+
+### 🆕 `copy_with_context` (v1.2.0)
+
+**Shell helper** in `functions.sh` that copies a file with its
+SELinux context and mode preserved.
+
+**Behavior**:
+1. Copy the file.
+2. Restore SELinux context via `restorecon` (preferred) or
+   `chcon u:object_r:magisk_file:s0` (fallback).
+3. Set mode `0600`.
+
+**Usage**: Any restore operation on a user file. Do **not** use a
+bare `cp -f`.
+
+**Reference**: `docs/BACKUP.md` §12.3; `docs/DEVELOPMENT.md` §10.4.
+
+---
+
+### 🆕 `write_manifest` (v1.2.0)
+
+**Shell helper** in `functions.sh` that writes `.manifest.json`
+with per-file SHA256 hashes.
+
+**Fields**:
+- `version` — actual module version (install-time) or `"unknown"`
+  (runtime).
+- `timestamp` — `YYYYMMDD-HHMMSS`.
+- `source` — source directory.
+- `root_solution` — `magisk` / `kernelsu` / `apatch` / `unknown`.
+- `files_count` — 0–5.
+- `files[]` — `{name, sha256}`.
+
+**Advisory**: Missing or invalid manifests do not block a restore.
+
+**Reference**: `docs/BACKUP.md` §5.1.
+
+---
+
+### 🆕 `verify_backup_integrity` (v1.2.0)
+
+**Shell helper** in `functions.sh` that runs the Layer 3 integrity
+checks.
+
+**Checks**:
+1. Non-empty (size > 0).
+2. Not oversized (size < 10 MB).
+3. SHA256 (advisory) — a mismatch is logged as a warning but does
+  **not** block a restore.
+
+**3-tier hash extraction**: `jq` → `awk` → `grep`/`sed`. If none
+succeeds, the check is skipped for that file.
+
+**Reference**: `docs/BACKUP.md` §9.1.
+
+---
+
+### 🆕 Data Guardian (v1.2.0)
+
+**Contributor badge** for testing the backup/restore system across
+devices, root solutions, and upgrade scenarios.
+
+**Acceptance criteria**:
+- ✅ Test the 10 data-preservation layers on **3+ devices** or
+  **3+ root solutions**.
+- ✅ Verify that all 5 user config files survive an in-place
+  upgrade.
+- ✅ Verify that recovery mode restores all 5 files.
+- ✅ Report the 7-field `backups` object before/after each scenario.
+
+**Reference**: `docs/HALL_OF_FAME.md`; `docs/FAQ.md` Q129.
+
+---
+
+### 🆕 Root-Solution Detection (v1.2.0)
+
+**Layer 5** of the 10 defensive layers. Detects the active root
+solution and adapts the candidate source list.
+
+**Detected solutions**:
+- **Magisk**: module folder kept during in-place upgrades.
+- **KernelSU**: module folder kept.
+- **APatch**: module folder may be **deleted before** `customize.sh`
+  runs. The installer checks
+  `/data/adb/modules_update/dnscrypt-proxy-webui/proxy` as a
+  fallback source.
+
+**Reference**: `docs/COMPATIBILITY.md` §7.2; `docs/BACKUP.md` §1.3.
+
+---
+
+### 🆕 BAK-1 .. BAK-4 (v1.2.0)
+
+**4 runtime additions** (not audit corrections) in the v1.2.0
+data-preservation release:
+
+| ID | Change | Reference |
+|:-:|---|---|
+| **BAK-1** | `runtime_info.backups` returns 7 fields | §5 "`runtime_info.backups`" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | §5 "`createAutoBackup`", "`backupMu`" |
+| **BAK-3** | `cleanupOldTransactions` | §5 "`cleanupOldTransactions`" |
+| **BAK-4** | `checkPendingNotifications` | §5 "`checkPendingNotifications`" |
+
+**Reference**: `docs/SECURITY.md` §5.31; `docs/ARCHITECTURE.md`
+§4.10.
+
+---
+
+### 🆕 FIX-1 / FIX-2 (v1.2.0)
+
+**2 correctness fixes** (not audit corrections) in the v1.2.0
+release:
+
+| ID | Fix | Reference |
+|:-:|---|---|
+| **FIX-1** | Recovery-mode correctness via **snapshot-and-reapply** — `§[8a]` restores the 5 files AND copies each to `$MODPATH/.recovery_snapshot/`; `§[9]` extracts the ZIP normally (extraction logic untouched); `§[9b2]` re-applies the 5 files from the snapshot | §9 "Recovery Mode Correctness Fix" |
+| **FIX-2** | Service Worker update-banner — send `SKIP_WAITING` to the correct worker | §9 "Service Worker Update-Banner Fix" |
+
+**Reference**: `docs/SECURITY.md` §5.32.
+
+---
+
+### 🆕 Bilingual WebUI (v1.2.0)
+
+**Global-edition feature** — the WebUI ships with **English as the
+default language** and an **in-page toggle** (`langToggle`) that
+switches to Arabic.
+
+**Properties**:
+- Preference stored **client-side only** in
+  `localStorage['dnscrypt-lang']`.
+- **No server state** — never transmitted to the API.
+- **No network requests** on toggle — pure DOM manipulation.
+- **Service Worker cache** stays neutral (HTML cached once).
+
+**Reference**: `docs/ARCHITECTURE.md` §6.7; `docs/API.md` §10.8.
 
 ---
 
@@ -1040,6 +1621,9 @@ func rebuildBlocklist() error {
 
 **Constraint**: Does not distinguish between read and write (use
 `sync.RWMutex` for reads).
+
+**v1.2.0** — `backupMu` is another `sync.Mutex` in `main.go`. See
+§5 "`backupMu`".
 
 ---
 
@@ -1104,6 +1688,21 @@ func applyMemoryLimit(key string) {
 
 ---
 
+### 🔒 `sync.Mutex` (`backupMu`) (v1.2.0)
+
+**`sync.Mutex` in `main.go`** that serializes pre-critical backups.
+
+**Protected**: The entire shell invocation of `createAutoBackup`.
+
+**Timeout**: `AUTO_BACKUP_TIMEOUT = 15 s`.
+
+**Constraint**: The lock is held for the entire shell invocation.
+Do **not** perform long operations while holding it.
+
+**See**: §5 "`backupMu`" for the full rationale.
+
+---
+
 ### 🏃 Goroutine
 
 **Lightweight thread** in Go — managed by the runtime.
@@ -1124,6 +1723,10 @@ func applyMemoryLimit(key string) {
 3. `rename()` atomic (POSIX guarantees this).
 
 **In the project**: `atomicWriteFile` / `atomicWriteStream`.
+
+**v1.2.0**: Also used for `$PERSISTENT_BACKUP/current/` (atomic
+update via `.current.tmp.$$` + `.current.old.$$` + `mv`) and for
+the watchdog token file.
 
 ---
 
@@ -1250,6 +1853,9 @@ func hasEndpoint(path, name string) bool {
 
 **⚠️ v1.0.0 — Fix #12 + NEW-2.**
 
+**v1.2.0**: `main()` registers `/api/runtime_info/` (with trailing
+slash) — both variants return the same JSON.
+
 ---
 
 ### 🎯 `debug.SetMemoryLimit` (v1.1.0 — MEM-1)
@@ -1273,6 +1879,73 @@ debug.SetMemoryLimit(220 * 1024 * 1024)  // 220 MB (ultimate)
 
 ---
 
+### ⏱️ `runShellWithTimeout` (v1.2.0)
+
+**Go function** in `main.go` that runs a shell command with a
+bounded timeout.
+
+**Usage in v1.2.0**:
+```go
+runShellWithTimeout(
+    ". functions.sh; ensure_backup_dir; "+
+    "backup_user_files <src> <dst> && "+
+    ". functions.sh; rotate_backups 21",
+    15*time.Second, // AUTO_BACKUP_TIMEOUT
+)
+```
+
+**Behavior**:
+- Distinguishes **timeout** from **exit non-zero** in the log.
+- Does not kill the child process if the timeout fires — the child
+  may still be running briefly (the caller does not retry
+  automatically).
+
+**Reference**: `docs/ARCHITECTURE.md` §4.3, §4.10.2.
+
+---
+
+### ⏱️ `AUTO_BACKUP_TIMEOUT` (v1.2.0)
+
+**Go constant** in `main.go` — `15 s`.
+
+**Purpose**: Bounds the duration of the `createAutoBackup` shell
+invocation.
+
+**Effect**: The `backupMu` mutex is held for at most this duration
+per call.
+
+**Rule**: Do **not** raise this without understanding the effect on
+`backupMu` serialization.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.10.2.
+
+---
+
+### 📦 `META-INF/update-binary` (v1.2.0)
+
+**Bootstrap script** that is the root manager's (Magisk/KernelSU/
+APatch) entry point for a module ZIP.
+
+**Path in the ZIP**: `META-INF/com/google/android/update-binary`.
+
+**Purpose**:
+- Sources `/data/adb/magisk/util_functions.sh`.
+- Calls `install_module`, which runs the module's `customize.sh`.
+
+**Non-responsibility**: Contains **no** DNSCrypt logic. All installer
+logic lives in `proxy/customize.sh`.
+
+**Accompanying file**: `META-INF/com/google/android/updater-script`
+(single line `#MAGISK`) — signals that the ZIP is a Magisk module.
+
+**v1.2.0 note**: Unchanged from v1.0.0. The 10 defensive layers are
+not visible to `update-binary` — they live entirely in
+`customize.sh` and other shell scripts.
+
+**Reference**: `docs/ARCHITECTURE.md` §8.4.
+
+---
+
 ## 7. CI/CD & Release Terms
 
 ### 🔄 CI — Continuous Integration
@@ -1280,6 +1953,10 @@ debug.SetMemoryLimit(220 * 1024 * 1024)  // 220 MB (ultimate)
 **Continuous integration** — every push/PR runs automated checks.
 
 **In the project**: `.github/workflows/ci.yml`.
+
+**v1.2.0 addition**: A `backup-smoke-test` job that validates the 10
+data-preservation layers (syntax + function presence + path
+consistency + docs references).
 
 ---
 
@@ -1299,7 +1976,7 @@ debug.SetMemoryLimit(220 * 1024 * 1024)  // 220 MB (ultimate)
 - **MINOR**: New feature (compatible).
 - **PATCH**: Bug fix.
 
-**Example**: `v1.1.0`.
+**Example**: `v1.2.0`.
 
 ---
 
@@ -1318,6 +1995,7 @@ debug.SetMemoryLimit(220 * 1024 * 1024)  // 220 MB (ultimate)
 | v1.1.0 | 1010000 |
 | v1.1.1 | 1010001 |
 | v1.2.0 | 1020000 |
+| v1.2.1 | 1020001 |
 | v2.0.0 | 2000000 |
 
 **⚠️ Constraint**: `hotfix` ≤ 99.
@@ -1371,6 +2049,25 @@ release.
 ```bash
 security(iptables): implement Custom Chains to prevent orphan rules
 ```
+
+---
+
+### 🧪 `upgrade-test.yml` (v1.2.0)
+
+**GitHub Actions workflow** that runs a **42-scenario matrix** (3
+root solutions × 2 source versions × 7 scenarios).
+
+**Trigger**: manual (`workflow_dispatch`) + weekly schedule.
+
+**Purpose**: Validate the 10 data-preservation layers across the
+combinations that matter most.
+
+**Runs in**: ~10 minutes.
+
+**Not part of the release pipeline** — it is a QA tool.
+
+**Reference**: `docs/CONTRIBUTING.md` §8.10; `docs/DEVELOPMENT.md`
+§7.4.
 
 ---
 
@@ -1569,6 +2266,10 @@ Android.
 the `MONITORING_UI_PORT` constant (MEM-3) instead of the hardcoded
 string `"8080"`. Behavior is unchanged.
 
+**v1.2.0 note**: The Dashboard's System Info panel also displays the
+**7-field `backups` object** from `runtime_info`. See §5
+"`runtime_info.backups`".
+
 ---
 
 ### 🎯 Per-Port Cache
@@ -1695,7 +2396,8 @@ var (
 - Less battery.
 - Faster response.
 
-**⚠️ v1.0.0 — NEW-6.**
+**⚠️ v1.0.0 — NEW-6.** — Also: **empty results are never cached**
+(BUG-C fix).
 
 ---
 
@@ -1780,6 +2482,131 @@ functional regression, not an exploitable vulnerability).**
 
 ---
 
+### 🆕 7-field Backups Schema (v1.2.0)
+
+**Security concept** — the `runtime_info.backups` object exposes 7
+fields describing the backup layer's state.
+
+**Purpose**:
+- **Observability** — a user reporting an issue can paste the JSON.
+- **Verification** — the System Info panel displays the values.
+- **Consistency** — matches `status.sh --json` on 7 shared fields.
+
+**Fields**: `available`, `in_flight_txn`, `orphan_txn`,
+`last_backup`, `last_backup_name`, `last_stable`, `path`.
+
+**Why this is a security-adjacent addition**: A non-zero
+`in_flight_txn` or `orphan_txn` signals a degraded backup layer that
+may need manual inspection. Exposing these fields allows scripts and
+users to detect this condition early.
+
+**⚠️ v1.2.0 — BAK-1 (not an audit correction).**
+
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+
+---
+
+### 🆕 Recovery Mode Correctness Fix (v1.2.0)
+
+**Correctness fix (FIX-1)** in `customize.sh`.
+
+**The bug**: In an early v1.2.0 draft, the ZIP extraction step
+(`§[9]`) ran **after** the recovery restore (`§[8a]`) and overwrote
+`webui.conf` and `dnscrypt-proxy.toml` with the ZIP's defaults. The
+subsequent restore step (`§[9c]`) was skipped in recovery mode, so
+the corrupted files were never re-fixed. **Result**: 2 of the 5
+restored files were silently lost during recovery.
+
+**The fix — snapshot-and-reapply strategy**:
+
+Rather than reordering the ZIP extraction steps (which would require
+maintaining a duplicate exclusion list that depends on knowing the
+ZIP's contents), the final v1.2.0 release uses a
+**snapshot-and-reapply** approach:
+
+| Phase | Section | What happens |
+|---|---|---|
+| **A** | `§[8a]` | Restore 5 files from `$RESTORE_SOURCE` into `$MODPATH/proxy/` **AND** copy each file to `$MODPATH/.recovery_snapshot/` |
+| **B** | `§[9]` | Extract the ZIP normally. This overwrites `webui.conf` and `dnscrypt-proxy.toml` with the ZIP's defaults (unavoidable without knowing the ZIP's contents) |
+| **C** | `§[9b]` | Move root-level web assets into `web/` |
+| **D** | `§[9b2]` | Re-apply the 5 files from `$MODPATH/.recovery_snapshot/` back into `$MODPATH/proxy/` |
+| **E** | `§[9c]` | Skipped when `RECOVERY_MODE=1` — already handled by A + D |
+
+**Why snapshot-and-reapply over "reorder + exclude"**:
+
+- It does **not** depend on knowing what the ZIP contains. If a
+  future release adds or removes files under `proxy/`, the fix keeps
+  working.
+- It keeps the extraction logic of `§[9]` **untouched**, so the
+  normal-install path is byte-for-byte identical to the pre-recovery
+  behavior.
+- The snapshot directory uses `$MODPATH/.recovery_snapshot/`
+  (dot-prefixed, cleaned up in `§[9b2]`), so it never appears in the
+  final module layout.
+
+**Partial re-application**: If `§[9b2]` re-applies fewer files than
+were snapshotted, the snapshot directory is **preserved** at
+`$MODPATH/.recovery_snapshot/` for manual recovery.
+
+**⚠️ v1.2.0 — FIX-1 (not an audit correction).**
+
+**Reference**: `docs/SECURITY.md` §5.32.1; `docs/ARCHITECTURE.md`
+§3.10.
+
+---
+
+### 🆕 Service Worker Update-Banner Fix (v1.2.0)
+
+**Correctness fix (FIX-2)** in `web/index.html` and
+`web/dashboard.html`.
+
+**The bug (v1.1.0)**: The [Reload] button sent `SKIP_WAITING` to
+`navigator.serviceWorker.controller` — the **old** worker — which
+ignored it. The new worker stayed in the `waiting` state, so the
+banner reappeared on every page reload → infinite loop.
+
+**The fix (v1.2.0)**:
+- Send `SKIP_WAITING` to `swRegistration.waiting` (the **new**
+  worker).
+- Reload on the `controllerchange` event.
+- Guard double-clicks with a `pendingReload` flag.
+
+**Scope**: The v1.1.0 fix applied only to `index.html`. The v1.2.0
+release completes the fix in `dashboard.html` as well.
+
+**⚠️ v1.2.0 — FIX-2 (not an audit correction).**
+
+**Reference**: `docs/SECURITY.md` §5.32.2; `docs/ARCHITECTURE.md`
+§6.5.
+
+---
+
+### 🆕 Language Toggle (client-side only) (v1.2.0)
+
+**Security concept** — the WebUI's bilingual toggle (English default
++ Arabic) is a **client-side only** concern.
+
+**Properties**:
+- **No server state**: The language preference is stored in
+  `localStorage['dnscrypt-lang']` and never transmitted to the API.
+- **No new network requests**: The toggle only manipulates the DOM.
+- **No SW cache pollution**: The Service Worker caches the HTML
+  **once**. Both `translations.en` and `translations.ar` objects are
+  inline in the same file.
+- **No XSS regression**: All translated strings pass through
+  `textContent` / `escapeHtml()` exactly like their English
+  counterparts.
+- **No CSP change**: The toggle does not require `'unsafe-inline'`
+  for anything beyond what already existed.
+- **No information disclosure**: The language preference reveals
+  nothing about the user.
+
+**⚠️ v1.2.0 — feature (not an audit correction).**
+
+**Reference**: `docs/BACKUP.md` §12.6; `docs/ARCHITECTURE.md` §6.7.
+
+---
+
 ## 10. Common Abbreviations
 
 | Abbreviation | Meaning | Full Form |
@@ -1845,6 +2672,15 @@ functional regression, not an exploitable vulnerability).**
 |:---:|---|---|
 | **MEM** | Memory improvement ID | Memory improvement (MEM-1/2/3) |
 | **Soft limit** | Go runtime soft limit | `debug.SetMemoryLimit` |
+
+**v1.2.0 Abbreviations**:
+
+| Abbreviation | Meaning | Full Form |
+|:---:|---|---|
+| **FBE** | File-Based Encryption | File-Based Encryption (Android) |
+| **MTP** | Media Transfer Protocol | Media Transfer Protocol |
+| **FUSE** | Filesystem in Userspace | Filesystem in Userspace (`/sdcard/` mount) |
+| **OTA** | Over-The-Air | Over-The-Air update |
 
 ---
 
@@ -1916,12 +2752,92 @@ functional regression, not an exploitable vulnerability).**
 |:-:|---|---|
 | **offline.html** | Removed restrictive CSP meta | `Offline Page CSP Removal` (§9) |
 
+### 🆕 v1.2.0 — Data-Preservation Additions (Not Audit Corrections)
+
+| ID | Change | Reference |
+|:-:|---|---|
+| **BAK-1** | 7-field `runtime_info.backups` | `runtime_info.backups` (§5) + §9 "7-field Backups Schema" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | `createAutoBackup`, `backupMu` (§5) + §6 `backupMu` |
+| **BAK-3** | `cleanupOldTransactions` | `cleanupOldTransactions` (§5) |
+| **BAK-4** | `checkPendingNotifications` | `checkPendingNotifications` (§5) |
+
+### 🆕 v1.2.0 — Correctness Fixes (Not Audit Corrections)
+
+| ID | Fix | Reference |
+|:-:|---|---|
+| **FIX-1** | Recovery-mode **snapshot-and-reapply** | `Recovery Mode Correctness Fix` (§9) |
+| **FIX-2** | Service Worker update-banner | `Service Worker Update-Banner Fix` (§9) |
+
+### 🆕 v1.2.0 — 10 Defensive Layers
+
+| # | Layer | Reference |
+|:-:|---|---|
+| 1 | Multi-Source Detection | `Multi-Source Detection` (§5) |
+| 2 | Persistent Backup | `Persistent Backup` (§5) |
+| 3 | SHA256 Integrity Verification | `verify_backup_integrity` (§5) |
+| 4 | Transactional Upgrade | `Transactional Upgrade` (§5) |
+| 5 | Root-Solution Compatibility | `Root-Solution Detection` (§5) |
+| 6 | SELinux Preservation | `copy_with_context` (§5) |
+| 7 | Recovery Mode | `Recovery Mode Trigger` (§5) |
+| 8 | Config Migrations | (see `docs/BACKUP.md` §11) |
+| 9 | Automation + Rotation | (see `docs/BACKUP.md` §6) |
+| 10 | Observability | `runtime_info.backups` (§5) |
+
+### 📁 File-Scoped Identifier Families (HARD-*)
+
+> **Note on HARD-* identifiers**: The `HARD-XX-NN` family is
+> **file-scoped**. Each source file documents its own `HARD-*`
+> identifiers in its header block. They are **NOT** centrally
+> catalogued here because they are implementation details, not
+> project-wide decisions. If you are looking for a specific
+> `HARD-*` identifier, open the source file that owns it.
+>
+> **Index of `HARD-*` families by owning file**:
+>
+> | Prefix | Owning file | Range | Purpose |
+> |---|---|---|---|
+> | `HARD-CS-*` | `proxy/customize.sh` | 01..10 | Installer hardening (10 defensive layers) |
+> | `HARD-FSH-*` | `proxy/functions.sh` | 01..11 | Backup helpers + `get_watchdog_token` (FSH-11) |
+> | `HARD-BK-*` | `docs/BACKUP.md` | 01..19 (with gaps) | Backup system reference hardening (see `docs/BACKUP.md` header for the exact list) |
+> | `HARD-COMPAT-*` | `docs/COMPATIBILITY.md` | 01..07 | Device compatibility hardening |
+> | `HARD-MK-*` | `Makefile` | 01..09 | Build-target hardening |
+> | `HARD-PM-*` | `scripts/package_module.sh` | 01..10 | Module packaging hardening |
+> | `BLD-*` | `proxy/build.sh` | 1..8 | Cross-compilation hardening |
+> | `ACT-*` | `proxy/action.sh` | 1..N | Magisk Action button hardening (e.g. ACT-5) |
+>
+> **Why these are file-scoped, not project-wide**:
+>
+> - A `HARD-*` identifier describes a **concrete implementation
+>   rule** inside a specific file (e.g. "always restore the SELinux
+>   context after a copy"). It is not a project-level decision that
+>   would justify an ADR.
+> - Renumbering a `HARD-*` identifier in one file has no effect on
+>   any other file. The family prefix (`CS`, `FSH`, `BK`, ...)
+>   already encodes the owning file, so central numbering would add
+>   coordination cost without any benefit.
+> - If a `HARD-*` rule ever becomes a project-wide concern, it is
+>   promoted to an **Audit Correction** (see §17 of
+>   `docs/SECURITY.md`) or a **BAK-* / FIX-* / MEM-*** identifier
+>   (see above). At that point it gains a project-wide number.
+>
+> **Cross-reference**:
+>
+> - The **Audit Corrections Registry** lives in
+>   `docs/SECURITY.md` §17 (currently at **#33**; next expected
+>   **#34** in v1.3.x).
+> - The **v1.2.0 runtime additions** (BAK-1..BAK-4, FIX-1, FIX-2,
+>   WD-TOKEN) are also listed in `docs/SECURITY.md` §17.2 — they
+>   are deliberately **not** audit correction numbers.
+> - The **10 defensive layers** correspond to the `HARD-CS-*` and
+>   `HARD-FSH-*` families. See `docs/BACKUP.md` §1.3 for the layer
+>   → file mapping.
+
 ### v1.0.0 — Audit Corrections Registry
 
 The last audit correction is **#33** (v1.0.0). See
 `docs/SECURITY.md` §17 for the full registry.
 
-**Next expected**: #34 (v1.2.x).
+**Next expected**: #34 (v1.3.x).
 
 ---
 
@@ -1951,18 +2867,20 @@ The last audit correction is **#33** (v1.0.0). See
 
 | Document | Purpose |
 |---|---|
-| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture |
-| [docs/SECURITY.md](SECURITY.md) | Security + Audit Corrections |
-| [docs/API.md](API.md) | HTTP API Reference |
+| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
+| [docs/SECURITY.md](SECURITY.md) | Security + Audit Corrections (§5.31, §5.32) |
+| [docs/API.md](API.md) | HTTP API Reference (§6.1.7) |
 | [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting |
 | [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix |
 | [docs/DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries management (Level 4) |
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
-| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (v1.0.0 → v1.1.0) |
-| [docs/FAQ.md](FAQ.md) | Frequently asked questions |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history |
+| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1) |
+| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q121–Q130) |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
 
 ---
 
@@ -1977,8 +2895,8 @@ Found a missing term? Or an unclear definition?
 
 ---
 
-*Last updated: 2026-09-26*
-*Version: v1.1.0*
+*Last updated: 2026-09-29*
+*Version: v1.2.0*
 *Author: gasciljh*
 
 ---

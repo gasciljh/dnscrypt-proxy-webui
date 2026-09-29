@@ -1,6 +1,6 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Release PR Template
-     Version: v1.1.0
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -12,25 +12,31 @@
        (.github/PULL_REQUEST_TEMPLATE.md). To use this one, append
        `?template=release.md` to the PR-creation URL:
 
-         https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.2.0?template=release.md
+         https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
 
        Full details: docs/BRANCHING.md §4.4
                      docs/RELEASE_PROCESS.md §5
                      docs/adr/0005-release-specific-pr-template.md
      ============================================================
-     v1.1.0 additions:
-       • New "v1.1.0 — version consistency" checklist covering the
-         5 places the version string appears (VERSION, module.prop,
-         manifest.json, sw.js, index.html/dashboard.html).
-       • New "v1.1.0 — runtime_info fields" check for the two new
-         fields added in v1.1.0 (profile_key, memory_limit_mb).
-       • New "v1.1.0 — memory limit per profile" check confirming
-         the dynamic limit works for each profile.
-       • Version examples in this template now reference v1.2.0 as
-         the next release (the template ships with v1.1.0).
-       • The release-patch.sh flow is now documented in the
-         "Post-Merge Plan" section, since PATCH releases were
-         formalized in ADR-0006 during the v1.0.0 cycle.
+     v1.2.0 additions:
+       • New "v1.2.0 — data preservation" checklist covering the
+         10 defensive layers, `backupMu`, the 7-field
+         `runtime_info.backups` object, and the watchdog token.
+       • New "v1.2.0 — backup layer verification" block with
+         commands to confirm snapshots are created and the
+         persistent backup directory exists.
+       • New "v1.2.0 — watchdog token" check confirming the
+         `.watchdog_token` file exists with mode `0600`.
+       • New "v1.2.0 — bilingual WebUI (EN + AR)" check.
+       • New "v1.2.0 — 42-scenario matrix" verification via
+         `upgrade-test.yml`.
+       • The version examples in this template now reference
+         v1.3.0 as the next release (the template ships with
+         v1.2.0).
+       • The old "v1.1.0 — runtime_info fields" and
+         "v1.1.0 — memory limit" sections remain (carried forward).
+       • Fixed the corrupted UTF-8 encoding in the previous
+         version of this file.
      ============================================================ -->
 
 ## 🚀 Release: `vX.Y.Z`
@@ -74,12 +80,12 @@ versionCode=NNNNNNN
 update.json: vX.Y.Z NNNNNNN
 ```
 
-### v1.1.0 — version consistency (5 files)
+### v1.2.0 — version consistency (5 files)
 
 <!--
-  v1.1.0 introduced a stricter version-consistency requirement.
-  The version string appears in 5 places that MUST all agree
-  before a release is cut. Run this and paste the output:
+  Since v1.1.0, the project requires version-string consistency
+  across 5 places. v1.2.0 keeps this requirement. Run this and
+  paste the output:
 
     V=$(cat VERSION)
     echo "VERSION:             $V"
@@ -136,6 +142,227 @@ dashboard.html:      vX.Y.Z           (var VERSION)
 - [ ] The two fields are also displayed in `web/index.html` (System Info panel)
 - [ ] The two fields are also displayed in `web/dashboard.html` (System Info panel)
 
+### v1.2.0 — data preservation (10 defensive layers)
+
+<!--
+  v1.2.0 introduces the Data-Preservation Release. Every in-place
+  upgrade now runs inside the 10 defensive layers. This block
+  confirms the layer functions are present in the released files.
+
+  See:
+    docs/BACKUP.md         — full reference
+    docs/SECURITY.md §5.31 — security model
+    docs/ARCHITECTURE.md §3.10 — flow diagram
+-->
+
+- [ ] **10 defensive layers present in `customize.sh`**
+  ```bash
+  for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
+           begin_transaction detect_root_solution copy_with_context \
+           RECOVERY_TRIGGER migrate_config; do
+      grep -q "$L" proxy/customize.sh && echo "✅ $L" || echo "❌ $L"
+  done
+  ```
+- [ ] **Backup helpers present in `functions.sh`**
+  ```bash
+  for H in auto_backup_if_needed rotate_backups backup_user_files \
+           restore_user_files cleanup_old_transactions get_backup_dir \
+           ensure_backup_dir get_last_backup_time copy_with_context \
+           verify_backup_integrity write_manifest get_watchdog_token; do
+      grep -q "$H" proxy/functions.sh && echo "✅ $H" || echo "❌ $H"
+  done
+  ```
+- [ ] **`main.go` backup additions (BAK-1..BAK-4)**
+  ```bash
+  grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2 createAutoBackup"
+  grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 backupMu"
+  grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
+  grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
+  grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1 function"
+  ```
+
+### v1.2.0 — backup layer verification
+
+<!--
+  Confirms the persistent backup directory exists and that a
+  snapshot has been created. Run these commands after the release
+  is published and installed on a test device.
+-->
+
+```bash
+# 1. Backup state (7-field object)
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
+```
+
+```json
+{
+  "available": 3,
+  "in_flight_txn": 0,
+  "orphan_txn": 0,
+  "last_backup": "2026-09-29 15:00:00",
+  "last_backup_name": "20260929-150000-manual-12345",
+  "last_stable": "20260929-095826-v1.2.0-12345",
+  "path": "/sdcard/dnscrypt-webui-backup"
+}
+```
+
+- [ ] The `backups` object has **exactly 7 keys**:
+  ```bash
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
+  # Expected: 7
+  ```
+- [ ] `available >= 1` (at least one snapshot exists)
+- [ ] `in_flight_txn == 0` (no stuck transactions)
+- [ ] `orphan_txn == 0` (no preserved interrupted installs)
+- [ ] `path == "/sdcard/dnscrypt-webui-backup"`
+- [ ] Backup directory exists with mode `0700`:
+  ```bash
+  su -c "stat -c '%a %U:%G %n' /sdcard/dnscrypt-webui-backup/"
+  # Expected: 700 root:root
+  ```
+- [ ] The 5 preserved files are present in `current/`:
+  ```bash
+  su -c "ls /sdcard/dnscrypt-webui-backup/current/"
+  # Expected: webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
+  #           allowlist.txt, denylist.txt, .manifest.json
+  ```
+- [ ] Cross-check with `status.sh --json`:
+  ```bash
+  diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups') \
+       <(su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | \
+         jq -S '.backups | del(.status, .last_backup_age_seconds)'")
+  # Expected: no diff
+  ```
+- [ ] `status.sh --diagnose` produces a complete report:
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" | head -30
+  ```
+
+### v1.2.0 — watchdog token (WD-TOKEN)
+
+<!--
+  v1.2.0 replaces the previous implicit "localhost bypass" on
+  POST /api/ensure_running_service with an explicit token.
+
+  See docs/SECURITY.md §5.33 for the design.
+-->
+
+- [ ] Token file exists with mode `0600`:
+  ```bash
+  su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  # Expected: -rw------- root root
+
+  su -c "stat -c '%a' /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  # Expected: 600
+  ```
+- [ ] Token is not empty:
+  ```bash
+  su -c "wc -c /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  # Expected: ~64 (hex token) or ~65 (with newline)
+  ```
+- [ ] Static verification in `main.go`:
+  ```bash
+  grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ loader"
+  grep -q 'verifyWatchdogToken' proxy/main.go && echo "✅ verify"
+  grep -q 'X-Watchdog-Token' proxy/main.go && echo "✅ header name"
+  grep -q 'subtle.ConstantTimeCompare' proxy/main.go && echo "✅ constant-time"
+  ```
+- [ ] Static verification in `watchdog.sh`:
+  ```bash
+  grep -q 'watchdog_token' proxy/watchdog.sh && echo "✅ reads"
+  grep -q 'X-Watchdog-Token' proxy/watchdog.sh && echo "✅ sends"
+  ```
+- [ ] Runtime test — the watchdog recovers a crashed DNS engine:
+  ```bash
+  # Ensure the service is running
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+  # Expected: DNS=UP
+
+  # Kill the DNS engine
+  su -c "pkill -9 dnscrypt-proxy"
+
+  # Wait for the watchdog (up to 60s)
+  sleep 60
+
+  # Verify the engine was restarted
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+  # Expected: DNS=UP
+  ```
+
+### v1.2.0 — bilingual WebUI (EN + AR)
+
+<!--
+  v1.2.0 ships the WebUI with English as the default language and
+  an in-page toggle (`langToggle`) to switch to Arabic. The API is
+  language-neutral.
+
+  See docs/ARCHITECTURE.md §6.7 and docs/API.md §10.8.
+-->
+
+- [ ] Toggle present in all three HTML pages:
+  ```bash
+  for f in index.html dashboard.html offline.html; do
+      grep -q 'id="langToggle"' web/$f && echo "✅ $f toggle"
+      grep -q 'en:' web/$f && grep -q 'ar:' web/$f && echo "✅ $f en+ar"
+      grep -q "dnscrypt-lang" web/$f && echo "✅ $f localStorage"
+      grep -q '\[dir="rtl"\]' web/$f && echo "✅ $f RTL"
+  done
+  ```
+- [ ] Manual browser test:
+  - [ ] Page loads in **English** by default
+  - [ ] Clicking `langToggle` switches to **Arabic** (RTL layout)
+  - [ ] Preference persists across reloads
+  - [ ] No network requests triggered by the toggle
+- [ ] API is language-neutral:
+  ```bash
+  curl -s http://127.0.0.1:9090/api?action=runtime_info | jq | grep -i lang
+  # Expected: no output
+  ```
+
+### v1.2.0 — 42-scenario matrix
+
+<!--
+  v1.2.0 adds a CI matrix that validates the 10 defensive layers
+  across 42 combinations (3 root solutions × 2 source versions ×
+  7 scenarios). See .github/workflows/upgrade-test.yml.
+-->
+
+- [ ] The workflow file exists:
+  ```bash
+  test -f .github/workflows/upgrade-test.yml && echo "✅ present"
+  ```
+- [ ] The workflow is green for the release commit:
+  ```bash
+  gh run list --workflow=upgrade-test.yml --limit 5
+  ```
+- [ ] `backup-smoke-test` job in `ci.yml` passed:
+  ```bash
+  grep -q 'backup-smoke-test' .github/workflows/ci.yml && echo "✅ job defined"
+  ```
+- [ ] `make check-backup` passes locally:
+  ```bash
+  make check-backup
+  # Expected: ✅ Backup shell validation complete
+  ```
+
+### v1.2.0 — breaking change check
+
+- [ ] `POST /api/append_denylist` now requires a `content` parameter:
+  ```bash
+  curl -X POST -b /tmp/cookies.txt \
+      http://127.0.0.1:9090/api/append_denylist | jq
+  # Expected: {"status": "error", "message": "Missing or empty 'content' parameter"}
+  ```
+- [ ] Sending `content` works:
+  ```bash
+  curl -X POST -b /tmp/cookies.txt \
+      --data-urlencode "content=facebook.com" \
+      http://127.0.0.1:9090/api/append_denylist | jq '.changed'
+  # Expected: true (or false if no change)
+  ```
+- [ ] Documented in `CHANGELOG.md` §Breaking Changes and
+      `docs/API.md` §6.2.7
+
 ---
 
 ## 🔢 Version Summary
@@ -162,6 +389,36 @@ dashboard.html:      vX.Y.Z           (var VERSION)
 - Fix:
 - Security:
 - Documentation:
+
+### v1.2.0 highlights (if applicable)
+
+<!--
+  If this release IS v1.2.0, confirm each item below. Otherwise
+  leave empty or delete.
+-->
+
+- [ ] **10 defensive layers** in `customize.sh` (multi-source,
+      persistent backup, integrity, transactions, root detection,
+      SELinux, recovery, migrations, rotation, observability)
+- [ ] **Persistent backup directory** at
+      `/sdcard/dnscrypt-webui-backup/`
+- [ ] **7-field `runtime_info.backups`** object (BAK-1)
+- [ ] **`createAutoBackup` + `backupMu`** — pre-critical backups
+      on 5 destructive endpoints (BAK-2)
+- [ ] **`cleanupOldTransactions`** at startup (BAK-3)
+- [ ] **`checkPendingNotifications`** at startup (BAK-4)
+- [ ] **FIX-1** — recovery-mode reorder
+- [ ] **FIX-2** — Service Worker update-banner
+- [ ] **Watchdog token (WD-TOKEN)** — `X-Watchdog-Token` on
+      `POST /api/ensure_running_service`
+- [ ] **Bilingual WebUI** — English default + Arabic toggle
+- [ ] **New CLI tools** — `action.sh --backup`,
+      `status.sh --diagnose`
+- [ ] **Breaking change** — `POST /api/append_denylist` requires
+      `content`
+- [ ] **42-scenario CI matrix** — `upgrade-test.yml`
+- [ ] Version bumped in 5 places (VERSION, module.prop, manifest,
+      sw, HTML)
 
 ### v1.1.0 highlights (if applicable)
 
@@ -203,6 +460,13 @@ dashboard.html:      vX.Y.Z           (var VERSION)
 - [ ] **Back-merge**: sync `develop` with `main`
   - For `release/*`: **automatic** via `release.yml` (see ADR-0003)
   - For `hotfix/*`: **manual** — run `make sync`
+
+- [ ] **v1.2.0**: Verify the backup layer survives the published release:
+  ```bash
+  gh release view vX.Y.Z
+  # Download and install the ZIP on a test device
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" | head -30
+  ```
 
 ### Post-merge commands (for reference)
 
@@ -253,6 +517,24 @@ gh release view vX.Y.Z
 
 **Rationale**: <!-- why this plan was chosen over the other -->
 
+### v1.2.0 — data-preservation safety net
+
+<!--
+  v1.2.0 ships with the 10 defensive layers. Even if a rollback
+  is needed, the user's 5 config files are preserved in the
+  persistent backup directory.
+-->
+
+- [ ] Confirmed the persistent backup directory will survive
+      rollback:
+  ```bash
+  su -c "ls -la /sdcard/dnscrypt-webui-backup/"
+  # Expected: current/, <ts>-<version>/…, .last_stable, …
+  ```
+- [ ] Confirmed that rolling back to a previous version does not
+      delete the backup directory (it is preserved by design —
+      see `docs/BACKUP.md` §5.6)
+
 ---
 
 ## 👀 Reviewer Checklist
@@ -267,7 +549,7 @@ gh release view vX.Y.Z
 - [ ] **SemVer bump**: matches the highest-severity change in the release
 - [ ] **CHANGELOG completeness**: all user-facing changes are listed
 - [ ] **CHANGELOG ordering**: newest section at the top (after `[Unreleased]`)
-- [ ] **`zipUrl` in `update.json`**: matches the tag name (e.g. `v1.2.0`)
+- [ ] **`zipUrl` in `update.json`**: matches the tag name (e.g. `v1.3.0`)
 - [ ] **No untracked changes**: `git status` is clean
 - [ ] **Tag name**: `vX.Y.Z` (no typos, no `-v` prefix, no double `v`)
 - [ ] **Post-merge plan**: the author confirmed the tag push and back-merge
@@ -280,6 +562,34 @@ gh release view vX.Y.Z
 - [ ] Version consistent across all 5 files (see pre-flight)
 - [ ] `web/sw.js` CACHE_VERSION matches `VERSION`
 - [ ] `web/manifest.json` version has no `v` prefix (PWA spec requirement)
+
+### v1.2.0-specific (if applicable)
+
+- [ ] **10 defensive layers** are present in `customize.sh` (see pre-flight)
+- [ ] **Backup helpers** are present in `functions.sh` (see pre-flight)
+- [ ] **`runtime_info.backups`** returns exactly 7 fields (see pre-flight)
+- [ ] **`backupMu`** present in `main.go`:
+  ```bash
+  grep -q 'backupMu' proxy/main.go && echo "✅"
+  ```
+- [ ] **Watchdog token** file exists with mode `0600` (see pre-flight)
+- [ ] **FIX-1** present in `customize.sh`:
+  ```bash
+  grep -A5 'RECOVERY_MODE" = "1"' proxy/customize.sh | \
+    grep -qE 'webui.conf|dnscrypt-proxy.toml' && echo "✅ FIX-1"
+  ```
+- [ ] **FIX-2** present in both HTML pages:
+  ```bash
+  grep -q 'swRegistration.waiting' web/index.html && echo "✅ index.html"
+  grep -q 'swRegistration.waiting' web/dashboard.html && echo "✅ dashboard.html"
+  ```
+- [ ] **Bilingual WebUI** — toggle present in all three pages (see pre-flight)
+- [ ] **Breaking change** documented in `CHANGELOG.md` and
+      `docs/API.md` §6.2.7
+- [ ] **`upgrade-test.yml`** is green for the release commit
+- [ ] **`make check-backup`** passes locally
+- [ ] **Data-preservation docs updated**: `docs/BACKUP.md` and
+      `docs/EMERGENCY.md` reflect the shipped behavior
 
 ---
 
@@ -301,24 +611,26 @@ gh release view vX.Y.Z
 <!-- ============================================================
      ⚠️  Final reminder before merging:
 
-     ┌───────────────────────────────────────────────┐
+     ┌─────────────────────────────────────────────────┐
      │  🚀  Release PR — Different rules apply               │
-     ├───────────────────────────────────────────────┤
+     ├─────────────────────────────────────────────────┤
      │  1. This PR targets `main` — that is correct here.    │
      │  2. The tag does NOT exist yet — it is created after  │
      │     the merge (or already pushed via release.sh /     │
      │     release-patch.sh).                                │
      │  3. `release.yml` will publish the release.           │
      │  4. `develop` must be synced after the release:       │
-     │       • release/* → automatic via release.yml        │
-     │       • hotfix/*  → manual (make sync)               │
-     └───────────────────────────────────────────────┘
+     │       • release/* → automatic via release.yml         │
+     │       • hotfix/*  → manual (make sync)                │
+     └─────────────────────────────────────────────────┘
 
      📖 Full details:
        docs/BRANCHING.md §4.4       (Release Workflow)
        docs/RELEASE_PROCESS.md §5   (PR Steps)
        docs/adr/0005                (Why a separate template)
        docs/adr/0006                (Why release-patch.sh)
+       docs/BACKUP.md               (Backup system — v1.2.0)
+       docs/EMERGENCY.md            (Recovery — v1.2.0)
 
      🎯 Quick verification before opening the PR:
 
@@ -336,6 +648,19 @@ gh release view vX.Y.Z
        # update.json fields
        jq -e ".version == \"$V\"" update.json >/dev/null && echo "✅ update.json version"
 
-     Current version line: v1.1.0
-     Last updated: 2026-09-26
+     🎯 v1.2.0 extra checks (if releasing v1.2.0 or later):
+
+       grep -q 'CANDIDATE_SOURCES' proxy/customize.sh && echo "✅ Layer 1"
+       grep -q 'PERSISTENT_BACKUP' proxy/customize.sh && echo "✅ Layer 2"
+       grep -q 'begin_transaction' proxy/customize.sh && echo "✅ Layer 4"
+       grep -q 'copy_with_context' proxy/customize.sh && echo "✅ Layer 6"
+       grep -q 'RECOVERY_TRIGGER' proxy/customize.sh && echo "✅ Layer 7"
+       grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2"
+       grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1"
+       grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
+       grep -q 'swRegistration.waiting' web/index.html && echo "✅ FIX-2"
+       make check-backup && echo "✅ backup shell validation"
+
+     Current version line: v1.2.0
+     Last updated: 2026-09-29
      ============================================================ -->

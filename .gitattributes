@@ -1,6 +1,6 @@
 # ============================================================
 # Git Attributes for DNSCrypt Smart Filter
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://git-scm.com/docs/gitattributes
@@ -12,24 +12,83 @@
 #   Rules are defined only for file types that actually exist
 #   in this repository. No speculative or defensive patterns.
 #
-# v1.1.0 notes:
-#   • New files added during the v1.0.0 → v1.1.0 cycle are
-#     covered by existing patterns — no new patterns were
-#     needed:
-#       - docs/adr/0004-unified-pr-template.md
-#       - docs/adr/0005-release-specific-pr-template.md
-#       - docs/adr/0006-rename-hotfix-to-release-patch.md
-#         → covered by `*.md`
-#       - scripts/release-patch.sh → covered by `*.sh`
-#       - .github/PULL_REQUEST_TEMPLATE/release.md
-#         → covered by `*.md`
+# v1.1.0 notes (kept):
 #   • `merge=union` is used ONLY for `CHANGELOG.md` and
 #     `VERSION`. It is deliberately NOT used for files with
 #     ordered content (SECURITY.md, docs/adr/README.md, etc.).
 #   • The `export-ignore` list was reviewed — it excludes
 #     development-only files from `git archive` and release
-#     tarballs. The ADRs are included in `docs/` which is
-#     already export-ignored.
+#     tarballs.
+#
+# ============================================================
+# v1.2.0 changes:
+#   • Version bumped from v1.1.0 to v1.2.0.
+#
+#   • 🔧 FIX (this revision): Removed the `-diff` attribute from
+#     `proxy/dnscrypt-proxy.version`.
+#
+#     Background:
+#       `-diff` tells Git to treat a file as binary for the
+#       purposes of `git diff` — it skips the text-based diff
+#       algorithm and shows "Binary files ... differ" instead.
+#
+#     Why `-diff` was wrong here:
+#       `proxy/dnscrypt-proxy.version` is a single-line text
+#       file (e.g. "2.1.18"). When the upstream DNS engine
+#       version is bumped, the change is exactly one line:
+#         -2.1.18
+#         +2.1.19
+#       Suppressing this diff with `-diff` HIDES the change
+#       from every `git log -p`, `git show`, and PR review view.
+#       That is the opposite of what we want for a file that is
+#       the Single Source of Truth for the DNS engine version.
+#
+#     Why the ORIGINAL intent (never CRLF-normalize) does not
+#     require `-diff`:
+#       The `text eol=lf` attributes already handle line-ending
+#       normalization. `-diff` only affects the diff display,
+#       not the stored line endings.
+#
+#     The v1.1.0 change note for this file claimed `-diff` was
+#     added as a preventive measure against binary treatment.
+#     That was based on a misunderstanding: `-diff` does not
+#     prevent binary treatment; it CAUSES it. The correct
+#     attributes are `text eol=lf` alone.
+#
+#   • The `merge=union` list was re-verified:
+#       - CHANGELOG.md  → still union (append-only)
+#       - VERSION       → still union (single-line, but
+#                         conflicts here are rare and
+#                         resolvable by hand)
+#     No new file was added to this list. In particular:
+#       - docs/BACKUP.md      → NOT union (numbered sections)
+#       - docs/EMERGENCY.md   → NOT union (numbered scenarios)
+#       - docs/UPGRADE.md     → NOT union (versioned §3.X)
+#     These files have ordered content and a union merge would
+#     produce duplicated or interleaved sections.
+#
+#   • The `export-ignore` list was re-verified. The v1.2.0
+#     release did NOT need any new export-ignore entry:
+#       - docs/ already covers BACKUP.md, EMERGENCY.md, and
+#         UPGRADE.md
+#       - scripts/ already covers release-patch.sh
+#       - .github/ already covers upgrade-test.yml and the
+#         release PR template
+#
+#   • Added a "Data preservation (v1.2.0)" note in the
+#     export-ignore section: the runtime backup directory
+#     (/sdcard/dnscrypt-webui-backup/) lives OUTSIDE the
+#     repository, so no export-ignore rule is needed for it.
+#
+#   • Global English edition: all comments are English-only.
+#     No Arabic strings exist in this file.
+#
+# Cross-references (v1.2.0):
+#   • docs/BACKUP.md      — backup system reference
+#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#   • Makefile            — `make package` creates dist/,
+#                           `make check-docs` verifies docs
 # ============================================================
 
 # ============================================================
@@ -47,6 +106,9 @@
 # Applies to both proxy/*.sh and scripts/*.sh. Explicit list
 # is kept for the module-root shell scripts that get extracted
 # to /data/adb/modules/ (where CRLF would break execution).
+#
+# v1.2.0 note: scripts/release-patch.sh and scripts/release.sh
+# are covered by `*.sh`. No new explicit entry was needed.
 # ============================================================
 *.sh          text eol=lf
 *.bash        text eol=lf
@@ -105,10 +167,40 @@ module.prop   text eol=lf
 VERSION       text eol=lf
 
 # ============================================================
+# proxy/dnscrypt-proxy.version: LF only, single line
+# ============================================================
+# The Single Source of Truth for the upstream dnscrypt-proxy
+# version (e.g. "2.1.18"). Read by:
+#   • scripts/fetch_dns_binaries.sh
+#   • scripts/package_module.sh
+#   • proxy/build.sh (indirectly, via release.yml)
+#
+# This file is NOT the module version (that is VERSION).
+# It is updated manually when the upstream DNSCrypt project
+# ships a new release. See docs/DNS_BINARIES.md §10.
+#
+# Any whitespace or CRLF would break the version check regex
+# (`^[0-9]+\.[0-9]+\.[0-9]+$`) in fetch_dns_binaries.sh.
+#
+# 🔧 v1.2.0 FIX: The `-diff` attribute was REMOVED from this
+#    rule. It is a single-line text file; `-diff` would hide
+#    the version bump from `git log -p`, `git show`, and PR
+#    reviews. The `text eol=lf` attributes are sufficient to
+#    guarantee correct line endings and text treatment.
+#
+#    See the file header ("v1.2.0 changes" → 🔧 FIX) for the
+#    full rationale.
+# ============================================================
+proxy/dnscrypt-proxy.version  text eol=lf
+
+# ============================================================
 # Go mod: LF only, no formatting
 # ============================================================
 # go.mod and go.sum are formatted by the Go toolchain. Do not
 # run formatters on them.
+#
+# v1.2.0 note: proxy/go.mod is unchanged from v1.1.0. No new
+# imports were added by the data-preservation release.
 # ============================================================
 go.mod        text eol=lf
 go.sum        text eol=lf
@@ -118,6 +210,10 @@ go.sum        text eol=lf
 # ============================================================
 # The `SHELL` variable and recipe lines use tabs. Git must not
 # convert them. LF-only is mandatory.
+#
+# v1.2.0 note: the Makefile gained four new targets
+# (check-backup, check-all, check-docs, diagnose-help). All
+# use tabs in their recipes. No rule change was needed.
 # ============================================================
 Makefile      text eol=lf
 
@@ -154,16 +250,35 @@ dnscrypt-proxy   binary
 # ============================================================
 # Files created at runtime by main.go. Never committed, but
 # if they exist locally, Git treats them as binary.
+#
+# Data preservation (v1.2.0):
+#   The persistent backup directory
+#   (/sdcard/dnscrypt-webui-backup/) lives OUTSIDE the
+#   repository. No rule is needed for it here.
 # ============================================================
 proxy/run/*.status         binary
 proxy/run/*.pid            binary
 proxy/run/*.tmp            binary
+proxy/run/*.tmp_*          binary
 proxy/run/.bootstrap_cache binary
+
+# ============================================================
+# Atomic-write temp files
+# ============================================================
+# main.go uses atomicWriteFile / atomicWriteStream, which create
+# short-lived temp files named `<target>.tmp_<random>`.
+# Treating them as binary avoids meaningless diffs.
+# ============================================================
+*.tmp_*                    binary
 
 # ============================================================
 # Diff behavior
 # ============================================================
 # Improves `git diff` output for common file types.
+#
+# 🔧 v1.2.0 FIX: `proxy/dnscrypt-proxy.version` is NOT listed
+# here with `-diff`. A single-line text file must be diffable
+# so that version bumps are visible in `git log -p`.
 # ============================================================
 *.md          diff=markdown
 *.go          diff=golang
@@ -185,6 +300,9 @@ checksums.txt -diff
 #
 # docs/adr/*.md is automatically covered by `docs/**` and
 # `*.md`. No explicit rule needed.
+#
+# v1.2.0 note: docs/BACKUP.md, docs/EMERGENCY.md, and
+# docs/UPGRADE.md are covered by `docs/**` automatically.
 # ============================================================
 docs/**       linguist-documentation
 *.md          linguist-documentation
@@ -232,6 +350,9 @@ proxy/run/.bootstrap_cache merge=binary
 #   • docs/SECURITY.md — same reason.
 #   • docs/adr/README.md — ADR index is ordered by number.
 #   • docs/BRANCHING.md — structured sections.
+#   • docs/BACKUP.md — v1.2.0, numbered sections (§1–§13).
+#   • docs/EMERGENCY.md — v1.2.0, numbered scenarios (§1–§12).
+#   • docs/UPGRADE.md — v1.2.0, versioned sections (§3.0, §3.1).
 # ============================================================
 CHANGELOG.md  -diff merge=union
 
@@ -251,6 +372,17 @@ VERSION       merge=union
 # reads from the working tree (not from `git archive`), so
 # this list only affects the GitHub-generated source tarball
 # (the "Source code (zip)" link on the Releases page).
+#
+# Data preservation (v1.2.0):
+#   The runtime backup directory
+#   (/sdcard/dnscrypt-webui-backup/) is NOT part of the
+#   repository. It never appears in `git archive` and does not
+#   need an export-ignore rule.
+#
+#   The runtime file proxy/dnscrypt-proxy.version is INCLUDED
+#   intentionally — it is the Single Source of Truth for the
+#   DNS engine version and is needed by scripts that consume
+#   the tarball.
 # ============================================================
 .github/       export-ignore
 .gitignore     export-ignore

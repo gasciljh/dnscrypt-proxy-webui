@@ -3,29 +3,57 @@
 > Comprehensive guide to fetching, caching, and verifying
 > `dnscrypt-proxy` binaries in DNSCrypt Smart Filter.
 
-**Version**: v1.1.0
-**Last updated**: 2026-09-26
+**Version**: v1.2.0
+**Last updated**: 2026-09-29
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.1.0 changes**:
->   • Version bumped from v1.0.0 to v1.1.0.
->   • `Last updated` reflects the v1.1.0 release date.
->   • Module-version examples updated from `v1.0.0` to `v1.1.0`
->     in §9 (Command Reference), §10 (Updating the Version), and
->     §11 (Troubleshooting).
->   • **Important note** added: the upstream DNS version
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • `Last updated` reflects the v1.2.0 release date.
+>   • **Important note**: the upstream DNS version
 >     (`proxy/dnscrypt-proxy.version`) stays at `2.1.18` in
->     v1.1.0. The v1.1.0 release does **not** bump the DNS
->     version — only the module version.
->   • §8 (CI Integration) clarified: v1.1.0 does not modify
->     the DNS-binaries pipeline. The v1.1.0 runtime improvements
->     (MEM-1 / MEM-2 / MEM-3) are orthogonal to how binaries
->     are fetched and packaged.
->   • §12.3 (Project Documentation) extended with
->     `docs/UPGRADE.md`.
+>     v1.2.0. The v1.2.0 release is a data-preservation release
+>     and does **not** bump the DNS version — only the module
+>     version.
+>   • §2.4 (v1.2.0 Example) reaffirms the version-separation
+>     rule: the module version and the DNS version are
+>     independent. The v1.2.0 release bumps only the former.
+>   • §8 (CI Integration) updated:
+>       - §8.1 (Related Workflows) — new row for `upgrade-test.yml`.
+>       - §8.3 (Cache Key) — note on v1.2.0 ↔ v1.1.0 cache reuse.
+>       - §8.7 (new) — v1.2.0 Workflow Additions: no impact on
+>         the DNS-binaries pipeline.
+>     The DNS-binaries pipeline is unchanged from v1.1.0.
+>   • §9 (Command Reference) examples updated from `v1.0.0` to
+>     `v1.2.0`.
+>   • §10 (Updating the Version) — examples updated to reflect
+>     the v1.2.0 release cycle. Module-version bump examples now
+>     use `v1.2.0` → `v1.3.0`.
+>   • §11.8 (new) — v1.2.0 Specific: No Impact on DNS Binaries.
+>     Explains why the 10 defensive layers do not affect the
+>     fetch / cache / verify pipeline.
+>   • §12.3 (Project Documentation) extended with:
+>       - [`docs/BACKUP.md`](BACKUP.md)
+>       - [`docs/EMERGENCY.md`](EMERGENCY.md)
+>       - [`docs/UPGRADE.md`](UPGRADE.md)
+>   • §13.5 (Version History) extended with a v1.2.0 row.
 >   • No structural changes to the fetch / cache / verify
 >     pipeline.
+>   • **Language note**: the WebUI ships with English as the
+>     default language and an in-page Arabic toggle. The
+>     preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention. The DNS-binaries
+>     pipeline is entirely server-side and language-neutral.
+
+> **v1.2.0 (Global Edition) — Encoding correction**:
+>   • 🔧 **Mojibake fix** — Every section marker, arrow,
+>     checkmark, warning, and box-drawing character in this file
+>     has been verified to render as proper UTF-8. The previous
+>     revision contained corrupted multi-byte sequences (e.g.
+>     `вҖ”` instead of `—`, `вҶ’` instead of `→`, `вң…` instead
+>     of `✅`). All symbols now render correctly.
 
 ---
 
@@ -60,15 +88,19 @@
 
 **Two versions coexist in the project** — do not confuse them:
 
-| Version | Source file | Value in v1.1.0 |
+| Version | Source file | Value in v1.2.0 |
 |---|---|:---:|
 | **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
-| **Module version** (this project) | `VERSION` | `v1.1.0` |
+| **Module version** (this project) | `VERSION` | `v1.2.0` |
 
 - The **DNS version** changes only when upstream ships a new release.
 - The **module version** changes with each project release.
-- The two are **independent**. A module release (e.g. `v1.1.0`) does
+- The two are **independent**. A module release (e.g. `v1.2.0`) does
   not necessarily change the DNS version.
+
+**v1.2.0 reaffirmation**: The v1.2.0 release is a
+**data-preservation release**. It does **not** bump the DNS
+version. The DNS version stays at `2.1.18`, identical to v1.1.0.
 
 ### 1.2 Challenges before Level 4
 
@@ -91,16 +123,27 @@
 | ✅ **5 fallback sources** | Resilient to GitHub changes | Level 4 |
 | ✅ **SHA256 verification** | Corruption detection | Level 4 |
 | ✅ **Local cache** | Speed + offline | Level 4 |
-| ✅ **CI cache** | ~70% faster in release | Level 4 |
+| ✅ **CI cache** | ~83% faster in release (~30s → ~5s) | Level 4 |
 | ✅ **Delegation** | Centralized code, easier maintenance | Level 4 |
 | ✅ **Retry logic** | 3 attempts on transient failure | Level 4 |
 | ✅ **Better error logging** | Track source + attempts | Level 4 |
 
-**Orthogonality with v1.1.0 runtime improvements**: The v1.1.0
-additions (MEM-1 dynamic memory limit, MEM-2 extended `shellQuote`,
-MEM-3 `MONITORING_UI_PORT` constant) live in `main.go` and the shell
-scripts. They do **not** touch the DNS-binaries pipeline. This
-document remains valid across the v1.0.0 → v1.1.0 transition.
+**Orthogonality with v1.1.0 and v1.2.0 runtime improvements**:
+
+- The **v1.1.0** additions (MEM-1 dynamic memory limit, MEM-2
+  extended `shellQuote`, MEM-3 `MONITORING_UI_PORT` constant)
+  live in `main.go` and the shell scripts. They do **not** touch
+  the DNS-binaries pipeline.
+- The **v1.2.0** additions (10 data-preservation layers) live in
+  `customize.sh`, `functions.sh`, `service.sh`, `status.sh`,
+  `uninstall.sh`, and `main.go`. They also do **not** touch the
+  DNS-binaries pipeline.
+- The **v1.2.0 bilingual WebUI** (English default + Arabic toggle)
+  is a purely client-side concern. It does **not** affect the
+  DNS-binaries pipeline.
+
+This document remains valid across the v1.0.0 → v1.1.0 → v1.2.0
+transitions.
 
 ---
 
@@ -119,19 +162,28 @@ document remains valid across the v1.0.0 → v1.1.0 transition.
 ### 2.2 Who Reads This File?
 
 ```text
-┌─────────────────────────────────────────────┐
-│  proxy/dnscrypt-proxy.version                       │
-│  (2.1.18)                                           │
-└──────────────┬──────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  proxy/dnscrypt-proxy.version                              │
+│  (2.1.18)                                                  │
+└──────────────────────┬─────────────────────────────────────┘
+                       │
+    ┌──────────────────┼──────────────────┐
+    ▼                  ▼                  ▼
+┌────────┐       ┌───────────┐      ┌───────────┐
+│ fetch  │       │ package   │      │ release.yml│
+│ _dns   │       │ _module   │      │  (verify +│
+│ .sh    │       │ .sh       │      │   package)│
+└────────┘       └───────────┘      └───────────┘
                   │
-    ┌───────────┼─────────────┬───────────────┐
-    ▼            ▼               ▼                 ▼
-┌────────┐ ┌────────┐ ┌──────────────┐ ┌─────────┐
-│ fetch   │ │package   │ │ release.yml    │ │ ci.yml    │
-│ _dns    │ │_module   │ │  (verify +     │ │(verify)   │
-│ .sh     │ │.sh       │ │   package)     │ │           │
-└────────┘ └────────┘ └──────────────┘ └─────────┘
+                  ▼
+           ┌───────────┐
+           │ ci.yml    │
+           │ (verify)  │
+           └───────────┘
 ```
+
+**v1.2.0 note**: No new consumer was added in the v1.2.0 cycle.
+The 10 defensive layers do not read this file.
 
 ### 2.3 Upgrade Scenario
 
@@ -152,7 +204,7 @@ echo "2.1.18" > proxy/dnscrypt-proxy.version
 
 ### 2.4 v1.1.0 Example — DNS Version Stays the Same
 
-The v1.1.0 module release **does not change** the DNS version:
+The v1.1.0 module release **did not change** the DNS version:
 
 ```bash
 # Before v1.1.0 release
@@ -164,10 +216,35 @@ cat VERSION                          # v1.1.0
 cat proxy/dnscrypt-proxy.version     # 2.1.18  ← unchanged
 ```
 
-**Why?** The v1.1.0 release contains:
+**Why?** The v1.1.0 release contained:
 - Runtime improvements in `main.go` (MEM-1, MEM-2, MEM-3).
 - Extended docs.
 - No changes to the encrypted DNS engine.
+
+### 2.5 v1.2.0 Example — DNS Version Stays the Same
+
+The v1.2.0 module release **did not change** the DNS version
+either:
+
+```bash
+# Before v1.2.0 release
+cat VERSION                          # v1.1.0
+cat proxy/dnscrypt-proxy.version     # 2.1.18
+
+# After v1.2.0 release
+cat VERSION                          # v1.2.0
+cat proxy/dnscrypt-proxy.version     # 2.1.18  ← unchanged
+```
+
+**Why?** The v1.2.0 release is a **data-preservation release**:
+
+- 10 defensive layers in `customize.sh`, `functions.sh`,
+  `service.sh`, `status.sh`, `uninstall.sh`.
+- 4 runtime additions in `main.go` (BAK-1..BAK-4).
+- 2 correctness fixes (FIX-1, FIX-2).
+- Bilingual WebUI (English default + Arabic toggle) — client-side
+  only, no server impact.
+- **No changes to the encrypted DNS engine or its binaries.**
 
 **Rule**: Only update `proxy/dnscrypt-proxy.version` when the
 **upstream** `dnscrypt-proxy` project ships a new release (see §10).
@@ -179,53 +256,54 @@ cat proxy/dnscrypt-proxy.version     # 2.1.18  ← unchanged
 ### 3.1 General Flow
 
 ```text
-┌───────────────────────────────────────────────┐
+┌────────────────────────────────────────────────────────┐
 │  [1] Read the version                                  │
-│      proxy/dnscrypt-proxy.version → "2.1.18"          │
-└────────────────────┬──────────────────────────┘
-                        ▼
-┌──────────────────────────────────────────────────┐
-│  [2] Check Cache                                          │
-│      ~/.cache/dnscrypt-proxy-webui/dns-binaries/          │
-│      ├── dnscrypt-proxy-arm64       ✅                   │
-│      ├── dnscrypt-proxy-arm         ✅                   │
-│      ├── dnscrypt-proxy-x86_64      ✅                   │
-│      ├── dnscrypt-proxy-i386        ❌ (missing)         │
-│      └── .manifest.json                                  │
-└─────────────────────┬────────────────────────────┘
-                          ▼
-              ┌─────────┴─────┐
+│      proxy/dnscrypt-proxy.version → "2.1.18"           │
+└────────────────────┬───────────────────────────────────┘
+                     ▼
+┌────────────────────────────────────────────────────────┐
+│  [2] Check Cache                                       │
+│      ~/.cache/dnscrypt-proxy-webui/dns-binaries/       │
+│      ├── dnscrypt-proxy-arm64       ✅                 │
+│      ├── dnscrypt-proxy-arm         ✅                 │
+│      ├── dnscrypt-proxy-x86_64      ✅                 │
+│      ├── dnscrypt-proxy-i386        ❌ (missing)       │
+│      └── .manifest.json                                │
+└────────────────────┬───────────────────────────────────┘
+                     ▼
+              ┌──────────────┐
               │ Cache Complete? │
-              └──────┬────────┘
+              └──────┬───────┘
            ✅ Yes     │      ❌ No
               │       │       │
-              ▼      │       ▼
-        ┌─────────┐ │   ┌────────────────┐
-        │ Use      │  │   │ Call fetch script │
-        │ cache    │  │   └──────────┬─────┘
-        └─────────┘ │                ▼
-              │       │  ┌───────────────────┐
-              │       │  │ Try 5 fallback srcs  │
-              │       │  └──────────┬────────┘
-              │       │               ▼
-              │       │  ┌───────────────────┐
-              │       │  │ SHA256 verification  │
-              │       │  └──────────┬────────┘
-              │       │               ▼
+              ▼       │       ▼
+        ┌──────────┐  │  ┌────────────────┐
+        │ Use      │  │  │ Call fetch script│
+        │ cache    │  │  └────────┬───────┘
+        └──────────┘  │           ▼
               │       │  ┌────────────────┐
-              │       │  │ Save to cache +   │
-              │       │  │ update manifest   │
+              │       │  │ Try 5 fallback │
+              │       │  │     sources    │
               │       │  └────────┬───────┘
-              │       │             │
-              └──────┴┬──────────┘
-                       ▼
-              ┌──────────────────┐
-              │ Copy to staging     │
-              │ (with i386→x86 map)│
-              └────────┬─────────┘
-                        ▼
+              │       │           ▼
+              │       │  ┌────────────────┐
+              │       │  │ SHA256 verify  │
+              │       │  └────────┬───────┘
+              │       │           ▼
+              │       │  ┌────────────────┐
+              │       │  │ Save to cache +│
+              │       │  │ update manifest│
+              │       │  └────────┬───────┘
+              │       │           │
+              └───────┴───────────┘
+                      ▼
               ┌────────────────┐
-              │ Create Magisk ZIP │
+              │ Copy to staging│
+              │ (i386→x86 map) │
+              └────────┬───────┘
+                       ▼
+              ┌────────────────┐
+              │ Create Magisk ZIP│
               └────────────────┘
 ```
 
@@ -295,9 +373,16 @@ https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.1.18/dnscrypt-pro
 https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/2.1.18/dnscrypt-proxy-android_arm64_2.1.18.zip
 ```
 
-**5. jsDelivr CDN:**
+**5. jsDelivr CDN (small files only):**
 ```text
-https://cdn.jsdelivr.net/gh/DNSCrypt/dnscrypt-proxy@2.1.18/dnscrypt-proxy-android_arm64-2.1.18.zip
+    # NOTE: jsDelivr's /gh/ endpoint serves files from the
+    # git tree, not release assets. Release ZIP files
+    # (dnscrypt-proxy-android_*-*.zip) are NOT in the git
+    # tree and are therefore NOT served by jsDelivr.
+    #
+    # If fetch_dns_binaries.sh uses jsDelivr, it is only for
+    # small files (e.g. .version, .minisig). Verify against
+    # the actual script before relying on this URL.
 ```
 
 ### 4.3 How the Trial Works
@@ -405,6 +490,9 @@ $ ./scripts/fetch_dns_binaries.sh --arch arm64 --verbose
 ⚠️ **Note**: GitHub Actions cache is evicted after 7 days of non-use.
 Because the workflow runs weekly, it will not be evicted.
 
+**v1.2.0 note**: No change to the cache TTL policy. The v1.2.0
+release does not touch this layer.
+
 ---
 
 ## 6. SHA256 Verification
@@ -412,22 +500,33 @@ Because the workflow runs weekly, it will not be evicted.
 ### 6.1 Mechanism
 
 ```text
-┌───────────────────────────────┐
-│ On fetch:                           │
-│   1. Download binary                │
-│   2. Compute SHA256                 │
-│   3. Save in .manifest.json         │
-└──────────────┬────────────────┘
+┌─────────────────────────────────┐
+│ On fetch:                       │
+│   1. Download binary            │
+│   2. Compute SHA256             │
+│   3. Save in .manifest.json     │
+└────────────────┬────────────────┘
                  ▼
-┌───────────────────────────────┐
-│ On use (later):                     │
-│   1. Read SHA from manifest         │
-│   2. Compute actual SHA             │
-│   3. Compare                        │
-│   ✅ Match → use                   │
-│   ❌ Differ → re-fetch             │
-└───────────────────────────────┘
+┌─────────────────────────────────┐
+│ On use (later):                 │
+│   1. Read SHA from manifest     │
+│   2. Compute actual SHA         │
+│   3. Compare                    │
+│   ✅ Match → use                │
+│   ❌ Differ → re-fetch          │
+└─────────────────────────────────┘
 ```
+
+**v1.2.0 note**: This SHA256 verification is **distinct** from the
+v1.2.0 backup integrity verification (Layer 3):
+
+| Verification | Target | File |
+|---|---|---|
+| **DNS binaries SHA256** | Downloaded `dnscrypt-proxy` binaries | `.manifest.json` in DNS cache |
+| **Backup integrity SHA256** (Layer 3) | The 5 user config files | `.manifest.json` in each backup snapshot |
+
+Both use SHA256, but they cover different artifacts and live in
+different directories.
 
 ### 6.2 Example
 
@@ -483,7 +582,7 @@ jq -r '."dnscrypt-proxy-arm64".sha256' ~/.cache/.../.manifest.json
 ./scripts/fetch_dns_binaries.sh --force --verbose
 
 # In package_module.sh (on upgrade)
-./scripts/package_module.sh --version v1.1.0 --force 2>/dev/null || \
+./scripts/package_module.sh --version v1.2.0 --force 2>/dev/null || \
   ./scripts/fetch_dns_binaries.sh --force
 ```
 
@@ -603,31 +702,37 @@ Permanent errors (version missing) fail after 3 attempts (as they should).
 
 ### 8.1 Related Workflows
 
-| Workflow | Role | Frequency |
-|---|---|---|
-| **`release.yml`** | Uses cache or fetches | On tag |
-| **`ci.yml`** | Verifies presence only | Every push/PR |
+| Workflow | Role | Frequency | v1.2.0 |
+|---|---|---|---|
+| **`release.yml`** | Uses cache or fetches | On tag | Unchanged |
+| **`ci.yml`** | Verifies presence only | Every push/PR | + `backup-smoke-test` job |
+| **`upgrade-test.yml`** | 42-scenario data-preservation matrix | Manual + push/PR (relevant paths) | **NEW in v1.2.0** |
 
-**v1.1.0 clarification**: The v1.1.0 release does not modify the
+**v1.2.0 clarification**: The v1.2.0 release does not modify the
 DNS-binaries pipeline. The `fetch_dns_binaries.sh` and
-`package_module.sh` scripts are the same as in v1.0.0. The runtime
-improvements (MEM-1/2/3) live entirely in `main.go` and the shell
-scripts, not in the CI pipeline.
+`package_module.sh` scripts are the same as in v1.1.0.
+
+The v1.2.0 additions (10 data-preservation layers, BAK-1..BAK-4)
+live entirely in `main.go` and the shell scripts, not in the CI
+pipeline for DNS binaries.
+
+The **bilingual WebUI** (English default + Arabic toggle) is a
+purely client-side feature and has **no impact** on this pipeline.
 
 ### 8.2 Cache Flow
 
 ```text
-┌───────────────────────────────────────┐
-│  release.yml                                 │
-│  (on push tag)                               │
-│                                              │
-│  1. Read DNS version                         │
-│  2. Restore from cache                       │
-│  3. Cache hit? → use                        │
-│     Cache miss? → fetch + verify            │
-│  4. Verify SHA                               │
-│  5. Package into Magisk ZIP                  │
-└───────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  release.yml                                           │
+│  (on push tag)                                         │
+│                                                        │
+│  1. Read DNS version                                   │
+│  2. Restore from cache                                 │
+│  3. Cache hit? → use                                   │
+│     Cache miss? → fetch + verify                       │
+│  4. Verify SHA                                         │
+│  5. Package into Magisk ZIP                            │
+└────────────────────────────────────────────────────────┘
 ```
 
 ### 8.3 Cache Key
@@ -643,6 +748,11 @@ restore-keys: |
 - New version → new cache.
 - Same version → cache hit (~5s instead of ~30s).
 
+**v1.2.0 note**: The cache key still uses `dns_version` (which is
+`2.1.18` for both v1.1.0 and v1.2.0). This means a v1.2.0 build
+reuses the v1.1.0 DNS-binaries cache. This is intentional and
+correct — the DNS version did not change.
+
 ### 8.4 Expected Cache Hit Rate
 
 | Scenario | Hit Rate |
@@ -650,6 +760,7 @@ restore-keys: |
 | Stable version | ~95% |
 | After version change | ~0% (first time) |
 | After a week | ~100% |
+| **v1.2.0 vs v1.1.0** | **100%** (DNS version unchanged) |
 
 ### 8.5 Cache Size
 
@@ -668,12 +779,35 @@ restore-keys: |
 |---|:---:|
 | cache hit (typical): ~40s | — |
 | cache miss: ~2-5 min | — |
-| **Weekly schedule**: ~4 runs/month × ~3 min | ~12 |
-| **Additional triggers**: | ~5-10 |
+| **Additional triggers** (pushes, PRs): | ~5-10 |
 | **Retry overhead (rare)**: | ~1-2 |
-| **Total**: | **~20-27 minutes/month** |
+| **Total**: | **~6-12 minutes/month** |
 
 **Free tier**: 2000 minutes/month → ~1.3% only.
+
+### 8.7 v1.2.0 Workflow Additions — Impact on DNS Binaries
+
+The v1.2.0 release adds two CI features that **do not** affect the
+DNS-binaries pipeline:
+
+**1. `backup-smoke-test` job** (in `ci.yml`):
+- Runs `bash -n` + `shellcheck` on the backup shell scripts.
+- Checks the presence of the 10 layer function names.
+- Verifies `PERSISTENT_BACKUP` path consistency.
+- Verifies the `docs/BACKUP.md` and `docs/EMERGENCY.md` references.
+- **Does NOT download or verify any DNS binary.**
+
+**2. `upgrade-test.yml`** (new file):
+- Runs a 42-scenario matrix (3 root solutions × 2 source versions
+  × 7 scenarios).
+- Uses pre-built binaries from the CI cache.
+- **Does NOT re-fetch the DNS binaries** — it reuses the cache
+  from `ci.yml`.
+- **Focus**: the 10 defensive layers, not the DNS-binaries
+  pipeline.
+
+**Conclusion**: The DNS-binaries pipeline in v1.2.0 is identical
+to v1.1.0.
 
 ---
 
@@ -714,16 +848,16 @@ restore-keys: |
 
 ```bash
 # Full build (fetches if needed)
-./scripts/package_module.sh --version v1.1.0
+./scripts/package_module.sh --version v1.2.0
 
 # --skip-dns-fetch: Skip fetch (use cache only)
 ./scripts/package_module.sh \
-    --version v1.1.0 \
+    --version v1.2.0 \
     --skip-dns-fetch
 
 # --offline: alias for --skip-dns-fetch (same behavior)
 ./scripts/package_module.sh \
-    --version v1.1.0 \
+    --version v1.2.0 \
     --offline
 ```
 
@@ -738,7 +872,7 @@ restore-keys: |
 ```bash
 # Custom cache directory
 ./scripts/package_module.sh \
-    --version v1.1.0 \
+    --version v1.2.0 \
     --dns-cache-dir /tmp/dns-cache
 ```
 
@@ -813,37 +947,37 @@ version**, not the module version. See §10.2 for the module version.
 
 ### 10.2 Module Version Bump
 
-Example: `v1.0.0` → `v1.1.0` (the v1.1.0 release):
+**Example: `v1.1.0` → `v1.2.0`** (the v1.2.0 release cycle):
 
 ```bash
 # 1. VERSION
-echo "v1.1.0" > VERSION
+echo "v1.2.0" > VERSION
 
 # 2. module.prop
-sed -i 's/^version=.*/version=v1.1.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1010000/' module.prop
+sed -i 's/^version=.*/version=v1.2.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
 
 # 3. update.json
 nano update.json
 
 # 4. Commit
 git add VERSION module.prop update.json
-git commit -m "release: v1.1.0"
+git commit -m "release: v1.2.0"
 ```
 
 **Important**: This step does **not** touch
 `proxy/dnscrypt-proxy.version`. The DNS version stays at `2.1.18`.
 
-**For the next release** (v1.2.0):
+**For the next release** (`v1.3.0`):
 ```bash
-echo "v1.2.0" > VERSION
-sed -i 's/^version=.*/version=v1.2.0/' module.prop
-sed -i 's/^versionCode=.*/versionCode=1020000/' module.prop
+echo "v1.3.0" > VERSION
+sed -i 's/^version=.*/version=v1.3.0/' module.prop
+sed -i 's/^versionCode=.*/versionCode=1030000/' module.prop
 ```
 
 The manual procedure above is a fallback. The recommended path is:
 ```bash
-./scripts/release.sh v1.2.0
+./scripts/release.sh v1.3.0
 ```
 which handles all three files automatically.
 
@@ -852,11 +986,25 @@ which handles all three files automatically.
 | Upgrade | What changes | Action | Affected workflows |
 |---|---|---|---|
 | **DNS version** (2.1.18 → 2.1.19) | `proxy/dnscrypt-proxy.version` | ✅ One file | `release.yml`, `ci.yml` |
-| **Module version** (v1.0.0 → v1.1.0) | `VERSION` + `module.prop` + `update.json` | Automated via `release.sh` | `ci.yml`, `release.yml` |
+| **Module version** (v1.1.0 → v1.2.0) | `VERSION` + `module.prop` + `update.json` | Automated via `release.sh` | `ci.yml`, `release.yml` |
+| **Module version** (v1.2.0 → v1.3.0) | Same as above | Same | Same |
 
 **Common confusion**: Both are called "version" in the codebase. This
 table is the authoritative distinction. See §1.1 for the two-version
 table at the top of the document.
+
+### 10.4 v1.2.0 Version History
+
+| Release | Module Version | DNS Version | Notes |
+|---|:---:|:---:|---|
+| First stable | v1.0.0 | 2.1.18 | 33 audit corrections |
+| Polish | v1.1.0 | 2.1.18 | MEM-1/2/3, no DNS change |
+| **Data preservation** | **v1.2.0** | **2.1.18** | **10 layers, no DNS change** |
+| Next minor (planned) | v1.3.0 | 2.1.18 (expected) | CSP hardening — no DNS change expected |
+
+**Rule**: The DNS version only changes when upstream
+`dnscrypt-proxy` ships a new release. It is not coupled to the
+module version.
 
 ---
 
@@ -938,7 +1086,7 @@ GITHUB_TOKEN=$GITHUB_TOKEN ./scripts/fetch_dns_binaries.sh --verbose
 **Symptom**:
 ```text
 ✗ dnscrypt-proxy-x86: cache miss
-✗ arm64: cache hit
+✓ arm64: cache hit
 ```
 
 **Cause**: `customize.sh` expects `x86` but cache contains `i386`.
@@ -969,29 +1117,84 @@ rm -rf ~/.cache/dnscrypt-proxy-webui/dns-binaries/
 cat ~/.cache/dnscrypt-proxy-webui/dns-binaries/.manifest.json | jq -r '.[].version'
 ```
 
-### 11.8 Scenario: v1.1.0 Specific — No Impact on DNS Binaries
+### 11.8 Scenario: v1.2.0 Specific — No Impact on DNS Binaries (new)
 
-**Symptom** (user concern): "I upgraded to v1.1.0. Do I need to
+**Symptom** (user concern): "I upgraded to v1.2.0. Do I need to
 re-fetch the DNS binaries?"
 
-**Answer**: **No.** The v1.1.0 release does **not** change the DNS
+**Answer**: **No.** The v1.2.0 release does **not** change the DNS
 version (`proxy/dnscrypt-proxy.version` stays at `2.1.18`). The
 DNS binaries cache is unchanged.
 
-**Verify** (after installing v1.1.0):
+**Verify** (after installing v1.2.0):
 ```bash
 # Module version changed
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.1.0
+# Expected: version=v1.2.0
 
 # DNS version unchanged
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.version" 2>/dev/null
 # Expected: 2.1.18  (or from proxy/dnscrypt-proxy.version in the repo)
 ```
 
-**Why users may ask this**: The v1.1.0 changelog mentions several
+**Why users may ask this**: The v1.2.0 changelog mentions several
 runtime improvements. None of them touch the DNS engine or its
 binaries.
+
+### 11.9 Scenario: v1.2.0 backup directory conflicts with DNS cache
+
+**Symptom** (potential confusion): "Does the DNS cache and the
+backup directory share the same path?"
+
+**Answer**: **No.** They are separate:
+
+| Directory | Purpose | Owner |
+|---|---|---|
+| `~/.cache/dnscrypt-proxy-webui/dns-binaries/` | DNS binaries cache (dev machine) | Developer |
+| `/sdcard/dnscrypt-webui-backup/` | Backup of 5 user config files (Android device) | End user |
+
+- The DNS cache is on the **developer's machine** — it does not
+  exist on the Android device.
+- The backup directory is on the **Android device** — it does not
+  exist on the developer's machine.
+- They never overlap.
+
+**Verification**:
+```bash
+# On the developer machine:
+ls ~/.cache/dnscrypt-proxy-webui/dns-binaries/
+# Expected: dnscrypt-proxy-arm64, dnscrypt-proxy-arm, etc.
+
+# On the Android device (via adb):
+adb shell su -c "ls /sdcard/dnscrypt-webui-backup/"
+# Expected: current/, <timestamp>-<version>/, .last_stable, etc.
+```
+
+### 11.10 Scenario: Bilingual WebUI does not affect DNS binaries
+
+**Symptom** (potential confusion): "Does adding Arabic support
+change the DNS binaries?"
+
+**Answer**: **No.** The bilingual WebUI (English default + Arabic
+toggle) is a purely client-side feature:
+
+- It changes `web/index.html`, `web/dashboard.html`,
+  `web/offline.html`.
+- It **does not** touch `main.go`, the shell scripts, or the DNS
+  binaries.
+- The DNS-binaries pipeline is entirely server-side and
+  language-neutral.
+
+**Verification**:
+```bash
+# The DNS binaries cache is unchanged after adding Arabic support
+ls -la ~/.cache/dnscrypt-proxy-webui/dns-binaries/
+# Expected: same 4 binaries + manifest as before
+
+# The WebUI is bilingual but the API is language-neutral
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
+# Expected: no "lang" or "language" field
+```
 
 ---
 
@@ -1005,10 +1208,13 @@ binaries.
 | `scripts/fetch_dns_binaries.sh` | Central script |
 | `scripts/package_module.sh` | Calls fetch |
 | `.github/workflows/release.yml` | Uses cache |
-| `.github/workflows/ci.yml` | Verifies |
+| `.github/workflows/ci.yml` | Verifies (+ v1.2.0 backup-smoke-test) |
+| `.github/workflows/upgrade-test.yml` | v1.2.0: 42-scenario data-preservation matrix |
 | `docs/ARCHITECTURE.md` | Architectural section |
 | `docs/SECURITY.md` | Audit Corrections |
-| `docs/UPGRADE.md` | Version upgrade guide (v1.0.0 → v1.1.0) |
+| `docs/UPGRADE.md` | Version upgrade guide (§3.0, §3.1) |
+| `docs/BACKUP.md` | Backup system reference (v1.2.0) |
+| `docs/EMERGENCY.md` | Emergency recovery (v1.2.0) |
 | **`docs/DNS_BINARIES.md`** | This file |
 | **`docs/TROUBLESHOOTING.md`** | Troubleshooting |
 | **`docs/GLOSSARY.md`** | Terms |
@@ -1031,8 +1237,10 @@ binaries.
 - [docs/GLOSSARY.md](GLOSSARY.md) — Glossary
 - [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix
 - [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide
+- [docs/BACKUP.md](BACKUP.md) — Backup system reference (v1.2.0)
+- [docs/EMERGENCY.md](EMERGENCY.md) — Emergency recovery (v1.2.0)
 - [docs/ROADMAP.md](ROADMAP.md) — Project plan
-- [CHANGELOG.md](../CHANGELOG.md) — Version history (v1.0.0 + v1.1.0)
+- [CHANGELOG.md](../CHANGELOG.md) — Version history (v1.0.0 → v1.2.0)
 
 ---
 
@@ -1068,7 +1276,11 @@ binaries.
 >
 > **7.** Use `--force` after SHA mismatch (do not delete cache manually).
 >
-> **8.** **(v1.1.0)** Do not confuse **DNS version** (`2.1.18`) with **module version** (`v1.1.0`). See §1.1.
+> **8.** **(v1.1.0)** Do not confuse **DNS version** (`2.1.18`) with **module version** (`v1.2.0`). See §1.1.
+>
+> **9.** **(v1.2.0)** Do not modify the DNS-binaries pipeline to accommodate the 10 defensive layers. They are orthogonal. See §11.8.
+>
+> **10.** **(v1.2.0)** Do not confuse the DNS-binaries cache with the persistent backup directory. They live in different locations and serve different purposes. See §11.9.
 
 ### 13.3 Numbers
 
@@ -1096,28 +1308,32 @@ binaries.
 | Module Version | DNS Version | Notes |
 |---|:---:|---|
 | v1.0.0 | 2.1.18 | First stable release — Level 4 established |
-| **v1.1.0** | **2.1.18** | **Polish release — DNS version unchanged** |
+| v1.1.0 | 2.1.18 | Polish release — DNS version unchanged |
+| **v1.2.0** | **2.1.18** | **Data preservation release — DNS version unchanged** |
 
-**The v1.1.0 release does not affect this document's core pipeline.**
-All Level 4 infrastructure (5 fallback sources, SHA256, retry logic,
-cache) is carried forward unchanged from v1.0.0.
+**The v1.1.0 and v1.2.0 releases do not affect this document's
+core pipeline.** All Level 4 infrastructure (5 fallback sources,
+SHA256, retry logic, cache) is carried forward unchanged from
+v1.0.0.
 
 ---
 
-*Last updated: 2026-09-26*
-*Version: v1.1.0*
+*Last updated: 2026-09-29*
+*Version: v1.2.0*
 *Author: gasciljh*
 
 ---
 
 <div align="center">
 
-**📥 Need help with DNS binaries?**
+**💡 Need help with DNS binaries?**
 
 - 📖 [docs/ARCHITECTURE.md](ARCHITECTURE.md) — Architectural section
-- 🆘 [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
+- 🚨 [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
 - 📝 [CHANGELOG.md](../CHANGELOG.md) — Version history
-- 🔄 [docs/UPGRADE.md](UPGRADE.md) — Upgrade guide (v1.0.0 → v1.1.0)
+- 🔄 [docs/UPGRADE.md](UPGRADE.md) — Upgrade guide (§3.0, §3.1)
+- 💾 [docs/BACKUP.md](BACKUP.md) — Backup system (v1.2.0)
+- 🚨 [docs/EMERGENCY.md](EMERGENCY.md) — Emergency recovery (v1.2.0)
 
 [⬆ Back to top](#dns-binaries--enterprise-guide-level-4)
 

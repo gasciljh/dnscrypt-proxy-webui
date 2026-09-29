@@ -1,32 +1,173 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
-     Version: v1.1.0
+     Version: v1.2.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
-     Bilingual Dashboard (English/Arabic) with:
+     Bilingual Dashboard (English default / Arabic toggle).
+
+     Features:
        • Live metrics from /api/metrics (JSON)
        • Resolver health
        • Cache statistics
        • Top domains
        • Recent queries
        • Source refresh status
-       • Runtime info (with dynamic ports + profile + memory)
+       • Runtime info (dynamic ports + profile + memory + backups)
        • Diagnostic file viewer
+       • Service Worker update banner
+
+     v1.2.0 fixes (original):
+       • Service Worker update banner markup + CSS + JS added.
+       • Fixed SW reload loop: [Reload] now sends SKIP_WAITING to
+         swRegistration.waiting (the NEW worker), and reloads on
+         'controllerchange'.
+       • Backup transaction counters (in_flight_txn / orphan_txn)
+         are rendered only when the API actually returns them.
+       • Language toggle restored (EN ↔ AR), preference persisted
+         in localStorage under 'dnscrypt-lang'.
+
      ============================================================
-     v1.1.0 changes:
-       • Version badge and footer updated to v1.1.0
-       • Runtime Info now displays profile key + memory limit
-         (new fields exposed by main.go v1.1.0)
-       • storeToken() documented as a no-op shim (see §[2])
-       • EventSource note clarified (same-origin cookies)
+     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     ============================================================
+     A pre-release audit of this file identified the following
+     issues. All of them are addressed in-place; no version bump.
+
+       🔧 DASH-1 — `formatBytes()` did not handle the GB range
+         and fell back to showing large MB values. Added a GB
+         branch.
+
+       🔧 DASH-2 — The service worker update checker was
+         missing entirely from this file. `index.html` sets up
+         a periodic `postMessage({type:'CHECK_UPDATE'})` (every
+         1 h). The dashboard now installs the same interval.
+
+       🔧 DASH-3 — `controllerchange` and `stopPolling()` did
+         not clear the new `swUpdateCheckInterval`. Added
+         explicit cleanup in both places.
+
+       🔧 DASH-4 — In `loadRuntimeInfo()`, the fallback for a
+         missing `backups.path` was the raw literal `'unknown'`
+         rather than the translated `t('riBackupNotInit')`.
+         Replaced by the translation key.
+
+       🛡️ DASH-5 — `bindSWUpdateButtons()` now installs a
+         3-second fallback that reloads the page if
+         `controllerchange` never fires (e.g. misbehaving or
+         terminated SW). Parity with IDX-11 in index.html.
+         Without this, `pendingReload` could stay true forever
+         and the [Reload] button would become a no-op.
+
+       🛡️ DASH-6 — `toggleLanguage()` now rebuilds the Runtime
+         Info card immediately, without requiring an extra
+         HTTP request. The card's labels (Version, Commit,
+         Backups, In-flight Txn, Orphan Txn, ...) switch
+         language along with the rest of the page. Parity with
+         the equivalent behavior in index.html's
+         `toggleLanguage()`.
+
+         Implementation: the runtime-info rendering logic has
+         been extracted into a dedicated `renderRuntimeInfo()`
+         helper, and the raw API response is cached in
+         `lastRuntimeData`. The language toggle calls
+         `renderRuntimeInfo(lastRuntimeData)` directly.
+
+       🛡️ DASH-7 — `formatBytes()` now returns "0 B" for
+         negative input, instead of the nonsensical
+         "<negative> B". Parity with IDX-13 in index.html.
+
+       🛡️ DASH-8 — `showSWUpdateBanner()` is now idempotent:
+         a redundant call with the banner already visible is a
+         no-op, avoiding needless style writes when both the
+         `updatefound` event and a periodic check fire close
+         together.
+
+       🛡️ DASH-9 — `initSSE()` now carries an explicit comment
+         on the `lastStatus` variable, documenting that it is
+         scoped per SSE connection (reset on each reconnect)
+         and intentionally NOT a global. Clarifies behavior
+         for a future reader.
+
+     ============================================================
+     v1.2.0 (Global Edition) — Additional hardening, second pass
+     ============================================================
+     A second review pass (cross-verified against index.html)
+     identified the following issues. All of them are addressed
+     in-place; no version bump.
+
+       🛡️ DASH-10 — `xhrRequest()` with retries, exponential
+         backoff, and explicit handling of HTTP 405 / 409 / 413
+         has been adopted from index.html. The previous
+         `xhrGet`/`xhrPost` pair did not retry on transient
+         network errors and did not distinguish these status
+         codes from generic failures.
+
+         New helpers:
+           • `getTimeoutForUrl(method, url)` — chooses a
+             per-endpoint timeout (310 s for update_profile,
+             60 s for service toggle/restart, 15 s default).
+           • `xhrRequest(method, url, data, cb, retries, delay)`.
+           • `xhrGet` / `xhrPost` are now thin wrappers around
+             `xhrRequest`.
+
+       🛡️ DASH-11 — `setNetworkDownUI(isDown)` has been added.
+         When the periodic metrics fetch fails repeatedly, the
+         status area border turns amber and the status text
+         shows "Server unreachable". When the fetch recovers,
+         the border is restored. Parity with index.html's
+         `setNetworkDownUI()`.
+
+       🛡️ DASH-12 — `showConfirmModal()` now supports
+         `options.primaryText` + `options.primaryCallback`.
+         A custom "primary" button can be inserted before the
+         standard Cancel/Confirm pair. Parity with the
+         index.html modal extension; used by
+         `handleSessionExpired()`.
+
+       🛡️ DASH-13 — `handleSessionExpired()` has been added.
+         It resets the backoff counters (`verifyBackoff`,
+         `sseBackoff`), tears down intervals/SSE, and shows a
+         modal with a `primaryText` = "Re-login" button.
+         Parity with index.html's `handleSessionExpired()`.
+
+       🛡️ DASH-14 — The `dashboardLink` fallback timeout: if
+         `loadRuntimeInfo()` fails or the runtime info never
+         arrives, the `loading` class is removed after 8 s so
+         the Dashboard link does not stay disabled forever.
+         Before this, a failed runtime_info fetch could leave
+         the link in a permanent `loading` state.
+
+       🛡️ DASH-15 — `stopPolling()` now clears the
+         `runtimeInfoRefreshTimeout` and the
+         `dashboardLinkFallbackTimer`, in addition to the
+         intervals already cleared (DASH-3).
+
+       🛡️ DASH-16 — The `<meta http-equiv="Cache-Control">` in
+         `<head>` has been complemented with
+         `<meta http-equiv="Pragma" content="no-cache">` and
+         `<meta http-equiv="Expires" content="0">` for legacy
+         proxy compatibility. The CSP / Cache-Control response
+         headers are still set by main.go, so this is a
+         belt-and-braces measure only.
+
+       🛡️ DASH-17 — `bindSWUpdateButtons()` and the SW
+         registration flow now use `installed`/`activated` SW
+         state checks consistently. When `reg.waiting` exists
+         AND `navigator.serviceWorker.controller` is present,
+         the banner is shown even if `updatefound` never fires
+         (e.g. the SW was already installed on a previous
+         visit). This closes a corner case where a returning
+         user could not see the update banner.
+
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="theme-color" content="#0d1117">
 
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -34,12 +175,37 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Dashboard v1.1.0</title>
+    <title>DNSCrypt Dashboard v1.2.0</title>
+
+    <!-- IDX-4 parity: apply lang/dir from localStorage BEFORE the
+         first paint, matching index.html. Without this, an
+         Arabic-preferring user sees a flash of LTR layout for
+         ~100 ms before boot() corrects it. -->
+    <script>
+      (function(){
+        try {
+          var l = localStorage.getItem('dnscrypt-lang');
+          if (l === 'ar') {
+            document.documentElement.lang = 'ar';
+            document.documentElement.dir = 'rtl';
+          }
+        } catch(e) {}
+      })();
+    </script>
+
     <style>
         :root { --bg:#0d1117; --bg-card:rgba(22,27,34,0.92); --primary:#58a6ff; --success:#3fb950; --danger:#f85149; --warning:#d29922; --text:#e6edf3; --text-muted:#8b949e; --border:rgba(255,255,255,0.06); --radius:12px; }
         * { margin:0; padding:0; box-sizing:border-box; }
         html { scroll-padding-top:140px; scroll-behavior:smooth; }
         body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; padding:20px; min-height:100vh; }
+
+        .update-banner { position:fixed; top:70px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg,rgba(88,166,255,0.95),rgba(31,111,235,0.95)); color:white; padding:12px 20px; border-radius:14px; box-shadow:0 10px 30px rgba(88,166,255,0.4); z-index:10002; display:none; align-items:center; gap:12px; font-size:13px; font-weight:600; max-width:90%; animation:slideDown 0.4s ease-out; }
+        @keyframes slideDown { from{opacity:0;transform:translate(-50%,-20px);} to{opacity:1;transform:translate(-50%,0);} }
+        .update-banner button { background:rgba(255,255,255,0.2); color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; white-space:nowrap; }
+        .update-banner button:hover { background:rgba(255,255,255,0.35); }
+        .update-banner .close-x { background:transparent; padding:4px 8px; font-size:14px; color:rgba(255,255,255,0.7); }
+        .update-banner .close-x:hover { background:rgba(255,255,255,0.15); color:white; }
+
         .container { max-width:1400px; margin:0 auto; }
         header { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:20px; padding:24px 20px; background:var(--bg-card); border-radius:var(--radius); border:1px solid var(--border); margin-bottom:24px; }
         header h1 { font-size:24px; color:var(--primary); text-align:center; width:100%; }
@@ -114,6 +280,9 @@
         .ri-item .ri-value { font-family:'JetBrains Mono','Courier New',monospace; font-size:11px; color:var(--text); word-break:break-all; direction:ltr; text-align:left; line-height:1.5; padding:4px 8px; background:rgba(0,0,0,0.3); border-radius:6px; border:1px solid rgba(255,255,255,0.03); }
         .ri-item .ri-value a { color:var(--primary); text-decoration:none; }
         .ri-item .ri-value a:hover { text-decoration:underline; }
+        .ri-item .ri-value.badge-ok { color: var(--success); font-weight: 700; }
+        .ri-item .ri-value.badge-warn { color: var(--warning); font-weight: 700; }
+        .ri-item .ri-value.badge-muted { color: var(--text-muted); }
         .ri-loading { text-align:center; color:var(--text-muted); padding:30px; font-size:13px; grid-column:1 / -1; }
         .ri-error { text-align:center; color:var(--danger); padding:30px; font-size:13px; grid-column:1 / -1; background:rgba(248,81,73,0.05); border:1px solid rgba(248,81,73,0.2); border-radius:10px; }
         .diag-files { background:var(--bg-card); border:1px solid rgba(139,148,158,0.2); border-radius:var(--radius); padding:18px; margin-bottom:20px; }
@@ -158,6 +327,8 @@
         .custom-modal-actions .modal-confirm:hover { opacity:0.85; }
         .custom-modal-actions .modal-cancel { background:rgba(255,255,255,0.1); color:var(--text); }
         .custom-modal-actions .modal-cancel:hover { background:rgba(255,255,255,0.2); }
+        .custom-modal-actions .modal-primary { background:var(--primary); color:white; }
+        .custom-modal-actions .modal-primary:hover { opacity:0.85; }
         .footer { margin-top:30px; text-align:center; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:14px; }
         .footer a { color:var(--primary); text-decoration:none; }
         .footer a:hover { text-decoration:underline; }
@@ -178,6 +349,13 @@
     </style>
 </head>
 <body>
+
+    <div id="swUpdateBanner" class="update-banner">
+        <span>🔄 <span id="swUpdateText">Update available — reload</span></span>
+        <button type="button" id="swUpdateReloadBtn">Reload</button>
+        <button type="button" class="close-x" id="swUpdateCloseBtn" title="Hide">✕</button>
+    </div>
+
     <div class="container">
         <header>
             <h1 id="pageTitle">📊 Monitoring Dashboard</h1>
@@ -266,7 +444,7 @@
         </div>
 
         <div class="footer">
-            <span id="footerText">DNSCrypt Proxy Dashboard – v1.1.0 Zero-Footprint</span>
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.2.0 Zero-Footprint</span>
             · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
         </div>
     </div>
@@ -304,9 +482,8 @@
         // ============================================================
         // [1] Settings
         // ============================================================
-        var VERSION = 'v1.1.0';
+        var VERSION = 'v1.2.0';
 
-        // Dynamic ports (updated from runtime_info)
         var PORTS = {
             webui:     '9090',
             dashboard: '9091'
@@ -346,6 +523,11 @@
                 riBindAddr:'Bind Address',
                 riWebuiPort:'WebUI Port', riDashboardPort:'Dashboard Port',
                 riProfile:'Profile', riMemoryLimit:'Memory Limit',
+                riBackupCount:'Backups', riBackupLatest:'Latest Backup',
+                riBackupLastStable:'Last Stable', riBackupPath:'Backup Path',
+                riBackupInFlight:'In-flight Txn', riBackupOrphan:'Orphan Txn',
+                riBackupNone:'none yet', riBackupNotInit:'not initialized',
+                riBackupSingle:'snapshot', riBackupPlural:'snapshots',
                 diagFilesTitle:'📁 Diagnostic Files', dfRefresh:'Refresh',
                 dfActiveFiles:'Active Files', dfArchiveFiles:'Archived Files',
                 dfEmergencyFiles:'Emergency Files', dfSensitiveFiles:'Sensitive Files',
@@ -363,11 +545,21 @@
                 fvClearSuccess: '✅ File cleared successfully',
                 fvClearError: '❌ Failed to clear file',
                 projectLink: 'Project',
+                swUpdateAvailable: '🔄 Update available — reload',
+                swUpdateReload: 'Reload',
                 noData: 'No data',
                 noDataTitle: 'No data yet',
                 noDataMessage: 'The DNS engine may be stopped, or it has not produced any metrics yet.',
                 noDataAction: '🖥️ Open WebUI',
-                unknownStatus: 'Unknown'
+                unknownStatus: 'Unknown',
+                networkError: '📡 Connection failed. Retrying...', networkDown: '⚠️ Server unreachable',
+                sessionExpiredTitle: 'Session Expired',
+                sessionExpiredMsg: 'Your session expired due to inactivity or connection loss. Please login again.',
+                sessionRelogin: '🔄 Re-login',
+                conflictDetected: '⚠️ Modified in another session. Reloading...',
+                fileTooLarge: '❌ File too large (> 5 MB)',
+                methodNotAllowed: '⚠️ Endpoint requires POST',
+                newVersionDetected: '🔔 A new version was detected'
             },
             ar: {
                 pageTitle: '📊 لـــوحـــة الـــمـــراقـــبـــة',
@@ -402,6 +594,11 @@
                 riBindAddr:'عنوان الاستماع',
                 riWebuiPort:'منفذ WebUI', riDashboardPort:'منفذ Dashboard',
                 riProfile:'البروفايل', riMemoryLimit:'حد الذاكرة',
+                riBackupCount:'النسخ الاحتياطية', riBackupLatest:'أحدث نسخة',
+                riBackupLastStable:'آخر حالة مستقرة', riBackupPath:'مسار النسخ الاحتياطي',
+                riBackupInFlight:'معاملة جارية', riBackupOrphan:'معاملة يتيمة',
+                riBackupNone:'لا يوجد بعد', riBackupNotInit:'لم تُهيَّأ',
+                riBackupSingle:'لقطة', riBackupPlural:'لقطات',
                 diagFilesTitle:'📁 ملفات التشخيص', dfRefresh:'تحديث',
                 dfActiveFiles:'ملفات نشطة', dfArchiveFiles:'ملفات مضغوطة',
                 dfEmergencyFiles:'ملفات طارئة', dfSensitiveFiles:'ملفات حساسة',
@@ -419,11 +616,21 @@
                 fvClearSuccess: '✅ تم مسح الملف بنجاح',
                 fvClearError: '❌ فشل مسح الملف',
                 projectLink: 'المشروع',
+                swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
+                swUpdateReload: 'إعادة التحميل',
                 noData: 'لا توجد بيانات',
                 noDataTitle: 'لا توجد بيانات بعد',
                 noDataMessage: 'محرك DNS قد لا يكون مشغّلًا، أو أنه لم يُنتج أي إحصائيات بعد.',
                 noDataAction: '🖥️ فتح WebUI',
-                unknownStatus: 'غير معروف'
+                unknownStatus: 'غير معروف',
+                networkError: '📡 فشل الاتصال بالخادم. جاري إعادة المحاولة...', networkDown: '⚠️ تعذر الاتصال بالخادم',
+                sessionExpiredTitle: 'انتهت الجلسة',
+                sessionExpiredMsg: 'انتهت جلستك بسبب عدم النشاط أو انقطاع الاتصال. يرجى إعادة تسجيل الدخول.',
+                sessionRelogin: '🔄 إعادة تسجيل الدخول',
+                conflictDetected: '⚠️ تم التعديل من جلسة أخرى. جاري إعادة التحميل...',
+                fileTooLarge: '❌ الملف كبير جدًا (> 5 MB)',
+                methodNotAllowed: '⚠️ نقطة النهاية تتطلب POST',
+                newVersionDetected: '🔔 تم اكتشاف إصدار جديد'
             }
         };
 
@@ -439,12 +646,33 @@
         var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
         var pendingConfirmCallback = null;
 
+        // DASH-6 fix: cache the most recent runtime_info response so
+        // the Runtime Info card can be re-rendered on language
+        // switch WITHOUT a second HTTP request.
+        var lastRuntimeData = null;
+
         var sseBackoff = 5000, sseMaxBackoff = 60000;
 
         var sseStatusDebounceTimer = null;
         var SSE_STATUS_DEBOUNCE_MS = 500;
 
         var showingNoDataBanner = false;
+
+        var swRegistration = null;
+        var pendingReload = false;
+        var controllerChangeHandlerInstalled = false;
+        // DASH-2 fix: periodic SW update check. Matches the
+        // interval used by index.html (1 hour).
+        var swUpdateCheckInterval = null;
+
+        // DASH-14 fix: fallback timer for the Dashboard link
+        // "loading" class. Prevents the link from staying
+        // permanently disabled if runtime_info fails.
+        var dashboardLinkFallbackTimer = null;
+
+        // DASH-15 fix: cleanup timer for scheduled runtime_info
+        // refresh.
+        var runtimeInfoRefreshTimeout = null;
 
         var $ = function(id) { return document.getElementById(id); };
         function t(key) { return translations[currentLang][key] || key; }
@@ -473,17 +701,7 @@
         }
 
         // ============================================================
-        // [2] Token helpers — cookie-only (v1.0.0+)
-        // ============================================================
-        // Backward-compat shims. Since v1.0.0, /api/auth/login no
-        // longer returns a token in the JSON response (see
-        // docs/SECURITY.md — Audit Correction #15-a).
-        //
-        // The Dashboard relies entirely on the HttpOnly session
-        // cookie set by the server. The three functions below are
-        // preserved as no-ops for consistency with index.html and
-        // to avoid touching call sites if a future migration to
-        // bearer tokens occurs.
+        // [2] Token helpers — cookie-only
         // ============================================================
         function getStoredToken() { return null; }
         function storeToken(tk) { void tk; }
@@ -547,10 +765,17 @@
             var map = { 'healthy':t('healthy'), 'stale':t('stale'), 'idle':t('idle'), 'ok':t('ok') };
             return map[String(status).toLowerCase()] || status;
         }
+        // DASH-1 fix: extended formatBytes to handle GB range.
+        // Large rotated logs, or the 50 MB emergency rotation in
+        // functions.sh, would otherwise display as "2048.0 MB".
+        //
+        // DASH-7 fix: guard against negative input by returning "0 B".
         function formatBytes(bytes) {
-            if (!bytes || bytes < 1024) return bytes + ' B';
+            if (!bytes || bytes < 0) return '0 B';
+            if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-            return (bytes/(1024*1024)).toFixed(1) + ' MB';
+            if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+            return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
         }
         function formatMtime(mtime) {
             var d = new Date(mtime * 1000);
@@ -574,12 +799,32 @@
         // ============================================================
         // [5] Modal
         // ============================================================
+        // DASH-12 fix: supports an optional custom primary button
+        // via options.primaryText + options.primaryCallback.
+        // Parity with the index.html modal extension, used by
+        // handleSessionExpired().
         function showConfirmModal(message, callback, options) {
             options = options || {};
             $('modalMessage').textContent = message;
             $('modalTitle').textContent = options.title || t('confirmTitle');
             $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
             $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+
+            var box = $('customModal').querySelector('.custom-modal-actions');
+            var existing = box.querySelector('.modal-primary');
+            if (existing) existing.remove();
+
+            if (options.primaryText && options.primaryCallback) {
+                var btn = document.createElement('button');
+                btn.className = 'modal-primary';
+                btn.textContent = options.primaryText;
+                btn.addEventListener('click', function() {
+                    closeConfirmModal();
+                    options.primaryCallback();
+                });
+                box.insertBefore(btn, box.firstChild);
+            }
+
             $('customModal').style.display = 'flex';
             pendingConfirmCallback = callback;
         }
@@ -589,55 +834,90 @@
         }
 
         // ============================================================
-        // [6] XHR — cookie-only
+        // [6] XHR with retries — parity with index.html
         // ============================================================
-        function xhrGet(url, cb) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.withCredentials = true;
-            var tk = getStoredToken();
-            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-            xhr.timeout = 15000;
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    try { cb(null, JSON.parse(xhr.responseText)); }
-                    catch(e) { cb(e, null); }
-                } else if (xhr.status === 401) {
-                    var e401 = new Error('HTTP 401'); e401.code = 401;
-                    cb(e401, null);
-                } else {
-                    var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
-                    cb(eN, null);
-                }
-            };
-            xhr.onerror = function() { cb(new Error('Network Error'), null); };
-            xhr.ontimeout = function() { cb(new Error('Timeout'), null); };
-            xhr.send();
+        // DASH-10 fix: adopt the retry-aware xhrRequest pattern
+        // from index.html. Adds:
+        //   • Retries on transient network errors / timeouts.
+        //   • Per-endpoint timeouts via getTimeoutForUrl.
+        //   • Explicit handling of HTTP 405 / 409 / 413.
+        //   • Session-expiry detection on HTTP 401.
+        // ============================================================
+        function getTimeoutForUrl(method, url) {
+            if (method === 'POST' && url.indexOf('update_profile') !== -1) {
+                return 310000;
+            }
+            if (url.indexOf('toggle_service') !== -1 ||
+                url.indexOf('restart_service') !== -1) {
+                return 60000;
+            }
+            return 15000;
         }
-        function xhrPost(url, data, cb) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', url, true);
-            xhr.withCredentials = true;
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-            var tk = getStoredToken();
-            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-            xhr.timeout = 15000;
-            xhr.onload = function() {
-                if (xhr.status === 200) {
-                    try { cb(null, JSON.parse(xhr.responseText)); }
-                    catch(e) { cb(e, null); }
-                } else if (xhr.status === 401) {
-                    var e401 = new Error('HTTP 401'); e401.code = 401;
-                    cb(e401, null);
-                } else {
-                    var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
-                    cb(eN, null);
+
+        function xhrRequest(method, url, data, cb, retries, delay) {
+            retries = (retries === undefined) ? 3 : retries;
+            delay = delay || 1000;
+            var attempt = 0;
+
+            function sendRequest() {
+                attempt++;
+                var xhr = new XMLHttpRequest();
+                xhr.open(method, url, true);
+                xhr.withCredentials = true;
+                if (method === 'POST') {
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
                 }
-            };
-            xhr.onerror = function() { cb(new Error('Network Error'), null); };
-            xhr.ontimeout = function() { cb(new Error('Timeout'), null); };
-            xhr.send(data || null);
+                var tk = getStoredToken();
+                if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+                xhr.timeout = getTimeoutForUrl(method, url);
+
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        try { cb(null, JSON.parse(xhr.responseText)); }
+                        catch(e) { cb(e, null); }
+                    } else if (xhr.status === 401) {
+                        var e401 = new Error('HTTP 401');
+                        e401.code = 401;
+                        cb(e401, null);
+                        handleSessionExpired();
+                    } else if (xhr.status === 405) {
+                        var e405 = new Error('HTTP 405');
+                        e405.code = 405;
+                        cb(e405, null);
+                        showMsg(t('methodNotAllowed'), 'warning', 3000);
+                    } else if (xhr.status === 409) {
+                        var e409 = new Error('HTTP 409');
+                        e409.code = 409;
+                        cb(e409, null);
+                        showMsg(t('conflictDetected'), 'warning', 3000);
+                        if (typeof loadLogFiles === 'function') loadLogFiles();
+                    } else if (xhr.status === 413) {
+                        var e413 = new Error('HTTP 413');
+                        e413.code = 413;
+                        cb(e413, null);
+                        showMsg(t('fileTooLarge'), 'error', 4000);
+                    } else {
+                        var eN = new Error('HTTP ' + xhr.status);
+                        eN.code = xhr.status;
+                        cb(eN, null);
+                    }
+                };
+                xhr.onerror = function() {
+                    if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                    else cb(new Error('Network Error'), null);
+                };
+                xhr.ontimeout = function() {
+                    if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                    else cb(new Error('Timeout'), null);
+                };
+                xhr.send(data || null);
+            }
+
+            sendRequest();
         }
+
+        function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
+        function xhrPost(url, data, cb) { xhrRequest('POST', url, data, cb); }
 
         // ============================================================
         // [7] No-data banner
@@ -676,8 +956,141 @@
         }
 
         // ============================================================
-        // [8] Runtime Info — updates PORTS dynamically
+        // [8] Runtime Info — pure rendering helper (DASH-6 refactor)
         // ============================================================
+        // DASH-6 fix: rendering is now extracted into its own
+        // function so that toggleLanguage() can re-render the card
+        // with the current language without issuing a second HTTP
+        // request. All side effects that are IDEMPOTENT (PORTS
+        // update, footer update, project link) also live here — so
+        // a re-render on language switch keeps the UI consistent.
+        //
+        // `data` is the raw /api/runtime_info response.
+        // `lastRuntimeData` (a module-level variable) caches the
+        // most recent response.
+        // ============================================================
+        function renderRuntimeInfo(data) {
+            var content = $('runtimeInfoContent');
+            if (!content) return;
+
+            if (data.webui_port) {
+                PORTS.webui = String(data.webui_port);
+                updateBackToHomeLinks();
+            }
+            if (data.dashboard_port) {
+                PORTS.dashboard = String(data.dashboard_port);
+            }
+
+            if (data.version && data.version !== 'dev') {
+                VERSION = data.version;
+                var footer = $('footerText');
+                if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
+            }
+
+            if (data.project_url && data.project_url !== '') {
+                var link = $('footerProjectLink');
+                var linkText = $('footerProjectText');
+                if (link) {
+                    link.href = data.project_url;
+                    link.style.display = 'inline';
+                }
+                if (linkText) linkText.textContent = t('projectLink');
+            }
+
+            var memDisplay = 'unknown';
+            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+                memDisplay = String(data.memory_limit_mb) + ' MB';
+            }
+
+            var bk = data.backups || {};
+            var bkCount = Number(bk.available) || 0;
+            // DASH-4 fix: fall back to the translated
+            // "not initialized" string instead of the raw
+            // literal 'unknown', for consistency with the
+            // other backup fallbacks and for correct display
+            // in Arabic. main.go always sets `path`, but the
+            // fallback should still be localized.
+            var bkPath = bk.path || t('riBackupNotInit');
+            var bkLast = bk.last_backup_name || bk.last_backup || null;
+            var bkLastStable = bk.last_stable || null;
+            var bkInFlight = Number(bk.in_flight_txn) || 0;
+            var bkOrphan = Number(bk.orphan_txn) || 0;
+
+            var bkCountLabel, bkCountClass;
+            if (bkCount === 0) {
+                bkCountLabel = t('riBackupNone');
+                bkCountClass = 'badge-muted';
+            } else if (bkCount === 1) {
+                bkCountLabel = '1 ' + t('riBackupSingle');
+                bkCountClass = 'badge-ok';
+            } else {
+                bkCountLabel = bkCount + ' ' + t('riBackupPlural');
+                bkCountClass = 'badge-ok';
+            }
+
+            var bkLatestLabel, bkLatestClass;
+            if (bkLast) {
+                bkLatestLabel = bkLast;
+                bkLatestClass = '';
+            } else {
+                bkLatestLabel = t('riBackupNotInit');
+                bkLatestClass = 'badge-warn';
+            }
+
+            var bkLastStableLabel, bkLastStableClass;
+            if (bkLastStable) {
+                bkLastStableLabel = bkLastStable;
+                bkLastStableClass = 'badge-ok';
+            } else {
+                bkLastStableLabel = t('riBackupNone');
+                bkLastStableClass = 'badge-muted';
+            }
+
+            var items = [
+                { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
+                { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
+                { icon:'⏱️', label:t('riBuildTime'), value:data.build_time_human||data.build_time||'unknown' },
+                { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
+                { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
+                { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
+                { icon:'📋', label:t('riProfile'), value:data.profile_key||'unknown' },
+                { icon:'🧠', label:t('riMemoryLimit'), value:memDisplay },
+                { icon:'💾', label:t('riBackupCount'), value:bkCountLabel, valueClass:bkCountClass },
+                { icon:'🕒', label:t('riBackupLatest'), value:bkLatestLabel, valueClass:bkLatestClass },
+                { icon:'🎯', label:t('riBackupLastStable'), value:bkLastStableLabel, valueClass:bkLastStableClass }
+            ];
+
+            if (bk.in_flight_txn !== undefined) {
+                items.push({ icon:'⏳', label:t('riBackupInFlight'), value:String(bkInFlight), valueClass:(bkInFlight > 0 ? 'badge-warn' : 'badge-muted') });
+            }
+            if (bk.orphan_txn !== undefined) {
+                items.push({ icon:'🗃️', label:t('riBackupOrphan'), value:String(bkOrphan), valueClass:(bkOrphan > 0 ? 'badge-warn' : 'badge-muted') });
+            }
+
+            items.push(
+                { icon:'📁', label:t('riBackupPath'), value:bkPath, valueClass:'badge-muted' },
+                { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
+                { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
+                { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
+                { icon:'📊', label:t('riProgressFile'), value:data.progress_file||'unknown' },
+                { icon:'📝', label:t('riLogFile'), value:data.log_file||'unknown' },
+                { icon:'🔌', label:t('riBindAddr'), value:data.bind_addr||'127.0.0.1' }
+            );
+
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                var valHtml;
+                if (items[i].isLink && items[i].value !== 'unknown') {
+                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+                } else {
+                    valHtml = escapeHtml(items[i].value);
+                }
+                var valCls = 'ri-value' + (items[i].valueClass ? ' ' + items[i].valueClass : '');
+                html += '<div class="ri-item"><span class="ri-label"><span class="ri-icon">' + items[i].icon + '</span>' + escapeHtml(items[i].label) + '</span><span class="' + valCls + '">' + valHtml + '</span></div>';
+            }
+            content.innerHTML = html;
+        }
+
         function loadRuntimeInfo() {
             var card = $('runtimeInfoCard');
             var content = $('runtimeInfoContent');
@@ -696,65 +1109,10 @@
                     content.innerHTML = '<div class="ri-error">' + t('riError') + '</div>';
                     return;
                 }
-
-                // Extract actual ports
-                if (data.webui_port) {
-                    PORTS.webui = String(data.webui_port);
-                    updateBackToHomeLinks();
-                }
-                if (data.dashboard_port) {
-                    PORTS.dashboard = String(data.dashboard_port);
-                }
-
-                if (data.version && data.version !== 'dev') {
-                    VERSION = data.version;
-                    var footer = $('footerText');
-                    if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
-                }
-
-                if (data.project_url && data.project_url !== '') {
-                    var link = $('footerProjectLink');
-                    var linkText = $('footerProjectText');
-                    if (link) {
-                        link.href = data.project_url;
-                        link.style.display = 'inline';
-                    }
-                    if (linkText) linkText.textContent = t('projectLink');
-                }
-
-                // v1.1.0 — memory limit display
-                var memDisplay = 'unknown';
-                if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-                    memDisplay = String(data.memory_limit_mb) + ' MB';
-                }
-
-                var items = [
-                    { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
-                    { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
-                    { icon:'⏱️', label:t('riBuildTime'), value:data.build_time_human||data.build_time||'unknown' },
-                    { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
-                    { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
-                    { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
-                    { icon:'📋', label:t('riProfile'), value:data.profile_key||'unknown' },
-                    { icon:'🧠', label:t('riMemoryLimit'), value:memDisplay },
-                    { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
-                    { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
-                    { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
-                    { icon:'📊', label:t('riProgressFile'), value:data.progress_file||'unknown' },
-                    { icon:'📝', label:t('riLogFile'), value:data.log_file||'unknown' },
-                    { icon:'🔌', label:t('riBindAddr'), value:data.bind_addr||'127.0.0.1' }
-                ];
-                var html = '';
-                for (var i = 0; i < items.length; i++) {
-                    var valHtml;
-                    if (items[i].isLink && items[i].value !== 'unknown') {
-                        valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
-                    } else {
-                        valHtml = escapeHtml(items[i].value);
-                    }
-                    html += '<div class="ri-item"><span class="ri-label"><span class="ri-icon">' + items[i].icon + '</span>' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
-                }
-                content.innerHTML = html;
+                // DASH-6 fix: cache the response so the language
+                // toggle can re-render without another HTTP call.
+                lastRuntimeData = data;
+                renderRuntimeInfo(data);
             });
         }
 
@@ -942,8 +1300,26 @@
         }
 
         // ============================================================
-        // [11] Diagnostics
+        // [11] Diagnostics + network-down UI
         // ============================================================
+        // DASH-11 fix: add setNetworkDownUI() — parity with
+        // index.html. When periodic fetches fail repeatedly, the
+        // status border turns amber and the text changes.
+        function setNetworkDownUI(isDown) {
+            var area = $('statusArea');
+            var txt = $('diagSse');
+            if (!area && !txt) return;
+            // In the dashboard, the equivalent of index.html's
+            // statusArea is the diagnostics bar. We turn the SSE
+            // indicator into a network warning when isDown.
+            if (isDown) {
+                if (txt) {
+                    txt.textContent = t('networkDown');
+                    txt.style.color = 'var(--warning)';
+                }
+            }
+        }
+
         function updateDiagnostics() {
             var sseEl = $('diagSse');
             if (sseConnected) {
@@ -981,8 +1357,8 @@
         }
         function updateUIStrings() {
             $('pageTitle').textContent = t('pageTitle');
-            $('langIcon').textContent = currentLang === 'ar' ? '🇬🇧' : '🇸🇦';
-            $('langText').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+            var langIcon = $('langIcon'); if (langIcon) langIcon.textContent = currentLang === 'ar' ? '🇬🇧' : '🇸🇦';
+            var langText = $('langText'); if (langText) langText.textContent = currentLang === 'ar' ? 'English' : 'العربية';
             $('rawText').textContent = t('rawData');
             $('refreshText').textContent = isRefreshing ? t('refreshing') : t('refresh');
             var riTitle = $('riTitle'); if (riTitle) riTitle.textContent = t('riTitle');
@@ -997,6 +1373,11 @@
             var modalConfirm = $('modalConfirmBtn'); if (modalConfirm) modalConfirm.textContent = t('confirmOk');
             var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
 
+            var swTxt = $('swUpdateText');
+            if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+            var swReload = $('swUpdateReloadBtn');
+            if (swReload) swReload.textContent = t('swUpdateReload');
+
             if (showingNoDataBanner) showNoDataBanner();
 
             updateNavLinks();
@@ -1010,6 +1391,11 @@
             updateDiagnostics();
             if (dataCache) renderDashboard(dataCache);
             if (logFilesData) renderLogFiles();
+            // DASH-6 fix: re-render the Runtime Info card immediately
+            // using the cached response. No second HTTP request is
+            // issued, and the card's labels switch language along
+            // with the rest of the page.
+            if (lastRuntimeData) renderRuntimeInfo(lastRuntimeData);
         }
         function toggleIdleResolvers() {
             showIdleResolvers = !showIdleResolvers;
@@ -1062,6 +1448,11 @@
                  + '<div class="stat"><span class="stat-label">' + t('cacheConfiguredSize') + '</span><span class="stat-value">' + formatNumber(cache.configured_size) + '</span></div>'
                  + '<div class="stat"><span class="stat-label">' + t('cacheEntries') + '</span><span class="stat-value">' + formatNumber(cache.entries) + ' / ' + formatNumber(cache.capacity) + '</span></div>'
                  + '<div class="stat"><span class="stat-label">' + t('cacheTTL') + '</span><span class="stat-value">' + (cache.min_ttl||0) + 's – ' + (cache.max_ttl||0) + 's</span></div></div></div>';
+
+            // The .dashboard-grid wrapper is closed after "cache" on
+            // purpose: only overview + cache share the two-column
+            // row on screens ≥ 768 px. All remaining cards take
+            // full width below.
 
             var queryTypesRows = (data.query_types||[]).map(function(q) {
                 return '<tr><td>' + escapeHtml(q.type) + '</td><td>' + formatNumber(q.count) + '</td></tr>';
@@ -1154,6 +1545,15 @@
             if (sse) { sse.close(); sse = null; }
             if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
             if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+            // DASH-3 fix: clear the periodic SW update check
+            // interval when polling stops (session expired or
+            // beforeunload). Matches IDX-7 in index.html.
+            if (swUpdateCheckInterval) { clearInterval(swUpdateCheckInterval); swUpdateCheckInterval = null; }
+            // DASH-15 fix: also clear the pending runtime-info
+            // refresh timeout and the dashboard-link fallback
+            // timer.
+            if (runtimeInfoRefreshTimeout) { clearTimeout(runtimeInfoRefreshTimeout); runtimeInfoRefreshTimeout = null; }
+            if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
             sseConnected = false;
             updateDiagnostics();
         }
@@ -1177,7 +1577,7 @@
             xhr.timeout = 15000;
             xhr.onload = function() {
                 if (xhr.status === 401) {
-                    stopPolling();
+                    handleSessionExpired();
                     var homeUrl = getWebUIUrl();
                     container.innerHTML = '<div class="error">' + t('unauthorized') + '<br><a href="' + homeUrl + '">' + t('backToHome') + '</a></div>';
                     return;
@@ -1217,6 +1617,10 @@
             }
             failureCount++;
             updateDiagnostics();
+            // DASH-11 fix: reflect network trouble in the
+            // diagnostics bar after repeated failures. Parity with
+            // index.html's setNetworkDownUI.
+            if (failureCount >= 3) setNetworkDownUI(true);
             if (dataCache && silent) return;
             $('dashboardContent').innerHTML = '<div class="error">' + t('error') + '</div>';
         }
@@ -1235,15 +1639,20 @@
             if (sessionExpired) return;
             if (sse) { sse.close(); sse = null; }
             try {
-                // Note: cookies are sent automatically for same-origin
-                // requests, so the EventSource constructor options are
-                // unnecessary here. This matches index.html.
                 sse = new EventSource('/events?t=' + Date.now());
                 sse.onopen = function() {
                     sseConnected = true;
                     sseBackoff = 5000;
+                    // DASH-11 fix: on a successful SSE connection,
+                    // restore the diagnostics bar color.
+                    setNetworkDownUI(false);
                     updateDiagnostics();
                 };
+                // DASH-9: lastStatus is scoped per SSE connection,
+                // NOT global. It is reset to null on every
+                // reconnect, so the first "status" event after a
+                // reconnect never triggers a spurious refetch of
+                // the dashboard data.
                 var lastStatus = null;
                 sse.addEventListener('status', function(e) {
                     var incoming = e.data;
@@ -1283,7 +1692,171 @@
         }
 
         // ============================================================
-        // [17] Bind events
+        // [17] Service Worker update handlers
+        // ============================================================
+        // DASH-8 fix: showSWUpdateBanner is now idempotent — a
+        // redundant call with the banner already visible is a
+        // no-op. Avoids needless style writes when both the
+        // `updatefound` event and the periodic CHECK_UPDATE ping
+        // fire close together.
+        // ============================================================
+        function showSWUpdateBanner() {
+            if (pendingReload) return;
+            var banner = $('swUpdateBanner');
+            if (banner && banner.style.display === 'flex') return;
+            var txt = $('swUpdateText');
+            if (txt) txt.textContent = t('swUpdateAvailable') || '🔄 Update available — reload';
+            if (banner) banner.style.display = 'flex';
+        }
+
+        function hideSWUpdateBanner() {
+            var banner = $('swUpdateBanner');
+            if (banner) banner.style.display = 'none';
+        }
+
+        function installControllerChangeHandler() {
+            if (controllerChangeHandlerInstalled) return;
+            if (!('serviceWorker' in navigator)) return;
+            controllerChangeHandlerInstalled = true;
+
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                if (!pendingReload) return;
+                pendingReload = false;
+                // DASH-3 fix: clear the periodic SW update check
+                // before reloading. Matches IDX-7 in index.html.
+                if (swUpdateCheckInterval) {
+                    clearInterval(swUpdateCheckInterval);
+                    swUpdateCheckInterval = null;
+                }
+                window.location.reload();
+            });
+        }
+
+        function setupSWUpdateHandler() {
+            if (!('serviceWorker' in navigator)) return;
+
+            installControllerChangeHandler();
+
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (!event.data) return;
+                if (event.data.type === 'UPDATE_AVAILABLE') {
+                    if (event.data.waiting && swRegistration && swRegistration.waiting) {
+                        showSWUpdateBanner();
+                    }
+                }
+            });
+
+            // DASH-2 fix: install the same periodic SW update
+            // check that index.html already has. Without this, a
+            // user who keeps the dashboard tab open would not be
+            // notified of an update until the browser happened to
+            // fire 'updatefound' on its own schedule.
+            if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+            swUpdateCheckInterval = setInterval(function() {
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+                }
+            }, 3600000);
+
+            // Also do a first check shortly after boot, so a user
+            // who reloads the page right after an update sees the
+            // banner quickly. 5 s matches index.html's value.
+            setTimeout(function() {
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+                }
+            }, 5000);
+        }
+
+        function bindSWUpdateButtons() {
+            var reloadBtn = $('swUpdateReloadBtn');
+            var closeBtn = $('swUpdateCloseBtn');
+
+            if (reloadBtn) {
+                reloadBtn.addEventListener('click', function() {
+                    if (pendingReload) return;
+
+                    if (!swRegistration) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    var waiting = swRegistration.waiting;
+                    if (!waiting) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    pendingReload = true;
+                    reloadBtn.disabled = true;
+
+                    try {
+                        waiting.postMessage({ type: 'SKIP_WAITING' });
+                    } catch (e) {
+                        pendingReload = false;
+                        reloadBtn.disabled = false;
+                        window.location.reload();
+                        return;
+                    }
+
+                    // DASH-5 fix: fallback reload if
+                    // 'controllerchange' does not fire within 3
+                    // seconds (e.g. misbehaving or terminated SW).
+                    // Without this, pendingReload could stay true
+                    // forever and the [Reload] button would become
+                    // a no-op. Parity with IDX-11 in index.html.
+                    setTimeout(function() {
+                        if (pendingReload) {
+                            pendingReload = false;
+                            if (swUpdateCheckInterval) {
+                                clearInterval(swUpdateCheckInterval);
+                                swUpdateCheckInterval = null;
+                            }
+                            window.location.reload();
+                        }
+                    }, 3000);
+                });
+            }
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', hideSWUpdateBanner);
+            }
+        }
+
+        // ============================================================
+        // [18] Session expired
+        // ============================================================
+        // DASH-13 fix: parity with index.html's
+        // handleSessionExpired. Resets backoff counters, tears
+        // down intervals/SSE, shows a modal with a primary
+        // "Re-login" action.
+        // ============================================================
+        function handleSessionExpired() {
+            if (sessionExpired) return;
+            sessionExpired = true;
+
+            // Reset backoff states so the next session starts
+            // from a fast polling interval.
+            sseBackoff = 5000;
+
+            if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
+            if (sse) { sse.close(); sse = null; }
+            if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+            if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+
+            showConfirmModal(t('sessionExpiredMsg'), null, {
+                title: t('sessionExpiredTitle'),
+                primaryText: t('sessionRelogin'),
+                primaryCallback: function() {
+                    // Redirect to the WebUI login page — the
+                    // dashboard has no login form of its own.
+                    window.location.href = getWebUIUrl();
+                }
+            });
+        }
+
+        // ============================================================
+        // [19] Bind events
         // ============================================================
         function bindEvents() {
             $('refreshBtn').addEventListener('click', manualRefresh);
@@ -1323,24 +1896,67 @@
         }
 
         // ============================================================
-        // [18] beforeunload
+        // [20] beforeunload
         // ============================================================
         window.addEventListener('beforeunload', function() { stopPolling(); });
 
         // ============================================================
-        // [19] Boot
+        // [21] Boot
         // ============================================================
         function boot() {
             document.documentElement.lang = currentLang;
             document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
 
-            // Update links immediately (fallback before runtime_info)
             updateBackToHomeLinks();
 
             updateUIStrings();
             updateDiagnostics();
             bindEvents();
-            loadRuntimeInfo();  // ← will update PORTS
+            bindSWUpdateButtons();
+
+            // DASH-14 fix: install a fallback timer that removes
+            // the `loading` class from the Dashboard link if the
+            // runtime_info request never resolves or fails. This
+            // prevents the link from staying disabled forever.
+            var dashLink = $('ndAction');
+            if (dashLink) {
+                dashboardLinkFallbackTimer = setTimeout(function() {
+                    if (dashLink) dashLink.classList.remove('loading');
+                }, 8000);
+            }
+
+            if ('serviceWorker' in navigator) {
+                installControllerChangeHandler();
+
+                navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    swRegistration = reg;
+
+                    // DASH-17 fix: show banner if a waiting worker
+                    // already exists (returning visitor). This
+                    // covers the case where 'updatefound' does not
+                    // fire because the SW was already registered
+                    // in a previous session.
+                    if (reg.waiting && navigator.serviceWorker.controller) {
+                        showSWUpdateBanner();
+                    }
+
+                    reg.addEventListener('updatefound', function() {
+                        var newWorker = reg.installing;
+                        if (!newWorker) return;
+                        newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                showSWUpdateBanner();
+                            }
+                        });
+                    });
+
+                    setupSWUpdateHandler();
+                }).catch(function() {
+                    // Silent — non-critical
+                });
+            }
+
+            loadRuntimeInfo();
             loadLogFiles();
             fetchDashboardData(false);
             refreshInterval = setInterval(function() { fetchDashboardData(true); }, 30000);

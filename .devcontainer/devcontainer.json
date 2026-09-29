@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – Dev Container Configuration
-// Version: v1.1.0
+// Version: v1.2.0 (Global Edition)
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -26,21 +26,25 @@
 // Reference:
 //   https://containers.dev/implementors/json_reference/
 //
+// ============================================================
 // Features used:
-//   ┌────────────────────────────────┬────────┬───────────┐
-//   │ Feature                              │ Version │ Purpose   │
-//   ├────────────────────────────────┼────────┼───────────┤
-//   │ devcontainers/features/go            │ 1       │ Go 1.22   │
-//   │ devcontainers/features/github-cli    │ 1       │ gh CLI    │
-//   │ devcontainers/features/common-utils  │ 2       │ base utils│
-//   └────────────────────────────────┴────────┴───────────┘
+// ============================================================
+//   ┌───────────────────────────────┬────────┬──────────┐
+//   │ Feature                             │ Version │ Purpose    │
+//   ├───────────────────────────────┼────────┼──────────┤
+//   │ devcontainers/features/go           │ 1       │ Go 1.22    │
+//   │ devcontainers/features/github-cli   │ 1       │ gh CLI     │
+//   │ devcontainers/features/common-utils │ 2       │ base utils │
+//   └───────────────────────────────┴────────┴──────────┘
 //
 //   The `:1` / `:2` suffix in each feature key is the feature's
 //   MAJOR version (devcontainer spec). Dependabot tracks these
 //   under the "devcontainers" ecosystem — see
 //   .github/dependabot.yml §[3].
 //
+// ============================================================
 // postCreateCommand chain:
+// ============================================================
 //   1. The image + features install their base tooling.
 //   2. .devcontainer/setup.sh runs (bash, idempotent, verbose).
 //   3. setup.sh installs the remaining dev tools:
@@ -60,14 +64,18 @@
 //   If postCreateCommand fails, re-run it manually:
 //     bash .devcontainer/setup.sh
 //
+// ============================================================
 // remoteUser:
+// ============================================================
 //   The container runs as `vscode` (non-root). This matters for
 //   tools that install into $HOME (go binaries, pip user packages,
 //   pre-commit hooks). Any tool that needs root uses sudo, which
 //   is pre-configured for the vscode user in devcontainer base
 //   images.
 //
-// v1.1.0 additions:
+// ============================================================
+// v1.1.0 additions (kept in v1.2.0):
+// ============================================================
 //   • Version bumped to v1.1.0 (documentation only — no behavior
 //     changes since v1.0.0).
 //   • Added a "Features used" table for quick scanning.
@@ -78,6 +86,33 @@
 //     Go binaries and Python packages land, which is a common
 //     source of confusion when debugging "command not found"
 //     errors.
+//
+// ============================================================
+// v1.2.0 additions:
+// ============================================================
+//   • Version bumped to v1.2.0 (documentation only — no behavior
+//     changes since v1.1.0).
+//   • The v1.2.0 release is a data-preservation release. It does
+//     NOT add any new dependencies, new tools, or new build steps.
+//     Therefore this devcontainer configuration requires NO
+//     changes to remain compatible with v1.2.0.
+//   • Confirmed: the 10 defensive layers introduced by v1.2.0
+//     live in shell scripts (customize.sh, service.sh, status.sh,
+//     uninstall.sh, functions.sh, watchdog.sh) and in main.go.
+//     None of them require a new tool for development or testing.
+//   • The dev environment used to develop v1.1.0 is the same
+//     environment used to develop v1.2.0. No tool was added,
+//     removed, or upgraded.
+//   • Cross-referenced docs/BACKUP.md and docs/EMERGENCY.md for
+//     readers who land here from a data-preservation context:
+//     those documents describe RUNTIME behavior on a real Android
+//     device, not development tooling. Testing the 10 layers
+//     requires a rooted Android device (or the emulator matrix
+//     in .github/workflows/upgrade-test.yml), not a new dev tool.
+//   • Expanded the "Features used" table with clear column
+//     headers for readability.
+//   • All comments are English-only (global edition). No Arabic
+//     strings exist in this file.
 // ============================================================
 {
   "name": "DNSCrypt Smart Filter Dev",

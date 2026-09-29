@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – devcontainer setup
-# Version: v1.1.0
+# Version: v1.2.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -33,24 +33,28 @@
 # Expected duration:
 #   ~2–4 minutes (depending on network speed)
 #
+# ============================================================
 # Tool install chain (7 phases):
-#   ┌───┬───────────────────────────────────────┐
-#   │ #  │ Phase                                       │
-#   ├───┼───────────────────────────────────────┤
-#   │ 1  │ apt update                                  │
-#   │ 2  │ Basic tools (via apt)                       │
-#   │ 3  │ Shell tools (shellcheck, shfmt)             │
-#   │ 4  │ Go tools (golangci-lint, staticcheck, ...)  │
-#   │ 5  │ Python tools (pip, pre-commit, yamllint,..) │
-#   │ 6  │ Android NDK check (optional)                │
-#   │ 7  │ Project setup (permissions, pre-commit)     │
-#   └───┴───────────────────────────────────────┘
+# ============================================================
+#   ┌───┬────────────────────────────────────────┐
+#   │ # │ Phase                                          │
+#   ├───┼────────────────────────────────────────┤
+#   │ 1 │ apt update                                     │
+#   │ 2 │ Basic tools (via apt)                          │
+#   │ 3 │ Shell tools (shellcheck, shfmt)                │
+#   │ 4 │ Go tools (golangci-lint, staticcheck, ...)     │
+#   │ 5 │ Python tools (pip, pre-commit, yamllint, ...)  │
+#   │ 6 │ Android NDK check (optional)                   │
+#   │ 7 │ Project setup (permissions, pre-commit)        │
+#   └────────────────────────────────────────────┘
 #
 #   Each phase prints a header (─────) so the log is scannable.
 #   Every tool install is wrapped in a `command -v` check, so
 #   re-running the script only installs what is missing.
 #
+# ============================================================
 # golangci-lint v2 — path note:
+# ============================================================
 #   golangci-lint changed its module path between v1 and v2:
 #     • v1:  github.com/golangci/golangci-lint/cmd/golangci-lint
 #     • v2:  github.com/golangci/golangci-lint/v2/cmd/golangci-lint
@@ -70,7 +74,9 @@
 #   leading "v2." (with the "v" prefix). This is deliberate: it
 #   rejects both v1 (e.g. "1.55.0") and unversioned builds.
 #
+# ============================================================
 # Idempotency behavior:
+# ============================================================
 #   The script is safe to run multiple times. For each tool:
 #     • If already installed at the correct version → skip.
 #     • If installed at a wrong/old version → reinstall.
@@ -84,7 +90,9 @@
 #   tool will show as ✗ in the final table, and the developer can
 #   re-run `bash .devcontainer/setup.sh` after fixing the network.
 #
-# v1.1.0 additions:
+# ============================================================
+# v1.1.0 additions (kept in v1.2.0):
+# ============================================================
 #   • Version bumped to v1.1.0 (documentation only — no behavior
 #     changes since v1.0.0).
 #   • Added a "Tool install chain" table summarizing the 7 phases.
@@ -94,6 +102,46 @@
 #   • Added an "Idempotency behavior" section documenting what
 #     happens when the script is re-run with partial state.
 #   • Confirmed all log messages and comments are English.
+#
+# ============================================================
+# v1.2.0 additions:
+# ============================================================
+#   • Version bumped to v1.2.0 (documentation only — no behavior
+#     changes since v1.1.0).
+#   • The v1.2.0 release is a data-preservation release. It adds
+#     no new dependencies, no new build steps, and no new tools
+#     to the project. Therefore setup.sh requires NO changes to
+#     remain compatible with v1.2.0.
+#
+#   • Confirmed: the 10 defensive layers introduced by v1.2.0
+#     live in shell scripts and in main.go. They use only the
+#     tools already present in this dev environment:
+#       - bash / sh            (already in the base image)
+#       - coreutils            (already in the base image)
+#       - sha256sum            (already in the base image via coreutils)
+#       - jq                   (installed in phase 2)
+#       - restorecon / chcon   (NOT tested in devcontainer — see note below)
+#       - Go stdlib only       (main.go additions use no new deps)
+#
+#   • IMPORTANT: testing the 10 layers requires a real Android
+#     device or an emulator with root. A dev container cannot
+#     simulate:
+#       - SELinux contexts (restorecon / chcon)
+#       - Magisk/KernelSU/APatch root managers
+#       - /sdcard/ mounts
+#       - Boot lifecycle (post-fs-data, service, boot_completed)
+#     The CI job that covers the runtime scenarios is
+#     .github/workflows/upgrade-test.yml (manual trigger).
+#     The static-only validation runs in ci.yml → backup-smoke-test.
+#
+#   • Cross-referenced the following documents for readers who
+#     land here from a data-preservation context:
+#       - docs/BACKUP.md      (backup system reference)
+#       - docs/EMERGENCY.md   (emergency recovery guide)
+#     These describe RUNTIME behavior on a device, not dev tooling.
+#
+#   • All comments and messages are English-only (global edition).
+#     No Arabic strings exist in this file.
 # ============================================================
 
 set -euo pipefail
@@ -120,8 +168,8 @@ log_info()  { echo -e "  ${DIM}·${NC} $1"; }
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  🔧 DNSCrypt Smart Filter – DevContainer Setup           ║${NC}"
-echo -e "${BOLD}║  ${DIM}v1.1.0${NC}                                                 ${BOLD}║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════════════════════${NC}${BOLD}╝${NC}"
+echo -e "${BOLD}║  ${DIM}v1.2.0${NC}                                                 ${BOLD}║${NC}"
+echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
 # ============================================================

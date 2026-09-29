@@ -1,0 +1,93 @@
+#!/sbin/sh
+# ============================================================
+# DNSCrypt Smart Filter – update-binary
+# Version: v1.2.0 (Global Edition)
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# Purpose:
+#   Magisk / KernelSU / APatch module installer entry point.
+#
+#   This file is invoked by the root manager when the user
+#   selects the module ZIP for installation. Its only job is
+#   to bootstrap the Magisk environment and then hand control
+#   to the module's own `customize.sh` (which performs the
+#   full installation, including the 10 data-preservation
+#   layers introduced in v1.2.0).
+#
+# Arguments (passed by Magisk):
+#   $1 = <not used>
+#   $2 = OUTFD    (file descriptor for the install log UI)
+#   $3 = ZIPFILE  (absolute path to the module ZIP)
+#
+# Execution flow:
+#   1. Set umask 022 for consistent file permissions.
+#   2. Define a minimal ui_print fallback (before util_functions
+#      is loaded, so that error messages can still be shown).
+#   3. Verify Magisk >= 20.4 is installed; abort with a clear
+#      message otherwise.
+#   4. Mount /data so that /data/adb/magisk is reachable.
+#   5. Source /data/adb/magisk/util_functions.sh — this is
+#      provided by Magisk itself, not by this repository.
+#   6. Call install_module — the Magisk-provided function that
+#      runs the module's `customize.sh`.
+#
+# Compatibility:
+#   • Magisk      — 20.4+ (requires util_functions.sh)
+#   • KernelSU    — supported (provides a Magisk-compatible
+#                   util_functions.sh shim)
+#   • APatch      — supported (same compatibility layer)
+#
+# ⚠️ This file is a standard Magisk boilerplate. It is
+#    intentionally kept close to the upstream template so that
+#    a future contributor familiar with Magisk can recognize
+#    it immediately. The only project-specific additions are
+#    the header above and the English-only messages.
+#
+# ⚠️ This file does NOT contain any DNSCrypt logic. All
+#    installer logic lives in:
+#       proxy/customize.sh    (the actual installer)
+#    The 10 data-preservation layers of v1.2.0 are implemented
+#    entirely inside customize.sh, functions.sh, service.sh,
+#    status.sh, uninstall.sh, and main.go.
+#
+# v1.2.0 changes:
+#   • Version bumped to v1.2.0 (documentation only — no behavior
+#     changes since v1.0.0).
+#   • Added this header for traceability. The body below is
+#     identical to the standard Magisk v20.4+ boilerplate.
+#   • Confirmed English-only (global edition): the ui_print
+#     message is English. No Arabic strings exist in this file.
+# ============================================================
+
+#################
+# Initialization
+#################
+
+umask 022
+
+# echo before loading util_functions
+ui_print() { echo "$1"; }
+
+require_new_magisk() {
+  ui_print "*******************************"
+  ui_print " Please install Magisk v20.4+! "
+  ui_print "*******************************"
+  exit 1
+}
+
+#########################
+# Load util_functions.sh
+#########################
+
+OUTFD=$2
+ZIPFILE=$3
+
+mount /data 2>/dev/null
+
+[ -f /data/adb/magisk/util_functions.sh ] || require_new_magisk
+. /data/adb/magisk/util_functions.sh
+[ $MAGISK_VER_CODE -lt 20400 ] && require_new_magisk
+
+install_module
+exit 0

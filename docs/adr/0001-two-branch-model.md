@@ -12,26 +12,35 @@
 
 ---
 
-> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+> **Verification History** (last reviewed: 2026-09-29, v1.2.0):
 >
-> This ADR was reviewed during the v1.1.0 release cycle and
-> **remains in effect**. No amendments were needed.
+> | Release | Date | Result | Notes |
+> |---|---|---|---|
+> | v1.0.0 | 2026-09-24 | ✅ | First release using this model |
+> | v1.1.0 | 2026-09-26 | ✅ | Confirmed; no amendments |
+> | v1.2.0 | 2026-09-29 | ✅ | Largest release to date; no friction |
 >
-> **Verification notes**:
+> **Details from the v1.2.0 review**:
 >
->   • The two-branch model (`main` + `develop`) has been in continuous
->     operation since 2026-09-24.
->   • Two releases have been published through this model:
->     `v1.0.0` (2026-09-24) and `v1.1.0` (2026-09-26).
->   • Both releases passed through the documented flow:
->     `release/*` → PR against `main` → tag → `release.yml` →
->     auto-sync `main → develop`.
->   • No branch-protection bypasses were needed.
->   • No contributor PRs were rejected due to branch-policy
->     confusion during this period.
+>   • The two-branch model has now been in continuous operation
+>     for **three releases**: `v1.0.0`, `v1.1.0`, and `v1.2.0`.
+>   • `v1.2.0` (Data-Preservation Release, 2026-09-29) passed
+>     through the documented flow **without modification**:
+>     `release/v1.2.0` → PR against `main` → tag → `release.yml`
+>     → auto-sync `main → develop`.
+>   • **No branch-protection bypasses** were needed during the
+>     v1.2.0 cycle.
+>   • **No branch-policy confusion** has been observed among
+>     contributors. (Note: the project is currently
+>     solo-maintained, so this conclusion is based on a small
+>     sample.)
+>   • The v1.2.0 additions (10 defensive layers, BAK-1..BAK-4,
+>     FIX-1/FIX-2, WD-TOKEN) were all merged through the
+>     documented `feature/* → develop` flow — this ADR's model
+>     handled a large, multi-file feature set without friction.
 >
-> **Result**: The decision is validated by real-world usage. No
-> superseding ADR is required.
+> **Result**: The decision is further validated by a third release
+> cycle. No superseding ADR is required.
 
 ---
 
@@ -82,8 +91,8 @@ This ADR covers **branch structure only**. It does **not** cover:
 
 ## Decision
 
-> **We will adopt a two-branch model: `main` (stable releases only)
-> and `develop` (integration branch).**
+> **We will adopt a two-branch model: `main` (stable releases only)**
+> **and `develop` (integration branch).**
 
 ### Specifics
 
@@ -216,13 +225,15 @@ develop ──●──●──●──●──●──●───●──
 - [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) — daily workflow for
   developers.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0 uses this branching model).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0).
 - [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) —
   runs on PRs targeting `main` and `develop`.
 - [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) —
   same triggers for SAST.
 - [`.github/workflows/release.yml`](../../.github/workflows/release.yml) —
   publishes releases from tags on `main`.
+- [`.github/workflows/upgrade-test.yml`](../../.github/workflows/upgrade-test.yml) —
+  42-scenario data-preservation matrix (added in v1.2.0).
 
 ### External references
 
@@ -239,8 +250,11 @@ develop ──●──●──●──●──●──●───●──
 
 ### Release verification
 
-- v1.0.0 (2026-09-24) — first release using this model.
-- v1.1.0 (2026-09-26) — second release; model validated.
+- **v1.0.0** (2026-09-24) — first release using this model.
+- **v1.1.0** (2026-09-26) — second release; model validated.
+- **v1.2.0** (2026-09-29) — third release; model further validated.
+  - Data-Preservation Release with 10 defensive layers shipped
+    through the standard `release/*` flow.
 - See `CHANGELOG.md` for the full release history.
 
 ---

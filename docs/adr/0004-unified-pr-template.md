@@ -1,6 +1,6 @@
 # ADR-0004: Unified PR Template
 
-**Status**: ⚠️ Superseded by [ADR-0005](0005-release-specific-pr-template.md)
+**Status**: ⚠️ Superseded (see **Superseded by** below)
 
 **Date**: 2026-09-24
 
@@ -24,6 +24,45 @@
 
 ---
 
+> **Supersession Verification (v1.2.0 — 2026-09-29)**:
+>
+> This ADR was reviewed during the v1.2.0 release cycle to confirm
+> that the **supersession decision** remains correct. No further
+> amendments are needed.
+>
+> **Verification notes**:
+>
+>   • The reversal has now been in effect through **three release
+>     cycles** (v1.0.0, v1.1.0, and v1.2.0) without any need to
+>     revisit it.
+>   • The **unified template** (`.github/PULL_REQUEST_TEMPLATE.md`)
+>     remains the **default** for all `feature/*`, `fix/*`,
+>     `docs/*`, `chore/*`, `refactor/*`, and `test/*` PRs —
+>     exactly as the supersession intended.
+>   • The **release template**
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) introduced by
+>     [ADR-0005](0005-release-specific-pr-template.md) is used
+>     exclusively for `release/*` and `hotfix/*` → `main` PRs.
+>   • **No contributor** has reported confusion about which
+>     template to use across all three release cycles.
+>   • The `?template=release.md` pattern documented in
+>     `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §5
+>     has worked as intended.
+>   • The v1.2.0 data-preservation release introduced a
+>     **Data-preservation checklist** section in the default
+>     template — this was added as an **extension**, not a
+>     reversal, and does not affect the validity of this ADR's
+>     supersession.
+>   • The **reversal is further validated**: keeping the unified
+>     template as the default (not deleting it) was the right
+>     choice, since 95%+ of PRs are feature/fix/docs PRs
+>     targeting `develop`.
+>   • No new ADR is needed to further modify this decision.
+>     ADR-0005 remains authoritative.
+>
+> **Result**: The supersession was correct, and no reconsideration
+> is required. This ADR remains a historical record.
+
 > **Supersession Verification (v1.1.0 — 2026-09-26)**:
 >
 > This ADR was reviewed during the v1.1.0 release cycle to confirm
@@ -44,7 +83,7 @@
 >     exclusively for `release/*` and `hotfix/*` → `main` PRs.
 >   • No contributor has reported confusion about which template
 >     to use. The `?template=release.md` pattern documented in
->     `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §6.5
+>     `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §5
 >     has worked as intended.
 >   • The **reversal is validated**: keeping the unified template
 >     as the default (not deleting it) was the right choice, since
@@ -275,14 +314,19 @@ change buried in a commit.
   the unified template.
 - [`.github/PULL_REQUEST_TEMPLATE/release.md`](../../.github/PULL_REQUEST_TEMPLATE/release.md) —
   the release-specific template (introduced by ADR-0005).
-- [`docs/BRANCHING.md`](../BRANCHING.md) §5.1 — the PR-target
-  rules.
+- [`docs/BRANCHING.md`](../BRANCHING.md) §4.4 — the
+  release-PR template URL pattern. Also covers §5.1 for the
+  PR-target rules.
 - [`docs/CONTRIBUTING.md`](../CONTRIBUTING.md) §6 — the PR
   process.
-- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §6 — release
-  PR steps.
+- [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §5 — the
+  release-PR flow (this is the section that documents the
+  `?template=release.md` pattern).
+- [ADR-0005](0005-release-specific-pr-template.md) — the full
+  rationale for the release-specific template.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0 used the release template).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0, which
+  used the release template).
 
 ### External references
 
@@ -315,9 +359,17 @@ change buried in a commit.
   - No new template was needed.
   - **No contributor requested** a different template or reported
     the query-string pattern as a problem.
-- **Supersession status**: confirmed correct. ADR-0005 remains
-  authoritative.
-- **Next review**: v1.2.0 cycle (or when the PR workflow changes).
+- **v1.2.0** (2026-09-29) — third release cycle; templates
+  extended (default gained a Data-preservation checklist).
+  - `v1.2.0` was published through a `release/*` PR using
+    `?template=release.md`.
+  - The unified template gained a new "Data-preservation
+    checklist" section (extension, not reversal).
+  - The release template gained v1.2.0-specific checks.
+  - **No contributor requested** a different template.
+- **Supersession status**: confirmed correct across three release
+  cycles. ADR-0005 remains authoritative.
+- **Next review**: v1.3.0 cycle (or when the PR workflow changes).
 - See `CHANGELOG.md` for the full release history.
 
 ---

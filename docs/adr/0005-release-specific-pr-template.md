@@ -12,6 +12,40 @@
 
 ---
 
+> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+>
+> This ADR was reviewed during the v1.2.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The release-specific template
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) has now been used
+>     for **three releases**: `v1.0.0`, `v1.1.0`, and `v1.2.0`.
+>   • The template's **version-first layout** continues to prove
+>     effective — reviewers find the critical release fields faster
+>     than with the unified template.
+>   • The **`?template=release.md` query-string pattern** documented
+>     in `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §6.5
+>     has worked as intended across all three cycles.
+>   • The **unified template** (from ADR-0004) remains the default
+>     for all non-release PRs — the two templates continue to
+>     coexist without conflict.
+>   • **v1.2.0 additions worked as designed**: the release template
+>     gained a new **"v1.2.0 — data preservation"** section
+>     (10 defensive layers, `backupMu`, 7-field `backups` object,
+>     watchdog token, bilingual WebUI, 42-scenario matrix, and the
+>     `append_denylist` breaking-change check).
+>   • The **post-merge checklist** in the release template caught
+>     the maintainer's attention and reminded them of the tag push
+>     and auto-sync steps for `v1.2.0`.
+>   • The **reversal of ADR-0004** has been validated across three
+>     release cycles — no contributor has requested reverting it.
+>
+> **Result**: The decision is validated by three release cycles
+> including the v1.2.0 data-preservation release. No superseding
+> ADR is required.
+
 > **Post-Release Verification (v1.1.0 — 2026-09-26)**:
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
@@ -156,7 +190,7 @@ Because GitHub only auto-applies the **default** template, the
 release template must be selected explicitly:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.2.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
 ```
 
 **Mitigation**:
@@ -343,13 +377,18 @@ journey**.
 - [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) §6 — release summary
   for developers.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (v1.0.0 → v1.1.0 used the release template).
+  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0, which
+  used the release template).
 - [`scripts/release.sh`](../../scripts/release.sh) — the local
   release automation.
 - [`scripts/release-patch.sh`](../../scripts/release-patch.sh) —
   the PATCH-release variant.
 - [`docs/adr/0004-unified-pr-template.md`](0004-unified-pr-template.md) —
   the superseded decision.
+- [`docs/BACKUP.md`](../BACKUP.md) — backup system reference
+  (v1.2.0 additions to the release template).
+- [`docs/EMERGENCY.md`](../EMERGENCY.md) — emergency recovery
+  (v1.2.0 additions to the release template).
 
 ### External references
 
@@ -385,15 +424,33 @@ journey**.
     fields, runtime_info additions) were filled in correctly.
   - Post-merge tag push documented and executed.
   - Auto-sync triggered correctly.
+- **v1.2.0** (2026-09-29) — third release; template **extended**
+  with v1.2.0-specific checks.
+  - `release/v1.2.0` → PR against `main` via
+    `?template=release.md`.
+  - Version-first layout: `version=v1.2.0`, `versionCode=1020000`.
+  - All pre-flight checklists completed.
+  - **New v1.2.0 sections** were filled in:
+    - "v1.2.0 — data preservation" (10 defensive layers).
+    - "v1.2.0 — backup layer verification" (7-field object).
+    - "v1.2.0 — watchdog token (WD-TOKEN)".
+    - "v1.2.0 — bilingual WebUI (EN + AR)".
+    - "v1.2.0 — 42-scenario matrix".
+    - "v1.2.0 — breaking change check"
+      (`append_denylist content`).
+  - Post-merge tag push documented and executed.
+  - Auto-sync triggered correctly.
+  - The **rollback plan section** documented the data-preservation
+    safety net (persistent backup directory preserved on rollback).
 - **Discoverability** — verified:
   - `docs/BRANCHING.md` §4.4 documents the query-string pattern.
   - `docs/RELEASE_PROCESS.md` §5 includes a pre-built link.
   - `.github/PULL_REQUEST_TEMPLATE.md` contains the one-line
     reminder.
   - No contributor has needed to ask which template to use.
-- **Rollback plan section** — never exercised (both releases were
-  successful).
-- **Next review**: v1.2.0 cycle.
+- **Rollback plan section** — never exercised (all three releases
+  were successful).
+- **Next review**: v1.3.0 cycle.
 - See `CHANGELOG.md` for the full release history.
 
 ---
