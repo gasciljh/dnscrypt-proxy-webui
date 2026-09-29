@@ -66,16 +66,10 @@
 name: Upgrade Test
 
 on:
-  push:
-    branches: [develop, main]
-    paths:
-      - 'proxy/*.sh'
-      - 'scripts/*.sh'
-      - '.github/workflows/upgrade-test.yml'
-  pull_request:
-    branches: [develop, main]
+  # Manual trigger only (as documented in docs/BRANCHING.md §723).
+  # The push/pull_request triggers were mistakenly added and caused
+  # every push and every PR to run (and fail) this matrix.
   workflow_dispatch:
-
 permissions:
   contents: read
 
