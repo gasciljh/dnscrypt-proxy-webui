@@ -403,6 +403,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 // ============================================================
@@ -4687,8 +4688,43 @@ func createAutoBackup(reason string) {
 // .pending_notification file in the persistent backup directory
 // and forwards its content to the log.
 func checkPendingNotifications() {
-	data, err := os.ReadFile(PENDING_NOTIFY_FILE)
+	path := PENDING_NOTIFY_FILE
+
+	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		logWithLevel("warn", "checkPendingNotifications: read failed: "+err.Error())
+		// Attempt cleanup so a stuck file does not loop forever.
+		_ = os.Remove(path)
+		return
+	}
+
+	if len(data) == 0 {
+		if err := os.Remove(path); err != nil {
+			logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
+		}
+		return
+	}
+
+	const maxNotificationBytes = 4096
+	if len(data) > maxNotificationBytes {
+		logWithLevel("warn", fmt.Sprintf(
+			"checkPendingNotifications: oversized (%d bytes), truncating to %d",
+			len(data), maxNotificationBytes))
+		data = data[:maxNotificationBytes]
+		// Back off any rune cut in half by the slice.
+		for len(data) > 0 && !utf8.Valid(data) {
+			data = data[:len(data)-1]
+		}
+	}
+
+	if !utf8.Valid(data) {
+		logWithLevel("warn", "checkPendingNotifications: invalid UTF-8, skipping")
+		if err := os.Remove(path); err != nil {
+			logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
+		}
 		return
 	}
 
@@ -4699,7 +4735,7 @@ func checkPendingNotifications() {
 		logWithLevel("debug", "checkPendingNotifications: empty notification file")
 	}
 
-	if err := os.Remove(PENDING_NOTIFY_FILE); err != nil {
+	if err := os.Remove(path); err != nil {
 		logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
 	}
 }
