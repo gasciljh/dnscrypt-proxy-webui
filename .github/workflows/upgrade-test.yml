@@ -151,7 +151,7 @@ jobs:
           - { id: 'L9-03', name: 'Rotation preserves current/ and metadata' }
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # ============================================================
       # [1.1] Prepare sandbox
