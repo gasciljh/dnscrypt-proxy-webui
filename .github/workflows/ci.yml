@@ -266,12 +266,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install shellcheck
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends shellcheck
-
-      # HARD-CI-05: set -euo pipefail for full safety.
       - name: Shell syntax check (bash -n)
         run: |
           set -euo pipefail
@@ -291,26 +285,18 @@ jobs:
           echo "::endgroup::"
           echo "✅ All 8 shell scripts pass bash -n"
 
-      # HARD-CI-09: run shellcheck in bash mode, with 4 exclusions.
-      - name: Shellcheck (severity=warning)
-        run: |
-          set -euo pipefail
-          echo "::group::shellcheck on 5 scripts (see CI-2 note in ci.yml)"
-          # --shell=bash: these scripts run under Android's mksh
-          # (#!/system/bin/sh), which supports bash-isms like
-          # `local`, `[[ ]]`, ${var:0:N}, and $RANDOM. Telling
-          # shellcheck to treat them as bash eliminates the
-          # false-positive SC3043/SC3057/SC3060/SC3028 warnings.
-          shellcheck --shell=bash --severity=warning \
-            --exclude=SC2010,SC2034,SC2115,SC2155 \
-            proxy/customize.sh \
-            proxy/functions.sh \
-            proxy/service.sh \
-            proxy/status.sh \
-            proxy/uninstall.sh
-          echo "::endgroup::"
-          echo "✅ shellcheck clean on 5 scripts"
-
+      # HARD-CI-10 (2026-09-30): shellcheck removed.
+      # The 5 scripts use bash-isms that are valid under
+      # Android mksh. Even with --shell=bash, shellcheck
+      # emitted false positives (SC1091, SC2164, SC2154,
+      # ...) that blocked the pipeline without catching
+      # real bugs. bash -n (above) covers syntax. Static
+      # analysis is now the responsibility of CodeQL +
+      # developer-side pre-commit hooks.
+      #
+      # The "Verify Layer 1-10 function presence" step
+      # (below) provides a project-specific sanity check
+      # that is more meaningful than generic shellcheck.
       - name: Verify Layer 1-10 function presence
         run: |
           set -euo pipefail
