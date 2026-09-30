@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v1.2.1] - 2026-09-30
+## [v1.2.0] - 2026-09-30
 
 > **Bug-fix release** — no new features, no breaking changes.
 
@@ -76,16 +76,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`--version` flag** on all six shell scripts
   (`action.sh`, `service.sh`, `status.sh`, `uninstall.sh`,
-  `watchdog.sh`, `customize.sh`). Prints `<script>: v1.2.1`
+  `watchdog.sh`, `customize.sh`). Prints `<script>: v1.2.0`
   and exits 0. Note: `status.sh` already uses `-V` as an alias
   for `--verbose`, so only the long form is provided.
 
 - **Observability:** `verify_backup_integrity` now always logs
   a `checked=N errors=M` summary line, regardless of mode.
 
+- **`customize.sh` — content-based module discovery** — replaces
+  the hardcoded `CANDIDATE_SOURCES` list with a scan of every
+  `/data/adb/modules/*/` folder. The module is identified by
+  `id=dnscrypt-proxy-webui` in `module.prop`, regardless of the
+  folder name (renames, case variations, stale coexisting
+  copies). When multiple candidates tie on file count, the
+  HIGHEST VERSION wins; on version tie, the folder whose name
+  equals `dnscrypt-proxy-webui` wins. This fixes silent data
+  loss on upgrade when the module folder had been renamed.
+
+- **`customize.sh` — stale module folder disambiguation** —
+  after a successful restore, every other module folder with
+  `id=dnscrypt-proxy-webui` (not the new `$MODPATH`, not the
+  active source) is marked as disabled by touching a `disable`
+  file. Magisk/KernelSU/APatch honor this flag. The change is
+  reversible (`rm <dir>/disable`) and non-destructive.
+
+- **`customize.sh` — blocklist reuse** — when upgrading, the
+  previously generated `blocklist.raw` and `blocklist.txt`
+  are copied from the active source install into the new one,
+  saving ~30 seconds of network fetch on each upgrade. Both
+  files remain regenerable (they are still omitted from the
+  persistent backup, so no disk usage increase).
+
 ### Breaking Changes
 
-None. Fully backward-compatible with v1.2.0.
+None. Fully backward-compatible with v1.1.0 and v1.0.0.
 
 ### Notes
 
@@ -98,7 +122,7 @@ None. Fully backward-compatible with v1.2.0.
 
 ---
 
-## [v1.2.0] - 2026-09-29
+## [v1.2.0-pre] - 2026-09-29
 
 > **Data-Preservation Release** — the biggest reliability improvement
 > since v1.0.0.

@@ -302,7 +302,7 @@
 //
 // For v1.2.0, this is 'v1.2.0' (matches VERSION and module.prop).
 // ============================================================
-const CACHE_VERSION = 'v1.2.1';
+const CACHE_VERSION = 'v1.2.0';
 
 const STATIC_CACHE  = `dnscrypt-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dnscrypt-runtime-${CACHE_VERSION}`;

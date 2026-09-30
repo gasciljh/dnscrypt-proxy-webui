@@ -4,7 +4,7 @@
   "short_name": "DNS Proxy",
   "description": "Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354 with per-profile blocklists (HaGeZi Light/Normal/PRO/PRO++/Ultimate), wildcard-aware Custom Rules (Allowlist + Denylist), WebUI (English default + Arabic toggle), separate monitoring Dashboard with JSON metrics, SSE live updates, and offline-capable PWA. Zero telemetry. v1.1.0 added dynamic per-profile memory limits (light=80MB to ultimate=220MB), extended shellQuote charset, and the MONITORING_UI_PORT constant. v1.2.0 adds comprehensive user-data preservation: multi-source smart detection (7 candidate locations — 9 on APatch, which adds two modules_update paths), persistent backup in /sdcard/dnscrypt-webui-backup, SHA256 integrity verification, transactional atomic upgrades with auto-rollback, recovery mode via trigger file, root-solution compatibility (Magisk/KernelSU/APatch), SELinux context preservation, periodic and pre-critical auto-backup, backup rotation (max 21 copies), upgrade history log, and a CLI diagnose tool.",
 
-  "version": "1.2.1",
+  "version": "1.2.0",
 
   "author": "gasciljh",
   "developer": {
