@@ -1395,7 +1395,7 @@ elif [ -n "$FOUND_SOURCE" ]; then
     if [ "$RESTORED_COUNT" -gt 0 ]; then
         ui_print "  ✅ Restored $RESTORED_COUNT user config file(s)"
 
-        # -- v1.2.2 blocklist reuse --
+        # -- v1.2.0 blocklist reuse --
         for _bl in blocklist.raw blocklist.txt; do
             _src="$FOUND_SOURCE/$_bl"
             _dst="$MODPATH/proxy/$_bl"
@@ -2370,7 +2370,7 @@ cleanup_old_transactions() {
 cleanup_old_transactions
 
 # ============================================================
-# [23b] v1.2.2 -- disable stale module folders
+# [23b] v1.2.0 -- disable stale module folders
 # ============================================================
 # Mark every other folder with id=dnscrypt-proxy-webui (not
 # $MODPATH, not $FOUND_SOURCE's parent) as disabled by touching
