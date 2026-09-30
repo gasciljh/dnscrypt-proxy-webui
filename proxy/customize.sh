@@ -670,6 +670,7 @@ CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/local/tmp/dnscrypt-webui-backup"
 
 FOUND_SOURCE=""
 FOUND_FILE_COUNT=0
+_best_version=""
 _best_score=0
 
 for candidate in $CANDIDATE_SOURCES; do
@@ -699,6 +700,7 @@ for candidate in $CANDIDATE_SOURCES; do
     _score=$(( _found_count * 1000000 + _vmaj * 10000 + _vmin * 100 + _vpat ))
     if [ "$_score" -gt "$_best_score" ]; then
         _best_score="$_score"
+        _best_version="$_ver"
         FOUND_SOURCE="$candidate"
         FOUND_FILE_COUNT="$_found_count"
     elif [ "$_score" -eq "$_best_score" ] && [ -n "$FOUND_SOURCE" ]; then
@@ -707,6 +709,7 @@ for candidate in $CANDIDATE_SOURCES; do
         if [ "$_cand_base" = "$MODULE_ID" ] && [ "$_best_base" != "$MODULE_ID" ]; then
             FOUND_SOURCE="$candidate"
             FOUND_FILE_COUNT="$_found_count"
+            _best_version="$_ver"
         fi
     fi
 done
