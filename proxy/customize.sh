@@ -636,71 +636,82 @@ copy_with_context() {
 }
 
 # ============================================================
-# [8] v1.2.0 — Layer 1: multi-source user data discovery
 # ============================================================
+# [8] v1.2.1 -- Layer 1: content-based multi-source discovery
+# ============================================================
+# Identify the module by CONTENT (module.prop id field), not
+# by folder name. Handles renames, case variations, and stale
+# coexisting copies across all root-solution roots.
+#
+# When multiple candidates exist, the HIGHEST VERSION wins
+# (score = files*1e6 + major*1e4 + minor*100 + patch), so a
+# stale v1.0.0 folder does not beat an active v1.1.0 folder.
+# ============================================================
+
 CANDIDATE_SOURCES=""
+MODULE_ID="dnscrypt-proxy-webui"
 
-# Standard and legacy module paths
-CANDIDATE_SOURCES="$CANDIDATE_SOURCES $MODPATH/proxy"
-CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/adb/modules/dnscrypt-proxy-webui/proxy"
-CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/adb/modules/DNSCrypt-Proxy-Webui/proxy"
-CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/adb/modules/DNSCrypt-Proxy-WebUI/proxy"
+for _root in /data/adb/modules /data/adb/modules_update /data/adb/ksu/modules /data/adb/ap/modules; do
+    [ -d "$_root" ] || continue
+    for _m in "$_root"/*; do
+        [ -d "$_m" ] || continue
+        [ -f "$_m/module.prop" ] || continue
+        _id=$(grep ^id= "$_m/module.prop" | head -1 | cut -d= -f2-)
+        _id=$(printf "%s" "$_id" | tr -d "\r ")
+        [ "$_id" = "$MODULE_ID" ] || continue
+        [ -f "$_m/proxy/webui.conf" ] && [ -s "$_m/proxy/webui.conf" ] || continue
+        CANDIDATE_SOURCES="$CANDIDATE_SOURCES $_m/proxy"
+    done
+done
 
-# APatch-specific: modules_update (Layer 5)
-if [ "$ROOT_SOLUTION" = "apatch" ]; then
-    CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/adb/modules_update/dnscrypt-proxy-webui/proxy"
-    CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/adb/modules_update/DNSCrypt-Proxy-Webui/proxy"
-fi
-
-# Persistent backup locations (Layer 2)
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP/current"
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP"
-
-# tmp fallback (legacy v1.1.0 backups)
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/local/tmp/dnscrypt-webui-backup"
 
-# --- Search ---
 FOUND_SOURCE=""
 FOUND_FILE_COUNT=0
-
-ui_print ""
-ui_print "- Searching for user data..."
+_best_score=0
 
 for candidate in $CANDIDATE_SOURCES; do
     [ -d "$candidate" ] || continue
-
-    # Skip if this is the current install target and is empty
-    if [ "$candidate" = "$MODPATH/proxy" ] && [ ! -f "$candidate/webui.conf" ]; then
-        continue
-    fi
-
-    # HARD-CS-04: renamed `_count` to `_found_count` to avoid any
-    # collision with shell-builtin or Magisk-provided variables.
     _found_count=0
     for _f in $USER_FILES; do
         if [ -f "$candidate/$_f" ] && [ -s "$candidate/$_f" ]; then
             _found_count=$((_found_count + 1))
         fi
     done
+    [ "$_found_count" -lt 3 ] && continue
 
-    # Require at least 3 valid files (represents real user data)
-    if [ "$_found_count" -ge 3 ]; then
+    _m_dir=$(dirname "$candidate")
+    _ver="0.0.0"
+    if [ -f "$_m_dir/module.prop" ]; then
+        _ver=$(grep ^version= "$_m_dir/module.prop" | head -1 | cut -d= -f2-)
+        _ver=$(printf "%s" "$_ver" | tr -d "v\r ")
+    fi
+
+    _vmaj=$(echo "$_ver" | cut -d. -f1)
+    _vmin=$(echo "$_ver" | cut -d. -f2)
+    _vpat=$(echo "$_ver" | cut -d. -f3)
+    case "$_vmaj" in ""|*[!0-9]*) _vmaj=0 ;; esac
+    case "$_vmin" in ""|*[!0-9]*) _vmin=0 ;; esac
+    case "$_vpat" in ""|*[!0-9]*) _vpat=0 ;; esac
+
+    _score=$(( _found_count * 1000000 + _vmaj * 10000 + _vmin * 100 + _vpat ))
+    if [ "$_score" -gt "$_best_score" ]; then
+        _best_score="$_score"
         FOUND_SOURCE="$candidate"
         FOUND_FILE_COUNT="$_found_count"
-        ui_print "  → Found: $candidate ($_found_count files)"
-        echo "Found user data: $candidate ($_found_count files)" >> "$INSTALL_LOG"
-        break
     fi
 done
 
 if [ -z "$FOUND_SOURCE" ]; then
-    ui_print "  → No existing user data found (fresh install)"
-    echo "No user data found — fresh install" >> "$INSTALL_LOG"
+    ui_print "  -> No existing user data found (fresh install)"
+    echo "No user data found" >> "$INSTALL_LOG"
 else
-    ui_print "  ✅ User data source: $FOUND_SOURCE"
+    ui_print "  OK: User data source: $FOUND_SOURCE ($FOUND_FILE_COUNT files)"
+    echo "Found: $FOUND_SOURCE ($FOUND_FILE_COUNT files)" >> "$INSTALL_LOG"
 fi
 
-# ============================================================
 # [8a] v1.2.0 — Layer 7: recovery mode check
 # ============================================================
 RECOVERY_MODE=0
