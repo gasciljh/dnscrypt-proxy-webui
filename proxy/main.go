@@ -403,6 +403,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"unicode/utf8"
 )
 
 // ============================================================
@@ -3423,21 +3424,29 @@ func readLogFile(name, confirm string) map[string]interface{} {
 
 		readSize := info.Size()
 		if readSize > LOG_MAX_READ_BYTES {
-			if _, seekErr := f.Seek(-LOG_MAX_READ_BYTES, io.SeekEnd); seekErr != nil {
-				if _, resetErr := f.Seek(0, io.SeekStart); resetErr != nil {
-					return map[string]interface{}{
-						"status":  "error",
-						"message": "Cannot seek file: " + resetErr.Error(),
-					}
-				}
-			}
-			readSize = LOG_MAX_READ_BYTES
 			truncated = true
+			// Fast path: seek to the last N bytes.
+			if _, seekErr := f.Seek(-LOG_MAX_READ_BYTES, io.SeekEnd); seekErr == nil {
+				data := make([]byte, LOG_MAX_READ_BYTES)
+				n, _ := io.ReadFull(f, data)
+				content = string(data[:n])
+			} else {
+				// Slow path: backward seek failed. Read all (bounded)
+				// and slice the last N bytes in memory, so the user
+				// still sees the newest entries.
+				logWithLevel("warn", "readLogFile: backward seek failed for "+name+", using slow path")
+				limited := io.LimitReader(f, LOG_MAX_READ_BYTES*2)
+				data, _ := io.ReadAll(limited)
+				if int64(len(data)) > LOG_MAX_READ_BYTES {
+					data = data[len(data)-LOG_MAX_READ_BYTES:]
+				}
+				content = string(data)
+			}
+		} else {
+			data := make([]byte, readSize)
+			n, _ := io.ReadFull(f, data)
+			content = string(data[:n])
 		}
-
-		data := make([]byte, readSize)
-		n, _ := io.ReadFull(f, data)
-		content = string(data[:n])
 	}
 
 	return map[string]interface{}{
@@ -4667,6 +4676,26 @@ func createAutoBackup(reason string) {
 		logWithLevel("warn", fmt.Sprintf(
 			"⚠️ auto-backup failed (reason=%s, took=%v): %v",
 			safeReason, elapsed, err))
+
+		// v1.2.1 fix: cleanup partial backup on failure
+		// The shell was SIGKILLed on timeout; children (cp,
+		// sha256sum) may briefly survive and finish writing to
+		// targetDir. Give them a short grace period, then remove
+		// the partial directory. rotate_backups already ignores
+		// manifest-less dirs (v1.2.1 change), but cleanup keeps
+		// the SD card tidy and the operator unconfused.
+		time.Sleep(500 * time.Millisecond)
+		if _, statErr := os.Stat(targetDir); statErr == nil {
+			if rmErr := os.RemoveAll(targetDir); rmErr != nil {
+				logWithLevel("debug", fmt.Sprintf(
+					"auto-backup cleanup: could not remove %s: %v",
+					filepath.Base(targetDir), rmErr))
+			} else {
+				logWithLevel("info", fmt.Sprintf(
+					"🧹 auto-backup cleanup: removed partial %s",
+					filepath.Base(targetDir)))
+			}
+		}
 		return
 	}
 
@@ -4679,8 +4708,43 @@ func createAutoBackup(reason string) {
 // .pending_notification file in the persistent backup directory
 // and forwards its content to the log.
 func checkPendingNotifications() {
-	data, err := os.ReadFile(PENDING_NOTIFY_FILE)
+	path := PENDING_NOTIFY_FILE
+
+	data, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		logWithLevel("warn", "checkPendingNotifications: read failed: "+err.Error())
+		// Attempt cleanup so a stuck file does not loop forever.
+		_ = os.Remove(path)
+		return
+	}
+
+	if len(data) == 0 {
+		if err := os.Remove(path); err != nil {
+			logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
+		}
+		return
+	}
+
+	const maxNotificationBytes = 4096
+	if len(data) > maxNotificationBytes {
+		logWithLevel("warn", fmt.Sprintf(
+			"checkPendingNotifications: oversized (%d bytes), truncating to %d",
+			len(data), maxNotificationBytes))
+		data = data[:maxNotificationBytes]
+		// Back off any rune cut in half by the slice.
+		for len(data) > 0 && !utf8.Valid(data) {
+			data = data[:len(data)-1]
+		}
+	}
+
+	if !utf8.Valid(data) {
+		logWithLevel("warn", "checkPendingNotifications: invalid UTF-8, skipping")
+		if err := os.Remove(path); err != nil {
+			logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
+		}
 		return
 	}
 
@@ -4691,7 +4755,7 @@ func checkPendingNotifications() {
 		logWithLevel("debug", "checkPendingNotifications: empty notification file")
 	}
 
-	if err := os.Remove(PENDING_NOTIFY_FILE); err != nil {
+	if err := os.Remove(path); err != nil {
 		logWithLevel("debug", "checkPendingNotifications: remove failed: "+err.Error())
 	}
 }

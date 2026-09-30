@@ -1721,6 +1721,7 @@ EOF
 # ============================================================
 verify_backup_integrity() {
     local dir="$1"
+    local strict="${2:-0}"
     local manifest="$dir/.manifest.json"
 
     [ -d "$dir" ] || return 1
@@ -1733,6 +1734,27 @@ verify_backup_integrity() {
 
     local has_sha=0
     command -v sha256sum >/dev/null 2>&1 && has_sha=1
+
+    # v1.2.1 STRICT: manifest and sha256sum are mandatory.
+    if [ "$strict" = "1" ]; then
+        if [ ! -f "$manifest" ]; then
+            log_fn "⚠️ verify_backup: manifest missing: $manifest"
+            return 1
+        fi
+        if [ "$has_sha" != "1" ]; then
+            log_fn "⚠️ verify_backup: sha256sum unavailable — cannot verify"
+            return 1
+        fi
+    fi
+
+    # v1.2.1 STRICT: expected file count from the manifest.
+    local manifest_count=0
+    if [ "$strict" = "1" ] && [ "$has_jq" = "1" ]; then
+        manifest_count=$(jq -r '.files_count // 0' "$manifest" 2>/dev/null)
+        case "$manifest_count" in
+            ''|*[!0-9]*) manifest_count=0 ;;
+        esac
+    fi
 
     for f in $USER_FILES; do
         local file="$dir/$f"
@@ -1786,7 +1808,14 @@ verify_backup_integrity() {
                            sed 's/.*"sha256"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         fi
 
-        [ -z "$expected_sha" ] && continue
+        # v1.2.1 STRICT: missing hash is an error in strict mode.
+        if [ -z "$expected_sha" ]; then
+            if [ "$strict" = "1" ]; then
+                log_fn "⚠️ verify_backup: no SHA256 in manifest for: $f"
+                errors=$((errors + 1))
+            fi
+            continue
+        fi
 
         local actual_sha
         actual_sha=$(sha256sum "$file" 2>/dev/null | awk '{print $1}')
@@ -1805,6 +1834,17 @@ verify_backup_integrity() {
         log_fn "⚠️ verify_backup: no user files found in $dir"
         return 1
     fi
+
+    # v1.2.1 STRICT: cross-check the count against the manifest.
+    if [ "$strict" = "1" ] && [ "$manifest_count" -gt 0 ]; then
+        if [ "$checked" -ne "$manifest_count" ]; then
+            log_fn "⚠️ verify_backup: count mismatch — manifest=$manifest_count, checked=$checked"
+            errors=$((errors + 1))
+        fi
+    fi
+
+    # v1.2.1: always log the summary (observability).
+    log_fn "ℹ️ verify_backup: checked=$checked errors=$errors in $(basename "$dir")"
 
     [ "$errors" -eq 0 ]
 }
@@ -1996,10 +2036,19 @@ rotate_backups() {
     fi
 
     local snapshots
+    # v1.2.1: skip empty / manifest-less snapshots
+    # A snapshot is counted for retention only if it is non-empty
+    # AND contains a .manifest.json. Partial/failed copies are
+    # ignored so they do not displace valid snapshots.
     snapshots=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
         ls -1d */ 2>/dev/null | \
         sed 's:/$::' | \
         grep -E '^[0-9]{8}-[0-9]{6}-' | \
+        while IFS= read -r _d; do
+            [ -z "$(ls -A "$_d" 2>/dev/null)" ] && continue
+            [ -f "$_d/.manifest.json" ] || continue
+            printf '%s\n' "$_d"
+        done | \
         sort -r)
 
     [ -z "$snapshots" ] && return 0

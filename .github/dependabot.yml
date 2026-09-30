@@ -245,6 +245,22 @@ updates:
       time: "06:00"
       timezone: "Etc/UTC"
     open-pull-requests-limit: 5
+    ignore:
+      # HARD-DEP-01: Dependabot repeatedly proposes major
+      # versions that do not exist on GitHub Actions
+      # (checkout@v7, upload-artifact@v7, action-gh-release@v3,
+      # codeql-action@v4). This matches the v1.1.0 incident
+      # documented in release.yml as HARD-REL-13.
+      # Block ONLY major-version updates. Patch and minor
+      # updates are still proposed (they are safe).
+      - dependency-name: "actions/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "softprops/action-gh-release"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "github/codeql-action"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "nttld/setup-ndk"
+        update-types: ["version-update:semver-major"]
     reviewers:
       - "gasciljh"
     assignees:

@@ -528,3 +528,20 @@ site/
 # below ignores them at any depth.
 txn-*/
 orphan-txn-*/
+# ============================================================
+# [3] DNS binaries (fetched by fetch_dns_binaries.sh)
+# ============================================================
+# DNS engine binaries downloaded per architecture. Injected
+# into the Magisk ZIP at packaging time. Never committed.
+#
+# ⚠️ NOTE: proxy/dnscrypt-proxy.toml and
+#    proxy/dnscrypt-proxy.version are TRACKED files. The
+#    patterns below use full filenames (no wildcard), so
+#    neither is matched. Verify:
+#      git check-ignore -v proxy/dnscrypt-proxy.version
+#      → should report "not ignored".
+# ============================================================
+proxy/dnscrypt-proxy-arm64
+proxy/dnscrypt-proxy-arm
+proxy/dnscrypt-proxy-x86_64
+proxy/dnscrypt-proxy-x86
