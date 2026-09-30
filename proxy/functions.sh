@@ -1735,7 +1735,7 @@ verify_backup_integrity() {
     local has_sha=0
     command -v sha256sum >/dev/null 2>&1 && has_sha=1
 
-    # v1.2.1 STRICT: manifest and sha256sum are mandatory.
+    # v1.2.0 STRICT: manifest and sha256sum are mandatory.
     if [ "$strict" = "1" ]; then
         if [ ! -f "$manifest" ]; then
             log_fn "⚠️ verify_backup: manifest missing: $manifest"
@@ -1747,7 +1747,7 @@ verify_backup_integrity() {
         fi
     fi
 
-    # v1.2.1 STRICT: expected file count from the manifest.
+    # v1.2.0 STRICT: expected file count from the manifest.
     local manifest_count=0
     if [ "$strict" = "1" ] && [ "$has_jq" = "1" ]; then
         manifest_count=$(jq -r '.files_count // 0' "$manifest" 2>/dev/null)
@@ -1808,7 +1808,7 @@ verify_backup_integrity() {
                            sed 's/.*"sha256"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         fi
 
-        # v1.2.1 STRICT: missing hash is an error in strict mode.
+        # v1.2.0 STRICT: missing hash is an error in strict mode.
         if [ -z "$expected_sha" ]; then
             if [ "$strict" = "1" ]; then
                 log_fn "⚠️ verify_backup: no SHA256 in manifest for: $f"
@@ -1835,7 +1835,7 @@ verify_backup_integrity() {
         return 1
     fi
 
-    # v1.2.1 STRICT: cross-check the count against the manifest.
+    # v1.2.0 STRICT: cross-check the count against the manifest.
     if [ "$strict" = "1" ] && [ "$manifest_count" -gt 0 ]; then
         if [ "$checked" -ne "$manifest_count" ]; then
             log_fn "⚠️ verify_backup: count mismatch — manifest=$manifest_count, checked=$checked"
@@ -1843,7 +1843,7 @@ verify_backup_integrity() {
         fi
     fi
 
-    # v1.2.1: always log the summary (observability).
+    # v1.2.0: always log the summary (observability).
     log_fn "ℹ️ verify_backup: checked=$checked errors=$errors in $(basename "$dir")"
 
     [ "$errors" -eq 0 ]
@@ -2036,7 +2036,7 @@ rotate_backups() {
     fi
 
     local snapshots
-    # v1.2.1: skip empty / manifest-less snapshots
+    # v1.2.0: skip empty / manifest-less snapshots
     # A snapshot is counted for retention only if it is non-empty
     # AND contains a .manifest.json. Partial/failed copies are
     # ignored so they do not displace valid snapshots.

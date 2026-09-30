@@ -282,10 +282,10 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # [1] Determine module path
 # ============================================================
 
-# v1.2.1: --version flag (checked before any argument parsing)
+# v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.1"
+		echo "$0: v1.2.0"
 		exit 0
 		;;
 esac

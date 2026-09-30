@@ -357,10 +357,10 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # [1] Determine module path (temporary)
 # ============================================================
 
-# v1.2.1: --version flag (checked before any argument parsing)
+# v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.1"
+		echo "$0: v1.2.0"
 		exit 0
 		;;
 esac
@@ -637,7 +637,7 @@ copy_with_context() {
 
 # ============================================================
 # ============================================================
-# [8] v1.2.1 -- Layer 1: content-based multi-source discovery
+# [8] v1.2.0 -- Layer 1: content-based multi-source discovery
 # ============================================================
 # Identify the module by CONTENT (module.prop id field), not
 # by folder name. Handles renames, case variations, and stale
@@ -701,6 +701,13 @@ for candidate in $CANDIDATE_SOURCES; do
         _best_score="$_score"
         FOUND_SOURCE="$candidate"
         FOUND_FILE_COUNT="$_found_count"
+    elif [ "$_score" -eq "$_best_score" ] && [ -n "$FOUND_SOURCE" ]; then
+        _cand_base=$(basename "$_m_dir")
+        _best_base=$(basename "$(dirname "$FOUND_SOURCE")")
+        if [ "$_cand_base" = "$MODULE_ID" ] && [ "$_best_base" != "$MODULE_ID" ]; then
+            FOUND_SOURCE="$candidate"
+            FOUND_FILE_COUNT="$_found_count"
+        fi
     fi
 done
 
@@ -708,8 +715,9 @@ if [ -z "$FOUND_SOURCE" ]; then
     ui_print "  -> No existing user data found (fresh install)"
     echo "No user data found" >> "$INSTALL_LOG"
 else
-    ui_print "  OK: User data source: $FOUND_SOURCE ($FOUND_FILE_COUNT files)"
-    echo "Found: $FOUND_SOURCE ($FOUND_FILE_COUNT files)" >> "$INSTALL_LOG"
+    _found_name=$(basename "$(dirname "$FOUND_SOURCE")")
+    ui_print "  OK: Found: $_found_name (v$_best_version, $FOUND_FILE_COUNT files)"
+    echo "Selected: $_found_name (v$_best_version, $FOUND_FILE_COUNT files) at $FOUND_SOURCE" >> "$INSTALL_LOG"
 fi
 
 # [8a] v1.2.0 — Layer 7: recovery mode check
@@ -1386,6 +1394,20 @@ elif [ -n "$FOUND_SOURCE" ]; then
 
     if [ "$RESTORED_COUNT" -gt 0 ]; then
         ui_print "  ✅ Restored $RESTORED_COUNT user config file(s)"
+
+        # -- v1.2.2 blocklist reuse --
+        for _bl in blocklist.raw blocklist.txt; do
+            _src="$FOUND_SOURCE/$_bl"
+            _dst="$MODPATH/proxy/$_bl"
+            if [ -f "$_src" ] && [ -s "$_src" ]; then
+                if [ ! -f "$_dst" ] || [ ! -s "$_dst" ]; then
+                    if copy_with_context "$_src" "$_dst" 2>/dev/null; then
+                        ui_print "  OK: Reused $_bl ($(wc -c < "$_src") bytes)"
+                        echo "Reused $_bl" >> "$INSTALL_LOG"
+                    fi
+                fi
+            fi
+        done
     fi
 
     if [ "$CRITICAL_RESTORE_FAILED" = "1" ]; then
@@ -2348,6 +2370,44 @@ cleanup_old_transactions() {
 cleanup_old_transactions
 
 # ============================================================
+# [23b] v1.2.2 -- disable stale module folders
+# ============================================================
+# Mark every other folder with id=dnscrypt-proxy-webui (not
+# $MODPATH, not $FOUND_SOURCE's parent) as disabled by touching
+# a `disable` file. Magisk/KernelSU/APatch honor it.
+#
+# Why disable instead of rm -rf:
+#   * Reversible: `rm disable` re-enables.
+#   * Non-destructive: data is preserved.
+#   * Safe: no recursive deletion.
+#   * Discovery still sees them as fallback sources.
+# ============================================================
+if [ -n "$FOUND_SOURCE" ]; then
+    _src_dir=$(dirname "$FOUND_SOURCE")
+    _disabled_count=0
+    for _root in /data/adb/modules /data/adb/modules_update /data/adb/ksu/modules /data/adb/ap/modules; do
+        [ -d "$_root" ] || continue
+        for _m in "$_root"/*; do
+            [ -d "$_m" ] || continue
+            [ "$_m" = "$MODPATH" ] && continue
+            [ "$_m" = "$_src_dir" ] && continue
+            [ -f "$_m/module.prop" ] || continue
+            _mid=$(grep '^id=' "$_m/module.prop" | head -1 | cut -d= -f2-)
+            _mid=$(printf "%s" "$_mid" | tr -d "\r ")
+            [ "$_mid" = "$MODULE_ID" ] || continue
+            if [ ! -f "$_m/disable" ]; then
+                if touch "$_m/disable" 2>/dev/null; then
+                    ui_print "  Locked stale: $(basename "$_m")"
+                    _disabled_count=$((_disabled_count + 1))
+                fi
+            fi
+        done
+    done
+    if [ "$_disabled_count" -gt 0 ]; then
+        echo "Disabled $_disabled_count stale" >> "$INSTALL_LOG"
+    fi
+fi
+
 # [24] Display final summary
 # ============================================================
 # CSH-16 fix: the previous version had TWO consecutive
