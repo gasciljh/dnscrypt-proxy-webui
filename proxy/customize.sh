@@ -2416,21 +2416,43 @@ cleanup_old_transactions
 # ============================================================
 if [ -n "$FOUND_SOURCE" ]; then
     _src_dir=$(dirname "$FOUND_SOURCE")
+    _target_basename=$(basename "$MODPATH")
+    _new_ver="${MODULE_VERSION#v}"
+    _new_vmaj=$(echo "$_new_ver" | cut -d. -f1); case "$_new_vmaj" in ""|*[!0-9]*) _new_vmaj=0 ;; esac
+    _new_vmin=$(echo "$_new_ver" | cut -d. -f2); case "$_new_vmin" in ""|*[!0-9]*) _new_vmin=0 ;; esac
+    _new_vpat=$(echo "$_new_ver" | cut -d. -f3); case "$_new_vpat" in ""|*[!0-9]*) _new_vpat=0 ;; esac
+    _new_score=$((_new_vmaj * 10000 + _new_vmin * 100 + _new_vpat))
+
     _disabled_count=0
     for _root in /data/adb/modules /data/adb/modules_update /data/adb/ksu/modules /data/adb/ap/modules; do
         [ -d "$_root" ] || continue
         for _m in "$_root"/*; do
             [ -d "$_m" ] || continue
             [ "$_m" = "$MODPATH" ] && continue
-            # REMOVED-SRC-EXCLUSION: source folder is a duplicate
-            # after successful restore, must be disabled
+
+            _m_name=$(basename "$_m")
+            # v1.2.1 smart disable: skip folders with same basename
+            # as $MODPATH (Magisk replaces them at boot).
+            [ "$_m_name" = "$_target_basename" ] && continue
+
             [ -f "$_m/module.prop" ] || continue
             _mid=$(grep '^id=' "$_m/module.prop" | head -1 | cut -d= -f2-)
             _mid=$(printf "%s" "$_mid" | tr -d "\r ")
             [ "$_mid" = "$MODULE_ID" ] || continue
+
+            # v1.2.1 smart disable: skip folders whose version >= ours.
+            _m_ver=$(grep '^version=' "$_m/module.prop" | head -1 | cut -d= -f2-)
+            _m_ver=$(printf "%s" "$_m_ver" | tr -d "v\r ")
+            _m_vmaj=$(echo "$_m_ver" | cut -d. -f1); case "$_m_vmaj" in ""|*[!0-9]*) _m_vmaj=0 ;; esac
+            _m_vmin=$(echo "$_m_ver" | cut -d. -f2); case "$_m_vmin" in ""|*[!0-9]*) _m_vmin=0 ;; esac
+            _m_vpat=$(echo "$_m_ver" | cut -d. -f3); case "$_m_vpat" in ""|*[!0-9]*) _m_vpat=0 ;; esac
+            _m_score=$((_m_vmaj * 10000 + _m_vmin * 100 + _m_vpat))
+
+            [ "$_m_score" -ge "$_new_score" ] && continue
+
             if [ ! -f "$_m/disable" ]; then
                 if touch "$_m/disable" 2>/dev/null; then
-                    ui_print "  🔒 Locked stale: $(basename "$_m")"
+                    ui_print "  🔒 Locked stale: $_m_name (v$_m_ver < v$_new_ver)"
                     _disabled_count=$((_disabled_count + 1))
                 fi
             fi
