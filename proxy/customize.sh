@@ -685,10 +685,18 @@ for candidate in $CANDIDATE_SOURCES; do
 
     _m_dir=$(dirname "$candidate")
     _ver="0.0.0"
-    if [ -f "$_m_dir/module.prop" ]; then
-        _ver=$(grep ^version= "$_m_dir/module.prop" | head -1 | cut -d= -f2-)
-        _ver=$(printf "%s" "$_ver" | tr -d "v\r ")
+
+    # manifest.json fallback (backup snapshots have no module.prop)
+    if [ -f "$candidate/.manifest.json" ]; then
+        _ver=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$candidate/.manifest.json" 2>/dev/null | \
+               head -1 | sed 's/.*"\([^"]*\)"$/\1/')
     fi
+
+    if [ "$_ver" = "0.0.0" ] && [ -f "$_m_dir/module.prop" ]; then
+        _ver=$(grep ^version= "$_m_dir/module.prop" | head -1 | cut -d= -f2-)
+    fi
+
+    _ver=$(printf "%s" "$_ver" | tr -d "v\r ")
 
     _vmaj=$(echo "$_ver" | cut -d. -f1)
     _vmin=$(echo "$_ver" | cut -d. -f2)
@@ -2393,7 +2401,8 @@ if [ -n "$FOUND_SOURCE" ]; then
         for _m in "$_root"/*; do
             [ -d "$_m" ] || continue
             [ "$_m" = "$MODPATH" ] && continue
-            [ "$_m" = "$_src_dir" ] && continue
+            # REMOVED-SRC-EXCLUSION: source folder is a duplicate
+            # after successful restore, must be disabled
             [ -f "$_m/module.prop" ] || continue
             _mid=$(grep '^id=' "$_m/module.prop" | head -1 | cut -d= -f2-)
             _mid=$(printf "%s" "$_mid" | tr -d "\r ")
