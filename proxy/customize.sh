@@ -525,8 +525,8 @@ INSTALL_LOG="/data/local/tmp/dnscrypt_install.log"
 } >> "$INSTALL_LOG"
 
 ARCH=$(getprop ro.product.cpu.abi)
-ui_print "- Architecture: $ARCH"
-ui_print "- Root solution: $ROOT_SOLUTION"
+ui_print "- 📱 Architecture: $ARCH"
+ui_print "- 🔐 Root solution: $ROOT_SOLUTION"
 echo "Architecture: $ARCH" >> "$INSTALL_LOG"
 
 # ============================================================
@@ -726,8 +726,14 @@ if [ -z "$FOUND_SOURCE" ]; then
     ui_print "  -> No existing user data found (fresh install)"
     echo "No user data found" >> "$INSTALL_LOG"
 else
-    _found_name=$(basename "$(dirname "$FOUND_SOURCE")")
-    ui_print "  OK: Found: $_found_name (v$_best_version, $FOUND_FILE_COUNT files)"
+    if [ "$FOUND_SOURCE" = "$PERSISTENT_BACKUP/current" ]; then
+        _found_name="backup/current"
+    elif [ "$FOUND_SOURCE" = "$PERSISTENT_BACKUP" ]; then
+        _found_name="backup"
+    else
+        _found_name=$(basename "$(dirname "$FOUND_SOURCE")")
+    fi
+    ui_print "  ✅ Found: $_found_name (v$_best_version, $FOUND_FILE_COUNT files)"
     echo "Selected: $_found_name (v$_best_version, $FOUND_FILE_COUNT files) at $FOUND_SOURCE" >> "$INSTALL_LOG"
 fi
 
@@ -850,7 +856,7 @@ if [ "$KILLED_COUNT" -gt 0 ]; then
 fi
 
 _inline_cleanup_firewall
-ui_print "- Firewall rules cleaned"
+ui_print "- 🔥 Firewall rules cleaned"
 echo "Firewall cleanup attempted (Custom Chain + Legacy)" >> "$INSTALL_LOG"
 
 # ============================================================
@@ -950,7 +956,7 @@ rollback_transaction() {
 
 if [ -n "$FOUND_SOURCE" ] && [ "$RECOVERY_MODE" != "1" ]; then
     if begin_transaction; then
-        ui_print "- Transaction started: $TXN_ID"
+        ui_print "- 📦 Transaction started: $TXN_ID"
         echo "Transaction: $TXN_ID" >> "$INSTALL_LOG"
     else
         ui_print "  ⚠️ Failed to create transaction dir — continuing without rollback"
@@ -1226,7 +1232,7 @@ if [ "$RECOVERY_MODE" = "1" ]; then
 elif [ -n "$FOUND_SOURCE" ]; then
     PERSISTENT_BACKUP_DIR="$BACKUP_DIR"
     if create_persistent_backup "$FOUND_SOURCE"; then
-        ui_print "- Persistent backup: $PERSISTENT_BACKUP_DIR"
+        ui_print "- 💾 Persistent backup: $PERSISTENT_BACKUP_DIR"
         echo "Persistent backup created: $PERSISTENT_BACKUP_DIR" >> "$INSTALL_LOG"
         PERSISTENT_BACKUP_OK=1
     else
@@ -1249,7 +1255,7 @@ fi
 # [9] Extract module files from ZIP
 # ============================================================
 ui_print ""
-ui_print "- Extracting module files..."
+ui_print "- 📂 Extracting module files..."
 
 mkdir -p "$MODPATH/web" 2>/dev/null
 
@@ -1373,7 +1379,7 @@ if [ "$RECOVERY_MODE" = "1" ]; then
     echo "Skipped [9c] restore — recovery mode" >> "$INSTALL_LOG"
 elif [ -n "$FOUND_SOURCE" ]; then
     ui_print ""
-    ui_print "- Restoring user configuration..."
+    ui_print "- 🔄 Restoring user configuration..."
 
     for f in $USER_FILES; do
         src="$FOUND_SOURCE/$f"
@@ -1406,16 +1412,31 @@ elif [ -n "$FOUND_SOURCE" ]; then
     if [ "$RESTORED_COUNT" -gt 0 ]; then
         ui_print "  ✅ Restored $RESTORED_COUNT user config file(s)"
 
-        # -- v1.2.0 blocklist reuse --
+        # -- v1.2.1 blocklist reuse: search all candidates --
+        # Priority 1: FOUND_SOURCE. If FOUND_SOURCE lacks the
+        # blocklist (e.g. backup/current excludes it by design),
+        # fall back to any module folder with a non-empty
+        # blocklist. Prevents [17] from creating empty files and
+        # forcing manual "Apply" in the WebUI on every upgrade.
         for _bl in blocklist.raw blocklist.txt; do
-            _src="$FOUND_SOURCE/$_bl"
             _dst="$MODPATH/proxy/$_bl"
-            if [ -f "$_src" ] && [ -s "$_src" ]; then
-                if [ ! -f "$_dst" ] || [ ! -s "$_dst" ]; then
-                    if copy_with_context "$_src" "$_dst" 2>/dev/null; then
-                        ui_print "  OK: Reused $_bl ($(wc -c < "$_src") bytes)"
-                        echo "Reused $_bl" >> "$INSTALL_LOG"
-                    fi
+            [ -f "$_dst" ] && [ -s "$_dst" ] && continue
+
+            _src=""
+            if [ -f "$FOUND_SOURCE/$_bl" ] && [ -s "$FOUND_SOURCE/$_bl" ]; then
+                _src="$FOUND_SOURCE/$_bl"
+            else
+                for _bm in /data/adb/modules/*/; do
+                    [ -f "$_bm/proxy/$_bl" ] && [ -s "$_bm/proxy/$_bl" ] || continue
+                    _src="$_bm/proxy/$_bl"
+                    break
+                done
+            fi
+
+            if [ -n "$_src" ]; then
+                if copy_with_context "$_src" "$_dst" 2>/dev/null; then
+                    ui_print "  ✅ Reused $_bl ($(wc -c < "$_src") bytes)"
+                    echo "Reused $_bl from $_src" >> "$INSTALL_LOG"
                 fi
             fi
         done
@@ -1510,16 +1531,16 @@ migrate_v1_0_0_to_v1_2_0() {
 migrate_config() {
     case "$SOURCE_VERSION" in
         "v1.0.0")
-            ui_print "- Migration: $SOURCE_VERSION → $MODULE_VERSION"
+            ui_print "- 🔄 Migration: $SOURCE_VERSION → $MODULE_VERSION"
             migrate_v1_0_0_to_v1_2_0
             ;;
         "v1.1.0"|"v1.2.0")
-            ui_print "- Migration: no changes needed ($SOURCE_VERSION → $MODULE_VERSION)"
+            ui_print "- 🔄 Migration: no changes needed ($SOURCE_VERSION → $MODULE_VERSION)"
             ;;
         "")
             ;;
         *)
-            ui_print "- Migration: unknown source ($SOURCE_VERSION) — using as-is"
+            ui_print "- 🔄 Migration: unknown source ($SOURCE_VERSION) — using as-is"
             ;;
     esac
 }
@@ -1598,7 +1619,7 @@ case "$ARCH" in
         ;;
 esac
 
-ui_print "- Target binaries: $DNS_BIN + $WEB_BIN"
+ui_print "- 🎯 Target binaries: $DNS_BIN + $WEB_BIN"
 
 if [ ! -f "$BIN_DIR/$DNS_BIN" ]; then
     echo "❌ DNS binary not found: $DNS_BIN" >> "$INSTALL_LOG"
@@ -1637,7 +1658,7 @@ ui_print ""
 # ============================================================
 RUN_DIR="$BIN_DIR/run"
 
-ui_print "- Creating secure run/ directory..."
+ui_print "- 🔧 Creating secure run/ directory..."
 
 mkdir -p "$RUN_DIR" 2>/dev/null
 
@@ -1678,16 +1699,16 @@ if [ "$RECOVERY_MODE" = "1" ]; then
     ui_print "- Recovery mode: old modules will be detected at runtime"
     echo "Old modules: runtime detection (recovery mode)" >> "$INSTALL_LOG"
 elif [ -n "$FOUND_SOURCE" ]; then
-    ui_print "- Upgrade detected (source: $FOUND_SOURCE)"
+    ui_print "- ⬆️  Upgrade detected (source: $FOUND_SOURCE)"
     ui_print "  Old modules will be detected at runtime via WebUI"
     echo "Upgrade detected: source=$FOUND_SOURCE" >> "$INSTALL_LOG"
 else
-    ui_print "- Fresh installation (no previous data found)"
+    ui_print "- 🆕 Fresh installation (no previous data found)"
     echo "Fresh install (no source)" >> "$INSTALL_LOG"
 fi
 
 ui_print ""
-ui_print "- Creating configuration files..."
+ui_print "- ⚙️  Creating configuration files..."
 
 # ============================================================
 # [14] Port validation — v1.2.0 collision-safe
@@ -1874,7 +1895,7 @@ ui_print "  ✅ Default config files created"
 # [18] Generate secure login credentials
 # ============================================================
 ui_print ""
-ui_print "- Generating secure credentials..."
+ui_print "- 🔐 Generating secure credentials..."
 
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
@@ -2069,7 +2090,7 @@ fi
 # ============================================================
 # [19] Set permissions
 # ============================================================
-ui_print "- Setting permissions..."
+ui_print "- 🔒 Setting permissions..."
 
 set_perm_recursive "$MODPATH" 0 0 0755 0644 2>/dev/null || true
 
@@ -2340,7 +2361,7 @@ rotate_backups() {
 }
 
 if [ "$PERSISTENT_BACKUP_OK" = "1" ]; then
-    ui_print "- Rotating old backups (keep: 21)"
+    ui_print "- 🗂️  Rotating old backups (keep: 21)"
     rotate_backups 21
     ui_print "  ✅ Rotation complete"
 fi
@@ -2350,7 +2371,7 @@ fi
 # ============================================================
 if [ "$TXN_ACTIVE" = "1" ]; then
     if commit_transaction; then
-        ui_print "- Transaction committed"
+        ui_print "- ✅ Transaction committed"
     else
         ui_print "  ⚠️ Transaction commit failed (non-critical)"
     fi
@@ -2409,7 +2430,7 @@ if [ -n "$FOUND_SOURCE" ]; then
             [ "$_mid" = "$MODULE_ID" ] || continue
             if [ ! -f "$_m/disable" ]; then
                 if touch "$_m/disable" 2>/dev/null; then
-                    ui_print "  Locked stale: $(basename "$_m")"
+                    ui_print "  🔒 Locked stale: $(basename "$_m")"
                     _disabled_count=$((_disabled_count + 1))
                 fi
             fi
