@@ -28,6 +28,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v1.3.0] - 2026-10-02
+
+> **Feature release** — PWA install button + live status LED.
+
+### Added
+
+- **PWA install button (WebUI)** — a smart, dynamic install
+  button that is **always visible** (except when the app is
+  already installed or running standalone). Its behavior adapts
+  to the browser:
+    • Chromium-based browsers (Chrome, Edge, Brave, Samsung
+      Internet) — clicking opens the native
+      `beforeinstallprompt` dialog.
+    • iOS Safari — clicking shows step-by-step "Add to Home
+      Screen" instructions.
+    • Unsupported browsers (Firefox, Opera Mini, older
+      browsers) — clicking shows a friendly modal stating the
+      browser is not supported, listing supported alternatives
+      (Chrome, Edge, Brave) with Play Store links, so the user
+      is guided rather than left without an explanation.
+  The modal is fully language-aware (EN + AR). Implemented in
+  `web/index.html` section [13c] and reflected in
+  `web/manifest.json` via the new `x-note-v130` field.
+
+- **Live status LED on the Today counter (WebUI)** — the
+  "Today" stat now carries a 12x12 LED that pulses green when
+  the DNS engine is running and turns solid red when the
+  service is stopped. Implemented as pure CSS + JS, aligned
+  with the existing `.status-dot` styling and the
+  `updateStatsDisplay()` handler in `web/index.html`.
+
+### 🐛 Fixed
+
+- **`service.sh` — DNS auto-start after boot** (v1.3.0
+  critical fix) — the DNS engine was not starting
+  automatically after a device reboot when the user had
+  previously left the service in the ON state. Root cause:
+  `watchdog.sh` waits a fixed 30-second interval before its
+  first API call, and by the time it fires
+  `POST /api/ensure_running_service`, the WebUI may not have
+  finished binding to its port. The watchdog would retry with
+  exponential backoff (30s → 60s → 120s → ...), leaving DNS
+  unavailable for minutes after boot.
+
+  **Fix:** `service.sh` now performs a direct, bounded wait
+  for the WebUI to become ready (up to 60 seconds, checking
+  for the watchdog token file + the WebUI TCP port), then
+  calls `POST /api/ensure_running_service` itself. This
+  guarantees DNS starts within a few seconds of the WebUI
+  coming up, without depending on the watchdog's polling
+  interval.
+
+  **Verified on-device:** DNS engine reaches "ON" state
+  within 5 seconds of `service.sh` startup, with 3 processes
+  running (webui + proxy + watchdog). See log block
+  `[v1.3.0 FIX]` in `service.sh` section [19]. The
+  `watchdog.sh` backoff behavior is left intact for crash
+  recovery during normal runtime — it is only the boot path
+  that now takes the direct route.
+
+### Changed
+
+- **Version bump across all metadata** — `VERSION`,
+  `module.prop` (`version` + `versionCode=1030000`),
+  `update.json` (`version` + `versionCode` + `versionName`
+  + `zipUrl`), `web/sw.js` (`CACHE_VERSION`),
+  `web/manifest.json` (`version`), the two SVG icons
+  (`icon-192.svg`, `icon-512.svg`), and the header comments
+  of `proxy/go.mod`, `scripts/generate-icons.sh`,
+  `scripts/fetch_dns_binaries.sh`, and `proxy/webui.conf`.
+
+- **`web/offline.html`** — version header, `<title>`,
+  `pageTitle`, and `versionBadge` bumped to `v1.3.0`. The
+  historical reference to the v1.2.0 data-preservation feature
+  in `safeMsg2` (EN + AR) remains unchanged — the feature
+  ships with v1.2.0, not v1.3.0.
+
+- **`web/index.html` and `web/dashboard.html`** — internal
+  documentation comments (IDX-* and DASH-* audit fixes) now
+  carry the `v1.3.0` header. No behavioral change.
+
+### Notes
+
+- **Backward compatibility**: no breaking API changes.
+  All additions since v1.2.0 are strictly additive.
+- **Data preservation**: the 10-layer user-data preservation
+  model (introduced in v1.2.0) is unchanged. The persistent
+  backup directory `/sdcard/dnscrypt-webui-backup/` continues
+  to protect the 5 user config files across upgrades,
+  reinstalls, and uninstalls.
+- **`docs/*.md`**: version headers remain at `v1.2.0` where
+  they document historical behavior. Files that describe the
+  current release have been updated separately.
+
+---
+
 ## [v1.2.0] - 2026-09-30
 
 > **Bug-fix release** — no new features, no breaking changes.

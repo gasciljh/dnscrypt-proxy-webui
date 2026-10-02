@@ -2,8 +2,8 @@
 
 Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewalls.
 
-**Version**: v1.2.0 (Global Edition)
-**Last updated**: 2026-09-29
+**Version**: v1.3.0 (Global Edition)
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -2028,6 +2028,6 @@ New badge for contributors who:
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0 (Global Edition)*
+*Last updated: 2026-10-02*
+*Version: v1.3.0 (Global Edition)*
 *Author: gasciljh*

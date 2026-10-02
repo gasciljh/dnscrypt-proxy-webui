@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – watchdog.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.3.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -225,7 +225,7 @@
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.0"
+		echo "$0: v1.3.0"
 		exit 0
 		;;
 esac
@@ -496,7 +496,7 @@ fi
 # ============================================================
 log_msg "============================================"
 log_msg "Watchdog started (PID: $$)"
-log_msg "   Version: v1.2.0 (Global Edition)"
+log_msg "   Version: v1.3.0 (Global Edition)"
 log_msg "─── Config ───"
 log_msg "   MODDIR:     $MODDIR"
 log_msg "   PORT:       $PORT"
@@ -966,7 +966,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$token_header" \
                     --header="$auth_header" "$url" \
@@ -975,7 +975,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$token_header" "$url" \
                     2>&1) || exit_code=$?
@@ -983,7 +983,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$auth_header" "$url" \
                     2>&1) || exit_code=$?
@@ -991,7 +991,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    wget -qO- --timeout=10 \
                     --post-data='' \
                     "$url" \
                     2>&1) || exit_code=$?
@@ -1020,7 +1020,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    busybox wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    busybox wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$token_header" \
                     --header="$auth_header" "$url" \
@@ -1029,7 +1029,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    busybox wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    busybox wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$token_header" "$url" \
                     2>&1) || exit_code=$?
@@ -1037,7 +1037,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    busybox wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    busybox wget -qO- --timeout=10 \
                     --post-data='' \
                     --header="$auth_header" "$url" \
                     2>&1) || exit_code=$?
@@ -1045,7 +1045,7 @@ watchdog_api_call() {
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \
-                    busybox wget -qO- --no-proxy --timeout=5 --tries=1 \
+                    busybox wget -qO- --timeout=10 \
                     --post-data='' \
                     "$url" \
                     2>&1) || exit_code=$?

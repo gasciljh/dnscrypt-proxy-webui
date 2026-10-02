@@ -269,7 +269,7 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: go
-          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       # HARD-CQ-02: fail loudly if proxy/go.mod is missing.
       # HARD-CQ-05: build the whole package, not just main.go.

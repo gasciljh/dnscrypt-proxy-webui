@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.2.0 (Global Edition)
+     Version: v1.3.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -19,7 +19,7 @@
        • Smart Edit Mode with draft auto-save and rollback
        • Service Worker update banner
 
-     v1.2.0 fixes (original):
+     v1.3.0 fixes (original):
        • Service Worker update banner loop fixed:
            [Reload] now sends SKIP_WAITING to
            swRegistration.waiting (the NEW worker), and reloads
@@ -30,13 +30,13 @@
          persisted in localStorage under 'dnscrypt-lang'.
 
      ============================================================
-     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     v1.3.0 — POST-AUDIT FIXES (this file, still v1.3.0)
      ============================================================
      A pre-release audit of this file identified the following
      issues. All of them are addressed in-place; no version bump.
 
        🔧 IDX-1 (critical) — The System Info panel did NOT
-         display the `backups` object that v1.2.0's main.go
+         display the `backups` object that v1.3.0's main.go
          exposes via `runtime_info`. Six new rows are now
          rendered: Snapshots, Latest Backup, Latest Date,
          Last Stable, In-Flight Txn, Orphan Txn, Backup Path.
@@ -100,7 +100,7 @@
          negative input, instead of the nonsensical "<negative> B".
 
      ============================================================
-     v1.2.0 (Global Edition) — Additional hardening, second pass
+     v1.3.0 (Global Edition) — Additional hardening, second pass
      ============================================================
      A second review pass identified the following issues.
      All of them are addressed in-place; no version bump.
@@ -173,7 +173,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.2.0</title>
+    <title>DNSCrypt Proxy v1.3.0</title>
 
     <!-- IDX-4 fix: apply lang/dir from localStorage BEFORE the
          first paint. Without this, an Arabic-preferring user
@@ -363,7 +363,40 @@
         }
 
         .stats-area { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; color:var(--text-muted); flex-wrap:wrap; gap:8px; }
-        .stats-area span { background:rgba(255,255,255,0.03); padding:4px 12px; border-radius:8px; border:1px solid var(--border); }
+        .stats-area > span { background:rgba(255,255,255,0.03); padding:4px 12px; border-radius:8px; border:1px solid var(--border); }
+        #blockedToday { display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:center; }
+        #blockedToday .stat-sub { flex-basis:100%; width:100%; }
+        .stat-paused { opacity:0.9; }
+        .stat-sub { display:block; font-size:9px; opacity:0.9; margin-top:4px; font-style:italic; line-height:1.4; font-weight:400; white-space:nowrap; letter-spacing:-0.2px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-width:100%; box-sizing:border-box; scrollbar-width:thin; padding-bottom:2px; }
+        .stat-sub::-webkit-scrollbar { height:3px; }
+        .stat-sub::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); border-radius:2px; }
+        .stat-sub::-webkit-scrollbar-thumb { background:rgba(88,166,255,0.4); border-radius:2px; }
+        .stats-area { align-items:flex-start; }
+        .stats-area > span { flex:1 1 0; min-width:0; }
+        #blockedToday { transition:opacity .3s ease; }
+        /* LED = exact copy of .status-dot style + pulsing glow */
+        /* LED — guaranteed 12x12 circle, unaffected by outer CSS rules */
+        #blockedToday .led {
+            display: inline-block !important;
+            width: 12px !important;
+            height: 12px !important;
+            min-width: 12px !important;
+            min-height: 12px !important;
+            max-width: 12px !important;
+            max-height: 12px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 50% !important;
+            box-sizing: border-box !important;
+            aspect-ratio: 1 / 1 !important;
+            flex: 0 0 12px !important;
+            line-height: 0 !important;
+            vertical-align: middle;
+            margin: 0 6px;
+            transition: 0.5s;
+        }
+        #blockedToday .led-on  { background: var(--success) !important; box-shadow: 0 0 20px var(--success) !important; }
+        #blockedToday .led-off { background: var(--danger) !important; box-shadow: none !important; }
         .runtime-info { margin-top:16px; background:rgba(88,166,255,0.05); border:1px solid rgba(88,166,255,0.2); border-radius:var(--radius); padding:16px; display:none; }
         .runtime-info .card-body { padding: 0 12px 14px 12px; }
         .runtime-info .ri-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px; }
@@ -446,6 +479,32 @@
         .card { display: block; }
         button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+
+        /* ===== v1.3.0 PWA Install Button ===== */
+        .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; }
+        .pwa-install-btn:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(88,166,255,.4); }
+        .pwa-install-btn:active { transform:translateY(0); }
+        .pwa-install-btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+        .pwa-install-btn .pwa-install-icon { font-size:16px; line-height:1; }
+        .pwa-install-btn .pwa-install-text { white-space:nowrap; }
+        .pwa-install-btn.pwa-installed { background:rgba(63,185,80,.15); color:var(--success); border:1px solid rgba(63,185,80,.35); box-shadow:none; cursor:default; }
+        @keyframes pwaFade { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
+        .pwa-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:6000; justify-content:center; align-items:center; padding:16px; }
+        .pwa-modal.open { display:flex; }
+        .pwa-modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:26px 22px 20px; width:100%; max-width:400px; box-shadow:0 30px 80px rgba(0,0,0,.8); text-align:center; animation:modalIn .25s ease-out; position:relative; }
+        .pwa-modal-close { position:absolute; top:8px; inset-inline-end:10px; background:transparent; border:none; color:var(--text-muted); font-size:22px; line-height:1; cursor:pointer; padding:4px 10px; border-radius:8px; font-family:inherit; transition:.15s; }
+        .pwa-modal-close:hover { background:rgba(255,255,255,.08); color:var(--text); }
+        .pwa-modal-icon { font-size:44px; line-height:1; margin-bottom:8px; display:block; }
+        .pwa-modal-title { font-size:16px; color:var(--text); margin-bottom:14px; font-weight:700; }
+        .pwa-modal-body { color:var(--text-muted); font-size:13px; line-height:1.6; text-align:start; }
+        .pwa-modal-body .pwa-step { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+        .pwa-modal-body .pwa-step:last-child { border-bottom:none; }
+        .pwa-modal-body .pwa-step-num { flex-shrink:0; width:22px; height:22px; border-radius:50%; background:rgba(88,166,255,.15); color:var(--primary); font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+        .pwa-modal-body .pwa-step-text { flex:1; color:var(--text); font-size:13px; }
+        .pwa-modal-actions { margin-top:16px; display:flex; gap:8px; justify-content:center; }
+        .pwa-modal-actions button { padding:10px 22px; border:none; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; background:var(--primary); color:#fff; transition:.2s; }
+        .pwa-modal-actions button:hover { opacity:.88; }
+
     </style>
 </head>
 <body>
@@ -457,6 +516,18 @@
         <div class="custom-modal-actions">
             <button class="modal-cancel" id="modalCancelBtn">Cancel</button>
             <button class="modal-confirm" id="modalConfirmBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<div id="pwaInstallModal" class="pwa-modal" role="dialog" aria-modal="true" aria-labelledby="pwaModalTitle">
+    <div class="pwa-modal-box">
+        <button class="pwa-modal-close" id="pwaModalClose" type="button" aria-label="Close">×</button>
+        <span class="pwa-modal-icon" id="pwaModalIcon">📲</span>
+        <h3 class="pwa-modal-title" id="pwaModalTitle">Install App</h3>
+        <div class="pwa-modal-body" id="pwaModalBody"></div>
+        <div class="pwa-modal-actions">
+            <button id="pwaModalOk" type="button">Got it</button>
         </div>
     </div>
 </div>
@@ -491,11 +562,15 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.2.0</span>
+                <span class="badge" id="versionBadge">v1.3.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
+            <button id="pwaInstallBtn" class="pwa-install-btn" type="button" style="display:none;" aria-label="Install">
+                <span class="pwa-install-icon">📲</span>
+                <span class="pwa-install-text" id="pwaInstallText">Install App</span>
+            </button>
         </div>
 
         <div class="status-area" id="statusArea">
@@ -625,7 +700,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.2.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.3.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -663,7 +738,7 @@
     // ============================================================
     // [1] Initial settings
     // ============================================================
-    var VERSION = 'v1.2.0';
+    var VERSION = 'v1.3.0';
 
     var PORTS = {
         webui:     '9090',
@@ -673,7 +748,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.2.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.3.0',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -698,6 +773,10 @@
             conflictDetected: '⚠️ Modified in another session. Reloading...',
             statusChecking: 'Checking...', statusOn: '🟢 Service Running', statusOff: '🔴 Service Stopped',
             blockedTodayLabel: '🚫 Today:', ramUsageLabel: '💾 RAM:',
+            statsRunningBefore: '(service',
+            statsRunningAfter: 'running)',
+            statsPausedBefore: '(paused',
+            statsPausedAfter: '\u2014 service stopped)',
             toggleOn: '▶️ Start Service', toggleOff: '⏹️ Stop Service',
             toggleSuccess: '✅ Status changed', toggleError: '❌ Failed to change status',
             restartBtn: '🔄 Restart', restartSuccess: '✅ Service restarted', restartError: '❌ Failed to restart',
@@ -759,12 +838,28 @@
             projectLink: 'Project',
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
+            pwaInstallBtn: 'Install App',
+            pwaInstalledBadge: '✓ Installed',
+            pwaModalTitle: 'Install as App',
+            pwaInstallSuccess: '✓ Installed successfully',
+            pwaModalOk: 'Got it',
+            pwaStepIos1: 'Tap the Share button ⬆️ at the bottom of Safari',
+            pwaStepIos2: 'Scroll and tap "Add to Home Screen" ➕',
+            pwaStepIos3: 'Tap "Add" to confirm',
+            pwaStepFirefox1: 'Tap the menu ☰ in Firefox',
+            pwaStepFirefox2: 'Select "Install" or "Add to Home screen"',
+            pwaStepGeneric1: 'Open your browser menu',
+            pwaStepGeneric2: 'Look for "Install" or "Add to Home Screen"',
+            pwaStepNoteLite: 'Note: this browser may not support full offline mode after installation.',
+            pwaUnsupportedTitle: 'Browser Not Supported',
+            pwaUnsupportedMsg: 'Your current browser does not support creating an app shortcut or installing this WebUI as an app.',
+            pwaSupportedList: 'Supported browsers:',
             // IDX-9 fix: waiting-for-content message
             waitForContent: '⏳ Please wait for the content to load from the server'
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.2.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.3.0',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -789,6 +884,10 @@
             conflictDetected: '⚠️ تم التعديل من جلسة أخرى. جاري إعادة التحميل...',
             statusChecking: 'جاري التحقق...', statusOn: '🟢 النظام نشط', statusOff: '🔴 النظام متوقف',
             blockedTodayLabel: '🚫 اليوم:', ramUsageLabel: '💾 الذاكرة:',
+            statsRunningBefore: '(الخدمة',
+            statsRunningAfter: 'إحصائية اليوم)',
+            statsPausedBefore: '(مُتوقّف مؤقتاً',
+            statsPausedAfter: 'بسبب إيقاف الخدمة)',
             toggleOn: '▶️ تشغيل الخدمة', toggleOff: '⏹️ إيقاف الخدمة',
             toggleSuccess: '✅ تم تغيير الحالة بنجاح', toggleError: '❌ فشل تغيير الحالة',
             restartBtn: '🔄 إعادة تشغيل', restartSuccess: '✅ تم إعادة تشغيل الخدمة بنجاح', restartError: '❌ فشل إعادة التشغيل',
@@ -850,6 +949,22 @@
             projectLink: 'المشروع',
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
+            pwaInstallBtn: 'ثبّت التطبيق',
+            pwaInstalledBadge: '✓ مثبّت',
+            pwaModalTitle: 'تثبيت كتطبيق',
+            pwaInstallSuccess: '✓ تم التثبيت بنجاح',
+            pwaModalOk: 'فهمت',
+            pwaStepIos1: 'اضغط زر المشاركة ⬆️ أسفل Safari',
+            pwaStepIos2: 'اسحب ثم اضغط "إضافة إلى الشاشة الرئيسية" ➕',
+            pwaStepIos3: 'اضغط "إضافة" للتأكيد',
+            pwaStepFirefox1: 'اضغط القائمة ☰ في Firefox',
+            pwaStepFirefox2: 'اختر "تثبيت" أو "إضافة إلى الشاشة الرئيسية"',
+            pwaStepGeneric1: 'افتح قائمة المتصفح',
+            pwaStepGeneric2: 'ابحث عن "تثبيت" أو "إضافة إلى الشاشة الرئيسية"',
+            pwaStepNoteLite: 'ملاحطة: قد لا يدعم هذا المتصفح العمل دون اتصال بعد التثبيت.',
+            pwaUnsupportedTitle: 'المتصفح غير مدعوم',
+            pwaUnsupportedMsg: 'متصفحك الحالي لا يدعم إنشاء اختصار أو تثبيت هذا WebUI كتطبيق.',
+            pwaSupportedList: 'المتصفحات المدعومة:',
             // IDX-9 fix: waiting-for-content message
             waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم'
         }
@@ -1350,7 +1465,29 @@
         }
     }
     function updateStatsDisplay() {
-        $('blockedToday').textContent = t('blockedTodayLabel') + ' ' + currentBlockedCount;
+        var btEl = $('blockedToday');
+        if (btEl) {
+            var isPaused = (currentStatus !== 'ON');
+            var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
+            var rawLabel = t('blockedTodayLabel');
+            var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
+
+            var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
+            var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
+            var ledCls = isPaused ? 'led led-off' : 'led led-on';
+
+            btEl.innerHTML =
+                escapeHtml(icon) + ' ' +
+                escapeHtml(labelText) + ' ' +
+                escapeHtml(currentBlockedCount) +
+                '<span class="' + ledCls + '" aria-hidden="true"></span>' +
+                '<span class="stat-sub">' +
+                escapeHtml(before) + ' ' + escapeHtml(after) +
+                '</span>';
+
+            if (isPaused) btEl.classList.add('stat-paused');
+            else btEl.classList.remove('stat-paused');
+        }
         $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
     }
 
@@ -1474,6 +1611,250 @@
         }
     }
 
+
+    // ============================================================
+    // [13c] PWA Install Button (v1.3.0) — smart & dynamic
+    // ============================================================
+    var deferredInstallPrompt = null;
+    var pwaInstalled = false;
+    var pwaCapable = false;
+
+    // ---- Dynamic browser name detection (NO hardcoded names) ----
+    // Layer 1: User-Agent Client Hints (W3C) — Chrome 90+, Edge 90+, Opera 76+
+    // Layer 2: generic UA parse — last "Name/Version" after skipping engines
+    // Layer 3: empty string → generic instructions
+    function getBrowserName() {
+        try {
+            if (navigator.userAgentData && navigator.userAgentData.brands) {
+                var brands = navigator.userAgentData.brands;
+                for (var i = 0; i < brands.length; i++) {
+                    var b = brands[i].brand || '';
+                    if (b && b.indexOf('Not') === -1 && b !== 'Chromium') {
+                        return b;
+                    }
+                }
+            }
+        } catch(e) {}
+
+        // UA parsing on modern browsers is unreliable: every
+        // Chromium variant (Chrome, Edge, Samsung, Via, Brave, ...)
+        // claims to be "Chrome" and ends with a legacy "Safari"
+        // token. We therefore DO NOT guess from the UA string when
+        // userAgentData is unavailable — we return an empty
+        // name and the modal shows a generic title. Only iOS
+        // Safari is identified from the UA, because its UA is
+        // unambiguous.
+        if (isIOSDevice()) return 'Safari';
+
+        return '';
+    }
+
+    function isIOSDevice() {
+        var ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/.test(ua)) return true;
+        if (/Macintosh/.test(ua) && 'ontouchend' in document) return true;
+        return false;
+    }
+
+    // Does the browser support creating a shortcut / install?
+    // Unified logic:
+    //   - iOS Safari: yes (Add to Home Screen)
+    //   - any browser that fired beforeinstallprompt: yes (pwaCapable=true)
+    //   - everything else: no (show the unified message)
+    function isBrowserSupported() {
+        if (isIOSDevice()) return true;
+        return pwaCapable === true;
+    }
+
+    function isPWAStandalone() {
+        try {
+            if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+            if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+        } catch(e) {}
+        if (navigator.standalone === true) return true;
+        return false;
+    }
+
+    function getPWAInstallSteps() {
+        var ua = navigator.userAgent || '';
+        if (isIOSDevice()) {
+            return [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
+        }
+        if (/Firefox/.test(ua) && /Android/.test(ua)) {
+            return [t('pwaStepFirefox1'), t('pwaStepFirefox2')];
+        }
+        var steps = [t('pwaStepGeneric1'), t('pwaStepGeneric2')];
+        if (!getBrowserName()) steps.push(t('pwaStepNoteLite'));
+        return steps;
+    }
+
+    // Supported browsers with Play Store links
+    // Package com.android.vending = Google Play Store app
+    function buildSupportedBrowsersHtml() {
+        var list = [
+            { name: 'Google Chrome',  pkg: 'com.android.chrome' },
+            { name: 'Microsoft Edge', pkg: 'com.microsoft.emmx' },
+            { name: 'Brave',          pkg: 'com.brave.browser' }
+        ];
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+            var pkg = list[i].pkg;
+            // market:// -> opens Play Store directly
+            // play.google.com -> professional fallback
+            var marketUrl = 'market://details?id=' + pkg;
+            var webUrl    = 'https://play.google.com/store/apps/details?id=' + pkg;
+            html +=
+                '<a href="' + marketUrl + '" data-pkg="' + pkg + '" data-web="' + webUrl + '" ' +
+                'data-action="open-store" ' +
+                'style="display:flex;align-items:center;justify-content:space-between;' +
+                'padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,0.03);' +
+                'border:1px solid rgba(255,255,255,0.08);border-radius:9px;' +
+                'color:var(--text);text-decoration:none;font-size:12.5px;font-weight:600;' +
+                'transition:background .2s,border-color .2s;cursor:pointer;">' +
+                '<span>' + escapeHtml(list[i].name) + '</span>' +
+                '<span style="color:var(--primary);font-size:14px;font-weight:700;opacity:.85;">\u2197</span>' +
+                '</a>';
+        }
+        return html;
+    }
+
+    function showPWAInstructionsModal() {
+        var modal = $('pwaInstallModal');
+        var body = $('pwaModalBody');
+        var title = $('pwaModalTitle');
+        var icon = $('pwaModalIcon');
+        if (!modal || !body) return;
+
+        // iOS Safari: dedicated steps
+        if (isIOSDevice()) {
+            if (icon) icon.textContent = '\uD83E\uDDED';
+            if (title) title.textContent = t('pwaModalTitle');
+            var steps = [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
+            var html = '';
+            for (var i = 0; i < steps.length; i++) {
+                html += '<div class="pwa-step"><span class="pwa-step-num">' + (i + 1) +
+                        '</span><span class="pwa-step-text">' + escapeHtml(steps[i]) + '</span></div>';
+            }
+            body.innerHTML = html;
+            modal.classList.add('open');
+            return;
+        }
+
+        // All other browsers: unified message
+        if (icon) icon.textContent = '\u26A0\uFE0F';
+        if (title) title.textContent = t('pwaUnsupportedTitle');
+
+        var htmlUnsupported =
+            '<div style="text-align:center;padding:4px 0;">' +
+                '<div style="color:var(--warning);font-weight:600;font-size:13px;margin-bottom:14px;line-height:1.6;">' +
+                    escapeHtml(t('pwaUnsupportedMsg')) +
+                '</div>' +
+                '<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);border-radius:12px;padding:14px 16px;text-align:start;">' +
+                    '<div style="color:var(--primary);font-weight:700;font-size:12.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;">' +
+                        '<span style="font-size:14px;">\u2705</span>' +
+                        '<span>' + escapeHtml(t('pwaSupportedList')) + '</span>' +
+                    '</div>' +
+                    buildSupportedBrowsersHtml() +
+                '</div>' +
+            '</div>';
+
+        body.innerHTML = htmlUnsupported;
+        modal.classList.add('open');
+
+        // Bind Play Store open events
+        var links = body.querySelectorAll('[data-action="open-store"]');
+        for (var li = 0; li < links.length; li++) {
+            (function(link) {
+                link.addEventListener('click', function(ev) {
+                    var pkg = this.getAttribute('data-pkg');
+                    var web = this.getAttribute('data-web');
+                    var t0 = Date.now();
+                    try {
+                        window.location.href = 'market://details?id=' + pkg;
+                        setTimeout(function() {
+                            if (!document.hidden && Date.now() - t0 < 2200) {
+                                try { window.open(web, '_blank', 'noopener'); } catch(e) {}
+                            }
+                        }, 1200);
+                    } catch (e) {
+                        window.open(web, '_blank', 'noopener');
+                    }
+                    ev.preventDefault();
+                    return false;
+                });
+            })(links[li]);
+        }
+    }
+
+    function closePWAInstructionsModal() {
+        var m = $('pwaInstallModal');
+        if (m) m.classList.remove('open');
+    }
+
+    function markPWAInstalled() {
+        pwaInstalled = true;
+        var btn = $('pwaInstallBtn');
+        if (!btn) return;
+        btn.classList.add('pwa-installed');
+        btn.disabled = true;
+        var txt = $('pwaInstallText');
+        if (txt) txt.textContent = t('pwaInstalledBadge');
+        var icon = btn.querySelector('.pwa-install-icon');
+        if (icon) icon.textContent = '\u2713';
+        setTimeout(function() { btn.style.display = 'none'; }, 4000);
+    }
+
+    function updatePWAInstallButtonVisibility() {
+        var btn = $('pwaInstallBtn');
+        if (!btn) return;
+        if (pwaInstalled || isPWAStandalone()) { btn.style.display = 'none'; return; }
+        btn.style.display = 'inline-flex';
+    }
+
+    function onPWAInstallBtnClick() {
+        if (pwaInstalled) return;
+        if (deferredInstallPrompt) {
+            var p = deferredInstallPrompt;
+            deferredInstallPrompt = null;
+            try {
+                p.prompt();
+                p.userChoice.then(function(choice) {
+                    if (choice && choice.outcome === 'accepted') {
+                        markPWAInstalled();
+                        showMsg(t('pwaInstallSuccess'), 'success', 3000);
+                    } else {
+                        var b = $('pwaInstallBtn');
+                        if (b) b.disabled = true;
+                        setTimeout(function() { if (b) b.disabled = false; }, 60000);
+                    }
+                }).catch(function() { showPWAInstructionsModal(); });
+            } catch(e) { showPWAInstructionsModal(); }
+            return;
+        }
+        showPWAInstructionsModal();
+    }
+
+    function initPWABeforeInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            pwaCapable = true;
+            updatePWAInstallButtonVisibility();
+        });
+        window.addEventListener('appinstalled', function() {
+            deferredInstallPrompt = null;
+            markPWAInstalled();
+            showMsg(t('pwaInstallSuccess'), 'success', 3000);
+        });
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                try { if (isPWAStandalone()) pwaInstalled = true; } catch(e) {}
+                updatePWAInstallButtonVisibility();
+            }
+        });
+        updatePWAInstallButtonVisibility();
+    }
+
     // ============================================================
     // [14] Runtime Info
     // ============================================================
@@ -1525,7 +1906,7 @@
             }
 
             // IDX-1 + IDX-8 fix: read the `backups` object that
-            // v1.2.0's main.go exposes via runtime_info. All SEVEN
+            // v1.3.0's main.go exposes via runtime_info. All SEVEN
             // fields are now rendered, including `last_backup`
             // (the raw timestamp — IDX-8). Rows that indicate a
             // problem (0 snapshots, in-flight > 0, orphan > 0, or
@@ -1556,7 +1937,7 @@
                 { label: t('riPidFile'), value: data.pid_file || 'unknown' },
                 { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
                 { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                // --- Backup layer (v1.2.0 — IDX-1, IDX-8) ---
+                // --- Backup layer (v1.3.0 — IDX-1, IDX-8) ---
                 { label: t('riBackupCount'), value: bkAvailable,
                   warn: bkAvailable === '0' },
                 { label: t('riBackupLatest'), value: bkLatest,
@@ -1894,6 +2275,10 @@
 
         $('restartBtn').title = t('restartBtn');
         $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+        var pwaTxt = $('pwaInstallText');
+        if (pwaTxt && !pwaInstalled) pwaTxt.textContent = t('pwaInstallBtn');
+        var pwaOk = $('pwaModalOk');
+        if (pwaOk) pwaOk.textContent = t('pwaModalOk');
         updateStatsDisplay();
         var ab = $('authBadge');
         if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
@@ -2307,6 +2692,8 @@
             btn.disabled = false;
             $('restartBtn').disabled = false;
         }
+
+        updateStatsDisplay();
     }
 
     function fetchStatus(callback) {
@@ -2769,6 +3156,13 @@
         $('customModal').addEventListener('click', function(e) {
             if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
         });
+
+        $('pwaInstallBtn').addEventListener('click', onPWAInstallBtnClick);
+        $('pwaModalClose').addEventListener('click', closePWAInstructionsModal);
+        $('pwaModalOk').addEventListener('click', closePWAInstructionsModal);
+        $('pwaInstallModal').addEventListener('click', function(e) {
+            if (e.target === this) closePWAInstructionsModal();
+        });
     }
 
     // ============================================================
@@ -2783,6 +3177,9 @@
         updateUIStrings();
         bindEvents();
         bindSWUpdateButtons();
+
+        // v1.3.0 — PWA install button init
+        initPWABeforeInstallPrompt();
 
         // IDX-14 fix: fallback timer that removes the `loading`
         // class from the Dashboard link if runtime_info never

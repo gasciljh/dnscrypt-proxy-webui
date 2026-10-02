@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – functions.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.3.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -424,7 +424,7 @@ get_dynamic_bootstrap() {
 # ============================================================
 # [5] Load BOOTSTRAP_IPS (with cache)
 # ============================================================
-_BOOTSTRAP_CACHE_FILE="$MODDIR/proxy/run/.bootstrap_cache"
+_BOOTSTRAP_CACHE_FILE="$(get_run_dir)/.bootstrap_cache"
 _BOOTSTRAP_CACHE_TTL=300  # 5 minutes
 
 # ------------------------------------------------------------
@@ -482,8 +482,10 @@ _load_bootstrap_from_cache() {
 
 _save_bootstrap_to_cache() {
     local value="$1"
-    mkdir -p "$MODDIR/proxy/run" 2>/dev/null
-    printf "%s" "$value" > "$_BOOTSTRAP_CACHE_FILE" 2>/dev/null || true
+    local _rd
+    _rd=$(get_run_dir)
+    mkdir -p "$_rd" 2>/dev/null
+    printf "%s" "$value" > "$_rd/.bootstrap_cache" 2>/dev/null || true
 }
 
 # --- Try loading from cache first ---
@@ -2029,32 +2031,52 @@ rotate_backups() {
     local keep="${1:-21}"
 
     [ -d "$PERSISTENT_BACKUP" ] || return 0
-
-    if [ ! -r "$PERSISTENT_BACKUP" ]; then
+    [ -r "$PERSISTENT_BACKUP" ] || {
         log_fn "⚠️ rotate_backups: $PERSISTENT_BACKUP is not readable — skipping"
         return 0
+    }
+
+    # ============================================================
+    # v1.3.0 — Professional rotation logic
+    # ============================================================
+    # Detection:
+    #   any directory containing .manifest.json, excluding:
+    #     current/, txn-*/, orphan-txn-*
+    # Sorting:
+    #   by mtime (numeric, descending) — robust vs clock drift
+    #   and against custom snapshot names.
+    # Preservation:
+    #   • .last_stable target        (recovery pointer)
+    #   • newest install snapshot    (name contains -v<digit>)
+    # ============================================================
+
+    local _protected=""
+    if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
+        _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
     fi
 
-    local snapshots
-    # v1.2.0: skip empty / manifest-less snapshots
-    # A snapshot is counted for retention only if it is non-empty
-    # AND contains a .manifest.json. Partial/failed copies are
-    # ignored so they do not displace valid snapshots.
-    snapshots=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        while IFS= read -r _d; do
-            [ -z "$(ls -A "$_d" 2>/dev/null)" ] && continue
+    local _list
+    _list=$(
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
             [ -f "$_d/.manifest.json" ] || continue
-            printf '%s\n' "$_d"
-        done | \
-        sort -r)
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1
+    )
 
-    [ -z "$snapshots" ] && return 0
+    [ -z "$_list" ] && return 0
 
     local total
-    total=$(printf '%s\n' "$snapshots" | wc -l | tr -d ' ')
+    total=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
 
     if [ "$total" -le "$keep" ]; then
         log_fn "ℹ️ rotate_backups: $total snapshot(s) — within limit ($keep)"
@@ -2064,10 +2086,31 @@ rotate_backups() {
     local to_remove=$((total - keep))
     log_fn "🧹 rotate_backups: removing $to_remove old snapshot(s) (keeping $keep)"
 
-    printf '%s\n' "$snapshots" | tail -n "$to_remove" | while IFS= read -r old; do
-        [ -z "$old" ] && continue
-        rm -rf "$PERSISTENT_BACKUP/$old" 2>/dev/null
-    done
+    local _newest_install
+    _newest_install=$(
+        printf '%s\n' "$_list" | \
+        grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | \
+        head -n1 | \
+        awk '{print $2}'
+    )
+
+    local _mt _name
+    while IFS=' ' read -r _mt _name; do
+        [ -z "$_name" ] && continue
+        if [ "$_name" = "$_protected" ]; then
+            log_fn "  🛡️ Preserved (last_stable): $_name"
+            continue
+        fi
+        if [ "$_name" = "$_newest_install" ]; then
+            log_fn "  🛡️ Preserved (newest install): $_name"
+            continue
+        fi
+        if rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null; then
+            log_fn "  🗑️ Removed: $_name"
+        fi
+    done <<EOF
+$(printf '%s\n' "$_list" | tail -n "$to_remove")
+EOF
 
     log_fn "✅ rotate_backups: done"
     return 0

@@ -2,8 +2,8 @@
 
 Vulnerability disclosure policy + threat model + applied protections.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 **Contact**: [GitHub Private Vulnerability Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new)
@@ -2306,6 +2306,6 @@ numbers.
 
 ---
 
-**Last updated**: 2026-09-29
-**Version**: v1.2.0
+**Last updated**: 2026-10-02
+**Version**: v1.3.0
 **Author**: gasciljh

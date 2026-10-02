@@ -3,8 +3,8 @@
 > A curated log of the architectural and process decisions that
 > shape the project.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -799,6 +799,6 @@ backend, or a switch to cgroups-based memory limits).
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-02*
+*Version: v1.3.0*
 *Author: gasciljh*

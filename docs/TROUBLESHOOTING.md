@@ -2,8 +2,8 @@
 
 > Comprehensive diagnostic guide: from symptoms to solutions.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -3653,6 +3653,6 @@ When opening a GitHub Issue, include:
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-02*
+*Version: v1.3.0*
 *Author: gasciljh*

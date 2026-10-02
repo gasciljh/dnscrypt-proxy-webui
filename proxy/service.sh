@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – service.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.3.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -244,7 +244,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.0"
+		echo "$0: v1.3.0"
 		exit 0
 		;;
 esac
@@ -723,25 +723,44 @@ _inline_auto_backup_if_needed() {
 _inline_rotate_backups() {
     local keep="${1:-21}"
 
-    # Numeric validation (v1.2.0 FIX)
     if ! echo "$keep" | grep -qE '^[0-9]+$'; then
         keep=21
     fi
 
     [ -d "$PERSISTENT_BACKUP" ] || return 0
+    [ -r "$PERSISTENT_BACKUP" ] || {
+        log_msg "⚠️ rotate_backups (inline): not readable — skipping"
+        return 0
+    }
 
-    # List snapshot directories by NAME (stable), newest first.
-    local snapshots
-    snapshots=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        sort -r)
+    # v1.3.0 — Professional rotation (parity with functions.sh)
+    local _protected=""
+    if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
+        _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
+    fi
 
-    [ -z "$snapshots" ] && return 0
+    local _list
+    _list=$(
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            [ -f "$_d/.manifest.json" ] || continue
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1
+    )
+
+    [ -z "$_list" ] && return 0
 
     local total
-    total=$(printf '%s\n' "$snapshots" | wc -l | tr -d ' ')
+    total=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
 
     if [ "$total" -le "$keep" ]; then
         return 0
@@ -750,14 +769,32 @@ _inline_rotate_backups() {
     local to_remove=$((total - keep))
     log_msg "🧹 rotate_backups (inline): removing $to_remove old snapshot(s) (keeping $keep)"
 
-    # HARD-SVC-07: declare `old` as local.
-    local old
-    printf '%s\n' "$snapshots" | tail -n "$to_remove" | while IFS= read -r old; do
-        [ -z "$old" ] && continue
-        rm -rf "$PERSISTENT_BACKUP/$old" 2>/dev/null
-    done
+    local _newest_install
+    _newest_install=$(
+        printf '%s\n' "$_list" | \
+        grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | \
+        head -n1 | \
+        awk '{print $2}'
+    )
 
-    # SVC-4 fix: log a success line, matching the canonical version.
+    local _mt _name
+    while IFS=' ' read -r _mt _name; do
+        [ -z "$_name" ] && continue
+        if [ "$_name" = "$_protected" ]; then
+            log_msg "  🛡️ Preserved (last_stable): $_name"
+            continue
+        fi
+        if [ "$_name" = "$_newest_install" ]; then
+            log_msg "  🛡️ Preserved (newest install): $_name"
+            continue
+        fi
+        if rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null; then
+            log_msg "  🗑️ Removed: $_name"
+        fi
+    done <<EOF
+$(printf '%s\n' "$_list" | tail -n "$to_remove")
+EOF
+
     log_msg "✅ rotate_backups (inline): done"
     return 0
 }
@@ -1340,5 +1377,69 @@ else
 fi
 log_msg "  • functions.sh: $([ "$FUNCTIONS_LOADED" = "1" ] && echo loaded || echo fallback)"
 log_msg "─────────────────────────────────────────────"
+
+# ============================================================
+# [19] v1.3.0 FIX — Ensure DNS starts after boot
+# ============================================================
+# السبب الجذري (مُشخّص 2026-10-02):
+#   Watchdog يدخل حلقة انتظار 30s قبل أول محاولة DNS.
+#   عند محاولته، WebUI لم يكن جاهزاً بعد → API call failed.
+#   النتيجة: DNS لا يبدأ تلقائياً حتى يُفتح WebUI يدوياً.
+#
+# الحلّ:
+#   service.sh ينتظر WebUI، ثم يستدعي API مباشرة.
+#   يضمن بدء DNS خلال ثوانٍ بدل 30-60 ثانية.
+# ============================================================
+log_msg "🔧 [v1.3.0 FIX] Ensuring DNS starts after boot..."
+
+# Guard: WATCHDOG_TOKEN_FILE قد لا يُعرَّف إذا فشل تحميل functions.sh
+if [ -z "$WATCHDOG_TOKEN_FILE" ]; then
+    WATCHDOG_TOKEN_FILE="$(dirname "$STATUS_FILE")/.watchdog_token"
+fi
+
+_wait_webui=0
+_wait_max=60
+while [ "$_wait_webui" -lt "$_wait_max" ]; do
+    if [ -f "$WATCHDOG_TOKEN_FILE" ] && \
+       [ -n "$(cat "$WATCHDOG_TOKEN_FILE" 2>/dev/null)" ] && \
+       do_is_port_open "$PORT" tcp 2>/dev/null; then
+        log_msg "✅ WebUI ready after ${_wait_webui}s"
+        break
+    fi
+    sleep 2
+    _wait_webui=$((_wait_webui + 2))
+done
+
+if [ "$_wait_webui" -ge "$_wait_max" ]; then
+    log_msg "⚠️ WebUI not ready after ${_wait_max}s — proceeding anyway"
+fi
+
+_dns_intent=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
+[ -z "$_dns_intent" ] && _dns_intent="OFF"
+log_msg "   DNS intent: $_dns_intent"
+
+if [ "$_dns_intent" = "ON" ]; then
+    _tok=$(cat "$WATCHDOG_TOKEN_FILE" 2>/dev/null | tr -d '\r\n ')
+    if [ -n "$_tok" ] && [ "${#_tok}" -ge 32 ]; then
+        log_msg "   Calling ensure_running_service API..."
+        _api_response=$(busybox wget -qO- \
+            --timeout=10 \
+            --header="X-Watchdog-Token: $_tok" \
+            --post-data="" \
+            "http://127.0.0.1:$PORT/api/ensure_running_service" 2>&1)
+        _api_rc=$?
+        log_msg "   API response: $_api_response (rc=$_api_rc)"
+        if [ "$_api_rc" -eq 0 ]; then
+            log_msg "✅ [v1.3.0 FIX] DNS start requested successfully"
+        else
+            log_msg "⚠️ [v1.3.0 FIX] API call failed (rc=$_api_rc) — Watchdog will retry"
+        fi
+    else
+        log_msg "⚠️ [v1.3.0 FIX] Watchdog token not ready — Watchdog will handle DNS"
+    fi
+else
+    log_msg "ℹ️ [v1.3.0 FIX] User intent is OFF — skipping DNS auto-start"
+fi
+
 
 exit 0

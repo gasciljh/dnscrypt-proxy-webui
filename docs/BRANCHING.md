@@ -3,8 +3,8 @@
 Complete guide to the project's Git workflow: branches, naming
 conventions, merge rules, and protection policies.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -1092,6 +1092,6 @@ make sync
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-02*
+*Version: v1.3.0*
 *Author: gasciljh*

@@ -3,8 +3,8 @@
 Thank you for your interest in contributing! This guide explains how
 to contribute effectively.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -2589,6 +2589,6 @@ through code, documentation, testing, or simply reporting an issue.
 
 ---
 
-**Last updated**: 2026-09-29
-**Version**: v1.2.0
+**Last updated**: 2026-10-02
+**Version**: v1.3.0
 **Author**: gasciljh

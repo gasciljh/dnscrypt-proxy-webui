@@ -3,7 +3,7 @@
 System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.2.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.3.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
@@ -18,14 +18,18 @@ System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-pr
 > - Emergency recovery → [`docs/EMERGENCY.md`](docs/EMERGENCY.md)
 > - Version history → [`CHANGELOG.md`](CHANGELOG.md)
 >
-> **🎯 Current version**: **v1.2.0** — Data-Preservation Release.
-> The **10 defensive layers** protect your 5 user config files
-> across upgrades, renames, reinstalls, and root-solution changes.
-> Includes the persistent backup directory
-> (`/sdcard/dnscrypt-webui-backup/`), recovery mode, transactional
-> installs, a 7-field `runtime_info.backups` object, and a bilingual
-> WebUI (English default + Arabic toggle).
-> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.2.0 changelog.
+> **🎯 Current version**: **v1.3.0** — Release.
+> Adds a **smart dynamic PWA install button**, a **live status
+> LED** on the Today counter, **DNS auto-start after boot**
+> (bounded wait + direct API call), a **professional backup
+> rotation** (manifest-based detection, mtime sorting,
+> preservation of `.last_stable` and the newest install),
+> and **CodeQL path-injection hardening** in `main.go`.
+> All v1.2.0 features are preserved (10 defensive layers,
+> persistent backup at `/sdcard/dnscrypt-webui-backup/`,
+> recovery mode, transactional installs, 7-field
+> `runtime_info.backups`, bilingual WebUI EN/AR).
+> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.3.0 changelog.
 
 ---
 
@@ -43,6 +47,11 @@ Android device into a filtered, encrypted DNS resolver.
 - Installable PWA with offline fallback
 - **v1.1.0**: Dynamic Go runtime memory limit per blocklist profile
   (light=80 MB → ultimate=220 MB) — prevents GC thrashing on heavy profiles
+- **v1.3.0**: Smart dynamic PWA install button, live status LED,
+  DNS auto-start after boot (bounded wait for WebUI + direct
+  API call), professional backup rotation (manifest-based
+  detection, mtime sorting), and CodeQL path-injection
+  sanitization
 - **v1.2.0**: **10 defensive layers** for user-data preservation —
   persistent backup at `/sdcard/dnscrypt-webui-backup/`,
   multi-source detection, transactional installs with rollback,
@@ -91,7 +100,7 @@ while keeping DNS filtering effective.
 
 ## Installation
 
-1. Download `dnscrypt-webui-1.2.0-module.zip` from
+1. Download `dnscrypt-webui-1.3.0-module.zip` from
    [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
 2. Install via Magisk Manager / KernelSU Manager / APatch.
 3. Save the credentials shown on-screen (also stored at
@@ -214,7 +223,7 @@ dnscrypt-proxy-webui/
 ├── README.md                        # Overview (EN)
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.2.0)
+├── VERSION                          # Single source of truth (v1.3.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
@@ -570,7 +579,7 @@ cd dnscrypt-proxy-webui
 git checkout develop
 
 # 3. Common commands
-make version         # show current version (v1.2.0)
+make version         # show current version (v1.3.0)
 make build           # build all 4 architectures
 make package         # build + package
 make clean           # clean build outputs

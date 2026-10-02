@@ -1,6 +1,6 @@
 /* ============================================================
  * DNSCrypt Smart Filter — Service Worker
- * Version: v1.2.0 (Global Edition)
+ * Version: v1.3.0 (Global Edition)
  * Author: gasciljh
  * Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
  * ============================================================
@@ -302,7 +302,7 @@
 //
 // For v1.2.0, this is 'v1.2.0' (matches VERSION and module.prop).
 // ============================================================
-const CACHE_VERSION = 'v1.2.0';
+const CACHE_VERSION = 'v1.3.0';
 
 const STATIC_CACHE  = `dnscrypt-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dnscrypt-runtime-${CACHE_VERSION}`;
