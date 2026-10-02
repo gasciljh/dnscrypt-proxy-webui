@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Offline Page
-     Version: v1.2.0 (Global Edition)
+     Version: v1.3.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -12,10 +12,10 @@
      first (this file), then falls back to an inline English-
      only page if the cache lookup fails.
 
-     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     v1.2.0 → v1.3.0 — POST-AUDIT FIXES
      ============================================================
      A pre-release audit of this file identified the following
-     issues. All of them are addressed in-place; no version bump.
+     issues. All of them are addressed in-place.
 
        🔧 OFF-1 — The <html> tag shipped with static
          lang="en" dir="ltr", matching index.html and
@@ -83,7 +83,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta name="theme-color" content="#0d1117">
     <meta name="robots" content="noindex, nofollow">
-    <title>Offline — DNSCrypt Smart Filter v1.2.0</title>
+    <title>Offline — DNSCrypt Smart Filter v1.3.0</title>
 
     <!-- OFF-1 fix: apply lang/dir from localStorage BEFORE the
          first paint, matching IDX-4 in index.html and
@@ -766,7 +766,7 @@
         <div>
             <span aria-hidden="true">🛡️</span>
             DNSCrypt Smart Filter
-            <span class="version" id="versionBadge">v1.2.0</span>
+            <span class="version" id="versionBadge">v1.3.0</span>
         </div>
         <div style="margin-top: 6px;">
             <a
@@ -787,7 +787,7 @@
 
     var translations = {
         en: {
-            pageTitle: 'Offline — DNSCrypt Smart Filter v1.2.0',
+            pageTitle: 'Offline — DNSCrypt Smart Filter v1.3.0',
             langToggle: '🇸🇦 العربية',
             title: 'Offline',
             subtitle: 'Cannot reach DNSCrypt WebUI server.<br>Make sure the service is running on port <code>9090</code>.',
@@ -822,7 +822,7 @@
             projectText: 'Project on GitHub'
         },
         ar: {
-            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.2.0',
+            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.3.0',
             langToggle: '🇬🇧 English',
             title: 'غير متصل',
             subtitle: 'لا يمكن الوصول إلى خادم DNSCrypt WebUI.<br>تأكد من أن الخدمة تعمل على المنفذ <code>9090</code>.',

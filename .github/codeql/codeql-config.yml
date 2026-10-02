@@ -1,0 +1,34 @@
+# ============================================================
+# CodeQL configuration — DNSCrypt Smart Filter
+# ============================================================
+# Purpose:
+#   Suppress specific CodeQL false positives that are known
+#   to be intentional design decisions in this project.
+#
+# Each suppressed rule is documented below with a rationale.
+# ============================================================
+
+name: "DNSCrypt Smart Filter CodeQL config"
+
+queries:
+  - uses: security-extended
+
+query-filters:
+  # ----------------------------------------------------------
+  # go/cookie-secure-not-set
+  # ----------------------------------------------------------
+  # The Secure attribute on the session cookie is intentionally
+  # set to isSecureCookie(), which returns:
+  #   • true  when BIND_ADDR is 127.0.0.1 / ::1 / localhost
+  #   • false otherwise (LAN-exposed deployments over plain HTTP)
+  #
+  # Rationale: forcing Secure=true would make the cookie
+  # unusable for users who access the WebUI over HTTP on a LAN
+  # (e.g. http://192.168.1.5:9090). The project supports both
+  # deployment modes, and modern browsers treat localhost as a
+  # secure context even without TLS, so the conditional value
+  # is the correct trade-off.
+  #
+  # This is a documented design decision, not a vulnerability.
+  - exclude:
+      id: go/cookie-secure-not-set

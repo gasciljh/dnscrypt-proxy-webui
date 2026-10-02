@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
-     Version: v1.2.0 (Global Edition)
+     Version: v1.3.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -18,7 +18,7 @@
        • Diagnostic file viewer
        • Service Worker update banner
 
-     v1.2.0 fixes (original):
+     v1.3.0 fixes (original):
        • Service Worker update banner markup + CSS + JS added.
        • Fixed SW reload loop: [Reload] now sends SKIP_WAITING to
          swRegistration.waiting (the NEW worker), and reloads on
@@ -29,7 +29,7 @@
          in localStorage under 'dnscrypt-lang'.
 
      ============================================================
-     v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+     v1.3.0 — POST-AUDIT FIXES (this file, still v1.3.0)
      ============================================================
      A pre-release audit of this file identified the following
      issues. All of them are addressed in-place; no version bump.
@@ -90,7 +90,7 @@
          for a future reader.
 
      ============================================================
-     v1.2.0 (Global Edition) — Additional hardening, second pass
+     v1.3.0 (Global Edition) — Additional hardening, second pass
      ============================================================
      A second review pass (cross-verified against index.html)
      identified the following issues. All of them are addressed
@@ -175,7 +175,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Dashboard v1.2.0</title>
+    <title>DNSCrypt Dashboard v1.3.0</title>
 
     <!-- IDX-4 parity: apply lang/dir from localStorage BEFORE the
          first paint, matching index.html. Without this, an
@@ -444,7 +444,7 @@
         </div>
 
         <div class="footer">
-            <span id="footerText">DNSCrypt Proxy Dashboard – v1.2.0 Zero-Footprint</span>
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.3.0 Zero-Footprint</span>
             · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
         </div>
     </div>
@@ -482,7 +482,7 @@
         // ============================================================
         // [1] Settings
         // ============================================================
-        var VERSION = 'v1.2.0';
+        var VERSION = 'v1.3.0';
 
         var PORTS = {
             webui:     '9090',

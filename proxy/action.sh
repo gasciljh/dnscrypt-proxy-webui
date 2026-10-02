@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – action.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.3.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -176,7 +176,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.0"
+		echo "$0: v1.3.0"
 		exit 0
 		;;
 esac
@@ -633,35 +633,64 @@ EOF
 _inline_rotate_backups() {
     local keep="${1:-21}"
 
-    # Numeric validation
     if ! echo "$keep" | grep -qE '^[0-9]+$'; then
         keep=21
     fi
 
     [ -d "$PERSISTENT_BACKUP" ] || return 0
+    [ -r "$PERSISTENT_BACKUP" ] || return 0
 
-    local snapshots
-    snapshots=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        sort -r)
+    # v1.3.0 — Professional rotation (parity with functions.sh)
+    local _protected=""
+    if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
+        _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
+    fi
 
-    [ -z "$snapshots" ] && return 0
+    local _list
+    _list=$(
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            [ -f "$_d/.manifest.json" ] || continue
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1
+    )
+
+    [ -z "$_list" ] && return 0
 
     local total
-    total=$(printf '%s\n' "$snapshots" | wc -l | tr -d ' ')
+    total=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
 
     if [ "$total" -le "$keep" ]; then
         return 0
     fi
 
     local to_remove=$((total - keep))
+    local _newest_install
+    _newest_install=$(
+        printf '%s\n' "$_list" | \
+        grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | \
+        head -n1 | \
+        awk '{print $2}'
+    )
 
-    printf '%s\n' "$snapshots" | tail -n "$to_remove" | while IFS= read -r old; do
-        [ -z "$old" ] && continue
-        rm -rf "$PERSISTENT_BACKUP/$old" 2>/dev/null
-    done
+    local _mt _name
+    while IFS=' ' read -r _mt _name; do
+        [ -z "$_name" ] && continue
+        [ "$_name" = "$_protected" ] && continue
+        [ "$_name" = "$_newest_install" ] && continue
+        rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null
+    done <<EOF
+$(printf '%s\n' "$_list" | tail -n "$to_remove")
+EOF
 
     log_msg "✅ rotate_backups (inline): done"
     return 0

@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – main.go
-// Version: v1.2.0 (Global Edition)
+// Version: v1.3.0 (Global Edition)
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -3266,6 +3266,48 @@ func removeModule(modulePath string) map[string]interface{} {
 // ============================================================
 // [30] Log file management
 // ============================================================
+// sanitizeLogFileName validates and returns a CodeQL-safe log
+// file name. On success, the returned string is guaranteed to
+// be a single path component (no separators, no "..", no NUL).
+//
+// This function is the canonical sanitizer for every path
+// construction that consumes a client-provided file name. It
+// resolves the CodeQL go/path-injection alerts by routing the
+// tainted input through filepath.Base(), which CodeQL
+// recognizes as an effective sanitizer.
+func sanitizeLogFileName(name string) (string, bool) {
+	if name == "" || len(name) > 200 {
+		return "", false
+	}
+	if strings.ContainsAny(name, "/\\\x00") {
+		return "", false
+	}
+	if strings.Contains(name, "..") {
+		return "", false
+	}
+	if !strings.HasPrefix(name, "dnscrypt") {
+		return "", false
+	}
+	// CodeQL-recognized sanitizer: filepath.Base returns only
+	// the final path component. Requiring base == name also
+	// rejects any input containing path separators (defence in
+	// depth, redundant with the check above).
+	base := filepath.Base(name)
+	if base != name || base == "." || base == ".." {
+		return "", false
+	}
+	validExts := []string{".log", ".gz", ".old", ".txt"}
+	for _, ext := range validExts {
+		if strings.HasSuffix(base, ext) {
+			return base, true
+		}
+	}
+	if strings.Contains(base, ".emergency.") {
+		return base, true
+	}
+	return "", false
+}
+
 func isAllowedLogFile(name string) bool {
 	if name == "" || len(name) > 200 {
 		return false
@@ -3359,22 +3401,23 @@ func listLogFiles() map[string]interface{} {
 // LAST 500 KB — a misleading result. Now the failure is handled
 // explicitly with a documented fallback.
 func readLogFile(name, confirm string) map[string]interface{} {
-	if !isAllowedLogFile(name) {
+	safeName, ok := sanitizeLogFileName(name)
+	if !ok {
 		return map[string]interface{}{
 			"status":  "error",
 			"message": "File not allowed",
 		}
 	}
 
-	if isSensitiveFile(name) && confirm != "1" {
+	if isSensitiveFile(safeName) && confirm != "1" {
 		return map[string]interface{}{
 			"status":  "requires_confirm",
 			"message": "Sensitive file requires confirmation",
-			"name":    name,
+			"name":    safeName,
 		}
 	}
 
-	path := filepath.Join(LOGS_DIR, name)
+	path := filepath.Join(LOGS_DIR, safeName)
 	info, err := os.Stat(path)
 	if err != nil {
 		return map[string]interface{}{
@@ -3460,28 +3503,29 @@ func readLogFile(name, confirm string) map[string]interface{} {
 }
 
 func clearLogFile(name string) map[string]interface{} {
-	if !isAllowedLogFile(name) {
+	safeName, ok := sanitizeLogFileName(name)
+	if !ok {
 		return map[string]interface{}{
 			"status":  "error",
 			"message": "File not allowed",
 		}
 	}
 
-	if isSensitiveFile(name) {
+	if isSensitiveFile(safeName) {
 		return map[string]interface{}{
 			"status":  "error",
 			"message": "Cannot clear sensitive file",
 		}
 	}
 
-	if name == filepath.Base(LOG_FILE) {
+	if safeName == filepath.Base(LOG_FILE) {
 		return map[string]interface{}{
 			"status":  "error",
 			"message": "Cannot clear the active system log",
 		}
 	}
 
-	path := filepath.Join(LOGS_DIR, name)
+	path := filepath.Join(LOGS_DIR, safeName)
 	info, err := os.Stat(path)
 	if err != nil {
 		return map[string]interface{}{
@@ -3498,14 +3542,14 @@ func clearLogFile(name string) map[string]interface{} {
 	}
 
 	if err := os.Truncate(path, 0); err != nil {
-		logWithLevel("error", "❌ clearLogFile failed for "+name+": "+err.Error())
+		logWithLevel("error", "❌ clearLogFile failed for "+safeName+": "+err.Error())
 		return map[string]interface{}{
 			"status":  "error",
 			"message": "Failed to clear file",
 		}
 	}
 
-	logEvent("🗑️ Cleared log file: " + name)
+	logEvent("🗑️ Cleared log file: " + safeName)
 	return map[string]interface{}{
 		"status":  "ok",
 		"message": "File cleared successfully",
@@ -3520,19 +3564,20 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := r.URL.Query().Get("file")
-	if !isAllowedLogFile(name) {
+	safeName, ok := sanitizeLogFileName(name)
+	if !ok {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprint(w, "Forbidden")
 		return
 	}
 
-	if isSensitiveFile(name) && r.URL.Query().Get("confirm") != "1" {
+	if isSensitiveFile(safeName) && r.URL.Query().Get("confirm") != "1" {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprint(w, "Confirmation required")
 		return
 	}
 
-	path := filepath.Join(LOGS_DIR, name)
+	path := filepath.Join(LOGS_DIR, safeName)
 	info, err := os.Stat(path)
 	if err != nil {
 		http.NotFound(w, r)
@@ -3546,7 +3591,7 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeName))
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
@@ -3628,6 +3673,15 @@ func buildBackupInfo() map[string]interface{} {
 			continue
 		}
 
+		// v1.3.0: detect snapshots by manifest presence, not by
+		// name pattern. This makes custom-named snapshots
+		// (e.g. "pre-v130-manual-...") visible to rotation and
+		// to the API.
+		manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
+		if _, err := os.Stat(manifestPath); err != nil {
+			continue
+		}
+
 		snapshots = append(snapshots, e)
 	}
 
@@ -3636,8 +3690,16 @@ func buildBackupInfo() map[string]interface{} {
 	info["orphan_txn"] = orphanTxn
 
 	if len(snapshots) > 0 {
+		// v1.3.0: sort by mtime, not by name. Name-based sorting
+		// fails when custom names are present or when the system
+		// clock has drifted.
 		sort.Slice(snapshots, func(i, j int) bool {
-			return snapshots[i].Name() < snapshots[j].Name()
+			fi, errI := snapshots[i].Info()
+			fj, errJ := snapshots[j].Info()
+			if errI != nil || errJ != nil {
+				return snapshots[i].Name() < snapshots[j].Name()
+			}
+			return fi.ModTime().Before(fj.ModTime())
 		})
 		newest := snapshots[len(snapshots)-1]
 		info["last_backup_name"] = newest.Name()

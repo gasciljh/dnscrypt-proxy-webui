@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – status.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.3.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -202,7 +202,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.2.0"
+		echo "$0: v1.3.0"
 		exit 0
 		;;
 esac
@@ -618,12 +618,24 @@ _list_snapshots() {
     local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
+    # v1.3.0 — manifest-based detection + mtime sorting
     local list
-    list=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        sort -r)
+    list=$(
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            [ -f "$_d/.manifest.json" ] || continue
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1 | awk '{print $2}'
+    )
 
     [ -z "$list" ] && return 0
 

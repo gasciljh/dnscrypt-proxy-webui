@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – Go Module Definition
-// Version: v1.2.0 (Global Edition)
+// Version: v1.3.0 (Global Edition)
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================

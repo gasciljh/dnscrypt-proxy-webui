@@ -2,8 +2,8 @@
 
 > Comprehensive guide for upgrading between DNSCrypt Smart Filter versions.
 
-**Current version**: v1.2.0
-**Last updated**: 2026-09-29
+**Current version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -1623,8 +1623,8 @@ ZIP.
 
 <div align="center">
 
-**Last updated**: 2026-09-29
-**Version**: v1.2.0
+**Last updated**: 2026-10-02
+**Version**: v1.3.0
 **Author**: gasciljh
 
 **💡 Tip**: Since v1.2.0, the persistent backup directory is

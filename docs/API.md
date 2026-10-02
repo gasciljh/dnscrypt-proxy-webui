@@ -2,10 +2,10 @@
 
 Complete reference for the HTTP API used to control the module programmatically.
 
-**Version**: v1.2.0
+**Version**: v1.3.0
 **Base URL (WebUI)**: `http://127.0.0.1:9090`
 **Base URL (Dashboard)**: `http://127.0.0.1:9091`
-**Last updated**: 2026-09-29
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -2755,6 +2755,6 @@ Documentation:
 
 ---
 
-**Last updated**: 2026-09-29
-**Version**: v1.2.0
+**Last updated**: 2026-10-02
+**Version**: v1.3.0
 **Author**: gasciljh

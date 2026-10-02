@@ -3,8 +3,8 @@
 > What's coming next in DNSCrypt Smart Filter — a comprehensive
 > vision for future releases.
 
-**Current version**: v1.2.0
-**Last updated**: 2026-09-29
+**Current version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -1631,8 +1631,8 @@ vulnerability is discovered.
 
 ---
 
-*Last updated: 2026-09-29*
-*Current version: v1.2.0*
+*Last updated: 2026-10-02*
+*Current version: v1.3.0*
 *Author: gasciljh*
 
 ---

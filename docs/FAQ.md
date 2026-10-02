@@ -2,8 +2,8 @@
 
 > Quick answers to 130+ common questions.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -2558,6 +2558,6 @@ MEM-1/2/3 + BAK-1..BAK-4 + FIX-1/2.
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-02*
+*Version: v1.3.0*
 *Author: gasciljh*

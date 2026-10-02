@@ -3,8 +3,8 @@
 Step-by-step guide to publishing a new release: from version bump
 to post-release verification.
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.3.0
+**Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -249,7 +249,8 @@ workflow.
 |---|---|---|
 | `v1.0.0` | Released (2026-09-24) | First stable release |
 | `v1.1.0` | Released (2026-09-26) | Polish + MEM-1/2/3 |
-| **`v1.2.0`** | **Released (2026-09-29)** | **Current — data-preservation release** |
+| **`v1.3.0`** | **Released (2026-10-02)** | **Current — PWA + LED + DNS auto-start + rotation + CodeQL fixes** |
+| **`v1.2.0`** | **Released (2026-09-29)** | **Previous — data-preservation release** |
 | `v1.2.1` | Planned (PATCH) | If a hotfix is needed |
 | `v1.3.0` | Planned (MINOR) | Next feature release |
 
@@ -1276,6 +1277,6 @@ gh release delete v1.3.0 --yes
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-02*
+*Version: v1.3.0*
 *Author: gasciljh*
