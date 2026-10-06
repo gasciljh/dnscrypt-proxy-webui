@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – service.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -215,6 +215,19 @@
 #         ├── allowlist.txt
 #         ├── denylist.txt
 #         └── run/
+
+# ============================================================
+# v1.4.0 \u2014 Companion Android app integration
+# ============================================================
+#   \U0001f4f1 SVC-V14-01 \u2014 No behavior change. The companion app
+#     APK (web/app-debug.apk) is not part of the boot service
+#     lifecycle. It is served by main.go; the boot path is
+#     unchanged.
+#
+#   \U0001f4f1 SVC-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
+#     Documentation only.
+#
+# ============================================================
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables (see
@@ -244,7 +257,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

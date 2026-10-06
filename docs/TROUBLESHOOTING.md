@@ -2,7 +2,7 @@
 
 > Comprehensive diagnostic guide: from symptoms to solutions.
 
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh

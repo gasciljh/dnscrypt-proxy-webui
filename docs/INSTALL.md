@@ -2,7 +2,7 @@
 
 > Detailed step-by-step installation guide.
 
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
@@ -1692,7 +1692,7 @@ su -c "sh /sdcard/verify-install.sh"
 <div align="center">
 
 **Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Author**: gasciljh
 
 </div>

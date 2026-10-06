@@ -2,17 +2,52 @@
 
 Complete reference for the HTTP API used to control the module programmatically.
 
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Base URL (WebUI)**: `http://127.0.0.1:9090`
 **Base URL (Dashboard)**: `http://127.0.0.1:9091`
-**Last updated**: 2026-10-02
+**Last updated**: 2026-10-06
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • **New static route**: `GET /app-debug.apk` — serves the
+>     optional companion Android app APK. Returns 404 when the
+>     file is absent. Mime type:
+>     `application/vnd.android.package-archive`. Cache-Control:
+>     `public, max-age=3600, immutable`.
+>   • **`POST /api/remove_module` hardened** against CodeQL
+>     `go/path-injection` — the caller-provided path is now
+>     sanitized via `filepath.Base()` and rebuilt from the trusted
+>     `MODULES_DIR` constant. No user-controlled data reaches any
+>     path expression. Two CodeQL alerts closed.
+>   • **Companion Android app integration** — a signed APK from
+>     [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
+>     is now bundled into the module ZIP as an **optional** asset
+>     (`web/app-debug.apk`). The WebUI install button is a plain
+>     `<a download>` link.
+>   • **iOS PWA logic removed** — Android-only project. No API
+>     impact.
+>   • **Compatibility**: All v1.3.0 clients continue to work
+>     without modification. All v1.4.0 changes are additive.
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **PWA install button** (WebUI) — dynamic, always-visible,
+>     browser-aware. **No API impact** — this is a client-side
+>     feature.
+>   • **Live status LED** on the Today counter (WebUI) — client-side
+>     only.
+>   • **`service.sh` DNS auto-start fix** — the boot path now calls
+>     `POST /api/ensure_running_service` directly. This is the same
+>     endpoint documented in §6.2.13. No API contract change.
+>   • **Compatibility**: All v1.2.0 clients continue to work
+>     without modification. All v1.3.0 changes are additive.
+
 > **v1.2.0 changes**:
 >   • Version bumped from v1.1.0 to v1.2.0.
->   • **Global edition — English default with Arabic toggle** — the
->     WebUI ships with English as the default language and an
+>   • **Global edition — English default with Arabic toggle** —
+>     the WebUI ships with English as the default language and an
 >     in-page toggle to switch to Arabic. The `lang` field of
 >     `manifest.json` defaults to `en` and `dir` to `ltr`; the
 >     toggle switches them at runtime. Documentation remains
@@ -103,6 +138,15 @@ Complete reference for the HTTP API used to control the module programmatically.
 >     as a distinct subsection so a reader can trace the full
 >     v1.2.0 delta.
 
+> **v1.4.0 (Global Edition) — Additional hardening in this revision**:
+>   • 🛡️ **API-V14-01** — `/app-debug.apk` is documented as
+>     **optional**: the route returns HTTP 404 when the file is
+>     absent. A missing APK does not break any other endpoint.
+>   • 🛡️ **API-V14-02** — The `removeModule` CodeQL fix is
+>     documented in §6.2.10 as a hardening change, not an API
+>     contract change. The endpoint still returns the same JSON
+>     shape for both success and error cases.
+
 ---
 
 ## Table of Contents
@@ -175,6 +219,8 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 │    GET  /favicon-16x16.png       Legacy favicon              │
 │    GET  /favicon.ico             IE + bookmarks              │
 │    GET  /offline.html            Offline fallback            │
+│    GET  /app-debug.apk           Companion Android app       │
+│                                  (optional, v1.4.0)          │
 │    GET  /                        index.html                  │
 │                                                              │
 │  Auth required (GET)                                         │
@@ -215,21 +261,29 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 └─────────────────────────────────────────────────────┘
 ```
 
-### 1.4 What was New in v1.1.0
+### 1.4 What was New in v1.4.0
 
 | Section | Change | Reference |
 |---|---|---|
-| **§2.1** | Memory limits per profile (new table) | MEM-1 |
-| **§6.1.7** | `runtime_info` returns `profile_key` + `memory_limit_mb` | MEM-1 |
-| **§6.1.14** | `metricsProxyHandler` uses `MONITORING_UI_PORT` constant | MEM-3 |
-| **§11** | Changelog entry for v1.1.0 | — |
+| **§1.3** | New static route: `GET /app-debug.apk` | Companion APK |
+| **§6.1.15** | New subsection documenting the companion APK route | Companion APK |
+| **§6.2.10** | `remove_module` documented with CodeQL path-injection hardening | CodeQL fix |
+| **§11** | Changelog entry for v1.4.0 | — |
 
-Architectural note: the API structure is unchanged — v1.1.0 is
-additive. All v1.0.0 clients continue to work without changes.
+Architectural note: the API structure is unchanged — v1.4.0 is
+additive. All v1.3.0 clients continue to work without changes.
 
----
+### 1.5 What was New in v1.3.0
 
-### 1.5 What is New in v1.2.0
+| Section | Change | Reference |
+|---|---|---|
+| **§6.2.13** | `ensure_running_service` is now called directly by `service.sh` at boot | DNS auto-start |
+| **§11** | Changelog entry for v1.3.0 | — |
+
+Architectural note: the API structure is unchanged — v1.3.0 is
+additive. All v1.2.0 clients continue to work without changes.
+
+### 1.6 What was New in v1.2.0
 
 | Section | Change | Reference |
 |---|---|---|
@@ -245,26 +299,9 @@ additive. All v1.0.0 clients continue to work without changes.
 | **§11** | Changelog entry for v1.2.0 | — |
 
 **Compatibility**: All v1.0.0 and v1.1.0 clients continue to
-work without modification. All v1.2.0 changes are additive:
+work without modification. All v1.2.0 changes are additive.
 
-- The `backups` object gained **two** fields
-  (`in_flight_txn`, `orphan_txn`).
-- Five POST endpoints now trigger a best-effort backup before
-  writing. This is transparent to clients: the request/response
-  format is unchanged, and a failed backup never fails the
-  request.
-- The `lang`/`dir` fields of `manifest.json` default to `en`/`ltr`
-  and are updated at runtime by the in-page toggle. This affects
-  only the PWA shell, not the API.
-- The API itself is **language-neutral**: it never sends nor
-  accepts a language identifier. The `langToggle` is a purely
-  client-side concern.
-
-**Architectural note**: v1.2.0 is a **data-preservation
-release**. It does not change the API contract — it only
-enriches the observability surface and hardens the write path.
-
-### 1.6 What was New in v1.0.0
+### 1.7 What was New in v1.0.0
 
 | Section | Change | Reference |
 |---|---|---|
@@ -566,7 +603,7 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 
 ## 3. Rate Limiting
 
-### 3.1 Limits (v1.2.0)
+### 3.1 Limits (v1.4.0)
 
 | Endpoint | Limit | Window | Enforcement |
 |---|---|---|---|
@@ -912,11 +949,11 @@ All three return the **same JSON body** — they invoke
 `buildRuntimeInfo()`. Choose whichever form fits the client
 convention; none is deprecated.
 
-**Response (v1.2.0):**
+**Response (v1.4.0):**
 
 ```json
 {
-  "version": "v1.2.0",
+  "version": "v1.4.0",
   "commit": "a1b2c3d",
   "build_time": "1726987200",
   "build_time_human": "2026-09-26T10:00:00Z",
@@ -1279,6 +1316,67 @@ curl -sI http://127.0.0.1:9091/api/metrics | grep Content-Type
 # Expected: Content-Type: application/json; charset=utf-8
 ```
 
+#### 6.1.15 `GET /app-debug.apk` — Companion Android App (v1.4.0)
+
+Serves the optional companion Android app APK. The APK is
+**not** required for the module to function; it is bundled into
+the module ZIP as an optional asset.
+
+**Source**: staged by `.github/workflows/release.yml` via
+`scripts/fetch_app_apk.sh` from
+[gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+
+**Public route** — no authentication required.
+
+**Request:**
+
+```http
+GET /app-debug.apk HTTP/1.1
+Host: 127.0.0.1:9090
+```
+
+**Response (200 OK — APK present):**
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=3600, immutable
+Content-Length: 3145728
+```
+
+**Response (404 Not Found — APK absent):**
+
+```http
+HTTP/1.1 404 Not Found
+Content-Type: text/plain; charset=utf-8
+```
+
+The 404 case is normal for local developer builds. The WebUI
+install button (`<a download href="/app-debug.apk">`) will
+simply lead to a "file not found" page in the browser.
+
+**Verify:**
+
+```bash
+# Check the route (with APK present)
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type|Cache-Control'
+# Expected:
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+
+# Check the route (with APK absent)
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep HTTP
+# Expected: HTTP/1.1 404 Not Found
+```
+
+**Cache-Control rationale**: APK files are immutable once
+released (the filename encodes the app version). The 1-hour cache
+avoids re-downloading the same APK on repeated WebUI visits while
+still allowing updates when a new release is published.
+
+---
+
 ### 6.2 POST Endpoints
 
 #### 6.2.1 `POST /api/auth/login`
@@ -1509,6 +1607,28 @@ Clear the main log.
 
 #### 6.2.10 `POST /api/remove_module`
 
+> **v1.4.0 CodeQL hardening**: The handler now sanitizes the
+> caller-provided path via `filepath.Base()` and rebuilds the
+> final path from the trusted `MODULES_DIR` constant:
+>
+> ```go
+> name := filepath.Base(modulePath)
+> if name == "" || name == "." || name == ".." ||
+>     name == string(filepath.Separator) {
+>     return map[string]interface{}{
+>         "status":  "error",
+>         "message": "Invalid module name",
+>     }
+> }
+> cleanPath := filepath.Join(MODULES_DIR, name)
+> ```
+>
+> This closes two CodeQL `go/path-injection` alerts (#1 and #2)
+> that were filed against the previous implementation. No
+> user-controlled data reaches any path expression from this
+> point onwards. The endpoint's request/response contract is
+> **unchanged** — this is purely a defence-in-depth hardening.
+
 **Request:**
 
 ```http
@@ -1518,7 +1638,7 @@ Content-Type: application/x-www-form-urlencoded
 path=/data/adb/modules/dnscrypt-old
 ```
 
-**Response:**
+**Response (200 OK):**
 
 ```json
 {
@@ -1526,10 +1646,30 @@ path=/data/adb/modules/dnscrypt-old
   "message": "Old module removed successfully"
 }
 ```
-*Security:*
+
+**Security:**
 - Path must be under `/data/adb/modules/`.
+- Path is sanitized via `filepath.Base()` before use.
 - Must contain `.module.fingerprint` with `dnscrypt-proxy-webui`.
 - Cannot remove the current module.
+
+**Response (400 — invalid path):**
+
+```json
+{
+  "status": "error",
+  "message": "Invalid module name"
+}
+```
+
+**Response (400 — path outside MODULES_DIR):**
+
+```json
+{
+  "status": "error",
+  "message": "Invalid path"
+}
+```
 
 #### 6.2.11 `POST /api/toggle_service`
 
@@ -1604,7 +1744,9 @@ Content-Length: 0
 
 #### 6.2.13 `POST /api/ensure_running_service`
 
-Called by the Watchdog. Checks `STATUS_FILE` then restarts if needed.
+Called by the Watchdog **and** (since v1.3.0) by `service.sh` at
+boot to ensure the DNS engine starts even when the WebUI has not
+yet loaded.
 
 **Request:**
 
@@ -1661,6 +1803,12 @@ normal auth. Any method other than POST, or any other endpoint,
 goes through normal auth. The exemption exists because the
 Watchdog runs on the same host and cannot easily carry a
 session cookie.
+
+**v1.3.0 note**: `service.sh` at boot performs the same POST
+call after waiting (bounded) for the WebUI to bind its port.
+This is the fix for the previous issue where DNS auto-start was
+delayed by the Watchdog's 30-second polling interval. See
+`CHANGELOG.md` §[v1.3.0].
 
 ---
 
@@ -1911,7 +2059,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "ok",
-  "version": "v1.2.0",
+  "version": "v1.4.0",
   "status": "ready"
 }
 ```
@@ -1924,7 +2072,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "not_running",
-  "version": "v1.2.0",
+  "version": "v1.4.0",
   "status": "unhealthy"
 }
 ```
@@ -2047,6 +2195,20 @@ curl -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics | jq
 # Expected: JSON with total_queries, blocked_queries, cache_stats, ...
 ```
 
+**Companion APK route (v1.4.0):**
+
+```bash
+# Check if the companion APK is available
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+# Expected when present:
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+
+# Download it
+curl -o DNS-Proxy.apk http://127.0.0.1:9090/app-debug.apk
+```
+
 **Basic Auth rate limiting:**
 
 ```bash
@@ -2159,6 +2321,10 @@ print(f"Last stable: {bk['last_stable']}")
 print(f"In-flight txn: {bk['in_flight_txn']}")
 print(f"Orphan txn: {bk['orphan_txn']}")
 print(f"Backup path: {bk['path']}")
+
+# v1.4.0 — Companion APK availability
+apk_head = s.head(f"{BASE}/app-debug.apk")
+print(f"Companion APK: HTTP {apk_head.status_code}")
 ```
 
 ### 10.3 Go
@@ -2233,6 +2399,11 @@ func main() {
         fmt.Printf("In-flight txn: %v\n", bk["in_flight_txn"])
         fmt.Printf("Orphan txn: %v\n", bk["orphan_txn"])
     }
+
+    // v1.4.0 — Companion APK availability
+    resp6, _ := client.Head(base + "/app-debug.apk")
+    defer resp6.Body.Close()
+    fmt.Printf("Companion APK: HTTP %d\n", resp6.StatusCode)
 }
 ```
 
@@ -2291,6 +2462,12 @@ async function getRuntimeInfo() {
     credentials: 'same-origin',
   });
   return resp.json();
+}
+
+// v1.4.0 — Check companion APK availability
+async function checkCompanionApk() {
+  const resp = await fetch(`${BASE}/app-debug.apk`, { method: 'HEAD' });
+  return resp.status === 200;
 }
 ```
 
@@ -2501,15 +2678,134 @@ document.documentElement.dir   // → "ltr" or "rtl"
 does not need to know or set the language. The JSON payloads are
 identical regardless of the WebUI language.
 
+### 10.9 Companion APK Route (v1.4.0)
+
+**Check availability:**
+
+```bash
+# HTTP HEAD — fastest way to check if the APK is available
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+```
+
+**Download the APK:**
+
+```bash
+curl -o DNS-Proxy.apk http://127.0.0.1:9090/app-debug.apk
+```
+
+**Verify the APK is a valid ZIP (APK = ZIP):**
+
+```bash
+file DNS-Proxy.apk
+# Expected: Android package (APK), Zip archive data
+```
+
+**Expected status codes:**
+
+| Scenario | HTTP Status | Notes |
+|---|---|---|
+| APK bundled (release build) | **200 OK** | Content-Type + Cache-Control set |
+| APK absent (dev build) | **404 Not Found** | `text/plain` body |
+
+**The WebUI install button** (`index.html`) uses a direct link:
+
+```html
+<a id="pwaInstallBtn" class="pwa-install-btn"
+   href="/app-debug.apk" download="DNS-Proxy.apk">
+    📲 Install App
+</a>
+```
+
+- No JavaScript required.
+- No browser-specific logic.
+- The `download` attribute forces the browser to download the
+  file rather than navigate to it.
+
 ---
 
 ## 11. Changelog
+
+### v1.4.0 (2026-10-06)
+
+**Integration release — companion Android app + CodeQL cleanup.**
+
+**Added**:
+
+- **`GET /app-debug.apk`** — serves the optional companion
+  Android app APK. Returns 404 when the file is absent. Mime:
+  `application/vnd.android.package-archive`; Cache-Control:
+  `public, max-age=3600, immutable`.
+- **`proxy/app-apk.version`** — Single Source of Truth for the
+  companion app version (fetched by `scripts/fetch_app_apk.sh`).
+
+**Changed**:
+
+- **`POST /api/remove_module`** — CodeQL `go/path-injection`
+  hardening. The caller-provided path is now sanitized via
+  `filepath.Base()` and rebuilt from the trusted `MODULES_DIR`
+  constant. Two CodeQL alerts (#1, #2) closed. No API contract
+  change — the request/response shapes are unchanged.
+- **`web/index.html`** — the install button is now a plain
+  `<a download href="/app-debug.apk">` link. No `onclick` handler,
+  no `beforeinstallprompt` state.
+- **iOS PWA logic removed** — Android-only project.
+
+**Compatibility**:
+
+- All v1.3.0 clients continue to work without modification.
+- All v1.4.0 changes are additive at the API level.
+- The new `/app-debug.apk` route does not affect any existing
+  endpoint.
+- The `remove_module` hardening does not change the endpoint's
+  observable behaviour for valid inputs.
+
+**Fixed**:
+
+- **CodeQL `go/path-injection` in `removeModule`** — 2 alerts
+  closed via `filepath.Base()` sanitization. See §6.2.10.
+
+**Removed**:
+
+- **iOS PWA logic** (~35 lines in `web/index.html`) — Android-only.
+
+**Audit Corrections**: **None** — the registry remains at
+**#33**.
+
+### v1.3.0 (2026-10-02)
+
+**Feature release — PWA install button + live status LED +
+DNS auto-start.**
+
+**Added**:
+
+- **PWA install button** (`web/index.html`) — dynamic,
+  always-visible, browser-aware. **No API impact** — this is a
+  client-side feature.
+- **Live status LED** on the Today counter (`web/index.html`) —
+  client-side only.
+
+**Changed**:
+
+- **`service.sh`** — the boot path now waits (bounded) for the
+  WebUI to bind its port, then calls
+  `POST /api/ensure_running_service` directly. This is the same
+  endpoint documented in §6.2.13. No API contract change.
+- **`proxy/build.sh`** — documentation only; no behavioural
+  change.
+
+**Compatibility**:
+
+- All v1.2.0 clients continue to work without modification.
+- All v1.3.0 changes are additive at the API level.
+
+**Audit Corrections**: **None** — the registry remains at
+**#33**.
 
 ### v1.2.0 (2026-09-29)
 
 **Data-preservation release — no breaking changes. All changes are additive.**
 
-Added (API surface):
+**Added (API surface)**:
 
 - **§6.1.7** — `runtime_info.backups` now returns **seven**
   fields: `available`, `in_flight_txn`, `orphan_txn`,
@@ -2524,7 +2820,7 @@ Added (API surface):
 - **§10.8** — new section documenting that the API is
   language-neutral (the WebUI toggle is client-side only).
 
-**v1.2.0 post-audit fixes (main.go — API-8 fix):**
+**v1.2.0 post-audit fixes (main.go — API-8 fix)**:
 
 The v1.2.0 post-audit pass applied seven corrections to
 `proxy/main.go`. They do not change the API contract, but they
@@ -2541,7 +2837,7 @@ fix behaviors that clients could observe:
 | **N-1** | `USER_AGENT` derived from `BuildVersion` | Custom `-ldflags` no longer leave a stale UA |
 | **N-4** | `getEntriesCount` caches `lastSize` even when count is `0` | Fewer full scans on the "no blocklist yet" state |
 
-Changed (documentation only — no API surface change):
+**Changed (documentation only — no API surface change)**:
 
 - **§1.1** — the language field is now bilingual (EN default +
   AR toggle). All "English-only" references were replaced with
@@ -2553,21 +2849,21 @@ Changed (documentation only — no API surface change):
 - **§12** — References now include `docs/BACKUP.md`,
   `docs/EMERGENCY.md`, and `docs/UPGRADE.md`.
 
-Deprecated:
+**Deprecated**:
 
 - None.
 
-Removed:
+**Removed**:
 
 - None.
 
-Fixed:
+**Fixed**:
 
 - No API-level fixes at the contract level. All v1.2.0 fixes to
   `main.go` (listed above) are internal — the request/response
   shapes are unchanged.
 
-Client compatibility:
+**Client compatibility**:
 
 - **v1.0.0 clients**: unaffected. All new fields are additive.
 - **v1.1.0 clients**: unaffected. The `backups` object gained
@@ -2582,7 +2878,7 @@ Client compatibility:
 
 **Polish release — no breaking changes. All changes are additive.**
 
-Added:
+**Added**:
 
 - **§2.1** — Memory limits per profile table (MEM-1).
 - **§6.1.7** — `runtime_info` returns `profile_key` and
@@ -2591,7 +2887,7 @@ Added:
 - **§6.1.14** — note that `metricsProxyHandler` uses the
   `MONITORING_UI_PORT` constant (MEM-3).
 
-Changed (internal only — same API surface):
+**Changed (internal only — same API surface)**:
 
 - `metricsProxyHandler` builds the upstream URL from the Go
   constant `MONITORING_UI_PORT` instead of the hardcoded
@@ -2602,21 +2898,21 @@ Changed (internal only — same API surface):
 - `main()` calls `applyMemoryLimit()` once at startup instead
   of using a hardcoded `debug.SetMemoryLimit(80 MB)`.
 
-Deprecated:
+**Deprecated**:
 
 - None.
 
-Removed:
+**Removed**:
 
 - None.
 
-Fixed:
+**Fixed**:
 
 - No API-level fixes. (The MEM-1 / MEM-2 / MEM-3 changes close
   edge cases; they are not audit corrections. See
   docs/SECURITY.md §17.)
 
-Client compatibility:
+**Client compatibility**:
 
 - **v1.0.0 clients**: unaffected. All new fields are additive.
 - **v1.1.0 clients**: can rely on `profile_key` and
@@ -2702,7 +2998,21 @@ Documentation:
 | [docs/EMERGENCY.md](EMERGENCY.md) | Emergency recovery guide (v1.2.0) |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 
-### 12.3 v1.0.0 References
+### 12.3 Companion App Repository
+
+The companion Android app is maintained in a separate repository:
+
+| Link | Purpose |
+|---|---|
+| [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) | Source repository |
+| [Releases](https://github.com/gasciljh/dnscrypt-proxy-app/releases) | Signed APK downloads |
+| [Issues](https://github.com/gasciljh/dnscrypt-proxy-app/issues) | Bug reports |
+
+The APK is fetched by `scripts/fetch_app_apk.sh` at release time
+from the version pinned in `proxy/app-apk.version` (Single Source
+of Truth).
+
+### 12.4 v1.0.0 References
 
 | Fix | Number | Reference |
 |---|:---:|---|
@@ -2722,7 +3032,7 @@ Documentation:
 | `rebuildMu` (RACE-1) | — | [SECURITY.md](SECURITY.md) |
 | `runtime_info` (PORT-2) | — | [SECURITY.md](SECURITY.md) |
 
-### 12.4 v1.1.0 References
+### 12.5 v1.1.0 References
 
 | Change | ID | Reference |
 |---|:---:|---|
@@ -2735,7 +3045,7 @@ Documentation:
 > The Audit Corrections Registry remains at #33 (last entry from
 > v1.0.0). The next audit correction will be #34.
 
-### 12.5 v1.2.0 References
+### 12.6 v1.2.0 References
 
 | Change | ID | Reference |
 |---|:---:|---|
@@ -2750,11 +3060,27 @@ Documentation:
 > in [SECURITY.md](SECURITY.md) §5.31. The Audit Corrections
 > Registry remains at #33.
 
+### 12.7 v1.3.0 / v1.4.0 References
+
+| Change | ID | Reference |
+|---|:---:|---|
+| PWA install button (WebUI) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.4 |
+| Live status LED (WebUI) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.1 |
+| DNS auto-start fix (`service.sh`) | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.3.0] |
+| Companion Android app integration | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0], [COMPATIBILITY.md](COMPATIBILITY.md) §1.9 |
+| CodeQL `go/path-injection` fix in `removeModule` | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0], §6.2.10 above |
+
+> **Note**: v1.3.0 and v1.4.0 do **not** add audit corrections.
+> They are feature / integration releases. The Audit Corrections
+> Registry remains at #33. The CodeQL fix in v1.4.0 closes two
+> **CodeQL alerts** (#1, #2) that are tracked separately from the
+> numbered audit corrections.
+
 **Last Audit Correction**: #33 (v1.0.0)
-**Next expected**: #34 (v1.3.x)
+**Next expected**: #34 (in a future release)
 
 ---
 
-**Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Last updated**: 2026-10-06
+**Version**: v1.4.0
 **Author**: gasciljh

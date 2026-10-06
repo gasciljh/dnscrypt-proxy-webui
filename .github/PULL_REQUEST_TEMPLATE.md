@@ -1,6 +1,6 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Pull Request Template
-     Version: v1.2.0 (Global Edition)
+     Version: v1.4.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================

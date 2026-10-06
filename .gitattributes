@@ -1,6 +1,6 @@
 # ============================================================
 # Git Attributes for DNSCrypt Smart Filter
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://git-scm.com/docs/gitattributes
@@ -192,6 +192,20 @@ VERSION       text eol=lf
 #    full rationale.
 # ============================================================
 proxy/dnscrypt-proxy.version  text eol=lf
+
+# ============================================================
+# proxy/app-apk.version: LF only, single line
+# ============================================================
+# Companion Android app version (e.g. "1.0.0", no "v" prefix).
+# Read by scripts/fetch_app_apk.sh. Any whitespace or CRLF
+# would break the version check regex
+# (`^[0-9]+\.[0-9]+\.[0-9]+$`).
+#
+# This file is NOT the module version (that is VERSION).
+# It is updated manually when the companion app ships a new
+# release. See proxy/app-apk.version for details.
+# ============================================================
+proxy/app-apk.version  text eol=lf
 
 # ============================================================
 # Go mod: LF only, no formatting

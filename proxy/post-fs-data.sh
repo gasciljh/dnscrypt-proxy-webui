@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – post-fs-data.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -264,6 +264,23 @@
 #   NOT implemented in section [1]; it is implemented by
 #   customize.sh at install time. The layer table describes
 #   WHO implements each layer, not WHERE in this file.
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 PFD-V14-01 — No behavior change. The companion
+#     Android app APK (web/app-debug.apk) is NOT part of the
+#     post-fs-data lifecycle. It is extracted by customize.sh
+#     and served by main.go; neither phase overlaps with this
+#     script.
+#
+#     The APK is a one-shot user download; it does not affect
+#     boot cleanup, firewall state, or process lifecycle.
+#
+#   📱 PFD-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     Documentation only. No changes to the emergency cleanup
+#     path, the Custom Chain teardown, or the STATUS_FILE
+#     semantics.
+#
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside the inline_firewall_cleanup

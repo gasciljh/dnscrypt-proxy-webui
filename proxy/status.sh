@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – status.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -173,6 +173,18 @@
 #       - customize.sh (self cleanup after COMMIT)
 #       - main.go:cleanupOldTransactions (at startup)
 #       - service.sh (via do_cleanup_transactions at boot)
+
+# ============================================================
+# v1.4.0 \u2014 Companion Android app integration
+# ============================================================
+#   \U0001f4f1 STS-V14-01 \u2014 No behavior change. The companion app
+#     APK (web/app-debug.apk) is not touched by status.sh. Its
+#     install state is entirely the user's concern.
+#
+#   \U0001f4f1 STS-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
+#     The `--version` output (if present) now reports v1.4.0.
+#
+# ============================================================
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables (see
@@ -202,7 +214,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

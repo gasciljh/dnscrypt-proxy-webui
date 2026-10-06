@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – customize.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -338,6 +338,29 @@
 #     summary is printed exactly once and reads coherently.
 #
 # ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 CSH-17 — The module ZIP may now contain
+#     `web/app-debug.apk` (the companion Android app). The
+#     file is OPTIONAL: it is staged by `.github/workflows/release.yml`
+#     via `scripts/fetch_app_apk.sh` before packaging. Local
+#     developer builds may omit it entirely.
+#
+#     Handling (no code change required):
+#       • Section [9] `unzip 'web/*'` extracts it automatically
+#         (the glob crosses path separators).
+#       • Section [10] critical-file check does NOT include it
+#         (an absent APK is not a fatal error).
+#       • Section [19] `set_perm_recursive` applies 0644 to it
+#         like every other web file.
+#       • `proxy/main.go` serves it at `/app-debug.apk` and
+#         returns 404 when the file is absent.
+#
+#   📱 CSH-18 — Version bump v1.3.0 → v1.4.0.
+#     The `--version` flag now reports v1.4.0. No behavior
+#     changes to the install pipeline itself.
+#
+# ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside multiple helper functions
 #   (get_module_version, _inline_cleanup_firewall,
@@ -360,7 +383,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

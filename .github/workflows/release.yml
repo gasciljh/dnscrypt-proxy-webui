@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Release Workflow
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -49,7 +49,7 @@
 #   the commit and the release are guaranteed to be consistent.
 #
 # ============================================================
-# Pipeline steps (11):
+# Pipeline steps (13):
 # ============================================================
 #   ┌────┬──────────────────────────┬──────────┐
 #   │ #  │ Step                          │ Duration   │
@@ -195,6 +195,24 @@
 #     trigger paths, not just the tag-push path.
 #
 # ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 REL-18 — New step "Fetch companion Android app APK".
+#     Downloads app-debug.apk from gasciljh/dnscrypt-proxy-app
+#     and places it in dist/ as DNS-Proxy-v<app-version>.apk
+#     (best-effort: a failed fetch does NOT fail the release).
+#
+#   📱 REL-19 — New step "Stage APK for module ZIP".
+#     Copies dist/DNS-Proxy-v*.apk → web/app-debug.apk so that
+#     package_module.sh (running later in the pipeline) can
+#     bundle the companion app into the module ZIP.
+#     If no APK is found, a warning is logged and packaging
+#     continues (APK is OPTIONAL, matching package_module.sh).
+#
+#   📱 REL-20 — Release assets now include:
+#     • dist/DNS-Proxy-v*.apk
+#     • dist/DNS-Proxy-v*.apk.sha256
+# ============================================================
 
 name: Release
 
@@ -301,6 +319,32 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             zip unzip jq curl ca-certificates
 
+      # ============================================================
+      # Fetch the companion Android app APK (v1.4.0)
+      # ============================================================
+      # Downloads app-debug.apk from the companion repo
+      # (gasciljh/dnscrypt-proxy-app) and renames it to
+      # DNS-Proxy-v<app-version>.apk in dist/.
+      #
+      # Version source: proxy/app-apk.version
+      #
+      # Best-effort: a failed fetch does NOT fail the release.
+      # The release proceeds without the APK asset.
+      # ============================================================
+      - name: Fetch companion Android app APK
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/fetch_app_apk.sh ]; then
+            echo "::warning::scripts/fetch_app_apk.sh not found — skipping APK"
+            exit 0
+          fi
+          chmod +x scripts/fetch_app_apk.sh
+          if ! ./scripts/fetch_app_apk.sh --output-dir ./dist; then
+            echo "::warning::Failed to fetch APK — release continues without it"
+          fi
+
       - name: Build WebUI binaries
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
@@ -326,6 +370,29 @@ jobs:
             fi
           done
           echo "::notice::All 4 WebUI binaries OK"
+
+      # ============================================================
+      # Stage APK for module ZIP (v1.4.0 — REL-19)
+      # ============================================================
+      # Copies dist/DNS-Proxy-v*.apk → web/app-debug.apk so that
+      # package_module.sh (running in the next step) can bundle
+      # the companion app into the module ZIP. The APK is
+      # OPTIONAL: if it is missing (e.g. the fetch step failed),
+      # a warning is logged and packaging proceeds.
+      # ============================================================
+      - name: Stage APK for module ZIP
+        run: |
+          set -euo pipefail
+          apk=$(ls dist/DNS-Proxy-v*.apk 2>/dev/null | head -n1 || true)
+          if [ -n "$apk" ] && [ -f "$apk" ]; then
+            mkdir -p web
+            cp -f "$apk" web/app-debug.apk
+            chmod 0644 web/app-debug.apk
+            echo "::notice::APK staged: $apk → web/app-debug.apk"
+            ls -la web/app-debug.apk
+          else
+            echo "::warning::No APK found in dist/ — module ZIP will not include companion app"
+          fi
 
       - name: Package Magisk module
         env:
@@ -410,6 +477,8 @@ jobs:
           files: |
             dist/dnscrypt-webui-*-module.zip
             dist/dnscrypt-webui-*-module.zip.sha256
+            dist/DNS-Proxy-v*.apk
+            dist/DNS-Proxy-v*.apk.sha256
             proxy/build/dnscrypt-webui-arm64
             proxy/build/dnscrypt-webui-arm
             proxy/build/dnscrypt-webui-amd64

@@ -12,21 +12,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-> Changes that will land in the next release (`v1.3.0` or a future PATCH).
+> Changes that will land in the next release (`v1.5.0` or a future PATCH).
 > Keep this section empty at the moment of each release.
 
 ### Planned (see `docs/ROADMAP.md` §5)
 
-- Remove `'unsafe-inline'` from CSP (CSP hardening) — v1.3.0.
-- Unify WebUI + Dashboard on a single port (PWA dual-origin fix) — v1.3.0.
-- Dedicated maskable icon (`icon-maskable.svg` / `icon-maskable.png`) — v1.3.0.
-- Backup integrity hardening (`BACKUP_INTEGRITY_MODE=enforce`) — v1.3.0.
-- WebUI uses `append_denylist` with a `content` parameter — v1.3.0.
-- Data Guardian badge tooling (`scripts/report-backup.sh`) — v1.3.0.
-- Extended multi-language support (FR, DE, ES, RU, ZH) — v1.4.0.
-- 2FA + Audit Logging — v1.4.0.
+- Remove `'unsafe-inline'` from CSP (CSP hardening) — v1.5.0.
+- Unify WebUI + Dashboard on a single port (PWA dual-origin fix) — v1.5.0.
+- Dedicated maskable icon (`icon-maskable.svg` / `icon-maskable.png`) — v1.5.0.
+- Backup integrity hardening (`BACKUP_INTEGRITY_MODE=enforce`) — v1.5.0.
+- WebUI uses `append_denylist` with a `content` parameter — v1.5.0.
+- Data Guardian badge tooling (`scripts/report-backup.sh`) — v1.5.0.
+- Extended multi-language support (FR, DE, ES, RU, ZH) — v1.5.0.
+- 2FA + Audit Logging — v1.5.0.
+---
+
+## [v1.4.0] - 2026-10-06
+
+> **Integration release** -- companion Android app + CodeQL cleanup + iOS removal.
+
+### Added
+
+- **Companion Android app integration** -- a signed APK from the
+  sister repository [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
+  is now bundled into the module ZIP as `web/app-debug.apk` (OPTIONAL
+  -- the build succeeds without it).
+
+  - `proxy/app-apk.version` -- Single Source of Truth for the app
+    version (currently `1.0.0`, no `v` prefix).
+  - `scripts/fetch_app_apk.sh` -- new fetcher (cache, download,
+    SHA256, `.manifest.json`, JSON output, offline mode,
+    `--version` override). Options mirror `scripts/fetch_dns_binaries.sh`.
+  - `GET /app-debug.apk` -- new static route in `proxy/main.go`
+    (mime: `application/vnd.android.package-archive`, Cache-Control
+    `public, max-age=3600, immutable`).
+  - **WebUI install button** -- converted from a JavaScript modal
+    (`beforeinstallprompt`) to a direct `<a download>` link pointing
+    at `/app-debug.apk`. No browser-specific logic, no
+    unsupported-browser modal.
+  - **Module ZIP** -- `scripts/package_module.sh` now bundles
+    `web/app-debug.apk` when present. Missing APK is a warning only,
+    not a build failure (parity with `release.yml`).
+
+- **CI/CD integration** -- the release pipeline now:
+  1. Fetches the companion APK into `dist/` (`.github/workflows/release.yml`).
+  2. Stages it at `web/app-debug.apk` before packaging.
+  3. Attaches `dist/DNS-Proxy-v*.apk` + `.sha256` to the GitHub Release.
+
+  `ci.yml` gains a `Verify companion app metadata` smoke-test step
+  (validates `proxy/app-apk.version` format, checks
+  `scripts/fetch_app_apk.sh` presence).
+
+- **Makefile targets** -- `make fetch-apk` and
+  `make check-app-version`. `package` now depends on `fetch-apk`;
+  `check-all` now depends on `check-app-version`.
+
+### Changed
+
+- **Version bump across all metadata** -- `VERSION` (`v1.3.0` to
+  `v1.4.0`), `module.prop` (`versionCode=1040000`), `update.json`
+  (`version` + `versionCode` + `versionName` + `releaseDate` +
+  `zipUrl`), `web/index.html` (`var VERSION`, `<title>`, badge,
+  footer). `proxy/main.go` header + `removeModule` comments.
+
+- **`proxy/main.go`** -- new `APK_FILE` constant + `serveStaticAssets`
+  entry for `/app-debug.apk`. `serveFile` now applies per-extension
+  Cache-Control (`.apk` -> 1 h immutable, everything else ->
+  no-store).
+
+- **`web/index.html`** -- install button is now
+  `<a id="pwaInstallBtn" href="/app-debug.apk" download="DNS-Proxy.apk">`.
+  The `initPWABeforeInstallPrompt()` call was removed from `boot()`.
+
+- **`scripts/package_module.sh`** -- `WEB_FILES_REQUIRED` and
+  `REQUIRED_IN_ZIP` now include `app-debug.apk` / `web/app-debug.apk`
+  with an OPTIONAL-handling branch in all three check sites
+  (sections `[13]`, `[16]`, `[19]`).
+
+### Fixed
+
+- **CodeQL `go/path-injection` in `removeModule` (proxy/main.go)** --
+  two alerts (#1, #2) closed by routing the caller-provided path
+  through `filepath.Base()` and rebuilding the final path from the
+  trusted `MODULES_DIR` constant + the sanitized basename. No
+  user-controlled data reaches any path expression. Defence-in-depth
+  prefix check kept as a second layer.
+
+### Removed
+
+- **iOS PWA logic** (`web/index.html`) -- Android-only project.
+  Roughly 35 lines removed:
+  - `isIOSDevice()` helper.
+  - `pwaStepIos1/2/3` translations (EN + AR).
+  - iOS branches in `getBrowserName()`, `isBrowserSupported()`,
+    `getPWAInstallSteps()`, `showPWAInstructionsModal()`.
+
+  Browsers that never fire `beforeinstallprompt` (Firefox, Samsung
+  Internet legacy builds) now fall through to the unified
+  "unsupported" message that lists supported alternatives
+  (Chrome / Edge / Brave) with Play Store links.
+
+### Security
+
+- **No new audit corrections.** The Audit Corrections Registry remains
+  at **#33** (last entry from v1.0.0).
+- **CodeQL status** -- 6 of 8 alerts closed in v1.3.0, remaining 2
+  (`go/path-injection` in `removeModule`) closed in this release.
+  No outstanding CodeQL alerts.
+- **All v1.0.0 / v1.1.0 / v1.2.0 / v1.3.0 security fixes remain in
+  place.**
+
+### Breaking Changes
+
+**None.** v1.4.0 is fully backward compatible with v1.3.0:
+
+- All API endpoints work with the same paths, methods, and auth.
+- All config files (`webui.conf`, `dnscrypt-proxy.toml`) keep the
+  same format.
+- All shell script CLI flags work the same way.
+- The WebUI install button no longer uses `beforeinstallprompt`, but
+  the PWA manifest and service worker are unchanged.
+- The companion APK route (`/app-debug.apk`) is additive; returning
+  404 when the file is absent is the intended behaviour.
+
+### Notes
+
+#### Companion app -- optional by design
+
+The APK is treated as a best-effort asset throughout the pipeline:
+
+| Stage | Behaviour if missing |
+|---|---|
+| `scripts/fetch_app_apk.sh` | exits 0 on cache hit, exits 1 on `--offline` + no cache |
+| `release.yml` Fetch step | logs `::warning::` -- release continues |
+| `release.yml` Stage step | logs `::warning::` -- packaging continues |
+| `scripts/package_module.sh` | logs warning -- ZIP built without APK |
+| `proxy/main.go` route | returns 404 for `/app-debug.apk` |
+| WebUI install button | click leads to 404 (browser "file not found") |
+
+This design lets local developer builds succeed without a network
+fetch, while release builds ship the APK.
+
+#### Version Files -- Where to Update
+
+At each release, the version string appears in:
+
+| File | Field | v1.4.0 value |
+|---|---|---|
+| `VERSION` | entire file | `v1.4.0` |
+| `module.prop` | `version=` | `v1.4.0` |
+| `module.prop` | `versionCode=` | `1040000` |
+| `update.json` | `.version` | `v1.4.0` |
+| `update.json` | `.versionCode` | `1040000` |
+| `update.json` | `.releaseDate` | `2026-10-06` |
+| `web/manifest.json` | `.version` | `1.4.0` (no `v`) |
+| `web/sw.js` | `CACHE_VERSION` | `v1.4.0` |
+| `web/index.html` | `var VERSION` | `v1.4.0` |
+| `proxy/main.go` | `USER_AGENT` | `v1.4.0` |
+| `proxy/app-apk.version` | entire file | `1.0.0` (companion app, no `v`) |
 
 ---
+
 
 ## [v1.3.0] - 2026-10-02
 
@@ -758,11 +904,11 @@ added in `v1.2.0`:
   `script-src`) — deferred to v1.3.0.
 - **PWA port unification** (serving Dashboard from `9090/dashboard`)
   — deferred to v1.3.0.
-- **Dedicated maskable icon** — deferred to v1.3.0.
+- **Dedicated maskable icon** — deferred to v1.5.0.
 - **Backup integrity enforcing mode** (`BACKUP_INTEGRITY_MODE=enforce`)
   — deferred to v1.3.0. Currently advisory only.
-- **WebUI uses `append_denylist`** — deferred to v1.3.0.
-- **Data Guardian badge tooling** — deferred to v1.3.0.
+- **WebUI uses `append_denylist`** — deferred to v1.5.0.
+- **Data Guardian badge tooling** — deferred to v1.5.0.
 - **Extended multi-language support** (FR, DE, ES, RU, ZH) —
   deferred to v1.4.0.
 - **JWT authentication alternative to cookies** — deferred to
@@ -1700,7 +1846,9 @@ low-severity — CSRF surface that existed since v1.0.0).
 
 ---
 
-[Unreleased]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.4.0...HEAD
+[v1.4.0]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.3.0...v1.4.0
+[v1.3.0]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.2.0...v1.3.0
 [v1.2.0]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.1.0...v1.2.0
 [v1.1.0]: https://github.com/gasciljh/dnscrypt-proxy-webui/compare/v1.0.0...v1.1.0
 [v1.0.0]: https://github.com/gasciljh/dnscrypt-proxy-webui/releases/tag/v1.0.0

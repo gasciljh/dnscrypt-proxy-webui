@@ -2,8 +2,8 @@
 
 Comprehensive architecture document explaining how the system works internally.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-06
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -16,11 +16,6 @@ Comprehensive architecture document explaining how the system works internally.
 >     `ltr`; the toggle updates them at runtime. The user's choice
 >     is persisted in `localStorage['dnscrypt-lang']`. Documentation
 >     remains English-only by project convention.
->
->     **Note**: the bilingual interface has been present since
->     v1.0.0 — v1.2.0 does NOT introduce it. What v1.2.0 adds is
->     a documentation convention (English-only source comments)
->     and a clarification that the toggle is purely client-side.
 >   • Added §3.10 (Backup & Restore Flow) documenting the 10
 >     defensive layers introduced in v1.2.0.
 >   • Added §4.10 (v1.2.0 Backend Additions) covering:
@@ -87,12 +82,23 @@ Comprehensive architecture document explaining how the system works internally.
 >     `backups` object.
 >   • Updated Legend and the Official Fix Numbers table with
 >     BAK-1..BAK-4, FSH-10, FSH-11, ACT-5, WD-TOKEN.
->   • **Encoding correction (this revision)**: fixed mojibake in
->     section markers, arrows, checkmarks, warnings, and box
->     drawing characters. All symbols now render as proper UTF-8,
->     and every box diagram is aligned to a fixed interior width.
 >   • No structural changes — v1.2.0 is a data-preservation
 >     release, not a re-architecture.
+
+> **v1.4.0 changes**:
+>   • Companion Android app integrated — `web/app-debug.apk` is now
+>     bundled into the module ZIP (optional). Fetched by
+>     `scripts/fetch_app_apk.sh`, served at `GET /app-debug.apk`
+>     (mime: `application/vnd.android.package-archive`, Cache-Control:
+>     `public, max-age=3600, immutable`).
+>   • `removeModule` hardened against CodeQL `go/path-injection` —
+>     `filepath.Base()` sanitization + `filepath.Join(MODULES_DIR, name)`.
+>   • iOS PWA logic removed (Android-only project).
+>   • **v1.3.0** (previously undocumented in this file):
+>     PWA install button now uses `<a download>` (was `onclick`),
+>     live status LED added to Today counter, DNS auto-start
+>     after boot via direct API call in `service.sh`.
+>   • Total tracked files: 87 → 90.
 
 ---
 
@@ -128,6 +134,7 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 - Ad / tracker blocking via updatable lists
 - Web interface for control (bilingual: English default + Arabic toggle)
 - **Persistent user-data preservation** across upgrades, renames, reinstalls, and uninstalls (v1.2.0)
+- **Optional companion Android app** (v1.4.0) served at `/app-debug.apk`
 
 ### 1.2 Architectural Principles
 
@@ -140,7 +147,7 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | **Localhost-Only** | All servers on `127.0.0.1` (by default) |
 | **Idempotent** | Running scripts twice changes nothing |
 | **Bounded Concurrency** | SSE writes bounded by 30 s deadline |
-| **Single Source of Truth** | `VERSION` + `module.prop` + `proxy/dnscrypt-proxy.version` |
+| **Single Source of Truth** | `VERSION` + `module.prop` + `proxy/dnscrypt-proxy.version` + `proxy/app-apk.version` |
 | **Clean State** | `STATUS_FILE` = user intent |
 | **Custom Chains** | iptables/ip6tables in dedicated chains |
 | **DNS Version** | Single file determines dnscrypt-proxy version |
@@ -164,9 +171,11 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | **v1.2.0 — Persistent Backup** | `/sdcard/dnscrypt-webui-backup/` survives uninstall + `/data` reset |
 | **v1.2.0 — Transactional Upgrade** | Atomic install with rollback; `txn-*` / `orphan-txn-*` |
 | **v1.2.0 — Recovery Mode (snapshot-and-reapply)** | Trigger file restores last known-good config **after** the ZIP extraction step |
-| **v1.2.0 — Bilingual WebUI** | English default + Arabic toggle, client-side only; documentation remains English-only |
+| **v1.2.0 — Bilingual WebUI** | English default + Arabic toggle, client-side only |
 | **v1.2.0 — Atomic `current/`** | `current/` updated via `.current.tmp.$$` + `.current.old.$$` + `mv` |
 | **v1.2.0 — Unique Snapshot Names** | `<ts>-<version>-<pid>` / `<ts>-manual-<pid>` / `<ts>-auto-<pid>` |
+| **v1.4.0 — CodeQL Path-Injection Hardening** | `removeModule` uses `filepath.Base()` + `filepath.Join(MODULES_DIR, name)` |
+| **v1.4.0 — Optional Companion APK** | `web/app-debug.apk` served at `/app-debug.apk`; missing file is not an error |
 
 ### 1.3 Dependencies
 
@@ -178,8 +187,11 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | **HaGeZi blocklists** | latest | Blocklists |
 | **iptables/nftables** | — | DNS redirection |
 | **DNS Binaries** | Level 4 | DNS binary management (5 fallback sources) |
+| **Companion Android app** | 1.0.0 | Optional native WebView wrapper (`proxy/app-apk.version`) |
 
 DNSCrypt-proxy version is determined by `proxy/dnscrypt-proxy.version` — see [`DNS_BINARIES.md`](DNS_BINARIES.md).
+
+Companion app version is determined by `proxy/app-apk.version` — see `scripts/fetch_app_apk.sh`.
 
 ---
 
@@ -203,6 +215,7 @@ DNSCrypt-proxy version is determined by `proxy/dnscrypt-proxy.version` — see [
 │  │  │  + MEM-1           │    │                              │   │  │
 │  │  │  + BAK-1           │    │                              │   │  │
 │  │  │  + EN/AR toggle    │    │                              │   │  │
+│  │  │  + /app-debug.apk  │    │                              │   │  │
 │  │  └─────────┬──────────┘    └──────────────┬───────────────┘   │  │
 │  │            │                              │                   │  │
 │  │            │ HTTP/SSE                     │ DNS               │  │
@@ -255,8 +268,9 @@ DNSCrypt-proxy version is determined by `proxy/dnscrypt-proxy.version` — see [
 
 | Component | Language | Responsibilities |
 |---|---|---|
-| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON, dynamic memory limit, **auto-backup triggers (v1.2.0)**, **rotation after pre-critical backup (v1.2.0)**, **transaction cleanup (v1.2.0)**, **`backups` runtime_info field (v1.2.0)**, **watchdog token generation (v1.2.0)** |
+| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON, dynamic memory limit, **auto-backup triggers (v1.2.0)**, **rotation after pre-critical backup (v1.2.0)**, **transaction cleanup (v1.2.0)**, **`backups` runtime_info field (v1.2.0)**, **watchdog token generation (v1.2.0)**, **`/app-debug.apk` route (v1.4.0)**, **CodeQL path-injection hardening in `removeModule` (v1.4.0)** |
 | **dnscrypt-proxy** | Go (upstream) | The actual DNS engine |
+| **Companion Android app** | Kotlin (separate repo) | Native WebView wrapper (`web/app-debug.apk`, optional, v1.4.0) |
 | **Shell scripts** | sh | Install, launch, watchdog, firewall, memory hint, **backup/restore (v1.2.0)**, **rotation (v1.2.0)**, **recovery mode (v1.2.0)**, **SELinux context preservation (v1.2.0)**, **watchdog token reader (v1.2.0)** |
 | **META-INF bootstrap** | sh | Magisk/KernelSU entry point — loads `util_functions.sh` and calls `install_module` (which runs `customize.sh`) |
 | **index.html** | HTML+JS | Main interface (bilingual: EN default + AR toggle) |
@@ -460,6 +474,37 @@ scripts/fetch_dns_binaries.sh
 │
 └──► save to cache + .manifest.json
 ```
+
+### 3.5b Companion APK Fetch (v1.4.0)
+
+```text
+Release pipeline (.github/workflows/release.yml)
+│
+▼
+scripts/fetch_app_apk.sh
+│
+├──► read proxy/app-apk.version → "1.0.0"
+│
+├──► cache check
+│      ~/.cache/dnscrypt-proxy-webui/app/DNS-Proxy-v1.0.0.apk
+│
+├──► if missing: download from
+│      https://github.com/gasciljh/dnscrypt-proxy-app/
+│        releases/download/v1.0.0/app-debug.apk
+│
+├──► SHA256 + .manifest.json
+│
+├──► output:
+│      dist/DNS-Proxy-v1.0.0.apk
+│      dist/DNS-Proxy-v1.0.0.apk.sha256
+│
+└──► release.yml stages it to web/app-debug.apk before packaging
+```
+
+**Best-effort**: a failed fetch logs `::warning::` — the release
+continues without the companion app. The APK is **optional**:
+`proxy/main.go` returns 404 for `/app-debug.apk` when the file is
+absent, and `customize.sh` extracts it only if present.
 
 ### 3.6 Login Flow (v1.0.0 — Fix NEW-1)
 
@@ -706,7 +751,7 @@ do not guess whether this is an upgrade."*
                                  ▼
         ┌────────────────────────────────────────────────────┐
         │  Extract ZIP (all 4 binaries + shell scripts +     │
-        │  config + web assets)                              │
+        │  config + web assets + optional companion APK)     │
         │                                                    │
         │  In RECOVERY MODE:                                 │
         │   • [8a] already restored the 5 user files AND     │
@@ -827,6 +872,7 @@ so the user can recover the remaining files manually.
 | Method | Path | Action | Auth | Timeout |
 |---|---|---|---|---|
 | GET | `/healthz` | Health check | No | 5 s |
+| GET | `/app-debug.apk` | Companion Android app (v1.4.0) | No | 15 s |
 | GET | `/readyz` | Readiness | Local-only | 5 s |
 | GET | `/api?action=X` | Various actions | Yes | 15 s |
 | POST | `/api/save_allowlist` | Save allowlist (+ backup + rotate) | Yes | 15 s |
@@ -843,6 +889,11 @@ so the user can recover the remaining files manually.
 | GET | `/api/download_log` | Download log file | Yes | 15 s |
 | GET | `/api/metrics` | Prometheus → JSON | Yes | 15 s |
 | GET | `/events` | SSE stream | Yes | ∞ (30 s per flush) |
+
+**Static assets (v1.4.0)**: 12 entries in `serveStaticAssets`, including
+`/app-debug.apk` (`application/vnd.android.package-archive`,
+`Cache-Control: public, max-age=3600, immutable`). Missing APK → 404
+via `http.NotFound` — the route is always registered.
 
 ### 4.3 Concurrency Model
 
@@ -983,6 +1034,7 @@ const sse = new EventSource('/events');
 - **v1.2.0 — Language toggle**: client-side only, no server state
 - **v1.2.0 — Watchdog token**: closes the CSRF hole on `ensure_running_service` (see §4.5.1)
 - **v1.2.0 — BUG-A..L fixes**: See the "Post-audit corrections" table below.
+- **v1.4.0 — CodeQL `go/path-injection` fix in `removeModule`**: `filepath.Base()` + `filepath.Join(MODULES_DIR, name)`.
 
 #### 4.5.1 Watchdog Token (v1.2.0)
 
@@ -1105,7 +1157,16 @@ detailed implementations in §4.8.
 | WD-TOKEN | Watchdog token (closes CSRF hole) | §4.5.1 |
 | BUG-A..L | Post-audit corrections | §4.11 |
 
-#### 4.6.4 Post-Audit Corrections (v1.2.0)
+#### 4.6.4 v1.4.0 — Backend Additions
+
+| ID | Topic | Reference |
+|---|---|---|
+| APK-1 | `APK_FILE` constant + `serveStaticAssets` entry + `serveFile` per-extension Cache-Control | §4.12.1 |
+| APK-2 | `/app-debug.apk` route (mime: `application/vnd.android.package-archive`) | §4.12.2 |
+| CQ-FIX | CodeQL `go/path-injection` fix in `removeModule` | §4.12.3 |
+| IOS-REMOVE | iOS PWA logic removed from `web/index.html` (Android-only) | §6.8 |
+
+#### 4.6.5 Post-Audit Corrections (v1.2.0)
 
 A pre-release audit identified the following issues, all
 corrected in-place within v1.2.0:
@@ -1606,6 +1667,144 @@ as optional.
 See §4.6.4 for the summary table. Each correction is
 documented inline in `main.go`'s header.
 
+### 4.12 v1.4.0 Backend Additions
+
+#### 4.12.1 APK-1 — `APK_FILE` + `serveStaticAssets` + `serveFile`
+
+**Constant** (added in `[2] Global paths`):
+
+```go
+// v1.4.0 - companion Android app APK (optional)
+APK_FILE = filepath.Join(WEB_DIR, "app-debug.apk")
+```
+
+**Registration** (in `serveStaticAssets`):
+
+```go
+staticAssets := map[string]struct {
+    path        string
+    contentType string
+}{
+    // ...
+    "/app-debug.apk": {
+        path:        APK_FILE,
+        contentType: "application/vnd.android.package-archive",
+    },
+}
+```
+
+**Per-extension Cache-Control** (in `serveFile`):
+
+```go
+func serveFile(w http.ResponseWriter, r *http.Request, path, contentType string) {
+    setSecurityHeaders(w)
+    if strings.HasSuffix(path, ".apk") {
+        w.Header().Set("Cache-Control", "public, max-age=3600, immutable")
+    } else {
+        w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+    }
+    if contentType != "" {
+        w.Header().Set("Content-Type", contentType)
+    }
+    if _, err := os.Stat(path); err != nil {
+        http.NotFound(w, r)
+        return
+    }
+    http.ServeFile(w, r, path)
+}
+```
+
+**Behavior**:
+- If `web/app-debug.apk` exists → served with immutable caching.
+- If absent → `http.NotFound` (404). This is deliberate: the APK
+  is optional and the WebUI install button points at it directly
+  (via `<a download>`). A missing file is not a server error.
+
+#### 4.12.2 APK-2 — `/app-debug.apk` route
+
+Registered in **both** the WebUI mux (port 9090) and the
+Dashboard mux (port 9091) — `serveStaticAssets` is called twice.
+
+Public (no auth): the APK is a static asset and a user who wants
+to install the companion app must be able to download it before
+logging in. The APK itself contains no secrets.
+
+#### 4.12.3 CQ-FIX — CodeQL `go/path-injection` in `removeModule`
+
+**Before (v1.3.0)**:
+
+```go
+func removeModule(modulePath string) map[string]interface{} {
+    // ...
+    if !strings.HasPrefix(modulePath, MODULES_DIR+"/") {
+        return map[string]interface{}{"status": "error", "message": "Invalid path"}
+    }
+    cleanPath := filepath.Clean(modulePath)
+    if err := os.RemoveAll(cleanPath); err != nil { /* ... */ }
+    // ...
+}
+```
+
+Two CodeQL alerts (#1, #2) flagged `os.RemoveAll(cleanPath)` as a
+path-injection sink: although `filepath.Clean` normalizes `..`,
+it does not remove them from the string, and CodeQL's taint
+analysis considers the caller-provided path to reach the sink.
+
+**After (v1.4.0)**:
+
+```go
+func removeModule(modulePath string) map[string]interface{} {
+    defer func() { recover() }()
+
+    // v1.4.0 fix (CodeQL go/path-injection):
+    // Extract the module name (last path component) via
+    // filepath.Base, which CodeQL recognizes as an effective
+    // path-injection sanitizer. The returned value contains no
+    // separators and no "..".
+    name := filepath.Base(modulePath)
+    if name == "" || name == "." || name == ".." ||
+        name == string(filepath.Separator) {
+        return map[string]interface{}{
+            "status":  "error",
+            "message": "Invalid module name",
+        }
+    }
+
+    // Defence-in-depth: require that the caller sent a path
+    // directly under MODULES_DIR. This check does NOT participate
+    // in path construction below.
+    expectedPrefix := MODULES_DIR + string(filepath.Separator)
+    if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
+        return map[string]interface{}{
+            "status":  "error",
+            "message": "Invalid path",
+        }
+    }
+
+    // Reconstruct the full path from the trusted base directory
+    // and the sanitized name. No user-controlled data reaches
+    // any path expression from this point onwards.
+    cleanPath := filepath.Join(MODULES_DIR, name)
+    // ... (rest of the function unchanged)
+}
+```
+
+**Why this closes the alerts**:
+- `filepath.Base(modulePath)` is a CodeQL-recognized sanitizer:
+  the returned value has no separators, no `..`, no NUL, and
+  represents exactly one path component.
+- `filepath.Join(MODULES_DIR, name)` combines a **trusted base
+  directory** (a package-level constant) with the **sanitized
+  basename**. No user-controlled data participates in path
+  construction.
+- The prefix check remains as defence-in-depth, but it is not the
+  sanitizer — the sanitizer is `filepath.Base` + the trusted
+  base dir.
+
+**Behavioural impact**: identical to v1.3.0 for every legitimate
+input. Only malformed inputs (empty basename, `.`, `..`,
+`/`-only) now short-circuit before any file operation.
+
 ---
 
 ## 5. Shell Scripts
@@ -1806,6 +2005,7 @@ The token is generated once and persists across restarts:
 | `manifest.json` | PWA manifest (`lang="en"`, `dir="ltr"`) | ~4 KB |
 | `sw.js` | Service Worker (language-neutral) | ~22 KB |
 | `offline.html` | Offline page (EN default + AR toggle) | ~18 KB |
+| `app-debug.apk` | Companion Android app (optional, v1.4.0) | ~3 MB |
 | `icon-192.svg` | Small icon | ~1.5 KB |
 | `icon-512.svg` | Maskable icon | ~1.7 KB |
 | `icon-192.png` | PWA icon | ~14 KB |
@@ -1814,6 +2014,12 @@ The token is generated once and persists across restarts:
 | `favicon-32x32.png` | favicon | ~1.4 KB |
 | `favicon-16x16.png` | favicon | ~553 B |
 | `favicon.ico` | favicon | ~4.7 KB |
+
+**v1.4.0 note**: `app-debug.apk` is optional and is only present
+when the release pipeline staged it (see §3.5b). Its absence does
+not affect `index.html`, `dashboard.html`, or the Service Worker.
+`main.go` returns 404 for `/app-debug.apk` when the file is
+missing.
 
 ### 6.2 Service Worker Caching Strategy
 
@@ -1843,6 +2049,12 @@ The token is generated once and persists across restarts:
 **v1.2.0 note**: The `shouldBypass()` rule for `/api/*` covers
 `runtime_info.backups`. The Service Worker **never** caches the
 backup state — the user always sees the current state.
+
+**v1.4.0 note**: The Service Worker does **not** cache
+`/app-debug.apk`. The install button is a direct `<a download>`
+link, so the browser handles the download outside the SW cache.
+This is deliberate: the APK is ~3 MB and caching it would
+consume the runtime cache budget for no benefit.
 
 **Language-neutral**: The SW caches the HTML once (with both
 `translations` objects inline). The language toggle operates
@@ -1884,6 +2096,10 @@ purely on the DOM; no additional cache entries are created.
 - **v1.2.0**: Bilingual WebUI (EN default + AR toggle). The
   `manifest.json` `lang` field defaults to `en` and `dir` to
   `ltr`. The toggle updates both at runtime.
+- **v1.4.0**: Install button is `<a download href="/app-debug.apk">`.
+  Removed the `onclick` handler and the `initPWABeforeInstallPrompt()`
+  call. iOS-specific logic removed from `isBrowserSupported()`,
+  `getPWAInstallSteps()`, and `showPWAInstructionsModal()`.
 
 ### 6.5 Service Worker Update Flow (v1.2.0 fix)
 
@@ -1954,7 +2170,7 @@ and the same CSS rules as `index.html`, making the fix complete.
 └──────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────┐
-│  Future solution (v1.3.x):                                   │
+│  Future solution (v1.5.0):                                   │
 │                                                              │
 │  Unify on a single port (Option A):                          │
 │  • Dashboard served from the same 9090 at /dashboard         │
@@ -1989,7 +2205,31 @@ client-side concern.
 **Documentation**: remains English-only by project convention.
 Community translations are welcome as separate files
 (`docs/*.<lang>.md`). Additional WebUI languages (FR, DE, ES,
-RU, ZH, ...) are deferred to v1.4.0 — see `docs/ROADMAP.md` §6.
+RU, ZH, ...) are deferred to **v1.5.0** — see `docs/ROADMAP.md` §6.
+
+### 6.8 iOS PWA Logic Removal (v1.4.0)
+
+**Android-only project.** All iOS-specific PWA code has been
+removed from `web/index.html` (~35 lines):
+
+| Removed | Purpose before removal |
+|---|---|
+| `isIOSDevice()` helper | Detect iOS Safari |
+| `pwaStepIos1/2/3` (EN + AR) | "Add to Home Screen" instructions |
+| iOS branch in `getBrowserName()` | UA-based iOS detection |
+| iOS branch in `isBrowserSupported()` | Mark iOS Safari as supported |
+| iOS branch in `getPWAInstallSteps()` | Return iOS-specific steps |
+| iOS branch in `showPWAInstructionsModal()` | Render the iOS modal |
+
+**Behavioural change**: browsers that never fire
+`beforeinstallprompt` (Firefox, Samsung Internet legacy builds)
+now fall through to the unified "unsupported" message that lists
+supported alternatives (Chrome / Edge / Brave) with Play Store
+links. No browser-specific branching remains.
+
+**`apple-touch-icon.png` is retained** — it is used by Android
+launchers as an icon fallback and by the `manifest.json` icons
+array. It is not "iOS-only".
 
 ---
 
@@ -2007,6 +2247,7 @@ RU, ZH, ...) are deferred to v1.4.0 — see `docs/ROADMAP.md` §6.
 | `PID_FILE` | `run/dnscrypt.pid` | ✓ | `startService` / `os.Remove` |
 | `selected_profile` | `selected_profile.txt` | ✓ | `updateProfile` |
 | DNS version | `proxy/dnscrypt-proxy.version` | ✓ | manual |
+| Companion app version | `proxy/app-apk.version` | ✓ | manual (v1.4.0) |
 | `portCacheMap` | memory | lost on restart | `isPortOpenCached` |
 | `systemShell` | memory (sync.Once) | lost on restart | `getSystemShell` |
 | `authCache` | memory | lost on restart | `getMonitoringAuth` |
@@ -2170,6 +2411,7 @@ Client                          Server
 │   ├── manifest.json              # lang="en", dir="ltr" (defaults)
 │   ├── sw.js
 │   ├── offline.html
+│   ├── app-debug.apk              # companion APK (optional, v1.4.0)
 │   ├── icon-192.svg
 │   ├── icon-512.svg
 │   ├── icon-192.png
@@ -2183,6 +2425,7 @@ Client                          Server
     ├── dnscrypt-webui             # binary (Go)
     ├── dnscrypt-proxy             # binary (upstream)
     ├── dnscrypt-proxy.version     # (Single Source of Truth)
+    ├── app-apk.version            # companion app version (v1.4.0)
     ├── dnscrypt-proxy.toml        # config
     ├── webui.conf                 # config
     ├── blocklist.txt              # output
@@ -2217,11 +2460,11 @@ Client                          Server
 /data/adb/dnscrypt-recovery        # external recovery trigger (optional, v1.2.0)
 ```
 
-### 8.2 Repository Layout (87 files)
+### 8.2 Repository Layout (90 files)
 
-> **Total tracked files**: **87** across 9 top-level directories.
+> **Total tracked files**: **90** across 9 top-level directories.
 >
-> **Note**: The file count is 87, matching the count in
+> **Note**: The file count is 90, matching the count in
 > `README.md`. The `.github/` directory contains 12 files:
 > 4 root files, 1 PR template (inside `PULL_REQUEST_TEMPLATE/`),
 > 3 issue templates, and 4 workflow files
@@ -2231,12 +2474,12 @@ Client                          Server
 dnscrypt-proxy-webui/
 │
 ├── Root files (14)
-│   ├── VERSION                    # module version (v1.2.0)
+│   ├── VERSION                    # module version (v1.4.0)
 │   ├── module.prop                # Magisk/KernelSU definition
 │   ├── update.json                # auto-update metadata
 │   ├── LICENSE                    # MIT
 │   ├── README.md                  # project overview
-│   ├── CHANGELOG.md               # version history (v1.0.0 → v1.2.0)
+│   ├── CHANGELOG.md               # version history (v1.0.0 → v1.4.0)
 │   ├── CODE_OF_CONDUCT.md         # Contributor Covenant v2.1
 │   ├── SECURITY.md                # security policy (summary)
 │   ├── Makefile                   # unified commands
@@ -2272,19 +2515,21 @@ dnscrypt-proxy-webui/
 │       ├── update-binary          # Magisk bootstrap (calls customize.sh)
 │       └── updater-script         # "#MAGISK" marker
 │
-├── scripts/ (5)
+├── scripts/ (6)
 │   ├── fetch_dns_binaries.sh      # DNS binaries fetcher (Level 4)
+│   ├── fetch_app_apk.sh           # Companion APK fetcher (v1.4.0)
 │   ├── generate-icons.sh          # PNG/ICO icon generator
 │   ├── package_module.sh          # build the Magisk ZIP
 │   ├── release.sh                 # stable / prerelease automation
 │   └── release-patch.sh           # PATCH-only (hotfix) automation
 │
-├── proxy/ (14)
+├── proxy/ (15)
 │   ├── action.sh                  # Magisk Action button handler
 │   ├── build.sh                   # cross-compile (4 archs)
 │   ├── customize.sh               # installer (10 data-preservation layers)
 │   ├── dnscrypt-proxy.toml        # DNSCrypt engine config
 │   ├── dnscrypt-proxy.version     # DNS engine version (2.1.18)
+│   ├── app-apk.version            # Companion app version (1.0.0, v1.4.0)
 │   ├── functions.sh               # shared shell library (incl. backup helpers)
 │   ├── go.mod                     # Go module definition
 │   ├── main.go                    # HTTP server (Go 1.22)
@@ -2295,12 +2540,13 @@ dnscrypt-proxy-webui/
 │   ├── watchdog.sh                # standalone watchdog process (token auth)
 │   └── webui.conf                 # WebUI/Dashboard config
 │
-├── web/ (13, bilingual: EN default + AR toggle)
+├── web/ (14, bilingual: EN default + AR toggle)
 │   ├── index.html                 # main UI
 │   ├── dashboard.html             # monitoring dashboard
 │   ├── manifest.json              # PWA manifest (lang=en, dir=ltr defaults)
 │   ├── sw.js                      # service worker
 │   ├── offline.html               # offline fallback
+│   ├── app-debug.apk              # companion APK, optional (v1.4.0)
 │   ├── icon-192.svg               # small icon (SVG)
 │   ├── icon-512.svg               # maskable icon (SVG)
 │   ├── icon-192.png               # small icon (PNG)
@@ -2347,15 +2593,15 @@ dnscrypt-proxy-webui/
 | `.github/` | 12 | CI (incl. `upgrade-test.yml`) + templates + policies |
 | `.devcontainer/` | 2 | Dev environment |
 | **`META-INF/`** | **2** | **Magisk bootstrap (update-binary + updater-script)** |
-| `scripts/` | 5 | Build + release tooling |
-| `proxy/` | 14 | Go backend + shell scripts + configs |
-| `web/` | 13 | HTML + PWA + SVG/PNG/ICO icons |
+| `scripts/` | 6 | Build + release tooling (incl. `fetch_app_apk.sh`) |
+| `proxy/` | 15 | Go backend + shell scripts + configs (incl. `app-apk.version`) |
+| `web/` | 14 | HTML + PWA + SVG/PNG/ICO icons + optional APK |
 | `docs/` | 18 | Documentation guides |
 | `docs/adr/` | 7 | Architecture Decision Records |
-| **Total** | **87** | Tracked in the repository |
+| **Total** | **90** | Tracked in the repository |
 
 **Cross-check**: `README.md` §Project Structure states the same
-total (87). The two files now agree.
+total (90). The two files now agree.
 
 ### 8.4 META-INF Bootstrap
 
@@ -2384,6 +2630,10 @@ The 10 data-preservation layers introduced in v1.2.0 are not
 visible to `update-binary` — they live entirely in
 `customize.sh` and the other shell scripts.
 
+**v1.4.0 note**: The companion APK (`web/app-debug.apk`) is
+extracted by `customize.sh` §[9] via the `unzip 'web/*'` glob,
+which crosses path separators. `update-binary` is unchanged.
+
 ### 8.5 Runtime Files (System)
 
 ```text
@@ -2398,11 +2648,14 @@ visible to `update-binary` — they live entirely in
 ├── dnscrypt_install.log           # install log
 
 ~/.cache/dnscrypt-proxy-webui/
-└── dns-binaries/
-    ├── dnscrypt-proxy-arm64       # binary
-    ├── dnscrypt-proxy-arm
-    ├── dnscrypt-proxy-x86_64
-    ├── dnscrypt-proxy-i386
+├── dns-binaries/
+│   ├── dnscrypt-proxy-arm64       # binary
+│   ├── dnscrypt-proxy-arm
+│   ├── dnscrypt-proxy-x86_64
+│   ├── dnscrypt-proxy-i386
+│   └── .manifest.json             # SHA256 metadata
+└── app/                           # (v1.4.0)
+    ├── DNS-Proxy-v1.0.0.apk       # companion app APK cache
     └── .manifest.json             # SHA256 metadata
 ```
 
@@ -2527,6 +2780,8 @@ engine stays down until a manual restart.
 │    (BUG-CS-B atomic update).                                 │
 │  • Snapshot directory names are unique per second            │
 │    (PID suffix, BUG-CS-C / BUG-E / FSH-10 / ACT-5).          │
+│  • `/app-debug.apk` never returns 5xx (v1.4.0): missing      │
+│    file → 404; existing file → 200 + immutable cache.        │
 │                                                              │
 │  Implementation:                                             │
 │  ───────────────                                             │
@@ -2536,6 +2791,9 @@ engine stays down until a manual restart.
 │  • main.go: createAutoBackup best-effort + rotation          │
 │  • main.go: cleanupOldTransactions preserves START           │
 │  • main.go: watchdog token verified in constant time         │
+│  • main.go: serveFile per-extension Cache-Control (v1.4.0)   │
+│  • main.go: removeModule hardened against path-injection     │
+│    via filepath.Base + filepath.Join(MODULES_DIR, name)      │
 │  • customize.sh: [9b2] re-applies recovery snapshot          │
 │  • customize.sh: create_persistent_backup returns 1 on 0     │
 │  • customize.sh: [19b] pre-generates the watchdog token      │
@@ -2600,6 +2858,8 @@ engine stays down until a manual restart.
 | **`cleanupOldTransactions` (v1.2.0)** | **~1 ms per `COMMIT`'d txn, runs once** |
 | **`checkPendingNotifications` (v1.2.0)** | **<100 µs, runs once** |
 | **`verifyWatchdogToken` (v1.2.0)** | **<5 µs (one file read + constant-time compare)** |
+| **`removeModule` (v1.4.0)** | **~50 µs for `filepath.Base` + `filepath.Join` (was ~30 µs for `Clean` + prefix check)** |
+| **`serveFile` (v1.4.0)** | **<1 µs (one `strings.HasSuffix`)** |
 
 ### 10.3 Disk I/O
 
@@ -2615,6 +2875,7 @@ engine stays down until a manual restart.
 | **`buildBackupInfo` (v1.2.0)** | **`ReadDir` + `Info()` + `ReadFile(.last_stable)`** |
 | **`rotate_backups` (v1.2.0)** | **`rm -rf` on old snapshots — at most ~21 dirs** |
 | **`getWatchdogToken` (v1.2.0)** | **1 file read (no cache) per API call** |
+| **`/app-debug.apk` (v1.4.0)** | **1 `os.Stat` (via `serveFile`); no read when 404** |
 
 ### 10.4 Network
 
@@ -2626,7 +2887,8 @@ engine stays down until a manual restart.
 | SSE keepalive | 15 s |
 | DNS query | 5 s |
 | DNS binaries download | 30 s + retry |
-| **Watchdog API call (curl)** | **5 s (`--max-time 5`)** |
+| Watchdog API call (curl) | 5 s (`--max-time 5`) |
+| Companion APK download (v1.4.0) | 60 s (`HTTP_TIMEOUT` in `fetch_app_apk.sh`) |
 
 ### 10.5 Dashboard Metrics Pipeline
 
@@ -2667,6 +2929,20 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
 # Backup state (7 fields)
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
+
+### 10.7 Companion APK Storage (v1.4.0)
+
+| Metric | Value |
+|---|---|
+| APK size (typical) | ~3 MB |
+| Cache location (build machine) | `~/.cache/dnscrypt-proxy-webui/app/` |
+| Module ZIP impact | +~3 MB (optional) |
+| Runtime memory impact | 0 MB — served as a static file |
+| Cache-Control | `public, max-age=3600, immutable` |
+
+**Absent-APK cost**: one `os.Stat` per request (typically 0
+requests — the WebUI install button is only clicked by users
+who want the companion app).
 
 ---
 
@@ -2874,6 +3150,47 @@ Applied consistently in:
 - `functions.sh:auto_backup_if_needed` (FSH-10)
 - `action.sh:_inline_backup_now` (ACT-5)
 
+### 11.31 v1.4.0 — Companion APK: Bundled vs Fetched-at-Install
+
+**Decision**: bundle the APK **inside the module ZIP** (optional
+asset) rather than fetching it on the device.
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Fetch the APK at install time on the device | Requires internet + trust in the on-device download; breaks offline installs |
+| Ship the APK as a separate GitHub Release asset only | Users must know to look for it; two downloads |
+| Link to the companion app's GitHub Release page | Cross-origin, unversioned, no integrity check |
+| **Bundle inside the module ZIP (optional)** | ✅ single download; SHA256 verified at build time; absent file is not an error |
+
+**Trade-offs accepted**:
+
+- The module ZIP grows by ~3 MB.
+- Local developer builds can omit the APK entirely (build still succeeds).
+- The WebUI install button may return 404 if a local build omitted the APK — this is documented behavior (`<a download>` → browser "file not found").
+
+### 11.32 v1.4.0 — CodeQL Fix: `filepath.Base` vs `strings.HasPrefix`
+
+**Decision**: use `filepath.Base()` + `filepath.Join(MODULES_DIR, name)`
+as the sanitizer, and keep the `strings.HasPrefix` check as
+defence-in-depth (not as the sanitizer).
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Keep the `strings.HasPrefix` check only | CodeQL `go/path-injection` treats the caller-provided path as taint reaching `os.RemoveAll` — two alerts remain open |
+| Use `filepath.Clean()` only | Removes trailing separators but does **not** remove `..`; CodeQL does not recognize it as a sanitizer for path injection |
+| Reject any path containing `..` | CodeQL does not model "reject-if-contains" as a sanitizer either |
+| Change the endpoint to accept a module *name* instead of a path | Backward-incompatible API change; existing WebUI sends `path=` |
+| **`filepath.Base()` + trusted base directory** | ✅ CodeQL-recognized; behavior unchanged for legitimate inputs; the caller still sends `path=` |
+
+**Behaviour preserved**: For any legitimate module path (a
+directory directly under `/data/adb/modules/`), the function
+behaves identically to v1.3.0. Only malformed inputs (empty
+basename, `.`, `..`, `/`-only) now short-circuit earlier.
+
 ---
 
 ## 12. Blocklist Filtering Strategy
@@ -3014,7 +3331,7 @@ send a `content` parameter. Callers should either:
 - Use `POST /api/save_denylist` with the full new content.
 
 The WebUI-side update to use `append_denylist` with content is
-planned for v1.2.1 or v1.3.0.
+planned for **v1.5.0**.
 
 ---
 
@@ -3306,6 +3623,26 @@ echo "2.1.19" > proxy/dnscrypt-proxy.version
 > **Never embed the DNS version anywhere — always use
 > `proxy/dnscrypt-proxy.version`.**
 
+### 14.12 v1.4.0 — Companion APK Fetch (parallel pipeline)
+
+The companion APK uses a **parallel pipeline** to the DNS
+binaries. The two are independent:
+
+| Aspect | DNS binaries | Companion APK (v1.4.0) |
+|---|---|---|
+| Script | `fetch_dns_binaries.sh` | `fetch_app_apk.sh` |
+| Source file | `proxy/dnscrypt-proxy.version` | `proxy/app-apk.version` |
+| Cache dir | `~/.cache/.../dns-binaries/` | `~/.cache/.../app/` |
+| Upstream repo | `DNSCrypt/dnscrypt-proxy` | `gasciljh/dnscrypt-proxy-app` |
+| Output | `dist/` (in module ZIP) | `dist/DNS-Proxy-v<ver>.apk` |
+| Required? | ✅ Always | ❌ Optional |
+| Consumer | `customize.sh` → `proxy/` | `customize.sh` → `web/` |
+
+**Shared design**: 5 fallback sources? No — the companion APK
+uses **2 sources** (direct tag URL + `latest` pointer). This is
+deliberate: the companion app has a simpler release process and
+only one asset name (`app-debug.apk`).
+
 ---
 
 ## 15. Platform Abstraction
@@ -3481,6 +3818,12 @@ surface in the System Info panel.
 }
 ```
 
+**v1.4.0 fields**:
+
+The `/app-debug.apk` route is a **static asset**, not a field in
+`runtime_info`. Its availability is implicit: the WebUI install
+button points at `/app-debug.apk` and the browser handles 404.
+
 **Where these come from**:
 
 | Field | Source | Type |
@@ -3553,7 +3896,11 @@ surface in the System Info panel.
 | **FSH-10** | PID suffix in default backup directory names | §5.4 |
 | **FSH-11** | `get_watchdog_token()` helper | §5.4, §5.7 |
 | **ACT-5** | PID suffix in `_inline_backup_now` | §5.4 |
-| **BUG-A..L** | Post-audit corrections in `main.go` | §4.6.4, §4.11 |
+| **BUG-A..L** | Post-audit corrections in `main.go` | §4.6.5, §4.11 |
+| **APK-1** | `APK_FILE` constant + serveStaticAssets + serveFile | §4.12.1 |
+| **APK-2** | `/app-debug.apk` route | §4.12.2 |
+| **CQ-FIX** | CodeQL path-injection fix in `removeModule` | §4.12.3 |
+| **IOS-REMOVE** | iOS PWA logic removed from `web/index.html` | §6.8 |
 
 ### Official Fix Numbers
 
@@ -3590,8 +3937,17 @@ surface in the System Info panel.
 | **FSH-10** | PID suffix in backup names | §5.4 |
 | **FSH-11** | get_watchdog_token | §5.4, §5.7 |
 | **ACT-5** | PID suffix in inline backup | §5.4 |
-| **BUG-A..L** | main.go post-audit corrections | §4.6.4, §4.11 |
+| **BUG-A..L** | main.go post-audit corrections | §4.6.5, §4.11 |
+| **APK-1** | APK_FILE constant + serveStaticAssets | §4.12.1 |
+| **APK-2** | /app-debug.apk route | §4.12.2 |
+| **CQ-FIX** | CodeQL path-injection fix | §4.12.3 |
+| **IOS-REMOVE** | iOS PWA logic removal | §6.8 |
 
+> **v1.4.0 note**: APK-1, APK-2, CQ-FIX, and IOS-REMOVE are the
+> v1.4.0 additions. They are not audit corrections — they are
+> integration work (companion APK) and correctness fixes
+> (CodeQL path-injection, iOS removal).
+>
 > **v1.2.0 note**: BAK-1..BAK-4, MEM-1..MEM-3, WD-TOKEN,
 > FSH-10, FSH-11, and ACT-5 are not audit corrections — they
 > close edge cases and security holes rather than fix known
@@ -3619,9 +3975,10 @@ surface in the System Info panel.
 - [Netfilter Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [DNSCrypt Protocol Specification](https://dnscrypt.info/protocol)
 - [Magisk — Module Structure](https://topjohnwu.github.io/Magisk/guides.html)
+- [Companion Android App](https://github.com/gasciljh/dnscrypt-proxy-app)
 
 ---
 
-**Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Last updated**: 2026-10-06
+**Version**: v1.4.0
 **Author**: gasciljh

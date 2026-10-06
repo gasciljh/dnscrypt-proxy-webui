@@ -397,4 +397,4 @@ These are documented in `docs/SECURITY.md` §5.30 as
 ---
 
 *Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Version: v1.4.0*

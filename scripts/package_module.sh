@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – package_module.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -14,10 +14,12 @@
 #     • 2 configuration files (webui.conf, dnscrypt-proxy.toml)
 #     • 4 WebUI binaries (arm64, arm, amd64, 386)
 #     • 4 DNS binaries  (arm64, arm, x86_64, x86)
-#     • 13 web/PWA files (HTML + icons + manifest + SW + offline)
+#     • 14 web/PWA files (HTML + icons + manifest + SW + offline
+#       + optional companion APK)
 #     • module.prop
 #
-#   Total: 32 required files, verified after packaging.
+#   Total: 33 entries (32 required + 1 optional APK), verified
+#   after packaging.
 #
 # Web file list (13 files) vs SW precache (11 files):
 #   The ZIP ships 13 web files. The Service Worker precaches 11
@@ -155,6 +157,29 @@
 #   🟢 L-6 — TMPDIR trailing-slash normalization now strips all
 #     trailing slashes, not just one.
 #
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   🆕 APK-01 — The companion Android app APK
+#     (web/app-debug.apk) is now bundled into the module ZIP
+#     as an OPTIONAL entry. The file is staged by release.yml
+#     (via scripts/fetch_app_apk.sh) before this script runs.
+#
+#     Behaviour:
+#       • If present and non-empty → bundled into web/.
+#       • If absent → a warning is logged and packaging
+#         continues. Local developer builds therefore work
+#         without requiring a network fetch.
+#
+#     Affected sites (all handled):
+#       [13] Web file check      → skip+warn on missing APK
+#       [16] Staging copy        → skip+warn on missing APK
+#       [19] ZIP structure check → skip+warn on missing APK
+#
+#   🆕 APK-02 — WEB_FILES_REQUIRED and REQUIRED_IN_ZIP now
+#     include "app-debug.apk" / "web/app-debug.apk" so that a
+#     properly staged release ZIP ships the companion app
+#     while still allowing APK-less local builds to succeed.
 # ============================================================
 # Reproducibility:
 #   • SOURCE_DATE_EPOCH is applied via `touch -d "@N"` to every
@@ -600,6 +625,7 @@ WEB_FILES_REQUIRED=(
     "favicon-32x32.png"
     "favicon-16x16.png"
     "favicon.ico"
+    "app-debug.apk"
     "offline.html"
 )
 
@@ -609,6 +635,15 @@ WEB_MISSING_HTML=0
 
 for f in "${WEB_FILES_REQUIRED[@]}"; do
     if [ ! -s "$REPO_ROOT/web/$f" ]; then
+        # v1.4.0: web/app-debug.apk is OPTIONAL. It is staged by
+        # release.yml (via fetch_app_apk.sh) before this script
+        # runs. A local developer build without the APK still
+        # succeeds.
+        if [ "$f" = "app-debug.apk" ]; then
+            log_warn "Optional web file missing: web/$f (skipping)"
+            continue
+        fi
+
         if [ -f "$REPO_ROOT/web/$f" ]; then
             log_error "Empty: web/$f"
         else
@@ -640,7 +675,7 @@ if [ "$WEB_MISSING" -gt 0 ]; then
     exit 1
 fi
 
-log_ok "All web files present and non-empty (${#WEB_FILES_REQUIRED[@]} files)"
+log_ok "All web files present (${#WEB_FILES_REQUIRED[@]} total, APK optional)"
 
 # ------------------------------------------------------------
 # [14] Check WebUI binaries (4 architectures)
@@ -813,9 +848,23 @@ for name in "${DNS_BINARIES_REQUIRED[@]}"; do
 done
 
 # --- Web files (13) ---
+# v1.4.0: web/app-debug.apk is OPTIONAL. It is staged by
+# release.yml (via fetch_app_apk.sh) before this script runs.
+# A local developer build without the APK still succeeds.
 for f in "${WEB_FILES_REQUIRED[@]}"; do
     src="$REPO_ROOT/web/$f"
-    [ -f "$src" ] || { log_error "Missing: web/$f"; exit 1; }
+    if [ ! -f "$src" ]; then
+        case "$f" in
+            app-debug.apk)
+                log_warn "Optional file missing: web/$f (skipping)"
+                continue
+                ;;
+            *)
+                log_error "Missing: web/$f"
+                exit 1
+                ;;
+        esac
+    fi
     cp "$src" "$STAGING/web/$f"
     chmod 0644 "$STAGING/web/$f"
 done
@@ -932,6 +981,7 @@ REQUIRED_IN_ZIP=(
     "web/favicon-32x32.png"
     "web/favicon-16x16.png"
     "web/favicon.ico"
+    "web/app-debug.apk"
     "web/offline.html"
 )
 
@@ -940,8 +990,15 @@ ZIP_CONTENTS=$(unzip -l "$OUTPUT_PATH" 2>/dev/null | awk '{print $4}')
 MISSING_IN_ZIP=0
 for item in "${REQUIRED_IN_ZIP[@]}"; do
     if ! echo "$ZIP_CONTENTS" | grep -qFx "$item"; then
-        log_error "ZIP missing: $item"
-        MISSING_IN_ZIP=$((MISSING_IN_ZIP + 1))
+        case "$item" in
+            web/app-debug.apk)
+                log_warn "Optional file not in ZIP: $item"
+                ;;
+            *)
+                log_error "ZIP missing: $item"
+                MISSING_IN_ZIP=$((MISSING_IN_ZIP + 1))
+                ;;
+        esac
     fi
 done
 
@@ -950,7 +1007,7 @@ if [ "$MISSING_IN_ZIP" -gt 0 ]; then
     exit 1
 fi
 
-log_ok "ZIP structure valid (${#REQUIRED_IN_ZIP[@]} files)"
+log_ok "ZIP structure valid (${#REQUIRED_IN_ZIP[@]} entries, APK optional)"
 
 # Additional stats.
 # HARD-PM-02: use count_matches instead of `grep -c ... || echo 0`.
@@ -998,6 +1055,7 @@ echo -e "    ${DIM}• SW:${NC}         1 file"
 echo -e "    ${DIM}• SVG:${NC}        ${SVG_COUNT} file(s) — icon-192, icon-512"
 echo -e "    ${DIM}• PNG:${NC}        ${PNG_COUNT} file(s)"
 echo -e "    ${DIM}• ICO:${NC}        ${ICO_COUNT} file(s)"
+echo -e "    ${DIM}• APK:${NC}        1 file (companion Android app — optional)"
 echo -e "    ${DIM}• Offline:${NC}    1 file"
 echo ""
 echo -e "  ${BOLD}v1.2.0 data preservation:${NC}"

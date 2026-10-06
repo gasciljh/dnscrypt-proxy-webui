@@ -3,7 +3,7 @@
 > A curated log of the architectural and process decisions that
 > shape the project.
 
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh

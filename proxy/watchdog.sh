@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – watchdog.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -211,6 +211,19 @@
 #     9  — Automation + rotation    — service.sh
 #     10 — Observability            — status.sh --diagnose
 #
+
+# ============================================================
+# v1.4.0 \u2014 Companion Android app integration
+# ============================================================
+#   \U0001f4f1 WD-V14-01 \u2014 No behavior change. The watchdog
+#     monitors the DNS engine and WebUI. The companion APK is
+#     a static asset; it has no process and does not need
+#     watchdog supervision.
+#
+#   \U0001f4f1 WD-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
+#     Documentation only.
+#
+# ============================================================
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables. The
@@ -225,7 +238,7 @@
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

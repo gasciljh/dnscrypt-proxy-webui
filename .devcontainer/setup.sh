@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – devcontainer setup
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 DC-V14-01 — No configuration change. The devcontainer
+#     setup does not build the companion Android app APK. That
+#     APK lives in a separate repository (gasciljh/dnscrypt-proxy-app)
+#     and is fetched by scripts/fetch_app_apk.sh at release time.
+#
+#   📱 DC-V14-02 — Version bump v1.2.0 → v1.4.0 (skipping
+#     v1.3.0, which did not affect the devcontainer).
+#
+# ============================================================
 # ============================================================
 # Purpose:
 #   Runs automatically after the devcontainer is created

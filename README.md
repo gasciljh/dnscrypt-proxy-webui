@@ -3,12 +3,13 @@
 System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.3.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.4.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
 [![KernelSU](https://img.shields.io/badge/KernelSU-supported-purple.svg)](https://kernelsu.org/)
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8.svg)](https://go.dev/)
+[![Android App](https://img.shields.io/badge/Android%20App-v1.0.0-3DDC84.svg)](https://github.com/gasciljh/dnscrypt-proxy-app)
 
 > **📖 Project documentation**:
 > - Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
@@ -18,7 +19,7 @@ System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-pr
 > - Emergency recovery → [`docs/EMERGENCY.md`](docs/EMERGENCY.md)
 > - Version history → [`CHANGELOG.md`](CHANGELOG.md)
 >
-> **🎯 Current version**: **v1.3.0** — Release.
+> **🎯 Current version**: **v1.4.0** — Integration release. (v1.4.0-integration)
 > Adds a **smart dynamic PWA install button**, a **live status
 > LED** on the Today counter, **DNS auto-start after boot**
 > (bounded wait + direct API call), a **professional backup
@@ -47,6 +48,12 @@ Android device into a filtered, encrypted DNS resolver.
 - Installable PWA with offline fallback
 - **v1.1.0**: Dynamic Go runtime memory limit per blocklist profile
   (light=80 MB → ultimate=220 MB) — prevents GC thrashing on heavy profiles
+- **v1.4.0**: Companion Android app integrated — a native WebView
+  wrapper (~3 MB) is now bundled into the module ZIP as an
+  OPTIONAL asset (`web/app-debug.apk`). The WebUI install button
+  is a direct `<a download>` link (no browser-specific logic),
+  and CodeQL path-injection alerts in `removeModule` are closed.
+  iOS PWA logic removed (Android-only project).
 - **v1.3.0**: Smart dynamic PWA install button, live status LED,
   DNS auto-start after boot (bounded wait for WebUI + direct
   API call), professional backup rotation (manifest-based
@@ -59,6 +66,25 @@ Android device into a filtered, encrypted DNS resolver.
   SELinux context preservation
 
 Works at the system level — no per-app configuration, no VPN.
+
+### 📱 Optional Android App
+
+For a native experience without requiring a browser, install
+the companion app:
+
+**→ [dnscrypt-proxy-app v1.0.0](https://github.com/gasciljh/dnscrypt-proxy-app/releases/tag/v1.0.0)**
+
+| Feature | Details |
+|---|---|
+| Size | ~3 MB |
+| Stack | Kotlin + WebView |
+| Min Android | 5.0 (API 21) |
+| Browser required | ❌ No |
+| Telemetry | ❌ None |
+
+A lightweight WebView wrapper that loads the WebUI at
+`127.0.0.1:9090` directly. Useful if you don't want to keep
+a browser tab open.
 
 ---
 
@@ -100,7 +126,7 @@ while keeping DNS filtering effective.
 
 ## Installation
 
-1. Download `dnscrypt-webui-1.3.0-module.zip` from
+1. Download `dnscrypt-webui-1.4.0-module.zip` from
    [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
 2. Install via Magisk Manager / KernelSU Manager / APatch.
 3. Save the credentials shown on-screen (also stored at
@@ -223,7 +249,7 @@ dnscrypt-proxy-webui/
 ├── README.md                        # Overview (EN)
 ├── SECURITY.md                      # Security policy (root summary)
 ├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.3.0)
+├── VERSION                          # Single source of truth (v1.4.0)
 │
 ├── .github/                         # CI/CD
 │   ├── workflows/
@@ -251,6 +277,7 @@ dnscrypt-proxy-webui/
 │
 ├── scripts/                         # Build & release tools
 │   ├── fetch_dns_binaries.sh        # DNS binaries fetcher (Level 4)
+│   ├── fetch_app_apk.sh             # Companion APK fetcher (v1.4.0)
 │   ├── generate-icons.sh            # PNG/ICO icon generator
 │   ├── package_module.sh            # Build Magisk ZIP
 │   ├── release.sh                   # Stable / Prerelease automation
@@ -262,6 +289,7 @@ dnscrypt-proxy-webui/
 │   ├── customize.sh                 # Magisk installer (10 data-preservation layers)
 │   ├── dnscrypt-proxy.toml          # DNSCrypt engine config
 │   ├── dnscrypt-proxy.version       # DNS binary version (2.1.18)
+│   ├── app-apk.version              # Companion app version (1.0.0, v1.4.0)
 │   ├── functions.sh                 # Shared shell library (backup helpers)
 │   ├── go.mod                       # Go module definition
 │   ├── main.go                      # HTTP server
@@ -285,7 +313,8 @@ dnscrypt-proxy-webui/
 │   ├── index.html                   # Main UI (FSM + SW Update + EN/AR toggle)
 │   ├── manifest.json                # PWA manifest (lang=en, dir=ltr defaults)
 │   ├── offline.html                 # Offline fallback page
-│   └── sw.js                        # Service Worker (language-neutral)
+│   ├── sw.js                        # Service Worker (language-neutral)
+│   └── app-debug.apk                # Companion APK (optional, v1.4.0)
 │
 └── docs/                            # Documentation (25 files)
     ├── adr/                         # Architecture Decision Records (7 files)
@@ -579,7 +608,7 @@ cd dnscrypt-proxy-webui
 git checkout develop
 
 # 3. Common commands
-make version         # show current version (v1.3.0)
+make version         # show current version (v1.4.0)
 make build           # build all 4 architectures
 make package         # build + package
 make clean           # clean build outputs
@@ -635,7 +664,7 @@ Releases are automated through two scripts:
 **Stable release** (from `develop`):
 
 ```bash
-./scripts/release.sh v1.3.0
+./scripts/release.sh v1.4.0
 ```
 
 **PATCH release** (from `main`):
@@ -725,6 +754,14 @@ This project follows the
 
 ---
 
+## Related Projects
+
+| Project | Description |
+|---|---|
+| [**dnscrypt-proxy-app**](https://github.com/gasciljh/dnscrypt-proxy-app) | Native Android WebView wrapper for this WebUI (optional, ~3 MB APK) |
+
+---
+
 ## Credits
 
 - [dnscrypt-proxy](https://github.com/DNSCrypt/dnscrypt-proxy) — DNS engine
@@ -753,8 +790,16 @@ The Code of Conduct is licensed under
 
 ## Links
 
+### Main module
+
 - Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 - Releases: https://github.com/gasciljh/dnscrypt-proxy-webui/releases
 - Issues: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - Discussions: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
 - Security reports: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
+
+### Companion app
+
+- Repository: https://github.com/gasciljh/dnscrypt-proxy-app
+- Releases: https://github.com/gasciljh/dnscrypt-proxy-app/releases
+- Issues: https://github.com/gasciljh/dnscrypt-proxy-app/issues

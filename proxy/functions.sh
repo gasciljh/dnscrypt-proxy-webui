@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – functions.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -274,6 +274,34 @@
 #     bootstrap cache, and closes a theoretical vector where
 #     a compromised run/ directory could redirect the token
 #     read to an attacker-controlled path.
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 FSH-16 — No behavior change. `functions.sh` is a
+#     shared library sourced by service.sh, action.sh,
+#     status.sh, uninstall.sh, watchdog.sh, and (via runShell)
+#     main.go. It does NOT manage the companion Android app
+#     APK (`web/app-debug.apk`).
+#
+#     The APK lifecycle is handled by:
+#       • customize.sh → extracts it from the ZIP (unzip 'web/*')
+#       • proxy/main.go  → serves it at /app-debug.apk
+#       • release.yml    → stages it via fetch_app_apk.sh
+#
+#     `functions.sh` continues to manage the 5 user config files
+#     (webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
+#     allowlist.txt, denylist.txt) and the backup/restore/rotation
+#     helpers, unchanged.
+#
+#   📱 FSH-17 — Version bump v1.3.0 → v1.4.0.
+#     No `--version` flag exists in this library (it is sourced,
+#     not executed directly). The version header is purely
+#     documentary. No behavior changes to any helper:
+#     backup_user_files, restore_user_files, rotate_backups,
+#     verify_backup_integrity, write_manifest, copy_with_context,
+#     get_watchdog_token, auto_backup_if_needed,
+#     cleanup_old_transactions, or the firewall functions.
 #
 # ============================================================
 # POSIX note on `local`:

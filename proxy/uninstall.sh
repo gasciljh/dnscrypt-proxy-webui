@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – uninstall.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -264,6 +264,21 @@
 #   • No deletion of /sdcard/dnscrypt-webui-backup/ — see [0].
 #   • No deletion of orphan-txn-* — see [0.2].
 #
+
+# ============================================================
+# v1.4.0 \u2014 Companion Android app integration
+# ============================================================
+#   \U0001f4f1 UNS-V14-01 \u2014 No behavior change. The module
+#     uninstall path does NOT touch the companion app APK.
+#     `web/app-debug.apk` is a build artifact of the module
+#     ZIP; it disappears when the module directory is removed.
+#     The user's separately-installed companion app (if any)
+#     is unaffected.
+#
+#   \U0001f4f1 UNS-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
+#     Documentation only.
+#
+# ============================================================
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside its internal helper
@@ -285,7 +300,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

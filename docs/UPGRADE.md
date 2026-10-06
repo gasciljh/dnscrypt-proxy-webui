@@ -1624,7 +1624,7 @@ ZIP.
 <div align="center">
 
 **Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Author**: gasciljh
 
 **💡 Tip**: Since v1.2.0, the persistent backup directory is

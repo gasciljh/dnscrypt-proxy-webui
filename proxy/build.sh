@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – build.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -189,6 +189,21 @@
 #
 # It ONLY produces the 4 WebUI binaries in proxy/build/.
 # The other scripts consume those binaries.
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 BLD-V14-01 — No behavior change. build.sh does not
+#     build the companion Android app APK (that lives in a
+#     separate repository: gasciljh/dnscrypt-proxy-app). The
+#     module build only cross-compiles proxy/main.go for the
+#     4 Android architectures, exactly as before.
+#
+#   📱 BLD-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     Documentation only. The 4-architecture cross-compile,
+#     reproducible build flags, and LDFLAGS injection are all
+#     unchanged.
+#
+# ============================================================
 # ============================================================
 # UPX + PIE warning
 # ============================================================

@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # ============================================================
 # DNSCrypt Smart Filter – action.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -157,6 +157,27 @@
 #   • Backup directory is /sdcard/dnscrypt-webui-backup/ (v1.2.0).
 #
 # ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 ACT-APK-01 — No behavior change. The module may now
+#     ship `web/app-debug.apk` (companion Android app). It is
+#     served by main.go at `/app-debug.apk` and installed by
+#     the user from the WebUI install button.
+#
+#     `action.sh` does not touch the APK. Its install/runtime
+#     lifecycle is orthogonal to the DNS engine and WebUI.
+#
+#     Relevant mode for the user:
+#       • None — the APK is a one-shot download; once installed,
+#         the companion app opens http://127.0.0.1:9090 like any
+#         browser.
+#
+#   📱 ACT-APK-02 — Version bump v1.3.0 → v1.4.0.
+#     `--version` now reports v1.4.0. No behavior changes to
+#     any mode (--restart, --status, --check, --diagnose,
+#     --backup, --help).
+#
+# ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables. The
 #   `local` keyword is supported by:
@@ -176,7 +197,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac

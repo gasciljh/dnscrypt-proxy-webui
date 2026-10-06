@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -159,6 +159,24 @@
 #       - SC2115 (rm -rf "$var" without ?) — guards exist
 #       - SC2155 (declare+assign) — intentional style
 #     No production code was changed; only the CI invocation.
+#
+# ============================================================
+# v1.4.0 \u2014 Companion Android app integration
+# ============================================================
+#   \U0001f4f1 CI-APK-01 \u2014 New smoke-test step
+#     "Verify companion app metadata". Validates:
+#       \u2022 proxy/app-apk.version format (X.Y.Z, no "v")
+#       \u2022 scripts/fetch_app_apk.sh presence
+#
+#     The companion app is OPTIONAL. A missing version file or
+#     script produces a warning, not a build failure. This
+#     mirrors the OPTIONAL semantics in package_module.sh and
+#     release.yml.
+#
+#   \U0001f4f1 CI-APK-02 \u2014 The web-asset smoke test does NOT
+#     require web/app-debug.apk. The APK is staged by the
+#     release pipeline (release.yml), not committed to git.
+#     Requiring it here would break CI on every push.
 # ============================================================
 
 name: CI
@@ -538,3 +556,40 @@ jobs:
 
           echo "::endgroup::"
           echo "✅ Version consistency verified across 5 files"
+
+      # ============================================================
+      # Verify companion app metadata (v1.4.0)
+      # ============================================================
+      # Validates proxy/app-apk.version format (X.Y.Z) and
+      # verifies that scripts/fetch_app_apk.sh is present.
+      #
+      # The companion app is OPTIONAL — a missing version file
+      # produces a warning, not an error.
+      # ============================================================
+      - name: Verify companion app metadata
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying companion app metadata"
+
+          if [ ! -s proxy/app-apk.version ]; then
+            echo "  ⚠️  proxy/app-apk.version missing (companion app optional)"
+          else
+            APP_V="$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if printf '%s' "$APP_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "  ✅ proxy/app-apk.version:        $APP_V (valid format)"
+            else
+              echo "  ❌ proxy/app-apk.version format invalid"
+              echo "     expected: X.Y.Z (e.g. 1.0.0)"
+              echo "     found:    $APP_V"
+              exit 1
+            fi
+          fi
+
+          if [ -s scripts/fetch_app_apk.sh ]; then
+            echo "  ✅ scripts/fetch_app_apk.sh present"
+          else
+            echo "  ⚠️  scripts/fetch_app_apk.sh missing (companion app optional)"
+          fi
+
+          echo "::endgroup::"
+          echo "✅ Companion app metadata verified"

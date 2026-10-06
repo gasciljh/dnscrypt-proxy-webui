@@ -3,7 +3,7 @@
 Complete reference for the persistent user-data backup system
 introduced in v1.2.0.
 
-**Version**: v1.3.0
+**Version**: v1.4.0
 **Last updated**: 2026-10-02
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
@@ -27,7 +27,26 @@ introduced in v1.2.0.
 > - Security model → [`SECURITY.md`](SECURITY.md) §5.31
 > - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0]
 
-> **v1.2.0 — this is the current release**:
+> **v1.4.0 — this is the current release**:
+>   • **No change to the backup system.** The v1.4.0 release is an
+>     integration release focused on the **companion Android app**
+>     and **CodeQL hardening**. The 10 defensive layers, the
+>     persistent backup directory, the rotation policy, and the
+>     `.manifest.json` schema are byte-for-byte identical to v1.2.0
+>     and v1.3.0.
+>   • **Companion Android app** (`web/app-debug.apk`) — an OPTIONAL
+>     asset bundled into the module ZIP. It is served at
+>     `GET /app-debug.apk` by `main.go`. This does NOT affect the
+>     backup layer: the APK is not one of the 5 preserved files.
+>   • **CodeQL `go/path-injection` fix in `removeModule`** — internal
+>     hardening of `main.go`. The backup layer is unaffected.
+>   • **iOS PWA logic removed** — Android-only project. No change to
+>     the WebUI, the Service Worker, or the backup directory.
+>   • **All v1.2.0 and v1.3.0 features remain in place.** No breaking
+>     change to the API, the config files, or the shell scripts.
+>   • See [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0] for details.
+
+> **v1.2.0 — the data-preservation release**:
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
@@ -111,7 +130,7 @@ introduced in v1.2.0.
 >     implicit confusion between the two.
 >   • 🛡️ **HARD-BK-17** — The tiered retention table in `§6.1`
 >     is now explicitly labelled as a planned enhancement
->     (v1.3.0), with the actual count-based policy stated
+>     (v1.5.0), with the actual count-based policy stated
 >     first.
 >   • 🛡️ **HARD-BK-18** — `§4.2` now documents the BSD `stat`
 >     fallback used by `functions.sh:get_last_backup_time`.
@@ -242,6 +261,7 @@ rebuilt, re-downloaded, or regenerated.
 | `run/` | Runtime state only (PIDs, status, progress) |
 | Binaries (`dnscrypt-proxy`, `dnscrypt-webui`) | Shipped fresh with each release |
 | Log files | Rotated; not user data |
+| **Companion APK** (`web/app-debug.apk`, v1.4.0) | Build artifact of the module ZIP; not user data |
 
 ### 2.2 Typical snapshot size
 
@@ -489,8 +509,8 @@ Every snapshot directory contains a `.manifest.json` file:
 
 ```json
 {
-  "version": "v1.2.0",
-  "timestamp": "20260926-095826",
+  "version": "v1.4.0",
+  "timestamp": "20261002-095826",
   "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
   "root_solution": "magisk",
   "files_count": 5,
@@ -539,7 +559,7 @@ Every snapshot directory contains a `.manifest.json` file:
 >
 > | Creator | `version` value | `root_solution` value |
 > |---|---|---|
-> | `customize.sh` (install / upgrade) | Actual module version (e.g. `v1.2.0`) | Detected at install time |
+> | `customize.sh` (install / upgrade) | Actual module version (e.g. `v1.4.0`) | Detected at install time |
 > | `main.go:createAutoBackup` | **`"unknown"`** | **`"unknown"`** |
 > | `action.sh --backup` (via `functions.sh:backup_user_files`) | **`"unknown"`** | **`"unknown"`** |
 > | `service.sh:auto_backup_if_needed` | **`"unknown"`** | **`"unknown"`** |
@@ -618,9 +638,9 @@ A JSON file that records every install / upgrade:
 {
   "upgrades": [
     {
-      "from": "v1.1.0",
-      "to": "v1.2.0",
-      "date": "2026-09-26T10:30:00Z",
+      "from": "v1.3.0",
+      "to": "v1.4.0",
+      "date": "2026-10-02T10:30:00Z",
       "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
       "root": "magisk",
       "files": 5
@@ -634,7 +654,7 @@ A JSON file that records every install / upgrade:
 **Fallback (no `jq`)**: A plain-text `.upgrade_history.txt`:
 
 ```text
-2026-09-26T10:30:00Z | v1.1.0 → v1.2.0 | source=/data/adb/modules/dnscrypt-proxy-webui/proxy | files=5
+2026-10-02T10:30:00Z | v1.3.0 → v1.4.0 | source=/data/adb/modules/dnscrypt-proxy-webui/proxy | files=5
 ```
 
 **Rotation**: The history file is **not rotated** — it grows slowly
@@ -683,9 +703,9 @@ is **count-based**: it keeps the 21 newest snapshots, sorted by
 
 There are no daily / weekly / monthly tiers today.
 
-**Planned enhancement (v1.3.0)**: The following tiered policy is
+**Planned enhancement (v1.5.0)**: The following tiered policy is
 under consideration for a future release, but is **not**
-implemented in v1.2.0:
+implemented in v1.4.0:
 
 | Tier (planned) | Count | Typical age |
 |----------------|:-----:|-------------|
@@ -934,7 +954,7 @@ The next boot will recreate the directory (empty).
 ```bash
 # From PC (with adb + root)
 adb shell su -c "tar czf /sdcard/dnscrypt-backup-$(date +%Y%m%d).tar.gz /sdcard/dnscrypt-webui-backup"
-adb pull /sdcard/dnscrypt-backup-20260926.tar.gz
+adb pull /sdcard/dnscrypt-backup-20261002.tar.gz
 ```
 
 ### 7.9 What about the language preference?
@@ -962,16 +982,16 @@ The choice is remembered on that device's browser.
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
 
-**Response (v1.2.0 — 7 fields)**:
+**Response (v1.4.0 — 7 fields)**:
 
 ```json
 {
   "available": 7,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-manual-12345",
-  "last_stable": "20260926-095826-v1.2.0-12345",
+  "last_backup": "2026-10-02 15:00:00",
+  "last_backup_name": "20261002-150000-manual-12345",
+  "last_stable": "20261002-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -984,7 +1004,7 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 | `in_flight_txn` | int | Number of `txn-*` directories (install in progress or interrupted) |
 | `orphan_txn` | int | Number of `orphan-txn-*` directories (preserved interrupted installs) |
 | `last_backup` | string \| null | Modification time of the newest snapshot |
-| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20260926-150000-manual-12345`) |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20261002-150000-manual-12345`) |
 | `last_stable` | string \| null | Content of the `.last_stable` pointer file, or null if not set |
 | `path` | string | Absolute path of the backup directory |
 
@@ -1013,10 +1033,10 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backup
   "available": 7,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-manual-12345",
+  "last_backup": "2026-10-02 15:00:00",
+  "last_backup_name": "20261002-150000-manual-12345",
   "last_backup_age_seconds": 3600,
-  "last_stable": "20260926-095826-v1.2.0-12345",
+  "last_stable": "20261002-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -1041,7 +1061,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
 **Output example**:
 
 ```text
-v1.2.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | BACKUP=7snap/1h ago | RUNDIR=/data/adb/modules/dnscrypt-proxy-webui/proxy/run
+v1.4.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | BACKUP=7snap/1h ago | RUNDIR=/data/adb/modules/dnscrypt-proxy-webui/proxy/run
 ```
 
 The `BACKUP=` field format is `<count>snap/<age>`.
@@ -1234,7 +1254,7 @@ su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.state"
 while `status.sh --json` returns 7, or vice versa.
 
 **Cause**: A version mismatch between `main.go` and
-`status.sh`. This should not occur on v1.2.0 — both were updated
+`status.sh`. This should not occur on v1.4.0 — both were updated
 in the same release.
 
 **Fix**:
@@ -1243,10 +1263,10 @@ in the same release.
    ```bash
    su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
    ```
-   → must be `version=v1.2.0`.
+   → must be `version=v1.4.0`.
 
 2. If the binary is stale (older than the scripts), reinstall
-   the module from the v1.2.0 ZIP.
+   the module from the v1.4.0 ZIP.
 
 3. After fixing, restart the WebUI and re-run:
    ```bash
@@ -1347,7 +1367,7 @@ Then upgrade and restore if needed (see §7.4).
 ### 11.4 No-op migrations
 
 If the `SOURCE_VERSION` matches `TARGET_VERSION`, `migrate_config()`
-does nothing. This is the case for v1.2.0 → v1.2.0 reinstalls.
+does nothing. This is the case for v1.4.0 → v1.4.0 reinstalls.
 
 ### 11.5 Language preference across migrations
 
@@ -1363,6 +1383,33 @@ The WebUI's language toggle (English default + Arabic) is
 After a migration, the WebUI may briefly load in English (default)
 before the browser's `localStorage` is read and reapplied. This
 is expected and only lasts for the first render frame.
+
+### 11.6 From v1.2.0 or v1.3.0 to v1.4.0
+
+**The upgrade is automatic and identical to v1.1.0 → v1.2.0.**
+
+What happens during the v1.4.0 upgrade:
+
+1. **Layer 1** (multi-source detection) — unchanged.
+2. **Layer 2** (persistent backup) — unchanged. A new snapshot
+   is created with the name
+   `<timestamp>-v1.4.0-<pid>`.
+3. **Layer 3** (SHA256 verification) — unchanged.
+4. **Layer 4** (transactional install) — unchanged.
+5. **Layers 5–10** — all unchanged.
+
+**No new config migration was added in v1.4.0.** All v1.2.0
+migrations still apply.
+
+**Companion APK (new in v1.4.0)**:
+- The installer extracts `web/app-debug.apk` from the ZIP if it is
+  present (OPTIONAL — the build succeeds without it).
+- The APK is **NOT** one of the 5 preserved files.
+- The APK is **NOT** added to the persistent backup directory.
+- The APK is served at `GET /app-debug.apk` by `main.go`.
+
+**Result**: Your 5 config files are preserved as in v1.2.0, and
+the backup layer is byte-for-byte unchanged.
 
 ---
 
@@ -1399,6 +1446,7 @@ with `READ_EXTERNAL_STORAGE` or root.
 | DNSCrypt server list cache | ❌ | N/A |
 | Binaries | ❌ | N/A |
 | Log files | ❌ | N/A |
+| **Companion APK** (`web/app-debug.apk`, v1.4.0) | **❌** | **N/A** |
 | **WebUI language preference** | **❌** | **N/A (browser-side only)** |
 
 **Note**: The DNSCrypt credentials (username/password for the
@@ -1411,6 +1459,10 @@ is `0700`, so only root can read them.
 not on the device. This is a deliberate design decision: the
 backup layer preserves server-side **user configuration**, not
 **client-side UI preferences**.
+
+**Companion APK note (v1.4.0)**: The optional `web/app-debug.apk`
+is **not** part of the backup. It is a build artifact that is
+re-extracted from the module ZIP on every install.
 
 ### 12.3 SELinux contexts
 
@@ -1501,6 +1553,29 @@ For users who require stronger guarantees, they can:
 - Clear `localStorage` manually if they want the WebUI to
   forget the language choice.
 
+### 12.7 Companion APK — security considerations (v1.4.0)
+
+The optional companion Android app (`web/app-debug.apk`) is
+**not** part of the backup layer. From a security standpoint:
+
+- **Not preserved**: The APK is a build artifact of the module
+  ZIP, not user data. It is not added to the persistent backup
+  directory and is not one of the 5 preserved files.
+- **Re-extracted on every install**: If a future release ships a
+  new APK, the new APK is extracted fresh from the ZIP. The old
+  APK is not restored from any snapshot.
+- **Served locally**: `main.go` serves the APK at
+  `GET /app-debug.apk` with a strict `Cache-Control:
+  public, max-age=3600, immutable` header. The endpoint is
+  subject to `checkAuth` (same auth as every other protected
+  route).
+- **Optional**: A module ZIP can be built without the APK. The
+  build and the install succeed in either case.
+
+**Why this matters for the backup layer**: A compromised APK
+cannot inject itself into the 5 preserved config files. The
+backup layer remains orthogonal to the APK lifecycle.
+
 ---
 
 ## 13. References
@@ -1518,6 +1593,7 @@ For users who require stronger guarantees, they can:
 | `proxy/uninstall.sh` | Preserves backup + cleans orphan transactions |
 | `proxy/post-fs-data.sh` | Does NOT touch backups (runs too early) |
 | `proxy/watchdog.sh` | Does NOT touch backups (read-only diagnostics) |
+| `scripts/fetch_app_apk.sh` | Fetches the companion APK (v1.4.0) — does NOT touch the backup layer |
 | `META-INF/com/google/android/update-binary` | Root manager entry point (does not touch backups) |
 
 ### 13.2 Related documentation
@@ -1536,7 +1612,7 @@ For users who require stronger guarantees, they can:
 | [`API.md`](API.md) §10.6 | Backup diagnostics examples |
 | [`API.md`](API.md) §10.7 | Recovery mode examples |
 | [`FAQ.md`](FAQ.md) Q121–Q130 | Backup questions |
-| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0] | Release notes |
+| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0] | Release notes |
 | [`INSTALL.md`](INSTALL.md) §10.5 | Manual backup before uninstall |
 
 ### 13.3 External references
@@ -1550,5 +1626,5 @@ For users who require stronger guarantees, they can:
 ---
 
 *Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Version: v1.4.0*
 *Author: gasciljh*

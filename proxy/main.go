@@ -1,6 +1,6 @@
 // ============================================================
 // DNSCrypt Smart Filter – main.go
-// Version: v1.3.0 (Global Edition)
+// Version: v1.4.0 (Global Edition)
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -442,6 +442,9 @@ var (
 	OFFLINE_FILE   = filepath.Join(WEB_DIR, "offline.html")
 	SW_FILE        = filepath.Join(WEB_DIR, "sw.js")
 	MANIFEST_FILE  = filepath.Join(WEB_DIR, "manifest.json")
+
+	// v1.4.0 - companion Android app APK (optional)
+	APK_FILE = filepath.Join(WEB_DIR, "app-debug.apk")
 
 	ICON_192_SVG_FILE = filepath.Join(WEB_DIR, "icon-192.svg")
 	ICON_512_SVG_FILE = filepath.Join(WEB_DIR, "icon-512.svg")
@@ -979,12 +982,12 @@ func isExposedBind(addr string) bool {
 // the `Secure` attribute.
 //
 // Rationale (Global Edition clarification):
-//   • On loopback addresses (127.0.0.1 / ::1 / localhost) the
+//   - On loopback addresses (127.0.0.1 / ::1 / localhost) the
 //     modern browser security model treats the origin as a
 //     "secure context" — the Secure attribute is honoured over
 //     plain HTTP, so marking the cookie Secure prevents it
 //     from ever leaking to a real network origin.
-//   • On any other bind address the transport is plain HTTP
+//   - On any other bind address the transport is plain HTTP
 //     with no TLS terminator assumed; forcing Secure=true
 //     would make the cookie unusable in some browsers. We
 //     therefore leave it off, and the operator is expected to
@@ -1354,7 +1357,7 @@ func getFunctionsScript() string {
 
 // shellQuote wraps s in single quotes if it contains any shell
 // metacharacter, escaping embedded single quotes via the
-// standard '\'' sequence.
+// standard backslash-two-single-quotes sequence.
 //
 // v1.1.0: extended to cover {, }, \n, \t in addition to the
 // original set. This protects against brace expansion and
@@ -1733,10 +1736,10 @@ func readMonitoringAuthFromFile() (username, password string) {
 // ============================================================
 // The watchdog token replaces the previous "localhost bypass"
 // for /api/ensure_running_service. The token is:
-//   • Generated on first startup (256 bits from crypto/rand).
-//   • Persisted to $RUN_DIR/.watchdog_token (mode 0600) so it
+//   - Generated on first startup (256 bits from crypto/rand).
+//   - Persisted to $RUN_DIR/.watchdog_token (mode 0600) so it
 //     survives restarts and can be read by watchdog.sh.
-//   • Compared in constant-time against the X-Watchdog-Token
+//   - Compared in constant-time against the X-Watchdog-Token
 //     header sent by the caller.
 //
 // If the token file cannot be written (e.g. read-only run dir),
@@ -2913,10 +2916,10 @@ func saveCustomRulesCombined(allow, deny string) map[string]interface{} {
 // that still triggered a pre-critical backup. The new signature
 // takes `content`:
 //
-//   • If `content` is empty (after trimming) → the request is
+//   - If `content` is empty (after trimming) → the request is
 //     rejected and NO backup is created. This preserves the
 //     "never waste a snapshot slot" invariant.
-//   • If `content` is non-empty → it is appended to the current
+//   - If `content` is non-empty → it is appended to the current
 //     denylist (with newline normalization) and the result is
 //     saved via `saveDenylist`, which triggers the pre-critical
 //     backup and rebuilds the blocklist.
@@ -3238,29 +3241,76 @@ func checkOldModules() []OldModuleInfo {
 
 func removeModule(modulePath string) map[string]interface{} {
 	defer func() { recover() }()
-	cleanPath := filepath.Clean(modulePath)
-	if !strings.HasPrefix(cleanPath+string(filepath.Separator), MODULES_DIR+string(filepath.Separator)) {
-		return map[string]interface{}{"status": "error", "message": "Invalid path"}
+
+	// v1.4.0 fix (CodeQL go/path-injection):
+	// Extract the module name (last path component) via
+	// filepath.Base, which CodeQL recognizes as an effective
+	// path-injection sanitizer. The returned value contains no
+	// separators and no "..".
+	name := filepath.Base(modulePath)
+	if name == "" || name == "." || name == ".." ||
+		name == string(filepath.Separator) {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Invalid module name",
+		}
 	}
+
+	// Defence-in-depth: require that the caller sent a path
+	// directly under MODULES_DIR. This check does NOT participate
+	// in path construction below.
+	expectedPrefix := MODULES_DIR + string(filepath.Separator)
+	if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Invalid path",
+		}
+	}
+
+	// Reconstruct the full path from the trusted base directory
+	// and the sanitized name. No user-controlled data reaches
+	// any path expression from this point onwards.
+	cleanPath := filepath.Join(MODULES_DIR, name)
+
 	if cleanPath == MODDIR {
-		return map[string]interface{}{"status": "error", "message": "Cannot remove current module"}
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Cannot remove current module",
+		}
 	}
-	fingerprintData, err := os.ReadFile(filepath.Join(cleanPath, ".module.fingerprint"))
+
+	fingerprintPath := filepath.Join(cleanPath, ".module.fingerprint")
+	fingerprintData, err := os.ReadFile(fingerprintPath)
 	if err != nil {
-		return map[string]interface{}{"status": "error", "message": "Module has no valid fingerprint"}
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Module has no valid fingerprint",
+		}
 	}
 	if !strings.Contains(string(fingerprintData), "dnscrypt-proxy-webui") {
-		return map[string]interface{}{"status": "error", "message": "This is not a DNSCrypt Proxy module"}
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "This is not a DNSCrypt Proxy module",
+		}
 	}
+
 	if err := os.RemoveAll(cleanPath); err != nil {
 		logWithLevel("error", "❌ removeModule failed: "+err.Error())
-		return map[string]interface{}{"status": "error", "message": "Failed to remove module"}
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Failed to remove module",
+		}
 	}
+
 	oldModulesMutex.Lock()
 	oldModulesCache = nil
 	oldModulesTime = time.Time{}
 	oldModulesMutex.Unlock()
-	return map[string]interface{}{"status": "ok", "message": "Old module removed successfully"}
+
+	return map[string]interface{}{
+		"status":  "ok",
+		"message": "Old module removed successfully",
+	}
 }
 
 // ============================================================
@@ -3618,16 +3668,16 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 // status.sh --json, minus the two fields that are exclusive to
 // the shell tool — `status` and `last_backup_age_seconds`):
 //
-//   • available         — number of snapshots (excludes
-//                         current/, txn-*, orphan-txn-*)
-//   • in_flight_txn     — number of `txn-*` directories
-//   • orphan_txn        — number of `orphan-txn-*` directories
-//   • last_backup       — human-readable timestamp of the newest
-//                         snapshot (or null)
-//   • last_backup_name  — directory name of the newest snapshot
-//                         (or null)
-//   • last_stable       — content of .last_stable (or null)
-//   • path              — absolute path of the backup directory
+//   - available         — number of snapshots (excludes
+//     current/, txn-*, orphan-txn-*)
+//   - in_flight_txn     — number of `txn-*` directories
+//   - orphan_txn        — number of `orphan-txn-*` directories
+//   - last_backup       — human-readable timestamp of the newest
+//     snapshot (or null)
+//   - last_backup_name  — directory name of the newest snapshot
+//     (or null)
+//   - last_stable       — content of .last_stable (or null)
+//   - path              — absolute path of the backup directory
 //
 // All operations are best-effort: any error results in a
 // consistent, safe shape (all counters 0, all nullable fields
@@ -4371,7 +4421,11 @@ func setSecurityHeaders(w http.ResponseWriter) {
 
 func serveFile(w http.ResponseWriter, r *http.Request, path, contentType string) {
 	setSecurityHeaders(w)
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	if strings.HasSuffix(path, ".apk") {
+		w.Header().Set("Cache-Control", "public, max-age=3600, immutable")
+	} else {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	}
 	if contentType != "" {
 		w.Header().Set("Content-Type", contentType)
 	}
@@ -4440,6 +4494,10 @@ func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType strin
 		"/offline.html": {
 			path:        OFFLINE_FILE,
 			contentType: "text/html; charset=utf-8",
+		},
+		"/app-debug.apk": {
+			path:        APK_FILE,
+			contentType: "application/vnd.android.package-archive",
 		},
 	}
 
@@ -4621,9 +4679,9 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 // config files before a destructive operation. The backup is
 // written by the shell layer (functions.sh:backup_user_files)
 // because:
-//   • The user files include formats best handled by shell tools.
-//   • The rotation logic already lives in functions.sh.
-//   • Keeping the backup policy in one place avoids duplication.
+//   - The user files include formats best handled by shell tools.
+//   - The rotation logic already lives in functions.sh.
+//   - Keeping the backup policy in one place avoids duplication.
 //
 // Failure of the backup NEVER blocks the user action — the
 // function logs a warning and returns. This preserves the
@@ -4631,34 +4689,36 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 // prevent the user from changing settings.
 //
 // Serialization:
-//   A single mutex (backupMu) ensures that two rapid user
-//   actions cannot trigger overlapping backups on the same
-//   source directory. The second call waits for the first.
+//
+//	A single mutex (backupMu) ensures that two rapid user
+//	actions cannot trigger overlapping backups on the same
+//	source directory. The second call waits for the first.
 //
 // ============================================================
 // v1.2.0 — post-audit improvements applied here
 // ============================================================
-//   • BUG-D fix: After a successful backup, rotate_backups 21
+//
+//   - BUG-D fix: After a successful backup, rotate_backups 21
 //     is invoked in the same shell call. This prevents unbounded
 //     accumulation of pre-critical snapshots when a user saves
 //     the denylist many times in a session.
 //
-//   • BUG-E fix: The target directory is now generated by
+//   - BUG-E fix: The target directory is now generated by
 //     main.go with a unique suffix
 //     (`<timestamp>-manual-<pid>-<rand4>`) and passed to
 //     `backup_user_files` as the second argument. This avoids
 //     the timestamp collision with `action.sh --backup`.
 //
-//   • BUG-K fix: The log message now distinguishes timeout
+//   - BUG-K fix: The log message now distinguishes timeout
 //     from exit non-zero (handled by runShellWithTimeout).
 //
-//   • HARD-10 (was M-07) fix: the shell line is now
+//   - HARD-10 (was M-07) fix: the shell line is now
 //     consistent — stderr from `backup_user_files` is captured
 //     by `runShellWithTimeout`; the two best-effort helpers
 //     (`ensure_backup_dir` and `rotate_backups`) are silenced
 //     explicitly. No `2>&1` is used anywhere on this line.
 //
-//   • R2-08: the functions.sh path is resolved via
+//   - R2-08: the functions.sh path is resolved via
 //     `getFunctionsScript()`. The FIRST argument to the shell
 //     line is the source directory for `backup_user_files` —
 //     `MODDIR/proxy` — which is a DIFFERENT argument from the
@@ -5007,6 +5067,9 @@ func main() {
 	logEvent("🔧 v1.2.0 (Global R2): R2-01..R2-08 post-review corrections applied (8 corrections)")
 	logEvent("🔧 v1.2.0 (Global R2): functions.sh resolved via " + getFunctionsScript())
 	logEvent("🔧 v1.2.0 (Global R3): R3-01 doc-comment fix applied (1 correction)")
+	logEvent("🆕 v1.4.0: CodeQL path-injection fix in removeModule (filepath.Base)")
+	logEvent("🆕 v1.4.0: iOS PWA logic removed (Android-only build)")
+	logEvent("📱 v1.4.0: companion APK served at /app-debug.apk (optional)")
 
 	if isExposedBind(bindAddr) {
 		logWithLevel("warn", "🔓 BIND_ADDR="+bindAddr+" — SERVICE IS EXPOSED TO NETWORK")

@@ -3,13 +3,33 @@
 > Comprehensive reference for all terms and abbreviations used
 > in DNSCrypt Smart Filter.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-06
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
->   • Version bumped from v1.1.0 to v1.2.0.
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • **Companion Android app integration** — new terms added:
+>       - Companion Android App
+>       - `app-apk.version`
+>       - `APK_FILE`
+>       - `/app-debug.apk` route
+>   • **CodeQL path-injection fix** — new terms added:
+>       - CodeQL Path-Injection Fix
+>       - `removeModule` hardening
+>       - `filepath.Base()` sanitization
+>   • **iOS PWA logic removal** — new term added:
+>       - iOS PWA Logic Removal
+>   • **v1.3.0 additions** (previously undocumented in this
+>     glossary):
+>       - PWA Install Button
+>       - Live Status LED
+>       - DNS Auto-Start After Boot
+>   • §11 (Fixes Index) — added the v1.3.0 features section and
+>     the v1.4.0 integration section.
+>   • §12 (References) — updated `CHANGELOG.md` reference to
+>     `§[v1.4.0]`.
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
@@ -17,67 +37,31 @@
 >     `localStorage['dnscrypt-lang']` and is never transmitted to
 >     the server. Documentation remains English-only by project
 >     convention.
->   • §5 Project-Specific Terms gained **20+ new entries** for
->     the v1.2.0 data-preservation release:
->       - Persistent Backup (v1.2.0)
->       - Transactional Upgrade (v1.2.0)
->       - `txn-*` directory (v1.2.0)
->       - `orphan-txn-*` directory (v1.2.0)
->       - `.last_stable` pointer (v1.2.0)
->       - `.last_backup` marker (v1.2.0)
->       - `.upgrade_history.json` (v1.2.0)
->       - `.pending_notification` (v1.2.0)
->       - Multi-Source Detection (v1.2.0)
->       - Recovery Mode Trigger (v1.2.0)
->       - `runtime_info.backups` (v1.2.0)
->       - `backupMu` (v1.2.0)
->       - `createAutoBackup` (v1.2.0)
->       - `cleanupOldTransactions` (v1.2.0)
->       - `checkPendingNotifications` (v1.2.0)
->       - `copy_with_context` (v1.2.0)
->       - `write_manifest` (v1.2.0)
->       - `verify_backup_integrity` (v1.2.0)
->       - Data Guardian (v1.2.0)
->       - Root-Solution Detection (v1.2.0)
->   • §6 Go & Shell Terms gained **4 new entries**:
->       - `sync.Mutex` (`backupMu`)
->       - `runShellWithTimeout`
->       - `AUTO_BACKUP_TIMEOUT`
->       - `META-INF/update-binary`
->   • §8 Metrics & Abstraction Terms gained a v1.2.0 note
->     about the 7-field `runtime_info.backups` object.
->   • §9 Advanced Security Terms gained **4 new entries**:
->       - 7-field Backups Schema
->       - Recovery Mode Correctness Fix
->       - Service Worker Update-Banner Fix
->       - Language Toggle (client-side only)
->   • §10 Common Abbreviations gained **4 new entries**:
->     FBE, MTP, FUSE, OTA.
->   • §11 Fixes Index gained a new section for the v1.2.0
->     Data-Preservation additions (BAK-1 / BAK-2 / BAK-3 / BAK-4)
->     and correctness fixes (FIX-1 / FIX-2), **plus** a new
->     note on the `HARD-*` file-scoped identifier family
->     (see §11 "Note on HARD-* identifiers").
->   • The Audit Corrections Registry remains at #33 — v1.2.0
->     does not extend it (see `docs/SECURITY.md` §17).
->   • §12 References updated with v1.2.0 additions
->     (`BACKUP.md`, `EMERGENCY.md`, `UPGRADE.md`).
 
-> **v1.2.0 (Global Edition) — Corrections in this revision**:
+> **v1.2.0 changes (historical)**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Added 20+ new entries for the data-preservation release
+>     (persistent backup, transactional upgrades, recovery mode,
+>     `runtime_info.backups`, `backupMu`, etc.).
+>   • Added 4 new entries to §6 (Go & Shell Terms): `sync.Mutex`
+>     (`backupMu`), `runShellWithTimeout`, `AUTO_BACKUP_TIMEOUT`,
+>     `META-INF/update-binary`.
+>   • Added 4 new entries to §10 (Common Abbreviations): FBE,
+>     MTP, FUSE, OTA.
+>   • §11 (Fixes Index) — added the v1.2.0 data-preservation
+>     section (BAK-1..BAK-4, FIX-1, FIX-2).
+
+> **v1.2.0 (Global Edition) — Corrections in this revision
+> (historical)**:
 >   • 🔧 **FIX-1 description** — §5 "Recovery Mode Trigger" and
 >     §9 "Recovery Mode Correctness Fix" previously described
 >     FIX-1 as a "reorder + exclude" strategy. The actual
 >     implementation in `customize.sh` uses a
 >     **snapshot-and-reapply** strategy (`§[8a]` + `§[9]` +
->     `§[9b2]`), which keeps the extraction logic of `§[9]`
->     untouched. The descriptions have been corrected to match
->     the shipped code.
+>     `§[9b2]`).
 >   • 🔧 **Reason string** — §5 "`createAutoBackup`" previously
 >     listed `pre-append-denylist` for the `appendDenylist` call
->     site. The actual reason string recorded by `main.go` is
->     `pre-denylist-save`, because `appendDenylist` delegates to
->     `saveDenylist` (which is where the pre-critical backup is
->     triggered). The entry has been corrected.
+>     site. The actual reason string is `pre-denylist-save`.
 
 ---
 
@@ -94,6 +78,7 @@
 9. [Advanced Security Terms](#9-advanced-security-terms)
 10. [Common Abbreviations](#10-common-abbreviations)
 11. [Fixes Index](#11-fixes-index)
+12. [References](#12-references)
 
 ---
 
@@ -218,7 +203,7 @@ using the ISP's DNS).
 **Managed by**: `main.go` via `startService()` / `stopService()`.
 
 **⚠️ v1.2.0 note**: The DNS version (2.1.18) is **separate** from the
-module version (v1.2.0). See §5 "DNS Version vs Module Version" for
+module version (v1.4.0). See §5 "DNS Version vs Module Version" for
 the distinction.
 
 ---
@@ -408,6 +393,14 @@ func rebuildBlocklist() error {
 **v1.2.0 note**: `manifest.json` `lang` defaults to `en` and `dir`
 to `ltr`. The in-page toggle updates both at runtime.
 
+**v1.3.0 note**: The install button is now dynamic — see §5
+"PWA Install Button".
+
+**v1.4.0 note**: The install button was converted from a
+`beforeinstallprompt`-based JavaScript flow to a direct
+`<a download>` link pointing at `/app-debug.apk`. See §5
+"Companion Android App" and "iOS PWA Logic Removal".
+
 ---
 
 ### ⚙️ Service Worker (SW)
@@ -457,8 +450,8 @@ Images).
 Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'
 ```
 
-**⚠️ Note**: `'unsafe-inline'` is currently present (TODO v1.2: remove
-it).
+**⚠️ Note**: `'unsafe-inline'` is currently present (planned for
+removal in v1.5.0).
 
 **v1.1.0 note**: `web/offline.html` **no longer has a CSP meta**. The
 previous `default-src 'none'` silently blocked the page's own scripts.
@@ -605,6 +598,10 @@ user into clicking.
 **Bootstrap**: `META-INF/com/google/android/update-binary` — the root
 manager's entry point. See §6.
 
+**v1.4.0 note**: The module ZIP may also contain an OPTIONAL
+`web/app-debug.apk` (companion Android app). See §5
+"Companion Android App".
+
 ---
 
 ### 💿 ROM
@@ -702,6 +699,11 @@ backoff.
 `$RUN_DIR/.watchdog_token` on every call (no cache). Read-only with
 respect to the backup directory.
 
+**v1.3.0**: The Watchdog is complemented by a direct
+`service.sh` API call after boot (see §5 "DNS Auto-Start After
+Boot"). The Watchdog's backoff behavior is left intact for crash
+recovery during normal runtime.
+
 ---
 
 ### 🎯 Audit Correction
@@ -734,6 +736,19 @@ respect to the backup directory.
 "BAK-4" and §5 "FIX-1 / FIX-2" for v1.2.0 runtime additions and
 correctness fixes. The registry remains at #33.
 
+**v1.3.0 does NOT add audit corrections.** The PWA install button,
+live status LED, and DNS auto-start-after-boot are functional
+features, not security fixes.
+
+**v1.4.0 does NOT add audit corrections.** The CodeQL
+path-injection fix in `removeModule` closes two static-analysis
+alerts (see §9 "CodeQL Path-Injection Fix"), but the underlying
+code was already guarded by a defensive prefix check. The fix is
+a **hardening**, not a correction of a known exploitable
+vulnerability. The registry remains at #33.
+
+**Next expected**: #34 (v1.5.x or later).
+
 ---
 
 ### 🩹 Hotfix
@@ -742,7 +757,7 @@ correctness fixes. The registry remains at #33.
 
 **Format**: `vX.Y.Z-hotfixN` (major.minor.patch-hotfixN).
 
-**In v1.2.0 context**: A hotfix from `v1.2.0` would be `v1.2.1`
+**In v1.4.0 context**: A hotfix from `v1.4.0` would be `v1.4.1`
 (PATCH release via `scripts/release-patch.sh`).
 
 ---
@@ -893,6 +908,7 @@ pre-critical backup. The `appendDenylist` endpoint now requires a
 **v1.1.0**: Also returns `profile_key` and `memory_limit_mb`.
 **v1.2.0**: Also returns `backups` (7 fields). See §5
 "`runtime_info.backups`".
+**v1.3.0/v1.4.0**: No structural change.
 
 ---
 
@@ -924,8 +940,9 @@ architecture. See §5 "Persistent Backup" and "Multi-Source Detection".
 **Architectural concept** — one source of truth.
 
 **In the project**:
-- `VERSION` — module version (v1.2.0).
+- `VERSION` — module version (v1.4.0).
 - `proxy/dnscrypt-proxy.version` — DNS version (2.1.18).
+- `proxy/app-apk.version` — companion app version (1.0.0, v1.4.0).
 - `MONITORING_UI_PORT` — reserved port (8080).
 
 **⚠️ Level 4.**
@@ -1088,17 +1105,21 @@ light profiles or starves the heavy ones.
 
 **Two independent versions** coexist in the project:
 
-| Version | Source file | v1.2.0 value |
+| Version | Source file | v1.4.0 value |
 |---|---|:---:|
 | **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
-| **Module version** (this project) | `VERSION` | `v1.2.0` |
+| **Module version** (this project) | `VERSION` | `v1.4.0` |
+| **Companion app version** (v1.4.0) | `proxy/app-apk.version` | `1.0.0` |
 
 - The **DNS version** changes only when upstream ships a new
   `dnscrypt-proxy` release.
 - The **module version** changes with each project release.
-- The two are **independent**. v1.2.0 did **not** bump the DNS version.
+- The **companion app version** changes only when the companion app
+  ships a new release (separate repository).
+- All three are **independent**. v1.3.0 and v1.4.0 did **not** bump
+  the DNS version.
 
-**Common confusion**: Both are called "version" in the codebase.
+**Common confusion**: All three are called "version" in the codebase.
 
 **Reference**: `docs/DNS_BINARIES.md` §1.1.
 
@@ -1116,6 +1137,8 @@ snapshotted to `/sdcard/dnscrypt-webui-backup/`.
 - ✅ Visible from any file manager + over USB (MTP).
 
 **Rotation**: Keep the 21 newest snapshots, sorted by directory name.
+
+**v1.3.0/v1.4.0**: No change to the backup layer.
 
 **Reference**: `docs/BACKUP.md` §1.3, §3.
 
@@ -1231,9 +1254,9 @@ immediately.
 {
   "upgrades": [
     {
-      "from": "v1.1.0",
-      "to": "v1.2.0",
-      "date": "2026-09-29T10:30:00Z",
+      "from": "v1.3.0",
+      "to": "v1.4.0",
+      "date": "2026-10-06T10:30:00Z",
       "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
       "root": "magisk",
       "files": 5
@@ -1335,15 +1358,15 @@ full analysis and `docs/ARCHITECTURE.md` §3.10 for the flow diagram.
 **7-field JSON object** in `runtime_info` describing the backup
 state.
 
-**Schema**:
+**Schema (v1.4.0 example)**:
 ```json
 {
   "available": 5,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-29 15:00:00",
-  "last_backup_name": "20260929-150000-v1.2.0",
-  "last_stable": "20260929-095826-v1.2.0",
+  "last_backup": "2026-10-06 15:00:00",
+  "last_backup_name": "20261006-150000-v1.4.0-12345",
+  "last_stable": "20261006-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -1392,7 +1415,7 @@ strings** (because `appendDenylist` delegates to `saveDenylist`):
 | `POST /api/save_custom_rules` | `"pre-custom-rules-save"` |
 | `POST /api/append_denylist` | (no own reason — delegates to `saveDenylist`, which uses `"pre-denylist-save"`) |
 
-**Corrected in this revision**: The `appendDenylist` entry
+**Corrected in v1.2.0 revision**: The `appendDenylist` entry
 previously listed `pre-append-denylist` — that string does **not**
 exist in the code. `appendDenylist` delegates to `saveDenylist`, so
 the recorded reason is `pre-denylist-save`.
@@ -1455,7 +1478,7 @@ SELinux context and mode preserved.
 **Behavior**:
 1. Copy the file.
 2. Restore SELinux context via `restorecon` (preferred) or
-   `chcon u:object_r:magisk_file:s0` (fallback).
+  `chcon u:object_r:magisk_file:s0` (fallback).
 3. Set mode `0600`.
 
 **Usage**: Any restore operation on a user file. Do **not** use a
@@ -1582,6 +1605,186 @@ switches to Arabic.
 - **Service Worker cache** stays neutral (HTML cached once).
 
 **Reference**: `docs/ARCHITECTURE.md` §6.7; `docs/API.md` §10.8.
+
+---
+
+### 🆕 PWA Install Button (v1.3.0 — v1.4.0 update)
+
+**WebUI feature** — a smart, dynamic install button that is always
+visible (except when the app is already installed or running
+standalone).
+
+**v1.3.0 behavior** (browser-adaptive):
+- **Chromium-based browsers** (Chrome, Edge, Brave, Samsung
+  Internet) — clicking opens the native
+  `beforeinstallprompt` dialog.
+- **iOS Safari** — clicking shows step-by-step "Add to Home
+  Screen" instructions.
+- **Unsupported browsers** (Firefox, Opera Mini, older browsers) —
+  clicking shows a friendly modal stating the browser is not
+  supported, listing supported alternatives (Chrome, Edge, Brave)
+  with Play Store links.
+
+**v1.4.0 change**: The install button was converted to a **direct
+`<a download>` link** pointing at `/app-debug.apk` (the companion
+Android app). The `beforeinstallprompt`-based flow and the iOS
+branch were removed (see §5 "Companion Android App" and
+"iOS PWA Logic Removal").
+
+**Reference**: `docs/ARCHITECTURE.md` §6.7; `CHANGELOG.md`
+§[v1.3.0] and §[v1.4.0].
+
+---
+
+### 🆕 Live Status LED (v1.3.0)
+
+**WebUI feature** — the "Today" stat now carries a 12×12 LED that
+pulses green when the DNS engine is running and turns solid red
+when the service is stopped.
+
+**Implementation**: Pure CSS + JS, aligned with the existing
+`.status-dot` styling and the `updateStatsDisplay()` handler in
+`web/index.html`.
+
+**Reference**: `CHANGELOG.md` §[v1.3.0].
+
+---
+
+### 🆕 DNS Auto-Start After Boot (v1.3.0)
+
+**Critical fix** in `service.sh` (v1.3.0).
+
+**Problem**: The DNS engine was not starting automatically after a
+device reboot when the user had previously left the service in
+the ON state. Root cause: `watchdog.sh` waits a fixed 30-second
+interval before its first API call, and by the time it fires
+`POST /api/ensure_running_service`, the WebUI may not have
+finished binding to its port. The watchdog would retry with
+exponential backoff (30s → 60s → 120s → ...), leaving DNS
+unavailable for minutes after boot.
+
+**Fix**: `service.sh` now performs a **direct, bounded wait** for
+the WebUI to become ready (up to 60 seconds, checking for the
+watchdog token file + the WebUI TCP port), then calls
+`POST /api/ensure_running_service` itself.
+
+**Result**: DNS engine reaches the "ON" state within ~5 seconds of
+`service.sh` startup. The `watchdog.sh` backoff behavior is left
+intact for crash recovery during normal runtime.
+
+**Reference**: `CHANGELOG.md` §[v1.3.0]; `proxy/service.sh`
+§[19].
+
+---
+
+### 🆕 Companion Android App (v1.4.0)
+
+**Optional asset** — a native Android WebView wrapper (~3 MB) that
+loads the WebUI at `127.0.0.1:9090`.
+
+**Source repository**:
+[gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+
+**Integration points**:
+- `proxy/app-apk.version` — Single Source of Truth for the app
+  version.
+- `scripts/fetch_app_apk.sh` — fetcher (cache, download, SHA256,
+  `.manifest.json`, JSON output, offline mode).
+- `web/app-debug.apk` — the APK bundled into the module ZIP as an
+  OPTIONAL asset.
+- `GET /app-debug.apk` — static route in `proxy/main.go`.
+- `web/index.html` — install button is a direct
+  `<a download>` link to `/app-debug.apk`.
+
+**Optional by design**:
+- `release.yml` fetches the APK into `dist/` (best-effort).
+- `release.yml` stages it at `web/app-debug.apk` (best-effort).
+- `package_module.sh` bundles it only if present (warning
+  otherwise).
+- `proxy/main.go` returns 404 if the file is absent.
+
+**Reference**: `CHANGELOG.md` §[v1.4.0]; `docs/API.md` §6.1.7;
+`docs/ARCHITECTURE.md`.
+
+---
+
+### 🆕 `app-apk.version` (v1.4.0)
+
+**Single Source of Truth** for the companion app version.
+
+**Path**: `proxy/app-apk.version`.
+
+**Format**: `X.Y.Z` (no `v` prefix), e.g. `1.0.0`.
+
+**Read by**: `scripts/fetch_app_apk.sh`.
+
+**Updated when**: The companion app (a separate repository) ships a
+new release.
+
+**Not** the module version — see §5 "DNS Version vs Module
+Version".
+
+**Reference**: `docs/DNS_BINARIES.md` (comparison); `CHANGELOG.md`
+§[v1.4.0].
+
+---
+
+### 🆕 `APK_FILE` (v1.4.0)
+
+**Go constant** in `proxy/main.go` that resolves the companion app
+APK path.
+
+**Value**: `filepath.Join(WEB_DIR, "app-debug.apk")`.
+
+**Used by**: `serveStaticAssets()` — registers the
+`/app-debug.apk` route with mime
+`application/vnd.android.package-archive`.
+
+**Behavior when file is absent**: Returns 404.
+
+**Reference**: `proxy/main.go` §[2].
+
+---
+
+### 🆕 `/app-debug.apk` route (v1.4.0)
+
+**New static route** registered in `serveStaticAssets()`.
+
+**Path**: `GET /app-debug.apk`.
+
+**Auth**: None (public, like other static assets).
+
+**Content-Type**: `application/vnd.android.package-archive`.
+
+**Cache-Control**: `public, max-age=3600, immutable` (per-extension
+cache rule in `serveFile()`).
+
+**Behavior**: Returns 404 if `web/app-debug.apk` is absent.
+
+**Reference**: `docs/API.md` §1.3; `proxy/main.go` §[35].
+
+---
+
+### 🆕 iOS PWA Logic Removal (v1.4.0)
+
+**Cleanup** — Android-only project.
+
+**Removed from `web/index.html`** (~35 lines):
+- `isIOSDevice()` helper.
+- `pwaStepIos1/2/3` translations (EN + AR).
+- iOS branches in `getBrowserName()`, `isBrowserSupported()`,
+  `getPWAInstallSteps()`, `showPWAInstructionsModal()`.
+
+**Rationale**: The project supports Android only (Magisk / KernelSU
+/ APatch module). The iOS-specific code paths were dead code on
+all supported platforms.
+
+**Consequence**: Browsers that never fire `beforeinstallprompt`
+(Firefox, Samsung Internet legacy builds) now fall through to the
+unified "unsupported" message that lists supported alternatives
+(Chrome / Edge / Brave) with Play Store links.
+
+**Reference**: `CHANGELOG.md` §[v1.4.0].
 
 ---
 
@@ -1946,6 +2149,63 @@ not visible to `update-binary` — they live entirely in
 
 ---
 
+### 🎯 `removeModule` (v1.4.0 — hardened)
+
+**Go function** in `main.go` that removes an old module folder.
+
+**v1.4.0 hardening** — closes two CodeQL
+`go/path-injection` alerts:
+
+1. The caller-provided path is passed through `filepath.Base()` to
+   extract the module name (last path component).
+2. The final path is rebuilt from the trusted `MODULES_DIR` constant
+   + the sanitized basename:
+   ```go
+   name := filepath.Base(modulePath)
+   // ...
+   cleanPath := filepath.Join(MODULES_DIR, name)
+   ```
+3. A defence-in-depth prefix check is kept as a second layer:
+   ```go
+   expectedPrefix := MODULES_DIR + string(filepath.Separator)
+   if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
+       return error("Invalid path")
+   }
+   ```
+
+**Effect**: No user-controlled data reaches any path expression after
+the sanitization step.
+
+**Reference**: `docs/SECURITY.md`; `CHANGELOG.md` §[v1.4.0];
+`proxy/main.go` §[29].
+
+---
+
+### 🎯 `sanitizeLogFileName` (v1.4.0)
+
+**Go function** in `main.go` that validates a client-provided log
+file name.
+
+**Guarantees on success**:
+- The returned string is a single path component (no separators,
+  no `..`, no NUL).
+- The name starts with `dnscrypt`.
+- The name ends with `.log`, `.gz`, `.old`, `.txt`, or contains
+  `.emergency.`.
+
+**CodeQL recognition**: The function routes the tainted input
+through `filepath.Base()`, which CodeQL recognizes as an effective
+path-injection sanitizer.
+
+**Used by**:
+- `readLogFile`.
+- `clearLogFile`.
+- `handleDownloadLog`.
+
+**Reference**: `proxy/main.go` §[30].
+
+---
+
 ## 7. CI/CD & Release Terms
 
 ### 🔄 CI — Continuous Integration
@@ -1958,6 +2218,11 @@ not visible to `update-binary` — they live entirely in
 data-preservation layers (syntax + function presence + path
 consistency + docs references).
 
+**v1.4.0 addition**: A `Verify companion app metadata` step that
+validates `proxy/app-apk.version` (format `X.Y.Z`) and confirms
+`scripts/fetch_app_apk.sh` is present. **Non-blocking** — the
+companion app is OPTIONAL.
+
 ---
 
 ### 🚀 CD — Continuous Deployment
@@ -1965,6 +2230,11 @@ consistency + docs references).
 **Continuous deployment** — automatic release when changes are merged.
 
 **In the project**: `.github/workflows/release.yml` (on tag push).
+
+**v1.4.0 additions to `release.yml`**:
+- Fetch companion APK into `dist/` (best-effort).
+- Stage APK at `web/app-debug.apk` before packaging (best-effort).
+- Attach `dist/DNS-Proxy-v*.apk` + `.sha256` to the GitHub Release.
 
 ---
 
@@ -1976,7 +2246,7 @@ consistency + docs references).
 - **MINOR**: New feature (compatible).
 - **PATCH**: Bug fix.
 
-**Example**: `v1.2.0`.
+**Example**: `v1.4.0`.
 
 ---
 
@@ -1996,6 +2266,9 @@ consistency + docs references).
 | v1.1.1 | 1010001 |
 | v1.2.0 | 1020000 |
 | v1.2.1 | 1020001 |
+| v1.3.0 | 1030000 |
+| v1.4.0 | 1040000 |
+| v1.4.1 | 1040001 |
 | v2.0.0 | 2000000 |
 
 **⚠️ Constraint**: `hotfix` ≤ 99.
@@ -2050,9 +2323,14 @@ release.
 security(iptables): implement Custom Chains to prevent orphan rules
 ```
 
+**v1.4.0 example**:
+```bash
+feat(app): integrate companion Android app as optional asset
+```
+
 ---
 
-### 🧪 `upgrade-test.yml` (v1.2.0)
+### 🧪 `upgrade-test.yml` (v1.2.0+)
 
 **GitHub Actions workflow** that runs a **42-scenario matrix** (3
 root solutions × 2 source versions × 7 scenarios).
@@ -2269,6 +2547,8 @@ string `"8080"`. Behavior is unchanged.
 **v1.2.0 note**: The Dashboard's System Info panel also displays the
 **7-field `backups` object** from `runtime_info`. See §5
 "`runtime_info.backups`".
+
+**v1.3.0/v1.4.0**: No changes to the metrics pipeline.
 
 ---
 
@@ -2581,7 +2861,7 @@ release completes the fix in `dashboard.html` as well.
 
 ---
 
-### 🆕 Language Toggle (client-side only) (v1.2.0)
+### 🆕 Language Toggle (client-side only) (v1.2.0+)
 
 **Security concept** — the WebUI's bilingual toggle (English default
 + Arabic) is a **client-side only** concern.
@@ -2607,6 +2887,50 @@ release completes the fix in `dashboard.html` as well.
 
 ---
 
+### 🆕 CodeQL Path-Injection Fix (v1.4.0)
+
+**Hardening** in `proxy/main.go:removeModule`.
+
+**Context**: CodeQL (GitHub's static-analysis tool) flagged two
+`go/path-injection` alerts on `removeModule`. The endpoint accepted a
+caller-provided path and used it in file operations after a
+string-prefix check — but CodeQL does not recognize string-prefix
+checks as path sanitizers, so the alerts persisted.
+
+**The fix**:
+
+1. Extract the module name via `filepath.Base()`, which CodeQL
+   recognizes as an effective path-injection sanitizer:
+   ```go
+   name := filepath.Base(modulePath)
+   ```
+2. Rebuild the final path from the trusted `MODULES_DIR` constant +
+   the sanitized basename:
+   ```go
+   cleanPath := filepath.Join(MODULES_DIR, name)
+   ```
+3. Keep the prefix check as defence-in-depth (does not participate
+   in path construction).
+
+**Effect**:
+- Both CodeQL alerts are closed.
+- The behaviour of the endpoint is unchanged for valid inputs.
+- The sanitization is enforced at the point of path construction, so
+  no user-controlled data reaches any path expression.
+
+**Was this exploitable?** The original code was already guarded by a
+prefix check that rejected any path outside `MODULES_DIR`. In
+practice, the endpoint could not be exploited to escape the module
+directory. The fix is a **hardening** that aligns the code with
+CodeQL's recognized sanitization pattern — it also removes a class
+of future regression risk.
+
+**⚠️ v1.4.0 — not an audit correction.**
+
+**Reference**: `CHANGELOG.md` §[v1.4.0]; `proxy/main.go` §[29].
+
+---
+
 ## 10. Common Abbreviations
 
 | Abbreviation | Meaning | Full Form |
@@ -2614,6 +2938,7 @@ release completes the fix in `dashboard.html` as well.
 | **ABI** | Application Binary Interface | Application Binary Interface |
 | **ACL** | Access Control List | Access Control List |
 | **API** | Application Programming Interface | Application Programming Interface |
+| **APK** | Android Package Kit | Android Package Kit |
 | **CI/CD** | Continuous Integration / Deployment | Continuous Integration / Deployment |
 | **CORS** | Cross-Origin Resource Sharing | Cross-Origin Resource Sharing |
 | **COOP** | Cross-Origin-Opener-Policy | Cross-Origin-Opener-Policy |
@@ -2681,6 +3006,14 @@ release completes the fix in `dashboard.html` as well.
 | **MTP** | Media Transfer Protocol | Media Transfer Protocol |
 | **FUSE** | Filesystem in Userspace | Filesystem in Userspace (`/sdcard/` mount) |
 | **OTA** | Over-The-Air | Over-The-Air update |
+
+**v1.3.0 / v1.4.0 Abbreviations**:
+
+| Abbreviation | Meaning | Full Form |
+|:---:|---|---|
+| **CodeQL** | CodeQL | GitHub's static-analysis engine |
+| **LED** | Light-Emitting Diode | Used metaphorically for the status indicator |
+| **WebView** | WebView | Android's embedded browser component (used by the companion app) |
 
 ---
 
@@ -2783,6 +3116,34 @@ release completes the fix in `dashboard.html` as well.
 | 9 | Automation + Rotation | (see `docs/BACKUP.md` §6) |
 | 10 | Observability | `runtime_info.backups` (§5) |
 
+### 🆕 v1.3.0 — Feature Release (Not an Audit Correction)
+
+**No audit corrections added.**
+
+| Feature | Reference |
+|---|---|
+| PWA Install Button | `PWA Install Button` (§5) |
+| Live Status LED | `Live Status LED` (§5) |
+| DNS Auto-Start After Boot | `DNS Auto-Start After Boot` (§5) |
+
+**The Audit Corrections Registry remains at #33.**
+
+### 🆕 v1.4.0 — Integration Release (Not an Audit Correction)
+
+**No audit corrections added.**
+
+| Change | Reference |
+|---|---|
+| Companion Android App | `Companion Android App` (§5) |
+| `app-apk.version` | `app-apk.version` (§5) |
+| `APK_FILE` constant | `APK_FILE` (§5) |
+| `/app-debug.apk` route | `/app-debug.apk route` (§5) |
+| iOS PWA Logic Removal | `iOS PWA Logic Removal` (§5) |
+| CodeQL Path-Injection Fix | `CodeQL Path-Injection Fix` (§9) + `removeModule` (§6) |
+| `sanitizeLogFileName` | `sanitizeLogFileName` (§6) |
+
+**The Audit Corrections Registry remains at #33.**
+
 ### 📁 File-Scoped Identifier Families (HARD-*)
 
 > **Note on HARD-* identifiers**: The `HARD-XX-NN` family is
@@ -2824,10 +3185,13 @@ release completes the fix in `dashboard.html` as well.
 >
 > - The **Audit Corrections Registry** lives in
 >   `docs/SECURITY.md` §17 (currently at **#33**; next expected
->   **#34** in v1.3.x).
+>   **#34** in v1.5.x or later).
 > - The **v1.2.0 runtime additions** (BAK-1..BAK-4, FIX-1, FIX-2,
 >   WD-TOKEN) are also listed in `docs/SECURITY.md` §17.2 — they
 >   are deliberately **not** audit correction numbers.
+> - The **v1.3.0 features** and **v1.4.0 integration** are
+>   documented in `CHANGELOG.md` §[v1.3.0] and §[v1.4.0] — they
+>   are not audit corrections either.
 > - The **10 defensive layers** correspond to the `HARD-CS-*` and
 >   `HARD-FSH-*` families. See `docs/BACKUP.md` §1.3 for the layer
 >   → file mapping.
@@ -2837,7 +3201,8 @@ release completes the fix in `dashboard.html` as well.
 The last audit correction is **#33** (v1.0.0). See
 `docs/SECURITY.md` §17 for the full registry.
 
-**Next expected**: #34 (v1.3.x).
+**Registry status as of v1.4.0**: unchanged at #33.
+**Next expected**: #34 (v1.5.x or later).
 
 ---
 
@@ -2862,6 +3227,7 @@ The last audit correction is **#33** (v1.0.0). See
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [Exponential Backoff (AWS)](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)
 - [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
+- [CodeQL — Go queries](https://codeql.github.com/codeql-query-help/go/)
 
 ### Internal Documentation
 
@@ -2876,11 +3242,11 @@ The last audit correction is **#33** (v1.0.0). See
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
-| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1) |
-| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1, §3.2) |
+| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0+)** |
+| [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0+)** |
 | [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q121–Q130) |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
 
 ---
 
@@ -2895,8 +3261,8 @@ Found a missing term? Or an unclear definition?
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-06*
+*Version: v1.4.0*
 *Author: gasciljh*
 
 ---

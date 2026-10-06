@@ -2,8 +2,8 @@
 
 Step-by-step procedures for recovering from catastrophic failures.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-06
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -13,42 +13,60 @@ Step-by-step procedures for recovering from catastrophic failures.
 > - Troubleshooting → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
 > - Security model → [`SECURITY.md`](SECURITY.md) §5.31, §5.32
 > - Architecture → [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.10
-> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0]
+> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0]
 
-> **v1.2.0 changes**:
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 release date.
+>   • **New §12 — Companion App Recovery (v1.4.0)**: how to
+>     diagnose and recover from a missing, corrupted, or
+>     incompatible `web/app-debug.apk` asset.
+>   • **§9.7 (extended) — Service Worker update banner**: the
+>     v1.3.0 DNS auto-start fix is now cross-referenced here.
+>   • **§11.9 (new) — Companion APK vs DNS Binaries**: a
+>     distinction table for the two separate pipelines.
+>   • **§11.10 (new) — DNS auto-start log markers**: quick
+>     reference for the `[v1.3.0 FIX]` log lines.
+>   • §1.4 (What is preserved) extended with a note on the
+>     companion APK (it is **not** part of the 5 preserved files).
+>   • §2.2 (First-response commands) extended with the companion
+>     APK state check.
+>   • §5.5 (Pre-flight checklist) extended with the APK asset
+>     check.
+>   • **Global edition — English-only**: this document is
+>     English-only. The WebUI itself remains bilingual (English
+>     default + Arabic toggle), but recovery procedures do not
+>     change with the language preference.
+>   • **Encoding correction (this revision)**: every mojibake
+>     sequence (e.g. `вҖ”` instead of `—`, `вҶ’` instead of `→`)
+>     has been replaced with proper UTF-8.
+
+> **v1.3.0 changes** (previously undocumented in this file):
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **DNS auto-start after boot fix** — `service.sh` §[19]
+>     performs a direct, bounded wait for the WebUI to become
+>     ready, then calls `POST /api/ensure_running_service` itself.
+>     This avoids the 30-60 s delay caused by the watchdog's first
+>     polling interval.
+>   • **PWA install button** — a smart dynamic button; unaffected
+>     by recovery procedures.
+>   • **Live status LED** on the Today counter — unaffected by
+>     recovery procedures.
+>   • **§11.8 (new)** — DNS auto-start markers in the log.
+>   • No structural changes to the recovery procedures.
+
+> **v1.2.0 changes** (kept for reference):
 >   • Version bumped from v1.0.0 to v1.2.0.
->   • **Global edition — English default + Arabic toggle** — the
->     WebUI ships with English as the default language and an
->     in-page toggle (`langToggle`) to switch to Arabic. The user's
->     choice is stored client-side in
->     `localStorage['dnscrypt-lang']`. Documentation remains
->     English-only by project convention.
+>   • Global edition — English default + Arabic toggle.
 >   • **§9.6 (corrected in this revision)** — Recovery-mode
 >     correctness note. Documents the v1.2.0 fix to the
->     `§[8a] → §[9] → §[9b2]` interaction that would have silently
->     overwritten 2 of 5 restored files. The implementation uses a
->     **snapshot-and-reapply** strategy, not a "reorder + exclude"
->     strategy. See `SECURITY.md` §5.32 for the full analysis and
->     `ARCHITECTURE.md` §3.10 for the flow diagram.
->   • **§3.5 (new)** — `backupMu` concurrency note. Explains why
->     rapid repeated API calls cannot corrupt a snapshot.
->   • **§5.5 (new)** — Full pre-flight checklist before testing
->     any recovery procedure on a device.
->   • **§5.10 (new)** — v1.2.0 language preference note. Explains
->     that the WebUI language choice survives all recovery paths
->     because it lives in the browser, not on the device.
+>     `§[8a] → §[9] → §[9b2]` interaction.
+>   • **§3.5 (new)** — `backupMu` concurrency note.
+>   • **§5.5 (new)** — Full pre-flight checklist.
+>   • **§5.10 (new)** — v1.2.0 language preference note.
 >   • **§11 (extended)** — Emergency reference card now includes
 >     the 7-field `runtime_info.backups` object and
->     `status.sh --diagnose` in the quick-command list.
->   • All commands updated to match v1.2.0 file paths and
->     behavior (`/sdcard/dnscrypt-webui-backup/`, recovery
->     triggers, orphan transaction handling).
->   • Cross-references updated to point at the corrected
->     sections in `BACKUP.md` §12.5, `ARCHITECTURE.md` §3.10,
->     and `SECURITY.md` §5.31, §5.32.
->   • **Encoding correction (this revision)**: fixed mojibake in
->     section markers, arrows, checkmarks, warnings, and box
->     drawing characters. All symbols now render as proper UTF-8.
+>     `status.sh --diagnose`.
 
 ---
 
@@ -65,7 +83,8 @@ Step-by-step procedures for recovering from catastrophic failures.
 9. [Recovery Mode (One-Command Fix)](#9-recovery-mode-one-command-fix)
 10. [Last-Resort Recovery (No Backups)](#10-last-resort-recovery-no-backups)
 11. [Emergency Reference Card](#11-emergency-reference-card)
-12. [References](#12-references)
+12. [Companion App Recovery (v1.4.0)](#12-companion-app-recovery-v140)
+13. [References](#13-references)
 
 ---
 
@@ -86,6 +105,7 @@ operation is impossible:
 | The backup directory itself is damaged | §8 |
 | The module cannot be reached via the WebUI | §9 |
 | Nothing else works | §10 |
+| The companion APK is missing or does not install | §12 |
 
 ### 1.2 Prerequisites
 
@@ -93,7 +113,8 @@ Before using this guide, ensure you have:
 
 - ✅ **A rooted device** (Magisk / KernelSU / APatch).
 - ✅ **A terminal app** (Termux, Material Terminal) OR **ADB**.
-- ✅ **A file manager with root access** (MiXplorer, MT Manager) — optional.
+- ✅ **A file manager with root access** (MiXplorer, MT Manager) —
+  optional.
 - ✅ **The user data location** from [`BACKUP.md`](BACKUP.md) §3.
 
 ### 1.3 The golden rule
@@ -128,12 +149,16 @@ rebuilt or re-downloaded.
   `localStorage['dnscrypt-lang']`, not on the device.
 - The browser's cache.
 - Any client-side UI state.
+- **The companion APK (`web/app-debug.apk`) — v1.4.0** — it is a
+  build artifact fetched from the release pipeline. See §12 for
+  how to recover it if needed.
 
 ### 1.5 What recovery does NOT affect
 
 | Item | Impact |
 |---|---|
 | The DNS binaries cache (`~/.cache/...`) | Not touched — this is a dev-machine artifact |
+| The companion APK cache (`~/.cache/.../app`) | Not touched — this is a dev-machine artifact |
 | The WebUI language preference (`localStorage`) | Not touched — client-side only |
 | The `META-INF/` bootstrap | Not touched — read-only at install time |
 | The Magisk/KernelSU module framework | Not touched |
@@ -168,6 +193,9 @@ What is the symptom?
 ├── Nothing above matched, but the module is misbehaving
 │   └── §9 (Recovery Mode)
 │
+├── Companion APK is missing / does not install
+│   └── §12 (Companion App Recovery)
+│
 └── Nothing worked
     └── §10 (Last-Resort Recovery)
 ```
@@ -190,6 +218,13 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backup
 su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/*.conf \
        /data/adb/modules/dnscrypt-proxy-webui/proxy/*.toml \
        /data/adb/modules/dnscrypt-proxy-webui/proxy/*.txt"
+
+# 5. Companion APK state (v1.4.0)
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1"
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version 2>&1"
+
+# 6. Companion APK route (requires the WebUI running)
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
 ```
 
 Save the output to a file for reference:
@@ -208,7 +243,7 @@ fastest way to identify the correct scenario:
 |---|---|---|
 | `available` | Snapshot count | `0` → §4 or §10 |
 | `in_flight_txn` | `txn-*` directories | `>0` → inspect with §3.5 |
-| `orphan_txn` | `orphan-txn-*` directories | `>0` → inspect with §4.4 |
+| `orphan_txn` | `orphan-txn-*` directories | `>0` → inspect with §4.5 |
 | `last_backup` | Timestamp of newest snapshot | `null` → no backups |
 | `last_backup_name` | Directory name of newest snapshot | Use as `$SNAP` in §4.3 |
 | `last_stable` | Content of `.last_stable` pointer | If missing, recovery uses `current/` |
@@ -371,8 +406,8 @@ After the device boots:
 ### 4.2 Root cause
 
 This is the **legacy bug** from v1.1.0 (§1.1 of
-[`BACKUP.md`](BACKUP.md)). It should not occur in v1.2.0, but may
-occur if:
+[`BACKUP.md`](BACKUP.md)). It should not occur in v1.2.0 or later,
+but may occur if:
 
 - The upgrade skipped v1.2.0 entirely (direct v1.0.0 → future).
 - The `/sdcard/` partition was full at install time.
@@ -525,7 +560,7 @@ su -c "grep 'auto-backup' /data/local/tmp/dnscrypt_main.log | tail -20"
 ```
 
 If you see two concurrent `auto-backup` entries with the same
-timestamp, file an issue — this should not happen in v1.2.0.
+timestamp, file an issue — this should not happen in v1.2.0+.
 
 ---
 
@@ -547,7 +582,8 @@ timestamp, file an issue — this should not happen in v1.2.0.
 | SELinux blocking execution | Medium |
 | Binary architecture mismatch | Medium |
 | Corrupted config | Low |
-| **Recovery mode incomplete (v1.2.0)** | **Low (fixed in v1.2.0)** |
+| Recovery mode incomplete (v1.2.0) | **Low (fixed in v1.2.0)** |
+| **Boot auto-start failed (v1.3.0)** | **Low (fixed in v1.3.0)** |
 
 ### 5.3 Diagnostic commands
 
@@ -568,6 +604,9 @@ su -c "nslookup google.com 127.0.0.1"
 # 5. Check the main log
 su -c "tail -50 /data/local/tmp/dnscrypt_main.log"
 su -c "tail -50 /data/local/tmp/dnscrypt-proxy.log"
+
+# 6. Check the DNS auto-start markers (v1.3.0)
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log | tail -5"
 ```
 
 ### 5.4 Solution A — Restart the service
@@ -646,7 +685,49 @@ su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; manage_firewall 1"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
-### 5.9 Pre-flight checklist before testing recovery
+### 5.9 Solution F — DNS auto-start failure (v1.3.0)
+
+If the DNS engine does not start automatically after a reboot even
+though the user intent is `ON`:
+
+**Diagnostic**:
+
+```bash
+# 1. Verify the fix is present in service.sh
+grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ fix marker"
+grep -q 'ensure_running_service' proxy/service.sh && echo "✅ direct API call"
+
+# 2. Check the boot log markers
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log"
+# Expected:
+#   🔧 [v1.3.0 FIX] Ensuring DNS starts after boot...
+#   ✅ WebUI ready after Ns
+#   Calling ensure_running_service API...
+#   ✅ [v1.3.0 FIX] DNS start requested successfully
+
+# 3. Verify user intent
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
+# Expected: ON
+
+# 4. Verify the watchdog token file exists
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+# Expected: -rw------- root root
+```
+
+**Solutions**:
+
+- **If the fix is missing**: reinstall v1.3.0+ (see §10).
+- **If the log markers are missing**: `service.sh` did not run —
+  check that the module is enabled and the device completed boot.
+- **If the watchdog token file is missing**: restart the WebUI once
+  (it regenerates the token on startup):
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+  ```
+- **If user intent is OFF**: the auto-start is intentionally
+  skipped. Set it to `ON` from the WebUI.
+
+### 5.10 Pre-flight checklist before testing recovery
 
 If you plan to test the recovery mode (§9) on a device:
 
@@ -670,9 +751,14 @@ If you plan to test the recovery mode (§9) on a device:
   ```bash
   su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
   ```
+- [ ] **(v1.4.0)** **Check the companion APK asset**:
+  ```bash
+  su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1"
+  # Expected: the file exists (or is intentionally absent)
+  ```
 - [ ] **Do not proceed** if any of the above is missing.
 
-### 5.10 Language preference note (v1.2.0)
+### 5.11 Language preference note (v1.2.0)
 
 The WebUI's language preference (English default + Arabic toggle)
 is **client-side only**:
@@ -838,6 +924,39 @@ curl -s http://127.0.0.1:9090/ | grep -c 'translations'
 
 **Note**: This is a client-side feature. It does **not** affect
 the API, the DNS engine, or the firewall.
+
+### 6.10 PWA install button not working (v1.3.0)
+
+**Symptom**: The `pwaInstallBtn` button does not respond, or the
+unsupported-browser modal does not appear.
+
+**Possible causes**:
+
+1. **Old browser** — very old browsers may not support
+   `beforeinstallprompt`.
+2. **Stale Service Worker cache** — the SW may be serving an old
+   HTML file.
+3. **PWA already installed** — the button hides itself after
+   installation.
+
+**Diagnostic**:
+
+```bash
+# 1. Verify the button exists in the served HTML
+curl -s http://127.0.0.1:9090/ | grep -c 'id="pwaInstallBtn"'
+# Expected: >= 1
+
+# 2. Verify the unsupported-browser modal exists
+curl -s http://127.0.0.1:9090/ | grep -c 'showPWAInstructionsModal'
+# Expected: >= 1
+```
+
+**Solutions**:
+
+- **Cause 1**: Use Chrome 88+, Firefox 92+, or Samsung Internet 16+.
+- **Cause 2**: Hard-refresh the page, clear site data.
+- **Cause 3**: This is expected — the button hides itself after
+  installation.
 
 ---
 
@@ -1014,7 +1133,6 @@ EOF
 for f in webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt; do
     if [ -f "$f" ]; then
         SHA=$(sha256sum "$f" | awk '{print $1}')
-        # Append to files array...
         echo "  $f: $SHA"
     fi
 done
@@ -1139,6 +1257,9 @@ If all three fail, `customize.sh` aborts with an error message.
 - ❌ It does **not** fix a corrupted `/sdcard/`.
 - ❌ It does **not** affect the WebUI's language preference (that
   is a client-side concern).
+- ❌ **It does not restore the companion APK** (v1.4.0) — the APK
+  is a build artifact, not part of the 5 preserved files. See
+  §12 for the APK recovery procedure.
 
 After recovery, you may need to reboot again (or restart the
 service) for the changes to take effect.
@@ -1181,9 +1302,9 @@ knowing the ZIP's contents), the final v1.2.0 release uses a
 
 3. **`§[9b2]` — re-apply snapshot**: The 5 files are re-applied
    from `$MODPATH/.recovery_snapshot/` into `$MODPATH/proxy/`.
-   On partial re-application (i.e. fewer files re-applied than
-   were snapshotted), the snapshot directory is **preserved** at
-   `$MODPATH/.recovery_snapshot/` for manual inspection.
+   On partial re-application, the snapshot directory is
+   **preserved** at `$MODPATH/.recovery_snapshot/` for manual
+   inspection.
 
 4. **`§[9c]` — skipped**: The normal-mode restore step is skipped
    when `RECOVERY_MODE=1`, because steps 1 and 3 already handled
@@ -1191,9 +1312,7 @@ knowing the ZIP's contents), the final v1.2.0 release uses a
 
 **Why this approach over filtering the unzip argument list**:
 
-- It does **not** depend on knowing what the ZIP contains. If a
-  future release adds or removes files under `proxy/`, the fix
-  keeps working.
+- It does **not** depend on knowing what the ZIP contains.
 - It keeps the extraction logic of `§[9]` untouched, so the
   normal-install path is byte-for-byte identical to the
   pre-recovery behavior.
@@ -1206,10 +1325,9 @@ knowing the ZIP's contents), the final v1.2.0 release uses a
 ```bash
 # 1. Check the module version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → must be version=v1.2.0
+# → must be version=v1.2.0 or later
 
 # 2. Check the fix is present in customize.sh
-# (look for the recovery snapshot directory and the re-apply block)
 su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
        echo '✅ v1.2.0 fix present (snapshot dir)'"
 
@@ -1217,11 +1335,11 @@ su -c "grep -q 'Re-applying recovery snapshot' /data/adb/modules/dnscrypt-proxy-
        echo '✅ v1.2.0 fix present (§[9b2] re-apply block)'"
 ```
 
-If the fix is not present, reinstall the module from the v1.2.0
+If the fix is not present, reinstall the module from the v1.2.0+
 ZIP.
 
 **Testing on a real device**: If you want to verify the fix
-yourself, see the pre-flight checklist in §5.9. The full test
+yourself, see the pre-flight checklist in §5.10. The full test
 procedure is:
 
 1. Set a distinctive value in `webui.conf` (e.g. `PORT=9191`).
@@ -1242,6 +1360,7 @@ sent `SKIP_WAITING` to `navigator.serviceWorker.controller` — the
 infinite loop.
 
 **The fix (v1.2.0)**:
+
 - Send `SKIP_WAITING` to `swRegistration.waiting` (the **new**
   worker).
 - Reload on the `controllerchange` event.
@@ -1259,9 +1378,37 @@ su -c "grep -q 'id=\"swUpdateBanner\"' /data/adb/modules/dnscrypt-proxy-webui/we
        echo '✅ banner in dashboard.html'"
 ```
 
-If any of the above is missing, reinstall v1.2.0.
+If any of the above is missing, reinstall v1.2.0+.
 
-### 9.8 Recovery mode and the language preference
+### 9.8 Recovery mode and the DNS auto-start fix (v1.3.0)
+
+**Not directly related** — but worth mentioning here because after
+a recovery-mode reboot, the DNS engine should auto-start if the
+user intent is `ON`.
+
+**The fix (v1.3.0)**: `service.sh` §[19] performs a bounded wait
+for WebUI readiness (up to 60 s), then calls
+`POST /api/ensure_running_service` directly.
+
+**Verify the fix is present**:
+
+```bash
+su -c "grep -q 'v1.3.0 FIX' /data/adb/modules/dnscrypt-proxy-webui/service.sh && \
+       echo '✅ v1.3.0 fix present'"
+```
+
+**After a recovery-mode reboot**, check:
+
+```bash
+# 1. DNS state
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: DNS=UP (if user intent is ON)
+
+# 2. Log markers
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log | tail -5"
+```
+
+### 9.9 Recovery mode and the language preference
 
 The WebUI's bilingual feature (English default + Arabic toggle)
 is **not affected** by recovery mode:
@@ -1326,6 +1473,7 @@ su -c "reboot"
 - Re-add custom rules to `allowlist.txt` and `denylist.txt`.
 - Toggle the WebUI language if needed (English default; Arabic
   via the `langToggle` button).
+- **(v1.4.0)** Re-download the companion APK if needed — see §12.
 
 ### 10.3 Recover DNS to a working state
 
@@ -1370,6 +1518,7 @@ If you have exhausted all options and want help:
    - Describe the exact sequence that led to the failure.
    - Include the `backups` object from `diagnose.json` if the issue
      is backup-related.
+   - Include the companion APK state if the issue is APK-related.
 
 3. For **security-related** issues, do **not** open a public
    Issue. Use [GitHub Private Vulnerability Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new).
@@ -1429,14 +1578,23 @@ su -c "reboot"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/uninstall.sh"
 
 # ============================================================
+# COMPANION APK (v1.4.0)
+# ============================================================
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1"
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version 2>&1"
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+
+# ============================================================
+# DNS AUTO-START (v1.3.0)
+# ============================================================
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log | tail -5"
+
+# ============================================================
 # LANGUAGE TOGGLE (v1.2.0)
 # ============================================================
 # In-browser (DevTools Console):
 #   localStorage.getItem('dnscrypt-lang')   // → "en" | "ar" | null
 #   localStorage.removeItem('dnscrypt-lang') // reset to English default
-#
-# Note: This is a client-side preference. It has no server-side
-# state and is not affected by any recovery procedure.
 ```
 
 ### 11.2 The 7-field `backups` object
@@ -1464,6 +1622,8 @@ output:
 | `/data/adb/modules/dnscrypt-proxy-webui/recovery` | Recovery trigger (module) |
 | `/data/adb/modules/dnscrypt-proxy-webui/disable` | Disable trigger |
 | `/data/adb/modules/dnscrypt-proxy-webui/.recovery_snapshot/` | v1.2.0 — temporary snapshot for post-extraction re-apply |
+| `/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk` | **v1.4.0 — Companion APK (optional)** |
+| `/data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version` | **v1.4.0 — Companion APK version** |
 | `/data/adb/dnscrypt-recovery` | Recovery trigger (external) |
 | `/sdcard/dnscrypt-webui-backup/` | Persistent backups |
 | `/sdcard/dnscrypt-webui-backup/current/` | Live snapshot |
@@ -1488,6 +1648,9 @@ output:
 | `status.sh --diagnose` | 3 | Module disabled |
 | `action.sh --backup` | 0 | Backup created |
 | `action.sh --backup` | 3 | Backup failed (0 files copied) |
+| `fetch_app_apk.sh` | 0 | APK ready |
+| `fetch_app_apk.sh` | 1 | Download failed |
+| `fetch_app_apk.sh` | 2 | Invalid arguments / no cache (offline) |
 
 ### 11.5 Recovery trigger quick reference
 
@@ -1510,7 +1673,7 @@ restore.
 | `.state` value | Meaning | Action |
 |---|---|---|
 | `START` | Install in progress, or interrupted | **Preserve** — may contain the only copy of user data |
-| `COMMIT` | Install succeeded, cleanup skipped | Safe to remove (`main.go` does this at startup) |
+| `COMMIT` | Install succeeded, cleanup skipped | Safe to remove |
 | `ROLLBACK` | Rollback already applied | Safe to remove |
 | (missing) | Inconsistent state | Inspect manually; do not delete blindly |
 
@@ -1534,17 +1697,247 @@ restore.
 | Reset to default by | Clearing browser `localStorage` |
 | Manual reset command | `localStorage.removeItem('dnscrypt-lang')` (DevTools) |
 
-### 11.8 Support links
+### 11.8 DNS auto-start markers (v1.3.0)
+
+Look for these markers in `/data/local/tmp/dnscrypt_main.log` after
+a reboot:
+
+```text
+🔧 [v1.3.0 FIX] Ensuring DNS starts after boot...
+✅ WebUI ready after <N>s
+   DNS intent: ON
+   Calling ensure_running_service API...
+   API response: {"status":"ON","action":"started"} (rc=0)
+✅ [v1.3.0 FIX] DNS start requested successfully
+```
+
+If these markers are **absent**, `service.sh` did not reach §[19].
+See §5.9 for diagnosis.
+
+If the last line is:
+```text
+⚠️ [v1.3.0 FIX] API call failed (rc=<N>) — Watchdog will retry
+```
+then `service.sh` reached §[19] but the API call failed. The
+watchdog will retry with exponential backoff.
+
+### 11.9 Companion APK vs DNS Binaries (v1.4.0)
+
+Two separate pipelines — do not confuse them:
+
+| Aspect | DNS Binaries | Companion APK |
+|---|---|---|
+| **Script** | `scripts/fetch_dns_binaries.sh` | `scripts/fetch_app_apk.sh` |
+| **Version source** | `proxy/dnscrypt-proxy.version` | `proxy/app-apk.version` |
+| **Cache dir** | `~/.cache/dnscrypt-proxy-webui/dns-binaries/` | `~/.cache/dnscrypt-proxy-webui/app/` |
+| **Destination in ZIP** | `proxy/dnscrypt-proxy-<arch>` | `web/app-debug.apk` |
+| **Source repo** | `DNSCrypt/dnscrypt-proxy` | `gasciljh/dnscrypt-proxy-app` |
+| **Mandatory** | Yes | **No** (optional) |
+| **Served at** | N/A (binary) | `GET /app-debug.apk` |
+| **Recovery impact** | Not preserved | Not preserved |
+
+**Recovering one does not affect the other.**
+
+### 11.10 Support links
 
 - **Bug reports**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
 - **Security**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
+- **Companion app**: https://github.com/gasciljh/dnscrypt-proxy-app/issues
 
 ---
 
-## 12. References
+## 12. Companion App Recovery (v1.4.0)
 
-### 12.1 Related documentation
+> **📱 New in v1.4.0.** The companion Android app is an **optional**
+> asset that is bundled into the module ZIP as
+> `web/app-debug.apk`. It is **not** part of the 5 preserved files
+> and it is **not** required for the module to function. This
+> section explains how to diagnose and recover a missing,
+> corrupted, or incompatible APK.
+
+### 12.1 What the companion APK is (and is not)
+
+| Aspect | Value |
+|---|---|
+| **Purpose** | A native WebView wrapper for the WebUI (~3 MB). Useful when the user does not want to keep a browser tab open. |
+| **Required?** | ❌ No — the WebUI works fully in any modern browser without it. |
+| **Source** | Built in a **separate repository** (`gasciljh/dnscrypt-proxy-app`). |
+| **Version** | Tracked in `proxy/app-apk.version` (e.g. `1.0.0`). |
+| **Preserved by backup?** | ❌ No — it is a build artifact, not user config. |
+| **Restored by recovery mode?** | ❌ No — recovery restores only the 5 user config files. |
+| **Removed by uninstall?** | ✅ Yes — it lives inside the module directory. |
+
+### 12.2 Symptoms that point to the APK
+
+| Symptom | Section |
+|---|---|
+| WebUI install button leads to "file not found" | §12.3 |
+| `curl -sI http://127.0.0.1:9090/app-debug.apk` returns 404 | §12.3 |
+| The downloaded APK does not install (parse error) | §12.4 |
+| The APK installs but cannot load the WebUI | §12.5 |
+
+### 12.3 Solution A — The APK file is missing (404)
+
+**Diagnostic**:
+
+```bash
+# 1. Verify the file is absent
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: "No such file or directory"
+
+# 2. Verify the route returns 404
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -1
+# Expected: HTTP/1.1 404 Not Found
+
+# 3. Verify the version file still exists
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version"
+# Expected: e.g. "1.0.0"
+```
+
+**Why this can happen**:
+
+- The module was built locally **without** the APK (the pipeline
+  treats the APK as optional).
+- The APK was accidentally deleted after install.
+- The `release.yml` `Fetch companion APK` step failed (network,
+  rate limit) — the release was published without the asset.
+
+**Solutions**:
+
+**Option 1 — Reinstall from an official release that includes the APK**:
+
+1. Download the latest release ZIP from
+   [GitHub Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
+2. Verify the ZIP contains `web/app-debug.apk`:
+   ```bash
+   unzip -l dnscrypt-webui-*.zip | grep 'app-debug.apk'
+   # Expected: a line with "web/app-debug.apk"
+   ```
+3. Install the ZIP via Magisk Manager.
+4. Reboot.
+
+**Option 2 — Install the APK manually from the companion repository**:
+
+1. Download the APK directly from the companion repository:
+   [gasciljh/dnscrypt-proxy-app releases](https://github.com/gasciljh/dnscrypt-proxy-app/releases).
+2. Install it on the device (sideload or via `adb install`).
+3. Verify the app opens `http://127.0.0.1:9090`.
+
+**Option 3 — Do nothing**:
+
+- The WebUI works fully in any modern browser.
+- The install button will lead to a 404 — the user can ignore it
+  or hide it via CSS (not recommended).
+
+### 12.4 Solution B — The APK does not install (parse error)
+
+**Diagnostic**:
+
+```bash
+# 1. Verify the file size looks sane (~3 MB)
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: ~3 MB (not a few KB)
+
+# 2. Verify the file is a valid ZIP (APKs are ZIPs starting with "PK")
+su -c "head -c 2 /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: "PK"
+
+# 3. Verify the SHA256 matches the release manifest
+su -c "sha256sum /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Compare with the .sha256 sidecar on the release page.
+```
+
+**Common causes**:
+
+| Cause | Diagnostic |
+|---|---|
+| The APK is corrupted | Size < 1 MB, or `head -c 2` returns something other than `PK` |
+| The APK was signed with a different key | Android refuses to install if a previous version with a different signature exists |
+| The APK targets a newer Android API | Check the minimum SDK on the release page |
+| The device is running an unsupported architecture | Check the APK's `lib/` folder |
+
+**Solutions**:
+
+- **Corruption**: re-download the APK (Option 1 or Option 2 in §12.3).
+- **Signature mismatch**: uninstall the previous version of the
+  companion app first:
+  ```bash
+  adb uninstall com.gasciljh.dnscrypt_proxy_app
+  ```
+  Then reinstall.
+- **API mismatch**: use an older or newer APK version that matches
+  your Android version.
+- **Architecture mismatch**: the APK may include native code. Verify
+  it includes your device's ABI:
+  ```bash
+  unzip -l app-debug.apk | grep 'lib/'
+  ```
+
+### 12.5 Solution C — The APK installs but cannot load the WebUI
+
+**Diagnostic**:
+
+```bash
+# 1. Verify the WebUI is running
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: WEBUI=UP
+
+# 2. Verify the WebUI port
+su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
+
+# 3. Verify the WebUI responds locally
+su -c "curl -sI http://127.0.0.1:9090/ | head -1"
+# Expected: HTTP/1.1 200 OK
+```
+
+**Common causes**:
+
+| Cause | Solution |
+|---|---|
+| The WebUI is not running | Start it: `action.sh --restart` |
+| The WebUI port was changed (e.g. to 9191) | The companion app hard-codes 9090 — update the app configuration or the module port |
+| `BIND_ADDR` is set to a non-loopback address | The companion app expects `127.0.0.1` — restore the default |
+| A firewall blocks `127.0.0.1:9090` | Rare; check that the module's own rules do not affect loopback |
+
+### 12.6 Prevention
+
+The APK is **optional**. If you do not use it:
+
+- Ignore the install button (it will 404 only when clicked).
+- You can hide the button via browser DevTools (one-off, does not
+  persist).
+
+If you **do** use it:
+
+- Keep the module ZIP's bundled APK up to date. Re-download the
+  latest module release when the companion repo publishes a new
+  app version.
+- Do not delete `web/app-debug.apk` manually — it will not be
+  regenerated unless you reinstall the module.
+
+### 12.7 What recovery mode does NOT do for the APK
+
+**Important**: Even though recovery mode (§9) restores the 5 user
+config files, it does **not** restore the companion APK. The APK is:
+
+- A build artifact (not user config).
+- Fetched at release time (not stored in the persistent backup).
+- Removed by uninstall (it lives inside the module directory).
+
+To recover the APK:
+
+1. Reinstall the module from a release that includes the APK.
+2. Or install it manually from the companion repository.
+
+**No combination of recovery steps will restore the APK** — it is
+out of scope for the backup/restore system.
+
+---
+
+## 13. References
+
+### 13.1 Related documentation
 
 | Document | Purpose |
 |----------|---------|
@@ -1555,38 +1948,50 @@ restore.
 | [`SECURITY.md`](SECURITY.md) | Security model + §5.31, §5.32 |
 | [`API.md`](API.md) | API reference |
 | [`FAQ.md`](FAQ.md) | Frequently asked questions |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture + §3.10, §6.7 |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution guide |
+| [`DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries reference (Level 4) |
 | [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
 
-### 12.2 Project files
+### 13.2 Project files
 
 | File | Role |
 |------|------|
 | `proxy/customize.sh` | Contains Layer 7 (recovery mode) and the v1.2.0 fix (§[8a], §[9b2]) |
 | `proxy/functions.sh` | Backup helpers |
-| `proxy/service.sh` | Auto-backup trigger |
-| `proxy/main.go` | Pre-critical backup + notification |
+| `proxy/service.sh` | Auto-backup trigger + DNS auto-start (v1.3.0) |
+| `proxy/main.go` | Pre-critical backup + notification + APK route (v1.4.0) |
 | `proxy/status.sh` | `--diagnose` tool |
 | `proxy/action.sh` | Manual backup trigger |
 | `proxy/uninstall.sh` | Preserves backup + cleans orphan transactions |
+| `scripts/fetch_dns_binaries.sh` | DNS binaries fetcher (Level 4) |
+| `scripts/fetch_app_apk.sh` | Companion APK fetcher (v1.4.0) |
 | `META-INF/com/google/android/update-binary` | Magisk bootstrap |
 
-### 12.3 External references
+### 13.3 Companion app repository
+
+- **Source**: [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
+- **Releases**: [gasciljh/dnscrypt-proxy-app/releases](https://github.com/gasciljh/dnscrypt-proxy-app/releases)
+- **Issues**: [gasciljh/dnscrypt-proxy-app/issues](https://github.com/gasciljh/dnscrypt-proxy-app/issues)
+
+### 13.4 External references
 
 - [Magisk — Module Structure](https://topjohnwu.github.io/Magisk/guides.html)
 - [KernelSU — Recovery](https://kernelsu.org/)
 - [APatch — Documentation](https://github.com/bmax121/APatch)
 - [Android — Safe Mode](https://source.android.com/docs/core/architecture/bootloader)
 - [TWRP — Recovery Mode](https://twrp.me/)
+- [Android — Install apps via adb](https://developer.android.com/tools/adb)
 
-### 12.4 Support
+### 13.5 Support
 
 - **Bug reports**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
 - **Security**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
+- **Companion app**: https://github.com/gasciljh/dnscrypt-proxy-app/issues
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-06*
+*Version: v1.4.0*
 *Author: gasciljh*

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.3.0 (Global Edition)
+     Version: v1.4.0 (Global Edition)
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -19,6 +19,7 @@
        • Smart Edit Mode with draft auto-save and rollback
        • Service Worker update banner
 
+     v1.4.0-direct-apk: install button is a direct <a download> link
      v1.3.0 fixes (original):
        • Service Worker update banner loop fixed:
            [Reload] now sends SKIP_WAITING to
@@ -173,7 +174,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.3.0</title>
+    <title>DNSCrypt Proxy v1.4.0</title>
 
     <!-- IDX-4 fix: apply lang/dir from localStorage BEFORE the
          first paint. Without this, an Arabic-preferring user
@@ -562,15 +563,17 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.3.0</span>
+                <span class="badge" id="versionBadge">v1.4.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
-            <button id="pwaInstallBtn" class="pwa-install-btn" type="button" style="display:none;" aria-label="Install">
+            <a id="pwaInstallBtn" class="pwa-install-btn"
+               href="/app-debug.apk" download="DNS-Proxy.apk"
+               style="display:inline-flex;" aria-label="Download companion Android app">
                 <span class="pwa-install-icon">📲</span>
                 <span class="pwa-install-text" id="pwaInstallText">Install App</span>
-            </button>
+            </a>
         </div>
 
         <div class="status-area" id="statusArea">
@@ -700,7 +703,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.3.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.4.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -738,7 +741,7 @@
     // ============================================================
     // [1] Initial settings
     // ============================================================
-    var VERSION = 'v1.3.0';
+    var VERSION = 'v1.4.0';
 
     var PORTS = {
         webui:     '9090',
@@ -748,7 +751,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.3.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.4.0',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -843,9 +846,6 @@
             pwaModalTitle: 'Install as App',
             pwaInstallSuccess: '✓ Installed successfully',
             pwaModalOk: 'Got it',
-            pwaStepIos1: 'Tap the Share button ⬆️ at the bottom of Safari',
-            pwaStepIos2: 'Scroll and tap "Add to Home Screen" ➕',
-            pwaStepIos3: 'Tap "Add" to confirm',
             pwaStepFirefox1: 'Tap the menu ☰ in Firefox',
             pwaStepFirefox2: 'Select "Install" or "Add to Home screen"',
             pwaStepGeneric1: 'Open your browser menu',
@@ -859,7 +859,7 @@
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.3.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.4.0',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -954,9 +954,6 @@
             pwaModalTitle: 'تثبيت كتطبيق',
             pwaInstallSuccess: '✓ تم التثبيت بنجاح',
             pwaModalOk: 'فهمت',
-            pwaStepIos1: 'اضغط زر المشاركة ⬆️ أسفل Safari',
-            pwaStepIos2: 'اسحب ثم اضغط "إضافة إلى الشاشة الرئيسية" ➕',
-            pwaStepIos3: 'اضغط "إضافة" للتأكيد',
             pwaStepFirefox1: 'اضغط القائمة ☰ في Firefox',
             pwaStepFirefox2: 'اختر "تثبيت" أو "إضافة إلى الشاشة الرئيسية"',
             pwaStepGeneric1: 'افتح قائمة المتصفح',
@@ -1644,17 +1641,9 @@
         // name and the modal shows a generic title. Only iOS
         // Safari is identified from the UA, because its UA is
         // unambiguous.
-        if (isIOSDevice()) return 'Safari';
-
         return '';
     }
 
-    function isIOSDevice() {
-        var ua = navigator.userAgent || '';
-        if (/iPhone|iPad|iPod/.test(ua)) return true;
-        if (/Macintosh/.test(ua) && 'ontouchend' in document) return true;
-        return false;
-    }
 
     // Does the browser support creating a shortcut / install?
     // Unified logic:
@@ -1662,7 +1651,9 @@
     //   - any browser that fired beforeinstallprompt: yes (pwaCapable=true)
     //   - everything else: no (show the unified message)
     function isBrowserSupported() {
-        if (isIOSDevice()) return true;
+        // v1.4.0: iOS-specific detection removed (Android-only project).
+        // Only Chromium-based browsers that fired beforeinstallprompt
+        // are considered supported.
         return pwaCapable === true;
     }
 
@@ -1676,10 +1667,8 @@
     }
 
     function getPWAInstallSteps() {
+        // v1.4.0: iOS-specific steps removed (Android-only project).
         var ua = navigator.userAgent || '';
-        if (isIOSDevice()) {
-            return [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
-        }
         if (/Firefox/.test(ua) && /Android/.test(ua)) {
             return [t('pwaStepFirefox1'), t('pwaStepFirefox2')];
         }
@@ -1725,22 +1714,10 @@
         var icon = $('pwaModalIcon');
         if (!modal || !body) return;
 
-        // iOS Safari: dedicated steps
-        if (isIOSDevice()) {
-            if (icon) icon.textContent = '\uD83E\uDDED';
-            if (title) title.textContent = t('pwaModalTitle');
-            var steps = [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
-            var html = '';
-            for (var i = 0; i < steps.length; i++) {
-                html += '<div class="pwa-step"><span class="pwa-step-num">' + (i + 1) +
-                        '</span><span class="pwa-step-text">' + escapeHtml(steps[i]) + '</span></div>';
-            }
-            body.innerHTML = html;
-            modal.classList.add('open');
-            return;
-        }
+        // v1.4.0: iOS-specific branch removed (Android-only project).
+        // All browsers now fall through to the unified unsupported message.
 
-        // All other browsers: unified message
+        // All browsers: unified message
         if (icon) icon.textContent = '\u26A0\uFE0F';
         if (title) title.textContent = t('pwaUnsupportedTitle');
 
@@ -2276,9 +2253,7 @@
         $('restartBtn').title = t('restartBtn');
         $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
         var pwaTxt = $('pwaInstallText');
-        if (pwaTxt && !pwaInstalled) pwaTxt.textContent = t('pwaInstallBtn');
-        var pwaOk = $('pwaModalOk');
-        if (pwaOk) pwaOk.textContent = t('pwaModalOk');
+        if (pwaTxt) pwaTxt.textContent = t('pwaInstallBtn');
         updateStatsDisplay();
         var ab = $('authBadge');
         if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
@@ -3157,12 +3132,6 @@
             if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
         });
 
-        $('pwaInstallBtn').addEventListener('click', onPWAInstallBtnClick);
-        $('pwaModalClose').addEventListener('click', closePWAInstructionsModal);
-        $('pwaModalOk').addEventListener('click', closePWAInstructionsModal);
-        $('pwaInstallModal').addEventListener('click', function(e) {
-            if (e.target === this) closePWAInstructionsModal();
-        });
     }
 
     // ============================================================
@@ -3178,8 +3147,7 @@
         bindEvents();
         bindSWUpdateButtons();
 
-        // v1.3.0 — PWA install button init
-        initPWABeforeInstallPrompt();
+        // v1.4.0 — install button is a direct <a download> link.
 
         // IDX-14 fix: fallback timer that removes the `loading`
         // class from the Dashboard link if runtime_info never

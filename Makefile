@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter – Makefile
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -163,6 +163,7 @@ COMMITTED_ADRS := \
 PLANNED_ADRS :=
 
 .PHONY: all help version build package clean dist-clean \
+        fetch-apk check-app-version \
         check-backup check-all check-docs check-adr diagnose-help \
         release release-patch sync
 
@@ -182,6 +183,10 @@ help:
 	@echo "    make clean                          - Clean outputs (build + dist)"
 	@echo "    make dist-clean                     - Clean dist/ only"
 	@echo "    make version                        - Show current version"
+	@echo ""
+	@echo "  Companion App (v1.4.0):"
+	@echo "    make fetch-apk                      - Fetch companion APK into dist/"
+	@echo "    make check-app-version              - Validate proxy/app-apk.version"
 	@echo ""
 	@echo "  Validation:"
 	@echo "    make check-backup                   - Validate ALL shell scripts"
@@ -249,7 +254,7 @@ build:
 #   dist/dnscrypt-webui-<VERSION>-module.zip
 #   dist/dnscrypt-webui-<VERSION>-module.zip.sha256
 # ============================================================
-package: build
+package: build fetch-apk
 	@echo "Packaging $(VERSION)..."
 	@chmod +x scripts/package_module.sh 2>/dev/null || true
 	@./scripts/package_module.sh \
@@ -327,7 +332,7 @@ check-backup:
 # HARD-MK-06: uses Make dependencies instead of recursively
 # invoking `$(MAKE)`.
 # ============================================================
-check-all: check-backup check-docs
+check-all: check-backup check-docs check-app-version
 	@echo "━━━ Running additional local validations ━━━"
 	@echo ""
 	@echo "  [1/2] bash -n on scripts/ helpers..."
@@ -474,6 +479,59 @@ diagnose-help:
 	@echo ""
 	@echo "  See docs/BACKUP.md for the full reference"
 	@echo "  See docs/EMERGENCY.md for recovery procedures"
+	@echo ""
+
+# ============================================================
+# Fetch companion Android app APK (v1.4.0)
+# ============================================================
+# Downloads the APK from gasciljh/dnscrypt-proxy-app releases
+# into dist/DNS-Proxy-v<version>.apk.
+#
+# The version is read from proxy/app-apk.version.
+#
+# Safe to re-run: uses cache (~/.cache/dnscrypt-proxy-webui/app).
+#
+# Output:
+#   dist/DNS-Proxy-v<ver>.apk
+#   dist/DNS-Proxy-v<ver>.apk.sha256
+# ============================================================
+fetch-apk:
+	@echo "━━━ Fetching companion app APK ━━━"
+	@echo ""
+	@chmod +x scripts/fetch_app_apk.sh 2>/dev/null || true
+	@./scripts/fetch_app_apk.sh --output-dir "$(DIST_DIR)"
+	@echo ""
+	@echo "✅ APK ready:"
+	@ls -la "$(DIST_DIR)"/DNS-Proxy-*.apk 2>/dev/null || true
+	@ls -la "$(DIST_DIR)"/DNS-Proxy-*.apk.sha256 2>/dev/null || true
+	@echo ""
+
+# ============================================================
+# Verify companion app version format (v1.4.0)
+# ============================================================
+# Validates proxy/app-apk.version (must be X.Y.Z).
+# ============================================================
+check-app-version:
+	@echo "━━━ Checking proxy/app-apk.version ━━━"
+	@echo ""
+	@if [ ! -s proxy/app-apk.version ]; then \
+		echo "  ❌ proxy/app-apk.version missing or empty"; \
+		exit 1; \
+	fi
+	@APP_V="$$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//')"; \
+	if printf '%s' "$$APP_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "  ✅ proxy/app-apk.version: $$APP_V (valid)"; \
+	else \
+		echo "  ❌ invalid format: $$APP_V"; \
+		echo "     expected: X.Y.Z (e.g. 1.0.0)"; \
+		exit 1; \
+	fi
+	@echo ""
+	@if [ -s scripts/fetch_app_apk.sh ]; then \
+		echo "  ✅ scripts/fetch_app_apk.sh present"; \
+	else \
+		echo "  ⚠️  scripts/fetch_app_apk.sh missing"; \
+	fi
 	@echo ""
 
 # ============================================================

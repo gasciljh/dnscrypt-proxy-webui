@@ -1,6 +1,6 @@
 # ============================================================
 # Git Ignore for DNSCrypt Smart Filter
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -545,3 +545,12 @@ proxy/dnscrypt-proxy-arm64
 proxy/dnscrypt-proxy-arm
 proxy/dnscrypt-proxy-x86_64
 proxy/dnscrypt-proxy-x86
+
+# ============================================================
+# [20] Companion Android app APK (v1.4.0)
+# ============================================================
+# web/app-debug.apk is staged by release.yml before packaging
+# and copied into the module ZIP. It is a build artifact and
+# must not be committed.
+# ============================================================
+web/app-debug.apk

@@ -379,6 +379,6 @@ The project's own code and documentation are licensed under the [MIT License](LI
 ---
 
 *Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Version: v1.4.0*
 *Maintainer: [@gasciljh](https://github.com/gasciljh)*
 *Author: gasciljh*

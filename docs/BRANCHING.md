@@ -3,49 +3,47 @@
 Complete guide to the project's Git workflow: branches, naming
 conventions, merge rules, and protection policies.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-06
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
->   • Version bumped from v1.1.0 to v1.2.0.
->   • `Last updated` reflects the v1.2.0 release date.
->   • Release examples updated from `v1.2.0` (now the current
->     release) to `v1.3.0` (the next planned release).
->   • Hotfix examples updated from `v1.1.1` to `v1.2.1` — the
->     first realistic PATCH release from `v1.2.0`.
->   • `§1.3 (Architecture Decisions)` — the ADR count remains at
->     6 (5 accepted + 1 superseded); no new ADR was added in the
->     v1.2.0 cycle because the release is a data-preservation
->     release, not an architectural decision.
->   • `§1.4 (Repository Map)` — the `main` release marker now
->     reflects `v1.2.0`.
->   • `§6.3 (Tags protection)` — reaffirmed the v1.1.0 fix that
->     documents the GitHub Rulesets UI (not the deprecated
->     Classic Branch Protection UI). No further change was
->     needed.
->   • `§7.3 (Release Automation)` — clarified the
->     `continue-on-error: true` behavior of the auto-sync step
->     after both v1.1.0 and v1.2.0 releases.
->   • `§8.1 (When to Use Hotfix)` — the "Current context"
->     table now shows `v1.0.0 → v1.1.0 → v1.2.0`, and the
->     first realistic PATCH release is `v1.2.1`.
->   • `§8.2 (Hotfix Steps)` and `§8.3 (Hotfix Versioning)` —
->     all examples updated to `v1.2.1`.
->   • `§9.1 (Cheat Sheet)` — all release examples updated to
->     `v1.3.0` (stable) and `v1.2.1` (PATCH).
->   • `§10 (References)` — extended with `docs/BACKUP.md`,
->     `docs/EMERGENCY.md`, and `docs/UPGRADE.md`.
->   • **Global edition note**: the WebUI ships with English as
->     the default language and an in-page Arabic toggle. The
->     language preference is client-side only and has **no**
->     impact on the branching strategy, PR flow, or release
->     pipeline.
->   • **No changes to the branching strategy itself.** The
->     two-branch model (`main` + `develop`), naming rules,
->     merge rules, and protection policies are unchanged.
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 release date.
+>   • **Companion Android app** — the module ZIP may now contain
+>     `web/app-debug.apk` (optional). No branching-strategy change
+>     is required; the APK is treated as an optional asset.
+>   • Release examples updated from `v1.4.0` (now the current
+>     release) to `v1.5.0` (the next planned release).
+>   • Hotfix examples updated from `v1.2.1` to `v1.4.1` — the
+>     first realistic PATCH release from `v1.4.0`.
+>   • §1.4 (Repository Map) — the `main` release marker now
+>     reflects `v1.4.0`.
+>   • §5.5 (Release PR Template) — example URL updated to
+>     `release/v1.5.0`.
+>   • §6.1 (Required status checks) — the v1.2.0 addition
+>     `Backup Smoke Test` is reaffirmed as required.
+>   • §8.1 (Hotfix versioning) — the release chain table now
+>     includes v1.3.0 and v1.4.0.
+>   • §9.1 (Cheat Sheet) — all release examples updated to
+>     `v1.5.0` (stable) and `v1.4.1` (PATCH).
+>   • §10.1 (References) — updated to reference the v1.4.0
+>     documentation set and the companion app repository.
+>   • No changes to the branching strategy itself. The two-branch
+>     model (`main` + `develop`), naming rules, merge rules, and
+>     protection policies are unchanged.
 >   • Documentation text is English-only by project convention.
+
+> **v1.2.0 changes (historical)**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Introduced the `backup-smoke-test` job as a required status
+>     check on `main` and `develop`.
+>   • §6.3 (Tags protection) — reaffirmed the v1.1.0 fix that
+>     documents the GitHub Rulesets UI (not the deprecated Classic
+>     Branch Protection UI).
+>   • Introduced the v1.2.0 data-preservation release. See
+>     [`docs/BACKUP.md`](BACKUP.md) for the full model.
 
 > **📖 Related documents**:
 > - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
@@ -117,18 +115,14 @@ The decisions that shaped this strategy are documented as **ADRs**:
 **Current ADR count**: 6 (5 accepted + 1 superseded).
 
 The `release-patch.sh` script named in ADR-0006 is now in active
-use — for example, `v1.2.0 → v1.2.1` would be a PATCH release
+use — for example, `v1.4.0 → v1.4.1` would be a PATCH release
 processed by that script (see §8).
 
-**v1.2.0 note**: The v1.2.0 release cycle did **not** add any new
-ADR. Its 10 data-preservation layers, 4 runtime additions
-(BAK-1..BAK-4), and 2 correctness fixes (FIX-1, FIX-2) are
-documented as runtime improvements in
-[`docs/SECURITY.md`](SECURITY.md) §5.31, §5.32, and §17.2 — not
-as architectural decisions. See
-[`docs/adr/README.md`](adr/README.md) §3.3 for the criteria.
-
-Full index: [`docs/adr/README.md`](adr/README.md).
+**v1.4.0 note**: The v1.4.0 release cycle did **not** add any new
+ADR. The companion APK integration, the CodeQL path-injection
+fix, and the iOS PWA removal are documented as functional
+changes in [`CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0] — not as
+architectural decisions. The ADR count remains at 6.
 
 ### 1.4 Repository Map
 
@@ -144,15 +138,15 @@ develop ──●──●──●──●──●──●───●──
 
 **Current state**:
 
-- `main` → **`v1.2.0`** (released 2026-09-29).
+- `main` → **`v1.4.0`** (released 2026-10-06).
 - `develop` → in sync with `main` after the automated post-release
   sync (see [ADR-0003](adr/0003-post-release-sync.md)).
 
 **Next planned releases**:
 
-- **`v1.2.1`** — first realistic PATCH release from v1.2.0 (via
-  `hotfix/*` + `release-patch.sh`).
-- **`v1.3.0`** — next MINOR release (via `release.sh`) — see
+- **`v1.4.1`** — first realistic PATCH release from v1.4.0 (via
+  `hotfix/*` + `release-patch.sh`), if needed.
+- **`v1.5.0`** — next MINOR release (via `release.sh`) — see
   [`docs/ROADMAP.md`](ROADMAP.md) §5.
 
 ### 1.5 Language Policy Note
@@ -190,7 +184,7 @@ follow the standard `feature/*` or `fix/*` flow (see §4.1).
 
 **Every commit on `main` corresponds to a released version.**
 
-Current state: `v1.2.0` (released 2026-09-29).
+Current state: `v1.4.0` (released 2026-10-06).
 
 ### 2.2 `develop` — Integration Branch
 
@@ -261,7 +255,7 @@ are not a separate branch type — they use `feature/*` or
 | **Direct push** | ⚠️ Only version bumps allowed. |
 | **Requires PR** | ✅ Yes, with 1 approval + CI pass. |
 
-**Example**: `release/v1.3.0`, `release/v2.0.0`.
+**Example**: `release/v1.5.0`, `release/v2.0.0`.
 
 **Rule**: Only version bumps, changelog updates, and critical fixes
 are allowed on `release/*`. No new features.
@@ -281,7 +275,7 @@ are allowed on `release/*`. No new features.
 | **Direct push** | ✅ Yes. |
 | **Requires PR** | ✅ Yes, fast-tracked. |
 
-**Example**: `hotfix/v1.2.1-login-bypass`.
+**Example**: `hotfix/v1.4.1-login-bypass`.
 
 **Note**: The `hotfix/*` **branch prefix** remains (it aligns with
 the widely-recognized Git Flow terminology). Only the **script
@@ -310,8 +304,8 @@ Where `<type>` is one of:
 | `feature/` | New functionality | `feature/webui-2fa` |
 | `fix/` | Non-critical bug fix | `fix/watchdog-backoff-reset` |
 | `docs/` | Documentation | `docs/api-jwt-auth` |
-| `release/` | Release preparation | `release/v1.3.0` |
-| `hotfix/` | Emergency fix | `hotfix/v1.2.1-login-bypass` |
+| `release/` | Release preparation | `release/v1.5.0` |
+| `hotfix/` | Emergency fix | `hotfix/v1.4.1-login-bypass` |
 | `chore/` | Maintenance, tooling | `chore/bump-dnscrypt-2.1.19` |
 | `refactor/` | Code refactoring | `refactor/split-main-go` |
 | `test/` | Adding/updating tests | `test/hasEndpoint-coverage` |
@@ -329,10 +323,10 @@ Where `<type>` is one of:
 For release branches only, the version must match `VERSION` exactly:
 
 ```text
-release/v1.3.0          ✅
-release/v1.3.0-beta1    ✅
-release/1.3.0           ❌ (missing 'v')
-release/v1.3            ❌ (incomplete)
+release/v1.5.0          ✅
+release/v1.5.0-beta1    ✅
+release/1.5.0           ❌ (missing 'v')
+release/v1.5            ❌ (incomplete)
 ```
 
 ---
@@ -380,17 +374,17 @@ changes, saving CI minutes.
 ```text
 1. git checkout develop
 2. git pull origin develop
-3. git checkout -b release/v1.3.0
-4. ./scripts/release.sh v1.3.0 --no-push     # updates VERSION + module.prop + update.json
+3. git checkout -b release/v1.5.0
+4. ./scripts/release.sh v1.5.0 --no-push     # updates VERSION + module.prop + update.json
 5. Verify: git diff
-6. Update CHANGELOG.md: add ## [1.3.0] - YYYY-MM-DD section
-7. git commit -m "release: v1.3.0"
-8. git push -u origin release/v1.3.0
+6. Update CHANGELOG.md: add ## [1.5.0] - YYYY-MM-DD section
+7. git commit -m "release: v1.5.0"
+8. git push -u origin release/v1.5.0
 9. Open PR → main using ?template=release.md
 10. Wait for CI + CodeQL to pass
 11. Approve + merge
 12. git checkout main && git pull origin main
-13. ./scripts/release.sh v1.3.0                # now push: creates tag
+13. ./scripts/release.sh v1.5.0                # now push: creates tag
 14. GitHub Actions publishes the release
 15. It auto-syncs main → develop
 ```
@@ -401,7 +395,7 @@ changes, saving CI minutes.
 ```text
 1. git checkout develop
 2. git pull origin develop
-3. ./scripts/release.sh v1.3.0                # interactive, with confirmation
+3. ./scripts/release.sh v1.5.0                # interactive, with confirmation
 4. Wait for GitHub Actions
 ```
 
@@ -412,14 +406,14 @@ Use the `release/*` flow when you need a **stabilization window**.
 ```text
 1. git checkout main
 2. git pull origin main
-3. git checkout -b hotfix/v1.2.1-critical-fix
+3. git checkout -b hotfix/v1.4.1-critical-fix
 4. ... fix ...
 5. git commit -m "fix(critical): patch login bypass"
-6. git push -u origin hotfix/v1.2.1-critical-fix
+6. git push -u origin hotfix/v1.4.1-critical-fix
 7. Open PR → main using ?template=release.md (fast-track review)
 8. Squash merge
 9. Tag + push:
-   ./scripts/release-patch.sh v1.2.1
+   ./scripts/release-patch.sh v1.4.1
 10. After release publishes: back-merge main → develop
     make sync
 ```
@@ -430,7 +424,7 @@ CI failures can be waived by the maintainer if the fix is critical.
 **Full details**: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) §2.3
 and §9.
 
-### 4.6 WebUI Translation Contribution (v1.2.0)
+### 4.6 WebUI Translation Contribution (v1.2.0+)
 
 The WebUI ships with **English as the default** and an in-page
 **Arabic toggle**. Adding or changing a WebUI string is a normal
@@ -483,17 +477,17 @@ Every PR must pass:
 
 - ✅ **`ci.yml`** — Build for all 4 architectures (arm64, arm, amd64, 386).
 - ✅ **`codeql.yml`** — Security analysis (SAST).
+- ✅ **`backup-smoke-test`** (v1.2.0+, part of `ci.yml`) — validates
+  the 10 data-preservation layers.
 - ✅ **No merge conflicts** with the target branch.
 - ✅ **PR template completed** (`.github/PULL_REQUEST_TEMPLATE.md`).
 - ✅ **CHANGELOG.md** updated (if user-facing).
 - ✅ **Documentation** updated (if applicable).
 
-**v1.2.0 addition**: `ci.yml` also runs a `backup-smoke-test` job
-that validates the 10 data-preservation layers in the shell
-scripts (syntax + function presence + path consistency + docs
-references). This job is required for PRs and pushes to
-`main`/`develop`, but is **not** required for the release tag
-pipeline (see §7.3).
+**v1.4.0 addition**: `ci.yml` also runs a `Verify companion app
+metadata` step that validates `proxy/app-apk.version` (format
+`X.Y.Z`) and confirms `scripts/fetch_app_apk.sh` is present. This
+step is **non-blocking** — the companion app is OPTIONAL.
 
 **v1.2.0 language check**: Any PR that adds a **new user-facing
 string** to the WebUI must supply **both** an English and an
@@ -525,8 +519,9 @@ Use **Conventional Commits** for the PR title:
 - `fix(watchdog): reset backoff on STATUS_FILE change`
 - `security(auth): enforce rate limit on Basic Auth`
 - `docs(api): add runtime_info schema`
-- **v1.2.0 example**: `feat(backup): add multi-source detection`
-- **v1.2.0 language example**: `feat(webui): add Arabic translation for X`
+- `feat(backup): add multi-source detection` (v1.2.0 example)
+- `feat(webui): add Arabic translation for X` (v1.2.0 example)
+- `feat(app): integrate companion Android app` (v1.4.0 example)
 
 ### 5.4 Merge Strategy
 
@@ -546,7 +541,7 @@ PRs targeting `main` (from `release/*` or `hotfix/*`) should use the
 dedicated template:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.5.0?template=release.md
 ```
 
 **Why a separate template?**
@@ -596,7 +591,7 @@ Configure at **Settings → Branches → Add rule**:
 - `CI / Build arm`
 - `CI / Build amd64`
 - `CI / Build 386`
-- `CI / Backup Smoke Test` (**v1.2.0 addition**)
+- `CI / Backup Smoke Test` (v1.2.0 addition)
 - `CodeQL / Analyze Go`
 
 **Note**: `github-actions[bot]` must be in the "Restrict who can
@@ -626,7 +621,7 @@ use a regular `git merge` (see §8.4), not `--force`.
 ### 6.3 Tags
 
 > **⚠️ Important — this section was rewritten in v1.1.0 and
-> verified in v1.2.0.**
+> verified in v1.2.0 and v1.4.0.**
 >
 > The previous version of this document described the deprecated
 > "Protected tags" page (Classic Branch Protection). GitHub now
@@ -720,7 +715,7 @@ The rationale for these rules is documented in:
 | `.github/workflows/ci.yml` | Push to `main` / `develop`; PR to `main` / `develop` |
 | `.github/workflows/codeql.yml` | Push to `main` / `develop`; PR; weekly (Mon 06:00 UTC) |
 | `.github/workflows/release.yml` | Tag push `v*.*.*` (with or without prerelease) |
-| `.github/workflows/upgrade-test.yml` | **v1.2.0**: manual + scheduled (42-scenario matrix) |
+| `.github/workflows/upgrade-test.yml` | Manual (`workflow_dispatch`) + weekly schedule |
 
 ### 7.2 What Runs on Each Branch
 
@@ -739,7 +734,7 @@ The rationale for these rules is documented in:
 When you run:
 
 ```bash
-./scripts/release.sh v1.3.0
+./scripts/release.sh v1.5.0
 ```
 
 The script pushes a tag → `release.yml` triggers → publishes the
@@ -748,7 +743,7 @@ release → **automatically syncs `main → develop`**.
 For PATCH releases:
 
 ```bash
-./scripts/release-patch.sh v1.2.1
+./scripts/release-patch.sh v1.4.1
 ```
 
 Same pipeline, but with 3 safety rules enforced (see
@@ -758,9 +753,9 @@ Same pipeline, but with 3 safety rules enforced (see
 — a failed sync **never fails the release**. The release is
 already published at this point.
 
-**v1.2.0 verification**: The auto-sync succeeded for both v1.1.0
-and v1.2.0 (fast-forward merge in both cases, no manual
-intervention). See
+**Verification history**: The auto-sync succeeded for v1.1.0,
+v1.2.0, v1.3.0, and v1.4.0 (fast-forward merge in all cases, no
+manual intervention). See
 [ADR-0003](adr/0003-post-release-sync.md) for details.
 
 If the auto-sync fails (e.g. due to branch protection on
@@ -779,7 +774,7 @@ the Ruleset that protects `develop`.
 
 Full process: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
 
-### 7.4 Language Policy in CI (v1.2.0)
+### 7.4 Language Policy in CI (v1.2.0+)
 
 The WebUI is **bilingual (English default + Arabic toggle)**. This
 does **not** affect the release or CI pipelines:
@@ -796,6 +791,24 @@ does **not** affect the release or CI pipelines:
 
 Contributors adding or modifying WebUI strings follow the standard
 flow (see §4.6). No CI configuration changes are required.
+
+### 7.5 Companion APK in CI (v1.4.0)
+
+The companion Android app is integrated as an **optional** asset:
+
+- `release.yml` fetches the APK into `dist/` via
+  `scripts/fetch_app_apk.sh` (best-effort: a failed fetch does
+  not fail the release).
+- `release.yml` stages the APK at `web/app-debug.apk` before
+  packaging (best-effort: a warning is logged if the APK is
+  missing).
+- `ci.yml` runs a `Verify companion app metadata` step that
+  validates `proxy/app-apk.version` and confirms
+  `scripts/fetch_app_apk.sh` is present.
+
+**No branching-strategy change is required** for the companion
+APK. It is treated as a build artifact, not as a versioned
+component of the module.
 
 ---
 
@@ -816,29 +829,31 @@ Use a `hotfix/*` branch only when:
 - Data corruption in `blocklist.txt`.
 - Rate limit bypass on `/readyz`.
 
-**Current context (v1.2.0)**: The first realistic hotfix scenario
-would be `v1.2.0 → v1.2.1`. The chain of releases is:
+**Current context (v1.4.0)**: The first realistic hotfix scenario
+would be `v1.4.0 → v1.4.1`. The chain of releases is:
 
 | From | To | Type |
 |---|---|---|
 | `v1.0.0` | `v1.1.0` | MINOR (features) |
 | `v1.1.0` | `v1.2.0` | MINOR (data preservation) |
-| `v1.2.0` | `v1.2.1` | PATCH (hotfix) |
-| `v1.2.1` | `v1.3.0` | MINOR (features) |
+| `v1.2.0` | `v1.3.0` | MINOR (PWA install button + live LED) |
+| `v1.3.0` | `v1.4.0` | MINOR (companion APK + CodeQL cleanup) |
+| `v1.4.0` | `v1.4.1` | PATCH (hotfix, if needed) |
+| `v1.4.1` | `v1.5.0` | MINOR (features) |
 
 ### 8.2 Hotfix Steps
 
 ```text
 1. git checkout main
 2. git pull origin main
-3. git checkout -b hotfix/v1.2.1-login-bypass
+3. git checkout -b hotfix/v1.4.1-login-bypass
 4. ... minimal fix ...
 5. git commit -m "fix(auth): patch login bypass"
-6. git push -u origin hotfix/v1.2.1-login-bypass
+6. git push -u origin hotfix/v1.4.1-login-bypass
 7. Open PR → main using ?template=release.md
 8. Fast-track review + merge
 9. Prepare the PATCH release:
-   ./scripts/release-patch.sh v1.2.1
+   ./scripts/release-patch.sh v1.4.1
 10. Back-merge to develop:
     make sync
 ```
@@ -860,8 +875,10 @@ A hotfix increments the **PATCH** component:
 |---|---|---|
 | `v1.0.0` | Fix critical bug | `v1.0.1` |
 | `v1.1.0` | Fix critical bug | `v1.1.1` |
-| **`v1.2.0`** | **Fix critical bug** | **`v1.2.1`** |
-| `v1.2.1` | Fix critical bug | `v1.2.2` |
+| `v1.2.0` | Fix critical bug | `v1.2.1` |
+| `v1.3.0` | Fix critical bug | `v1.3.1` |
+| **`v1.4.0`** | **Fix critical bug** | **`v1.4.1`** |
+| `v1.4.1` | Fix critical bug | `v1.4.2` |
 
 **Rule**: hotfix versions are **never** used for features. If a
 feature is needed, wait for the next MINOR release.
@@ -898,7 +915,7 @@ above works for both regular and hotfix releases.
 | Aspect | Value |
 |---|---|
 | **Script** | `scripts/release-patch.sh` |
-| **Usage** | `./scripts/release-patch.sh v1.2.1` |
+| **Usage** | `./scripts/release-patch.sh v1.4.1` |
 | **Branch** | Must be `main` |
 | **Bump** | `PATCH` only (delegates to `release.sh`) |
 | **Safety rules** | 3 (branch, MAJOR equal, MINOR equal) |
@@ -957,26 +974,26 @@ git checkout -b fix/my-fix
 
 # Start a release
 git checkout develop && git pull
-git checkout -b release/v1.3.0
-./scripts/release.sh v1.3.0 --no-push
+git checkout -b release/v1.5.0
+./scripts/release.sh v1.5.0 --no-push
 # ... update CHANGELOG.md ...
-git commit -m "release: v1.3.0"
-git push -u origin release/v1.3.0
+git commit -m "release: v1.5.0"
+git push -u origin release/v1.5.0
 # → Open PR against main using ?template=release.md
 
 # Publish (from main after merge)
 git checkout main && git pull
-./scripts/release.sh v1.3.0
+./scripts/release.sh v1.5.0
 
 # Hotfix
 git checkout main && git pull
-git checkout -b hotfix/v1.2.1-critical
+git checkout -b hotfix/v1.4.1-critical
 # ... fix ...
-git push -u origin hotfix/v1.2.1-critical
+git push -u origin hotfix/v1.4.1-critical
 # → Open PR against main using ?template=release.md
 
 # Prepare the PATCH release (after merge)
-./scripts/release-patch.sh v1.2.1
+./scripts/release-patch.sh v1.4.1
 
 # Sync develop after PATCH release
 make sync
@@ -1018,8 +1035,8 @@ make sync
 | Use `merge commits` | Squash merge only |
 | Use the default template for releases | Use `?template=release.md` |
 | Enable `Restrict creations` without a Bypass entry | Add `Repository admin` to the Bypass list (see §6.3) |
-| **v1.2.0**: Edit a `txn-*` directory manually | Let `main.go` + `service.sh` handle cleanup (see [`BACKUP.md`](BACKUP.md) §10.5) |
-| **v1.2.0**: Add an English string without the matching Arabic entry | Add both `en` and `ar` entries in the `translations` object |
+| Edit a `txn-*` directory manually | Let `main.go` + `service.sh` handle cleanup (see [`BACKUP.md`](BACKUP.md) §10.5) |
+| Add an English string without the matching Arabic entry | Add both `en` and `ar` entries in the `translations` object |
 
 ---
 
@@ -1033,14 +1050,14 @@ make sync
 | [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) | Developer setup and daily workflow |
 | [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) | Step-by-step release process |
 | [`docs/adr/README.md`](adr/README.md) | Architecture Decision Records index |
-| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1) |
+| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1, §3.2) |
 | [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections (§5.31, §5.32) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0+)** |
+| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0+)** |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture (§3.10, §4.10) |
 | [`docs/API.md`](API.md) | HTTP API reference (§6.1.7) |
 | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting guide |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
 | [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community guidelines |
 | [`docs/ROADMAP.md`](ROADMAP.md) | Future plans |
 | [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
@@ -1061,23 +1078,26 @@ make sync
 
 | File | Purpose |
 |---|---|
-| `.github/workflows/ci.yml` | Build matrix + linting + backup smoke test |
+| `.github/workflows/ci.yml` | Build matrix + linting + backup smoke test + companion app metadata |
 | `.github/workflows/codeql.yml` | SAST security scanning |
-| `.github/workflows/release.yml` | Release automation + sync |
-| `.github/workflows/upgrade-test.yml` | **v1.2.0**: 42-scenario data-preservation matrix |
+| `.github/workflows/release.yml` | Release automation + sync + APK fetch/stage |
+| `.github/workflows/upgrade-test.yml` | 42-scenario data-preservation matrix |
 | `.github/CODEOWNERS` | Auto-assign reviewers |
 | `.github/PULL_REQUEST_TEMPLATE.md` | Default PR template |
 | `.github/PULL_REQUEST_TEMPLATE/release.md` | Release PR template |
 | `.github/dependabot.yml` | Dependency updates |
 | `scripts/release.sh` | Full release automation |
 | `scripts/release-patch.sh` | PATCH-release automation (3 safety rules) |
-| `Makefile` | `make release`, `make release-patch`, `make sync` |
-| `VERSION` | Single source of truth (version) |
+| `scripts/fetch_app_apk.sh` | **Companion APK fetcher (v1.4.0)** |
+| `scripts/package_module.sh` | Module packaging (with optional APK) |
+| `Makefile` | `make release`, `make release-patch`, `make sync`, `make fetch-apk`, `make check-app-version` |
+| `VERSION` | Single source of truth (module version) |
+| `proxy/app-apk.version` | **Single source of truth (companion app version, v1.4.0)** |
 | `module.prop` | Magisk module definition |
 | `update.json` | Auto-update metadata |
 | `docs/UPGRADE.md` | Version upgrade guide |
-| `docs/BACKUP.md` | **Backup system reference (v1.2.0)** |
-| `docs/EMERGENCY.md` | **Emergency recovery (v1.2.0)** |
+| `docs/BACKUP.md` | Backup system reference (v1.2.0+) |
+| `docs/EMERGENCY.md` | Emergency recovery (v1.2.0+) |
 
 ### 10.4 External Resources
 
@@ -1089,9 +1109,10 @@ make sync
 - [GitHub Rulesets — Bypass list](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository#granting-bypass-permissions-for-your-ruleset)
 - [GitHub Branch Protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
 - [Michael Nygard — Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
+- [Companion app repository — gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-06*
+*Version: v1.4.0*
 *Author: gasciljh*
