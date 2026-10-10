@@ -447,12 +447,12 @@
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
-            <a id="pwaInstallBtn" class="pwa-install-btn"
-               href="/app-debug.apk" download="DNS-Proxy.apk"
-               aria-label="Download companion Android app">
+            <button id="pwaInstallBtn" class="pwa-install-btn" type="button"
+                    data-mode="install"
+                    aria-label="Install companion Android app">
                 <span class="pwa-install-icon">📲</span>
                 <span class="pwa-install-text" id="pwaInstallText">Install App</span>
-            </a>
+            </button>
         </div>
 
         <div class="status-area" id="statusArea">
@@ -718,7 +718,15 @@
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
             pwaInstallBtn: 'Install App',
-            pwaInstallAriaLabel: 'Download companion Android app',
+            pwaInstallAriaLabel: 'Install companion Android app',
+            pwaInstalled: 'Installed',
+            pwaUpdate: 'Update App',
+            installing: '⏳ Installing...',
+            installSuccess: '✅ Companion app installed',
+            installError: '❌ Install failed',
+            installTokenError: '❌ Failed to get install token',
+            installConfirm: 'Install the companion app?\n\nThis uses root to install the APK bundled in the module.\n\nNo internet connection is required.',
+            installManualDownload: '⬇️ Download manually',
             waitForContent: '⏳ Please wait for the content to load from the server'
         },
         ar: {
@@ -811,7 +819,15 @@
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
             pwaInstallBtn: 'ثبّت التطبيق',
-            pwaInstallAriaLabel: 'تحميل تطبيق أندرويد المرافق',
+            pwaInstallAriaLabel: 'تثبيت تطبيق أندرويد المرافق',
+            pwaInstalled: 'مثبَّت',
+            pwaUpdate: 'تحديث التطبيق',
+            installing: '⏳ جاري التثبيت...',
+            installSuccess: '✅ تم تثبيت التطبيق بنجاح',
+            installError: '❌ فشل التثبيت',
+            installTokenError: '❌ فشل الحصول على رمز التثبيت',
+            installConfirm: 'تثبيت التطبيق المرافق؟\n\nسيتم التثبيت محليًا عبر صلاحيات root.\n\nلا يُطلب اتصال بالإنترنت.',
+            installManualDownload: '⬇️ التنزيل يدويًا',
             waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم'
         }
     };
@@ -2653,6 +2669,115 @@
     });
 
     // ============================================================
+    // [27b] v1.5.0 (APK-5) — Companion app install
+    // ============================================================
+    // Three-button flow:
+    //   1. Fetches companion_app_state on boot → sets button label
+    //   2. On click → requests install_token → shows confirm modal
+    //   3. On confirm → POSTs /api/install_companion_app with token
+    //   4. On failure → offers "manual download" fallback
+    // ============================================================
+    function refreshCompanionState() {
+        xhrGet('/api?action=companion_app_state', function(err, data) {
+            if (err || !data) return;
+            updatePwaButton(data);
+        });
+    }
+
+    function updatePwaButton(state) {
+        var btn = $('pwaInstallBtn');
+        var txt = $('pwaInstallText');
+        if (!btn || !txt) return;
+
+        var icon = btn.querySelector('.pwa-install-icon');
+        var installed = (state.installed === true || state.installed === 'true');
+        var vname = state.version_name || '';
+        var expected = state.expected_version || '';
+
+        if (!installed) {
+            if (icon) icon.textContent = '\uD83D\uDCF2';
+            txt.textContent = t('pwaInstallBtn');
+            btn.dataset.mode = 'install';
+            btn.disabled = false;
+        } else if (vname && expected && vname === expected) {
+            if (icon) icon.textContent = '\u2705';
+            txt.textContent = t('pwaInstalled');
+            btn.dataset.mode = 'none';
+            btn.disabled = true;
+        } else {
+            if (icon) icon.textContent = '\uD83D\uDD04';
+            txt.textContent = t('pwaUpdate');
+            btn.dataset.mode = 'install';
+            btn.disabled = false;
+        }
+    }
+
+    function handleCompanionInstall() {
+        var btn = $('pwaInstallBtn');
+        if (!btn || btn.dataset.mode === 'none') return;
+
+        xhrGet('/api?action=install_token', function(err, data) {
+            if (err || !data || !data.token) {
+                showMsg(t('installTokenError'), 'error', 3000);
+                return;
+            }
+            var token = data.token;
+
+            showConfirmModal(t('installConfirm'), function(confirmed) {
+                if (confirmed) {
+                    doCompanionInstall(token);
+                }
+            }, { title: '\uD83D\uDCF2 ' + t('pwaInstallBtn') });
+        });
+    }
+
+    function doCompanionInstall(token) {
+        var btn = $('pwaInstallBtn');
+        var txt = $('pwaInstallText');
+        if (btn) btn.disabled = true;
+        if (txt) txt.textContent = t('installing');
+
+        xhrPost('/api/install_companion_app',
+            'token=' + encodeURIComponent(token),
+            function(err, data) {
+                if (btn) btn.disabled = false;
+
+                if (err || !data) {
+                    showMsg(t('installError'), 'error', 4000);
+                    refreshCompanionState();
+                    return;
+                }
+
+                if (data.status === 'ok') {
+                    showMsg(t('installSuccess'), 'success', 3000);
+                    refreshCompanionState();
+                    return;
+                }
+
+                // Failure — offer manual download as fallback.
+                var msg = data.message_ar && currentLang === 'ar'
+                    ? data.message_ar
+                    : (data.message_en || data.message || t('installError'));
+                var hint = data.hint_ar && currentLang === 'ar'
+                    ? data.hint_ar
+                    : (data.hint_en || '');
+
+                var fullMsg = '\u274C ' + msg;
+                if (hint) fullMsg += '\n\n\uD83D\uDCA1 ' + hint;
+
+                showConfirmModal(fullMsg, null, {
+                    title: t('installError'),
+                    primaryText: t('installManualDownload'),
+                    primaryCallback: function() {
+                        window.location.href = '/app-debug.apk';
+                    }
+                });
+                refreshCompanionState();
+            }
+        );
+    }
+
+    // ============================================================
     // [28] bindEvents
     // ============================================================
     function bindEvents() {
@@ -2663,6 +2788,12 @@
         $('passwordInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') performLogin();
         });
+
+        var _pwaBtn = $('pwaInstallBtn');
+        if (_pwaBtn) {
+            _pwaBtn.addEventListener('click', handleCompanionInstall);
+            refreshCompanionState();
+        }
 
         $('toggleBtn').addEventListener('click', handleToggle);
         $('restartBtn').addEventListener('click', handleRestart);

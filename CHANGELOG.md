@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned (see `docs/ROADMAP.md` §5 and §6)
 
 **v1.5.0 (Q1 2027)** — Feature release:
+- **Companion app direct install (APK-4..9)** — WebUI
+  install button is now a true one-tap install instead of a
+  browser download. Backed by a new `proxy/install_app.sh`
+  with a 5-level `pm install` cascade, SELinux context
+  preparation, SHA256 verification, and AR/EN error
+  translation. Endpoints: `POST /api/install_companion_app`,
+  `POST /api/uninstall_companion_app`,
+  `GET /api?action=companion_app_state`,
+  `GET /api?action=install_token`. The companion APK +
+  `.sha256` are also mirrored to `/sdcard/dnscrypt-webui-
+  backup/apk/` (APK-9) for non-root access. Full fallback to
+  the previous download flow remains available.
 - Remove `'unsafe-inline'` from CSP (CSP hardening).
 - Unify WebUI + Dashboard on a single port (PWA dual-origin fix).
 - Dedicated maskable icon (`icon-maskable.svg` / `icon-maskable.png`).
