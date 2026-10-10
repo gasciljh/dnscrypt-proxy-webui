@@ -1728,6 +1728,59 @@ else
 fi
 
 # ============================================================
+# [10c] v1.5.0 (APK-9) — Mirror companion APK to /sdcard/
+# ============================================================
+# The companion APK (web/app-debug.apk) and its .sha256 sidecar
+# are mirrored to /sdcard/dnscrypt-webui-backup/apk/ so that:
+#   1. Users WITHOUT root can find the APK via a file manager
+#      (/sdcard is world-readable; /data/adb is not).
+#   2. The APK survives module uninstall (uninstall.sh preserves
+#      the backup directory).
+#   3. A future reinstall can fall back to the mirrored copy if
+#      the release ZIP omitted the APK (local dev build).
+#
+# The mirror is BEST-EFFORT: if /sdcard is not mounted or not
+# writable, a warning is logged and the install continues. The
+# module still works — the APK remains available inside the
+# module (web/app-debug.apk) and is served by main.go at
+# /app-debug.apk (v1.4.0 route).
+#
+# Naming: the mirrored files keep their original names
+# (app-debug.apk, app-debug.apk.sha256) so install_app.sh and
+# user tooling can find them at a stable path.
+# ============================================================
+APK_MIRROR_DIR="$PERSISTENT_BACKUP/apk"
+APK_SRC="$MODPATH/web/app-debug.apk"
+SHA_SRC="$MODPATH/web/app-debug.apk.sha256"
+
+_apk_mirrored=0
+_sha_mirrored=0
+
+if [ -f "$APK_SRC" ] && [ -s "$APK_SRC" ]; then
+    if mkdir -p "$APK_MIRROR_DIR" 2>/dev/null; then
+        if cp -f "$APK_SRC" "$APK_MIRROR_DIR/app-debug.apk" 2>/dev/null; then
+            chmod 0644 "$APK_MIRROR_DIR/app-debug.apk" 2>/dev/null
+            _apk_mirrored=1
+        fi
+
+        if [ -f "$SHA_SRC" ] && [ -s "$SHA_SRC" ]; then
+            if cp -f "$SHA_SRC" "$APK_MIRROR_DIR/app-debug.apk.sha256" 2>/dev/null; then
+                chmod 0644 "$APK_MIRROR_DIR/app-debug.apk.sha256" 2>/dev/null
+                _sha_mirrored=1
+            fi
+        fi
+    fi
+fi
+
+if [ "$_apk_mirrored" = "1" ]; then
+    ui_print "  ✅ Companion APK mirrored: $APK_MIRROR_DIR"
+    echo "APK mirror: $APK_MIRROR_DIR (sha=$_sha_mirrored)" >> "$INSTALL_LOG"
+else
+    ui_print "  ⚠️  Companion APK mirror skipped (best-effort)"
+    echo "APK mirror: skipped (source missing or /sdcard unwritable)" >> "$INSTALL_LOG"
+fi
+
+# ============================================================
 # [11] Select binaries for architecture
 # ============================================================
 case "$ARCH" in
@@ -2413,6 +2466,8 @@ Five user config files (only these):
 - `.pending_notification`         — transient; read+deleted by main.go at boot
 - `.upgrade_history.json`         — full upgrade log (JSON, when jq is available)
 - `.upgrade_history.txt`          — fallback log when jq is unavailable
+- `apk/`                          — mirrored companion APK + .sha256
+                                     (v1.5.0, APK-9)
 - `README.md`                     — this file
 
 ## Retention

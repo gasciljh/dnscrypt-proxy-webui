@@ -488,6 +488,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"io"
 	"log"
 	"net"
@@ -504,7 +505,6 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
-	securejoin "github.com/cyphar/filepath-securejoin"
 )
 
 // ============================================================
@@ -655,6 +655,19 @@ const (
 )
 
 // ============================================================
+// [3b] v1.5.0 (APK-5..7) — Companion app install constants
+// ============================================================
+const (
+	COMPANION_PKG             = "com.gasciljh.dnscrypt_proxy"
+	INSTALL_SCRIPT_REL        = "install_app.sh"
+	INSTALL_TIMEOUT           = 90 * time.Second
+	INSTALL_TOKEN_TTL         = 60 * time.Second
+	MAX_INSTALL_ATTEMPTS      = 5
+	INSTALL_LOCKOUT_PERIOD    = 15 * time.Minute
+	COMPANION_STATE_CACHE_TTL = 30 * time.Second
+)
+
+// ============================================================
 // [4] Types
 // ============================================================
 type Profile struct {
@@ -677,6 +690,20 @@ type Session struct {
 }
 
 type LoginAttempt struct {
+	Count       int
+	LastAttempt time.Time
+	LockedUntil time.Time
+}
+
+// InstallToken is a one-shot CSRF token for the install endpoint.
+type InstallToken struct {
+	Value     string
+	ExpiresAt time.Time
+	Used      bool
+}
+
+// InstallAttempt tracks per-IP rate limiting for install requests.
+type InstallAttempt struct {
 	Count       int
 	LastAttempt time.Time
 	LockedUntil time.Time
@@ -1000,6 +1027,21 @@ var (
 	watchdogTokMu    sync.RWMutex
 	watchdogTokValue string
 	watchdogTokTime  time.Time
+)
+
+// ============================================================
+// [8b] v1.5.0 (APK-5..7) — Companion app install state
+// ============================================================
+var (
+	installTokens   = make(map[string]*InstallToken)
+	installTokensMu sync.Mutex
+
+	installAttempts   = make(map[string]*InstallAttempt)
+	installAttemptsMu sync.Mutex
+
+	companionStateCache string
+	companionStateTime  time.Time
+	companionStateMutex sync.Mutex
 )
 
 type portCacheEntry struct {
@@ -1908,6 +1950,229 @@ func checkAuth(r *http.Request) bool {
 		recordLoginAttempt(ip, false)
 	}
 	return false
+}
+
+// ============================================================
+// [17d] v1.5.0 (APK-5..7) — Companion app install helpers
+// ============================================================
+
+func getInstallScript() string {
+	return filepath.Join(MODDIR, INSTALL_SCRIPT_REL)
+}
+
+func generateInstallToken() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	tok := hex.EncodeToString(b)
+
+	installTokensMu.Lock()
+	now := time.Now()
+	for k, v := range installTokens {
+		if v.ExpiresAt.Before(now) {
+			delete(installTokens, k)
+		}
+	}
+	installTokens[tok] = &InstallToken{
+		Value:     tok,
+		ExpiresAt: now.Add(INSTALL_TOKEN_TTL),
+		Used:      false,
+	}
+	installTokensMu.Unlock()
+
+	return tok
+}
+
+func validateAndConsumeInstallToken(tok string) bool {
+	if tok == "" {
+		return false
+	}
+	installTokensMu.Lock()
+	defer installTokensMu.Unlock()
+
+	t, ok := installTokens[tok]
+	if !ok {
+		return false
+	}
+	if t.Used || t.ExpiresAt.Before(time.Now()) {
+		delete(installTokens, tok)
+		return false
+	}
+	t.Used = true
+	return true
+}
+
+func recordInstallAttempt(ip string, success bool) {
+	installAttemptsMu.Lock()
+	defer installAttemptsMu.Unlock()
+
+	if success {
+		delete(installAttempts, ip)
+		return
+	}
+
+	a := installAttempts[ip]
+	if a == nil {
+		a = &InstallAttempt{}
+		installAttempts[ip] = a
+	}
+	a.Count++
+	a.LastAttempt = time.Now()
+	if a.Count >= MAX_INSTALL_ATTEMPTS {
+		a.LockedUntil = time.Now().Add(INSTALL_LOCKOUT_PERIOD)
+		a.Count = 0
+	}
+}
+
+func isInstallLockedOut(ip string) bool {
+	installAttemptsMu.Lock()
+	defer installAttemptsMu.Unlock()
+
+	a := installAttempts[ip]
+	if a == nil {
+		return false
+	}
+	if a.LockedUntil.IsZero() {
+		return false
+	}
+	if a.LockedUntil.Before(time.Now()) {
+		delete(installAttempts, ip)
+		return false
+	}
+	return true
+}
+
+// callInstallScript runs install_app.sh with the given mode and
+// returns its parsed JSON output.
+func callInstallScript(mode string) map[string]interface{} {
+	script := getInstallScript()
+	if _, err := os.Stat(script); err != nil {
+		return map[string]interface{}{
+			"status":  "error",
+			"action":  mode,
+			"reason":  "script_not_found",
+			"message": "install_app.sh not found at " + script,
+		}
+	}
+
+	var cmd string
+	switch mode {
+	case "install":
+		cmd = ". " + shellQuote(script)
+	case "status":
+		cmd = ". " + shellQuote(script) + " --status"
+	case "uninstall":
+		cmd = ". " + shellQuote(script) + " --uninstall"
+	default:
+		return map[string]interface{}{
+			"status":  "error",
+			"reason":  "invalid_mode",
+			"message": "unknown install mode: " + mode,
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), INSTALL_TIMEOUT)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, getSystemShell(), "-c", cmd)
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+	command.Stdout = &outBuf
+	command.Stderr = &errBuf
+
+	err := command.Run()
+	raw := strings.TrimSpace(outBuf.String())
+
+	var parsed map[string]interface{}
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var m map[string]interface{}
+		if json.Unmarshal([]byte(line), &m) == nil {
+			parsed = m
+		}
+	}
+
+	if parsed == nil {
+		msg := "install_app.sh produced no JSON output"
+		if err != nil {
+			msg += " (error: " + err.Error() + ")"
+		}
+		errOut := strings.TrimSpace(errBuf.String())
+		if errOut != "" {
+			msg += " stderr: " + errOut
+		}
+		logWithLevel("warn", "callInstallScript("+mode+"): "+msg)
+		return map[string]interface{}{
+			"status":  "error",
+			"action":  mode,
+			"reason":  "no_json_output",
+			"message": msg,
+		}
+	}
+
+	return parsed
+}
+
+func installCompanionApp(r *http.Request) map[string]interface{} {
+	ip := getClientIP(r)
+
+	if isInstallLockedOut(ip) {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Too many install attempts. Try again later.",
+			"reason":  "rate_limited",
+		}
+	}
+
+	tok := r.FormValue("token")
+	if !validateAndConsumeInstallToken(tok) {
+		recordInstallAttempt(ip, false)
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Invalid or expired install token",
+			"reason":  "invalid_token",
+		}
+	}
+
+	logEvent("\U0001F4F2 install_companion_app requested by " + ip)
+	result := callInstallScript("install")
+
+	if result["status"] == "ok" {
+		recordInstallAttempt(ip, true)
+	} else {
+		recordInstallAttempt(ip, false)
+	}
+	return result
+}
+
+func uninstallCompanionApp() map[string]interface{} {
+	logEvent("\U0001F5D1 uninstall_companion_app requested")
+	return callInstallScript("uninstall")
+}
+
+func getCompanionState() map[string]interface{} {
+	companionStateMutex.Lock()
+	defer companionStateMutex.Unlock()
+
+	if !companionStateTime.IsZero() && time.Since(companionStateTime) < COMPANION_STATE_CACHE_TTL {
+		var cached map[string]interface{}
+		if json.Unmarshal([]byte(companionStateCache), &cached) == nil {
+			return cached
+		}
+	}
+
+	result := callInstallScript("status")
+
+	if b, err := json.Marshal(result); err == nil {
+		companionStateCache = string(b)
+		companionStateTime = time.Now()
+	}
+
+	return result
 }
 
 // ============================================================
@@ -3133,12 +3398,12 @@ func removeModule(modulePath string) map[string]interface{} {
 	// and the sanitized name. No user-controlled data reaches
 	// any path expression from this point onwards.
 	cleanPath, err := securejoin.SecureJoin(MODULES_DIR, name)
-        if err != nil {
-                return map[string]interface{}{
-                        "status":  "error",
-                        "message": "Invalid path",
-                }
-        }
+	if err != nil {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "Invalid path",
+		}
+	}
 
 	if cleanPath == MODDIR {
 		return map[string]interface{}{
@@ -3998,6 +4263,21 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if hasEndpoint(r.URL.Path, "install_companion_app") {
+			if !requireFormContentType(w, r) {
+				return
+			}
+			result := installCompanionApp(r)
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+
+		if hasEndpoint(r.URL.Path, "uninstall_companion_app") {
+			result := uninstallCompanionApp()
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+
 		w.WriteHeader(http.StatusNotFound)
 		json.NewEncoder(w).Encode(map[string]string{"status": "error", "message": "Unsupported POST endpoint"})
 		return
@@ -4083,6 +4363,13 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 	case "check_old_modules":
 		old := checkOldModules()
 		res = map[string]interface{}{"modules": old, "count": len(old)}
+
+	case "companion_app_state":
+		res = getCompanionState()
+
+	case "install_token":
+		tok := generateInstallToken()
+		res = map[string]interface{}{"token": tok, "ttl": int(INSTALL_TOKEN_TTL.Seconds())}
 
 	case "toggle", "restart", "ensure_running":
 		w.Header().Set("Allow", "POST")

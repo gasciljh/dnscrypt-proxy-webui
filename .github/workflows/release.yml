@@ -441,6 +441,21 @@ jobs:
             chmod 0644 web/app-debug.apk
             echo "::notice::APK staged: $apk → web/app-debug.apk"
             ls -la web/app-debug.apk
+
+            # v1.5.0 (APK-8): stage the SHA256 sidecar alongside
+            # the APK so that install_app.sh can verify integrity
+            # before running `pm install`. Absence of the sidecar
+            # is not fatal — install_app.sh degrades to advisory
+            # mode (skips verification with a warning).
+            sha="${apk}.sha256"
+            if [ -f "$sha" ]; then
+              cp -f "$sha" web/app-debug.apk.sha256
+              chmod 0644 web/app-debug.apk.sha256
+              echo "::notice::SHA256 staged: $sha → web/app-debug.apk.sha256"
+              ls -la web/app-debug.apk.sha256
+            else
+              echo "::warning::No .sha256 sidecar found — install_app.sh will run in advisory mode"
+            fi
           else
             echo "::warning::No APK found in dist/ — module ZIP will not include companion app"
           fi

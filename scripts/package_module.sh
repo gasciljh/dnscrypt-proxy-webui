@@ -10,17 +10,18 @@
 #   Build the final Magisk / KernelSU / APatch ZIP for release.
 #
 #   Combines:
-#     • 8 shell scripts (customize, service, post-fs-data,
-#       action, status, uninstall, functions, watchdog)
+#     • 9 shell scripts (customize, service, post-fs-data,
+#       action, status, uninstall, functions, watchdog,
+#       install_app)
 #     • 2 configuration files (webui.conf, dnscrypt-proxy.toml)
 #     • 4 WebUI binaries (arm64, arm, amd64, 386)
 #     • 4 DNS binaries  (arm64, arm, x86_64, x86)
-#     • 14 web/PWA files (HTML + icons + manifest + SW + offline
-#       + optional companion APK)
+#     • 15 web/PWA files (HTML + icons + manifest + SW + offline
+#       + optional companion APK + optional APK SHA256 sidecar)
 #     • module.prop
 #
-#   Total: 33 entries (32 required + 1 optional APK), verified
-#   after packaging.
+#   Total: 34 entries (32 required + 2 optional: APK + APK.sha256),
+#   verified after packaging.
 #
 # Web file list (14 files) vs SW precache (11 files):
 #   The ZIP ships 14 web files (13 required + 1 optional APK).
@@ -686,6 +687,7 @@ WEB_FILES_REQUIRED=(
 	"favicon-16x16.png"
 	"favicon.ico"
 	"app-debug.apk"
+	"app-debug.apk.sha256"
 	"offline.html"
 )
 
@@ -699,10 +701,12 @@ for f in "${WEB_FILES_REQUIRED[@]}"; do
 		# release.yml (via fetch_app_apk.sh) before this script
 		# runs. A local developer build without the APK still
 		# succeeds.
-		if [ "$f" = "app-debug.apk" ]; then
-			log_warn "Optional web file missing: web/$f (skipping)"
-			continue
-		fi
+		case "$f" in
+			app-debug.apk|app-debug.apk.sha256)
+				log_warn "Optional web file missing: web/$f (skipping)"
+				continue
+				;;
+		esac
 
 		if [ -f "$REPO_ROOT/web/$f" ]; then
 			log_error "Empty: web/$f"
@@ -877,7 +881,7 @@ mkdir -p "$STAGING/proxy" "$STAGING/web"
 cp "$REPO_ROOT/module.prop" "$STAGING/module.prop"
 
 # --- Shell scripts (8) ---
-for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh watchdog.sh; do
+for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh watchdog.sh install_app.sh; do
 	src="$REPO_ROOT/proxy/$s"
 	[ -f "$src" ] || { log_error "Missing: proxy/$s"; exit 1; }
 	cp "$src" "$STAGING/$s"
@@ -915,7 +919,7 @@ for f in "${WEB_FILES_REQUIRED[@]}"; do
 	src="$REPO_ROOT/web/$f"
 	if [ ! -f "$src" ]; then
 		case "$f" in
-			app-debug.apk)
+			app-debug.apk|app-debug.apk.sha256)
 				log_warn "Optional file missing: web/$f (skipping)"
 				continue
 				;;
@@ -1015,6 +1019,7 @@ REQUIRED_IN_ZIP=(
 	"uninstall.sh"
 	"functions.sh"
 	"watchdog.sh"
+	"install_app.sh"
 
 	"proxy/dnscrypt-proxy.toml"
 	"proxy/webui.conf"
@@ -1042,6 +1047,7 @@ REQUIRED_IN_ZIP=(
 	"web/favicon-16x16.png"
 	"web/favicon.ico"
 	"web/app-debug.apk"
+	"web/app-debug.apk.sha256"
 	"web/offline.html"
 )
 
@@ -1051,7 +1057,7 @@ MISSING_IN_ZIP=0
 for item in "${REQUIRED_IN_ZIP[@]}"; do
 	if ! echo "$ZIP_CONTENTS" | grep -qFx "$item"; then
 		case "$item" in
-			web/app-debug.apk)
+			web/app-debug.apk|web/app-debug.apk.sha256)
 				log_warn "Optional file not in ZIP: $item"
 				;;
 			*)
