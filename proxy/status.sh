@@ -1,7 +1,10 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
+# shellcheck disable=SC2059  # printf color codes are trusted constants
 # ============================================================
 # DNSCrypt Smart Filter – status.sh
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -173,18 +176,83 @@
 #       - customize.sh (self cleanup after COMMIT)
 #       - main.go:cleanupOldTransactions (at startup)
 #       - service.sh (via do_cleanup_transactions at boot)
-
+#
 # ============================================================
-# v1.4.0 \u2014 Companion Android app integration
+# v1.3.0 — Server-side refinement: snapshot detection
 # ============================================================
-#   \U0001f4f1 STS-V14-01 \u2014 No behavior change. The companion app
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   However, the snapshot enumeration pipeline in this script
+#   (§[7c] `_list_snapshots`) was ALSO refined in v1.3.0 to
+#   match the canonical implementations in `functions.sh`,
+#   `main.go`, `service.sh`, and `watchdog.sh`. Earlier
+#   revisions of this header incorrectly claimed "no changes
+#   to the status display" and "byte-for-byte identical
+#   between v1.2.0 and v1.3.0" — those claims were inaccurate
+#   and are corrected in the v1.4.0 revision (see STS-V14-03
+#   below).
+#
+#   The v1.3.0 refinement is documented under two identifiers
+#   (also used in CHANGELOG.md and docs/ARCHITECTURE.md §4.13.1):
+#
+#   🔧 SNAP-MANIFEST — manifest-based snapshot detection.
+#     A directory is treated as a snapshot iff it contains a
+#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
+#     and `orphan-txn-*/`.
+#
+#     Before v1.3.0: only directories whose name matched the
+#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
+#     custom-named snapshots were silently skipped.
+#
+#   🔧 SNAP-MTIME — mtime sort.
+#     Candidates are ordered by mtime (numeric, descending),
+#     not by lexicographic directory name. Robust against
+#     clock drift and manual renames. Aligns `status.sh`'s
+#     `_list_snapshots` with the `runtime_info.backups` API
+#     (which uses the same mtime sort since v1.3.0).
+#
+#   All other v1.2.0 diagnostic modes (--short, --check,
+#   --json, --verbose, --diagnose) remain byte-for-byte
+#   identical between v1.2.0 and v1.3.0.
+#
+#   See CHANGELOG.md v1.3.0 section, and
+#   docs/ARCHITECTURE.md §4.13.1 and §11.31–§11.32.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 STS-V14-01 — No behavior change. The companion app
 #     APK (web/app-debug.apk) is not touched by status.sh. Its
 #     install state is entirely the user's concern.
 #
-#   \U0001f4f1 STS-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
-#     The `--version` output (if present) now reports v1.4.0.
+#   📱 STS-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     The `--version` output now reports v1.4.0. No behavior
+#     changes to the status display.
 #
-# ============================================================
+#   📚 STS-V14-03 — Documentation-sync correction for v1.3.0.
+#     The v1.3.0 block above and the two doc-blocks that precede
+#     `_list_snapshots()` were previously inaccurate. They
+#     claimed "no changes to the status display" and "sorted
+#     by directory name (stable across rsync and other
+#     operations that may change mtimes)", while the v1.3.0
+#     code in `_list_snapshots` in fact:
+#       • Detects snapshots by `.manifest.json` presence
+#         (SNAP-MANIFEST).
+#       • Sorts candidates by mtime, descending (SNAP-MTIME).
+#
+#     This revision corrects both blocks so they reflect the
+#     actual v1.3.0 implementation. No code in this file
+#     changed between v1.3.0 and v1.4.0 — this is a
+#     documentation-only correction. The version header on
+#     line 4 is bumped to v1.4.0 for traceability, in line
+#     with the other module files.
+#
+#     See CHANGELOG.md v1.4.0 section and
+#     docs/ARCHITECTURE.md §4.13.
+#
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables (see
@@ -600,27 +668,46 @@ MEMORY_HINT=$(mem_hint 2>/dev/null)
 # ============================================================
 # HARD-STS-08: the snapshot enumeration pipeline is now
 # expressed via the shared helper `_list_snapshots`, defined
-# just below. This keeps the sort order (by directory name),
-# the exclusion rules (current/, txn-*, orphan-txn-*), and the
-# timestamp regex in a single place.
+# just below. This keeps the detection rule, the exclusion
+# rules (current/, txn-*, orphan-txn-*), and the sort order
+# in a single place.
 #
-# Snapshot names match: ^[0-9]{8}-[0-9]{6}-
-# which covers:
-#   • <ts>-<version>-<pid>          (customize.sh)
-#   • <ts>-manual-<pid>             (functions.sh/action.sh)
-#   • <ts>-manual-<pid>-<rand4>     (main.go)
-#   • <ts>-auto-<pid>               (service.sh)
+# v1.3.0 (STS-V14-03): the detection rule is manifest-based
+# (SNAP-MANIFEST) and the sort order is mtime descending
+# (SNAP-MTIME) — matching main.go, functions.sh, service.sh,
+# and watchdog.sh. Custom-named snapshots (e.g. produced by an
+# older customize.sh that used a different naming scheme, or
+# by a manual `action.sh --backup`) are visible as long as
+# they carry a `.manifest.json`.
+#
+# Snapshot names created by the current toolchain follow
+# `<YYYYMMDD>-<HHMMSS>-` (which the sort regex of the other
+# scripts still relies on), but the status.sh detection is
+# manifest-based and does NOT depend on the name pattern.
 # ============================================================
 
 # ------------------------------------------------------------
 # _list_snapshots [limit]
 # ------------------------------------------------------------
-# Prints one snapshot directory name per line, newest first,
-# sorted by directory name (stable across rsync and other
-# operations that may change mtimes). When `limit` is provided
-# and positive, prints at most that many entries.
+# Prints one snapshot directory name per line, newest first.
 #
-# Excludes: current/, txn-*, orphan-txn-*.
+# v1.3.0 — detection and ordering (parity with functions.sh,
+# main.go, service.sh, and watchdog.sh):
+#   • SNAP-MANIFEST: a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file. This makes
+#     custom-named snapshots (e.g. "pre-v130-manual-...")
+#     visible to the enumeration, and hides arbitrary
+#     directories that happen to match the timestamp pattern
+#     but lack a manifest.
+#   • SNAP-MTIME: candidates are ordered by mtime (numeric,
+#     descending, `sort -rn -k1,1`), not by lexicographic
+#     directory name. Robust against clock drift and manual
+#     renames.
+#
+# Excludes: current/, txn-*, orphan-txn-* (by name).
+#
+# When `limit` is provided and positive, prints at most that
+# many entries.
 #
 # Note (L-5): `_list_snapshots 0` and `_list_snapshots` (with
 # no argument) both print the full list. The distinction between
@@ -1248,7 +1335,10 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
             while IFS= read -r _snap; do
                 [ -z "$_snap" ] && continue
                 _bk_i=$((_bk_i + 1))
-                _file_count=$(ls -1 "$PERSISTENT_BACKUP/$_snap" 2>/dev/null | grep -cE '\.(conf|toml|txt)$')
+                _file_count=0
+            for _chk in "$PERSISTENT_BACKUP/$_snap"/*.conf "$PERSISTENT_BACKUP/$_snap"/*.toml "$PERSISTENT_BACKUP/$_snap"/*.txt; do
+                [ -f "$_chk" ] && _file_count=$((_file_count + 1))
+            done
                 [ -z "$_file_count" ] && _file_count=0
                 _has_manifest=""
                 [ -f "$PERSISTENT_BACKUP/$_snap/.manifest.json" ] && _has_manifest=" +manifest"
@@ -1627,7 +1717,10 @@ if [ "$VERBOSE_MODE" = "1" ]; then
         printf "%s--- Verbose: All Backups ---%s\n" "$MAGENTA" "$NC"
         while IFS= read -r _snap; do
             [ -z "$_snap" ] && continue
-            _file_count=$(ls -1 "$PERSISTENT_BACKUP/$_snap" 2>/dev/null | grep -cE '\.(conf|toml|txt)$')
+            _file_count=0
+            for _chk in "$PERSISTENT_BACKUP/$_snap"/*.conf "$PERSISTENT_BACKUP/$_snap"/*.toml "$PERSISTENT_BACKUP/$_snap"/*.txt; do
+                [ -f "$_chk" ] && _file_count=$((_file_count + 1))
+            done
             [ -z "$_file_count" ] && _file_count=0
             _snap_size=$(du -sh "$PERSISTENT_BACKUP/$_snap" 2>/dev/null | cut -f1)
             _snap_time=$(date -r "$PERSISTENT_BACKUP/$_snap" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "?")

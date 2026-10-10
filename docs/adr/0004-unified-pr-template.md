@@ -12,6 +12,32 @@
 
 ---
 
+> **Identifier inventory in this file (4 total)**:
+>   • HARD-ADR4-01 (v1.3.0 supersession verification block
+>     extended with server-side rotation refinements context —
+>     v1.4.0)
+>   • HARD-ADR4-02 (v1.4.0 supersession verification block
+>     extended with MAIN-01 context — v1.4.0)
+>   • HARD-ADR4-03 (Supersession verification section extended —
+>     v1.3.0 SNAP-*/ROT-* + v1.4.0 MAIN-01 — v1.4.0)
+>   • HARD-ADR4-04 (Header + footer identifier inventory +
+>     cross-references + `Last reviewed` sync added — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](../ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](../COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/GLOSSARY.md](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+>     Rotation Guardian badge
+>   • [docs/HALL_OF_FAME.md](../HALL_OF_FAME.md) — Rotation Guardian
+>     + Companion App Champion badges
+>   • [ADR-0005](0005-release-specific-pr-template.md) — the
+>     superseding decision
+>   • [CHANGELOG.md](../../CHANGELOG.md) — version history
+
+---
+
 > **⚠️ Historical ADR — Superseded**
 >
 > This decision was **reversed** on the same day it was made, after
@@ -24,7 +50,105 @@
 
 ---
 
-> **Supersession Verification (v1.2.0 — 2026-09-29)**:
+> **Supersession Verification (v1.4.0 — 2026-10-06)**:
+>
+> This ADR was reviewed during the v1.4.0 release cycle to confirm
+> that the **supersession decision** remains correct. No further
+> amendments are needed.
+>
+> **Verification notes**:
+>
+>   • The reversal has now been in effect through **five release
+>     cycles** (v1.0.0, v1.1.0, v1.2.0, v1.3.0, and v1.4.0) without
+>     any need to revisit it.
+>   • The **unified template** (`.github/PULL_REQUEST_TEMPLATE.md`)
+>     remains the **default** for all `feature/*`, `fix/*`,
+>     `docs/*`, `chore/*`, `refactor/*`, and `test/*` PRs —
+>     exactly as the supersession intended.
+>   • The **release template**
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) introduced by
+>     [ADR-0005](0005-release-specific-pr-template.md) is used
+>     exclusively for `release/*` and `hotfix/*` → `main` PRs.
+>   • **No contributor** has reported confusion about which
+>     template to use across all five release cycles.
+>   • The `?template=release.md` pattern documented in
+>     `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §5
+>     has worked as intended.
+>   • **v1.3.0** (2026-10-02) — the feature release was published
+>     through a `release/*` PR using `?template=release.md`. The
+>     unified template remained the default for the few
+>     accompanying feature/fix/docs PRs.
+>       - **Client-side**: PWA install button + live status LED.
+>       - **Shell-side**: DNS auto-start fix in `service.sh`.
+>       - **Server-side rotation refinements**: SNAP-MANIFEST +
+>         SNAP-MTIME (in `main.go:buildBackupInfo()`) and
+>         ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (in
+>         `functions.sh:rotate_backups()`), mirrored in 5 other
+>         scripts. **None of these affected the PR-template
+>         choice** — the release template handled a multi-file
+>         server-side release without modification, which is a
+>         further validation of the ADR-0005 supersession.
+>   • **v1.4.0** (2026-10-06) — the integration release (companion
+>     app + CodeQL fix + iOS removal + **MAIN-01**) was published
+>     through a `release/*` PR using `?template=release.md`. The
+>     unified template did **not** need any new section for the
+>     companion app integration, the CodeQL hardening, or the
+>     `LOG_LEVEL` load-order fix — the release template handled
+>     them correctly.
+>   • The v1.2.0 data-preservation release introduced a
+>     **Data-preservation checklist** section in the default
+>     template — this was added as an **extension**, not a
+>     reversal, and does not affect the validity of this ADR's
+>     supersession.
+>   • The **reversal is further validated**: keeping the unified
+>     template as the default (not deleting it) was the right
+>     choice, since the overwhelming majority of PRs are
+>     feature/fix/docs PRs targeting `develop`.
+>   • No new ADR is needed to further modify this decision.
+>     ADR-0005 remains authoritative.
+>
+> **Result**: The supersession was correct, and no reconsideration
+> is required. This ADR remains a historical record.
+
+> **Supersession Verification (v1.3.0 — 2026-10-02)**:
+>
+> This ADR was reviewed during the v1.3.0 release cycle to confirm
+> that the **supersession decision** remains correct. No further
+> amendments are needed.
+>
+> **Verification notes**:
+>
+>   • The reversal has now been in effect through **four release
+>     cycles** (v1.0.0, v1.1.0, v1.2.0, and v1.3.0).
+>   • The **unified template** (`.github/PULL_REQUEST_TEMPLATE.md`)
+>     remains the **default** for all `feature/*`, `fix/*`,
+>     `docs/*`, `chore/*`, `refactor/*`, and `test/*` PRs.
+>   • The **release template**
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) was used
+>     exclusively for the `release/v1.3.0` → `main` PR.
+>   • **No contributor** has reported confusion about which
+>     template to use.
+>   • The feature-release scope — **three categories of changes** —
+>     was published without requiring any change to the unified
+>     template:
+>       - **Client-side**: PWA install button + live status LED.
+>       - **Shell-side**: DNS auto-start fix in `service.sh`.
+>       - **Server-side rotation refinements**: five new semantics
+>         (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+>         ROT-PROTECT) documented in
+>         [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13.
+>     This is itself an **argument in favour of the supersession**:
+>     a release touching client-side JS, shell scripts, Go code,
+>     and backup/rotation semantics was handled cleanly by the
+>     dedicated release template, while the unified template
+>     continued to serve its ordinary audience unchanged.
+>   • No new ADR is needed to further modify this decision.
+>     ADR-0005 remains authoritative.
+>
+> **Result**: The supersession was correct, and no reconsideration
+> is required. This ADR remains a historical record.
+
+> **Supersession Verification (v1.2.0 — 2026-09-29)** (retained as history):
 >
 > This ADR was reviewed during the v1.2.0 release cycle to confirm
 > that the **supersession decision** remains correct. No further
@@ -63,7 +187,7 @@
 > **Result**: The supersession was correct, and no reconsideration
 > is required. This ADR remains a historical record.
 
-> **Supersession Verification (v1.1.0 — 2026-09-26)**:
+> **Supersession Verification (v1.1.0 — 2026-09-26)** (retained as history):
 >
 > This ADR was reviewed during the v1.1.0 release cycle to confirm
 > that the **supersession decision** remains correct. No further
@@ -228,6 +352,12 @@ It does **not** cover:
 - ❌ **Not optimal for the release workflow.** Releases have a
   specific, short lifecycle (bump, tag, publish) that a
   general-purpose template does not capture well.
+- ❌ **Cannot handle multi-file cross-cutting releases well.** A
+  release that touches client-side JS, shell scripts, Go code,
+  and backup/rotation semantics across 8+ files (e.g. v1.3.0 with
+  SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME +
+  ROT-PROTECT) needs a dedicated, extensible checklist — which a
+  unified template does not naturally provide.
 
 ### Neutral
 
@@ -248,8 +378,8 @@ It does **not** cover:
 | **No template** | ✅ Zero maintenance<br>✅ Zero constraints on authors | ❌ Inconsistent PR descriptions<br>❌ Missing critical info (device, ROM, logs, tests)<br>❌ More back-and-forth during review<br>❌ Reviewers must ask the same questions repeatedly | A template is a **forcing function** for quality. Without it, PRs degrade to "Fix bug" with no context — a pattern seen in many open-source projects. |
 | **YAML Issue Forms** (used for Issues) | ✅ Structured fields<br>✅ Required vs optional<br>✅ Beautiful rendering in GitHub UI | ❌ **Not supported for PRs** — YAML forms are an **Issues-only** feature<br>❌ Would require contributors to open an Issue before every PR (indirect flow) | Technically impossible. GitHub's YAML forms apply to Issues only. |
 | **Template query-string approach** (`?template=release.md`) | ✅ Allows per-type templates<br>✅ Stays in one folder | ❌ Requires the author to know and type the query string<br>❌ Broken links in docs easily<br>❌ Not discoverable from the New PR page<br>❌ PWA shortcut generation issues | Discoverability wins. Most contributors will not know to append `?template=release.md`. |
-| **Unified template (chosen, then superseded)** | ✅ One file<br>✅ Easy discovery<br>✅ Consistent structure<br>✅ Target Branch section handles base selection | ❌ Longer file<br>❌ Release-specific checklists are missing<br>❌ Template grows over time | — |
-| **Unified + release-specific templates** (later adopted in [ADR-0005](0005-release-specific-pr-template.md)) | ✅ Full coverage<br>✅ Release PRs get dedicated checklists<br>✅ Feature PRs stay focused | ❌ Two files to maintain<br>❌ Requires documentation on which to use<br>❌ Slightly more complex CI | **Chosen in ADR-0005** — see that ADR for the rationale. |
+| **Unified template (chosen, then superseded)** | ✅ One file<br>✅ Easy discovery<br>✅ Consistent structure<br>✅ Target Branch section handles base selection | ❌ Longer file<br>❌ Release-specific checklists are missing<br>❌ Template grows over time<br>❌ Cannot handle cross-cutting multi-file releases well | — |
+| **Unified + release-specific templates** (later adopted in [ADR-0005](0005-release-specific-pr-template.md)) | ✅ Full coverage<br>✅ Release PRs get dedicated checklists<br>✅ Feature PRs stay focused<br>✅ Handles cross-cutting releases (v1.3.0 SNAP-*/ROT-*, v1.4.0 companion app) | ❌ Two files to maintain<br>❌ Requires documentation on which to use<br>❌ Slightly more complex CI | **Chosen in ADR-0005** — see that ADR for the rationale. |
 
 ---
 
@@ -294,6 +424,30 @@ it demonstrates exactly why ADRs are valuable: the reversal is
 **explicit**, **reasoned**, and **traceable**, rather than a silent
 change buried in a commit.
 
+### Later validation (v1.3.0 / v1.4.0)
+
+The reversal was further validated by two releases that would have
+been awkward to document through a unified template:
+
+- **v1.3.0** — a release touching **client-side JS** (PWA install
+  button + live status LED), **shell scripts** (DNS auto-start fix
+  in `service.sh`), **Go code** (`main.go:buildBackupInfo()` —
+  SNAP-MANIFEST + SNAP-MTIME), and **shell rotation semantics**
+  (`functions.sh:rotate_backups()` — ROT-MANIFEST + ROT-MTIME +
+  ROT-PROTECT, mirrored in 5 other scripts). The release template
+  handled all of this with a dedicated checklist.
+- **v1.4.0** — an integration release adding an **optional
+  companion Android app**, closing **two CodeQL
+  `go/path-injection` alerts** in `removeModule`, removing **iOS
+  PWA logic**, and applying **MAIN-01** (`LOG_LEVEL` load-order
+  fix in `main.go`). Again, the release template was the correct
+  vehicle — the unified template did not need to grow a "companion
+  app integration" section, nor a "CodeQL hardening" section, nor a
+  "startup-order fix" section.
+
+Both cases support the intuition from the reversal: **rare,
+high-stakes releases deserve their own template.**
+
 ---
 
 ## Related Decisions
@@ -324,9 +478,19 @@ change buried in a commit.
   `?template=release.md` pattern).
 - [ADR-0005](0005-release-specific-pr-template.md) — the full
   rationale for the release-specific template.
+- [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13 — v1.3.0
+  server-side rotation refinements (SNAP-*/ROT-*); §4.1 and §11.37
+  — MAIN-01 load-order fix (v1.4.0).
+- [`docs/COMPATIBILITY.md`](../COMPATIBILITY.md) §10.3.5 — on-device
+  SNAP-*/ROT-* verification procedure.
+- [`docs/GLOSSARY.md`](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+  Rotation Guardian badge.
+- [`docs/HALL_OF_FAME.md`](../HALL_OF_FAME.md) — Rotation Guardian
+  + Companion App Champion badges.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0, which
-  used the release template).
+  (§3.1 covers v1.0.0 → v1.1.0; §3.2 covers v1.1.0 → v1.2.0;
+  §3.3 covers v1.2.0 → v1.3.0; §3.4 covers v1.3.0 → v1.4.0 — all
+  four used the release template).
 
 ### External references
 
@@ -367,9 +531,38 @@ change buried in a commit.
     checklist" section (extension, not reversal).
   - The release template gained v1.2.0-specific checks.
   - **No contributor requested** a different template.
-- **Supersession status**: confirmed correct across three release
+- **v1.3.0** (2026-10-02) — fourth release cycle; templates
+  unchanged.
+  - `v1.3.0` was published through a `release/*` PR using
+    `?template=release.md`.
+  - The **feature release** shipped **three categories** of changes
+    without requiring any new template:
+      - Client-side: PWA install button + live status LED.
+      - Shell-side: DNS auto-start fix in `service.sh`.
+      - **Server-side rotation refinements**: SNAP-MANIFEST +
+        SNAP-MTIME (in `main.go:buildBackupInfo()`) and
+        ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (in
+        `functions.sh:rotate_backups()`), mirrored in 5 other
+        scripts. See [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
+        §4.13.
+  - **No contributor requested** a different template.
+  - This release further validated the supersession: a
+    cross-cutting release across JS, shell, and Go was handled by
+    the release template without touching the unified one.
+- **v1.4.0** (2026-10-06) — fifth release cycle; templates
+  unchanged.
+  - `v1.4.0` was published through a `release/*` PR using
+    `?template=release.md`.
+  - The **integration-release** scope (companion Android app +
+    CodeQL `go/path-injection` fix + iOS PWA removal + **MAIN-01**
+    `LOG_LEVEL` load-order fix) was handled by the existing release
+    template.
+  - The unified template did not need a new section for the
+    companion app, the CodeQL fix, or the startup-order fix.
+  - **No contributor requested** a different template.
+- **Supersession status**: confirmed correct across five release
   cycles. ADR-0005 remains authoritative.
-- **Next review**: v1.3.0 cycle (or when the PR workflow changes).
+- **Next review**: v1.5.0 cycle (or when the PR workflow changes).
 - See `CHANGELOG.md` for the full release history.
 
 ---

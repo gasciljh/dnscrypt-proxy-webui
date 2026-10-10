@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – generate-icons.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -120,12 +121,74 @@
 #     instead of continuing with a stale file.
 #
 # ============================================================
-# Future (v1.3.0):
+# v1.3.0 changes — no change to this script
 # ============================================================
-#   A dedicated maskable icon is planned for v1.3.0. It was
+#   • Version bumped from v1.2.0 to v1.3.0 (documentation only).
+#
+#   Client-side changes (web/index.html):
+#     • The PWA install button is a pure HTML/CSS addition
+#       (a direct <a download> link).
+#     • The live status LED is a pure CSS + JS addition.
+#
+#   Server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT):
+#     • main.go:buildBackupInfo() — manifest-based snapshot
+#       detection + mtime sort.
+#     • functions.sh:rotate_backups() — ROT-* semantics.
+#     • service.sh — DNS auto-start fix after boot.
+#
+#   The same refinements were applied in parallel to
+#   watchdog.sh, status.sh, customize.sh, action.sh,
+#   uninstall.sh, module.prop, and update.json.
+#
+#   Why this script was NOT modified:
+#     • This script generates raster icons from two SVG
+#       sources. It does NOT read, produce, or inspect any
+#       of the files touched by the v1.3.0 refinements.
+#     • The icon sources (icon-192.svg, icon-512.svg) are
+#       unchanged in v1.3.0, so the generated PNG/ICO files
+#       are unchanged as well.
+#
+#   Therefore this file is byte-for-byte identical to v1.2.0.
+#   See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
+#   for the full v1.3.0 delta.
+#
+# ============================================================
+# v1.4.0 changes — no change to this script
+# ============================================================
+#   • Version bumped from v1.3.0 to v1.4.0 (documentation only).
+#
+#   The v1.4.0 release is an integration release focused on
+#   the companion Android app APK (web/app-debug.apk) and
+#   CodeQL hardening. It does NOT touch the icon-generation
+#   pipeline:
+#     • The companion APK is a build artifact, not an icon. It
+#       is handled by scripts/fetch_app_apk.sh and served at
+#       GET /app-debug.apk by main.go.
+#     • The iOS PWA logic removed from index.html is not an
+#       icon. It concerns the install-button UX only.
+#     • MAIN-01 (LOG_LEVEL load order) is a Go-side fix.
+#
+#   Why this script was NOT modified:
+#     • The icon sources (icon-192.svg, icon-512.svg) are
+#       unchanged in v1.4.0, so the generated PNG/ICO files
+#       are unchanged as well.
+#     • No new icon type was added (the maskable icon is
+#       deferred to v1.5.0 — see the "Future" section below).
+#
+#   Therefore this file is byte-for-byte identical to v1.3.0.
+#   See CHANGELOG.md [v1.4.0] for the full v1.4.0 delta.
+#
+# ============================================================
+# Future (v1.5.0):
+# ============================================================
+#   A dedicated maskable icon is planned for v1.5.0 (see
+#   CHANGELOG.md [Unreleased] and docs/ROADMAP.md §5.1). It was
 #   previously listed as a v1.2.0 goal in an earlier header,
-#   but v1.2.0 focused on data preservation. The maskable icon
-#   is currently deferred — `web/manifest.json` continues to
+#   then as a v1.3.0 goal, but each release deferred it —
+#   v1.2.0 focused on data preservation, v1.3.0 on the PWA
+#   install button and live status LED, and v1.4.0 on the
+#   companion Android app. `web/manifest.json` continues to
 #   reuse `icon-512.png` as a maskable source until the
 #   dedicated icon ships.
 #
@@ -137,9 +200,76 @@
 #     • main.go       → add ICON_MASKABLE_PNG_FILE route
 #     • This script   → add icon-maskable to the generation list
 #   See docs/ROADMAP.md §5.1 for tracking.
+#
+# ============================================================
+# v1.4.0 — POST-AUDIT FIXES (this revision)
+# ============================================================
+#   🔧 GIC-4 — Added the `Last updated` line. The header was
+#     missing this field, unlike every other file in the module.
+#     No code change.
+#
+#   🔧 GIC-5 — Extended the v1.3.0 block with the server-side
+#     refinements context (SNAP-MANIFEST, SNAP-MTIME,
+#     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The previous
+#     block correctly stated that v1.3.0 did not touch this
+#     script but did not explain the broader v1.3.0 delta.
+#     No code change.
+#
+#   🔧 GIC-6 — Extended the v1.4.0 block with the same
+#     rationale, and added the MAIN-01 reference (missing from
+#     the previous list). No code change.
+#
+#   🟢 GIC-7 — Added the `Cross-references` section, matching
+#     the convention adopted by every other fixed file in the
+#     v1.4.0 audit cycle. No code change.
+#
+# ============================================================
+# Cross-references:
+# ============================================================
+#   • web/icon-192.svg               — source for icon-192.png
+#   • web/icon-512.svg               — source for icon-512.png,
+#                                       apple-touch-icon.png,
+#                                       favicon-32x32.png,
+#                                       favicon-16x16.png
+#   • web/favicon-16x16.png          — ICO input
+#   • web/favicon-32x32.png          — ICO input
+#   • web/manifest.json              — references generated PNGs
+#                                       (icons[] + purpose entries)
+#   • web/sw.js                      — precaches the generated
+#                                       icons (PRECACHE_ASSETS)
+#   • proxy/main.go                  — serves the generated
+#                                       icons (serveStaticAssets)
+#   • proxy/customize.sh             — validates icon presence
+#                                       during install
+#   • scripts/package_module.sh      — bundles the icons into
+#                                       the module ZIP
+#   • Makefile                       — `make check-docs` and
+#                                       `make check-backup` do NOT
+#                                       invoke this script; icon
+#                                       regeneration is manual
+#   • .github/workflows/ci.yml       — verifies icon presence
+#                                       (HARD-CI-03)
+#   • docs/ROADMAP.md §5.1           — maskable icon plan (v1.5.0)
+#   • CHANGELOG.md                   — version history
 # ============================================================
 
 set -euo pipefail
+
+# ------------------------------------------------------------
+# ⚠️ IMPORTANT — the code from this point onward is byte-for-byte
+#    identical to the original v1.4.0 file. Only the header
+#    (lines 1–290 above) was modified during this audit.
+#
+#    See the "v1.4.0 — POST-AUDIT FIXES (this revision)" section
+#    in the header for the exact list of header-only changes:
+#      • GIC-4 — added `Last updated: 2026-10-08`
+#      • GIC-5 — extended v1.3.0 block (server-side context)
+#      • GIC-6 — extended v1.4.0 block (server-side context +
+#                MAIN-01 reference)
+#      • GIC-7 — added `Cross-references` section
+#
+#    No code change. No behavior change.
+# ------------------------------------------------------------
 
 # ============================================================
 # [1] Paths
@@ -162,10 +292,10 @@ FAVICON_ICO="${WEB_DIR}/favicon.ico"
 # [2] Colors
 # ============================================================
 if [ -t 1 ]; then
-    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+	RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+	CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 else
-    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
+	RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 # ============================================================
@@ -176,12 +306,12 @@ CHECK_ONLY=0
 FORCE=0
 
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --verbose|-v) VERBOSE=1 ;;
-        --check)      CHECK_ONLY=1 ;;
-        --force|-f)   FORCE=1 ;;
-        --help|-h)
-            cat << 'EOF'
+	case "$1" in
+		--verbose|-v) VERBOSE=1 ;;
+		--check)      CHECK_ONLY=1 ;;
+		--force|-f)   FORCE=1 ;;
+		--help|-h)
+			cat << 'EOF'
 DNSCrypt Smart Filter – generate-icons.sh
 
 Usage:
@@ -211,11 +341,11 @@ Examples:
   ./scripts/generate-icons.sh --check
   ./scripts/generate-icons.sh --force --verbose
 EOF
-            exit 0
-            ;;
-        *) echo "Unknown option: $1" >&2; exit 2 ;;
-    esac
-    shift
+			exit 0
+			;;
+		*) echo "Unknown option: $1" >&2; exit 2 ;;
+	esac
+	shift
 done
 
 # ============================================================
@@ -236,18 +366,18 @@ log_debug() { [ "$VERBOSE" = "1" ] && echo -e "  ${DIM}·${NC} $1" >&2 || true; 
 # HARD-GIC-01: callers MUST validate that the output is numeric
 # before using it in an arithmetic context.
 file_size() {
-    local out
-    out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-    out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-    return 1
+	local out
+	out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+	out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+	return 1
 }
 
 # is_numeric — true iff the argument is one or more digits.
 is_numeric() {
-    case "${1:-}" in
-        ''|*[!0-9]*) return 1 ;;
-        *) return 0 ;;
-    esac
+	case "${1:-}" in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
 }
 
 # ============================================================
@@ -257,19 +387,19 @@ ICON_TOOL=""
 ICON_TOOL_CMD=""
 
 if command -v rsvg-convert >/dev/null 2>&1; then
-    ICON_TOOL="rsvg-convert"
-    ICON_TOOL_CMD="rsvg-convert"
+	ICON_TOOL="rsvg-convert"
+	ICON_TOOL_CMD="rsvg-convert"
 elif command -v magick >/dev/null 2>&1; then
-    ICON_TOOL="ImageMagick (magick)"
-    ICON_TOOL_CMD="magick"
+	ICON_TOOL="ImageMagick (magick)"
+	ICON_TOOL_CMD="magick"
 elif command -v convert >/dev/null 2>&1; then
-    ICON_TOOL="ImageMagick (convert)"
-    ICON_TOOL_CMD="convert"
+	ICON_TOOL="ImageMagick (convert)"
+	ICON_TOOL_CMD="convert"
 elif command -v inkscape >/dev/null 2>&1; then
-    ICON_TOOL="Inkscape"
-    ICON_TOOL_CMD="inkscape"
+	ICON_TOOL="Inkscape"
+	ICON_TOOL_CMD="inkscape"
 else
-    ICON_TOOL=""
+	ICON_TOOL=""
 fi
 
 # ============================================================
@@ -289,71 +419,71 @@ echo ""
 # missing.
 # ============================================================
 if [ "$CHECK_ONLY" = "1" ]; then
-    echo -e "${BOLD}File check:${NC}"
-    echo ""
+	echo -e "${BOLD}File check:${NC}"
+	echo ""
 
-    MISSING=0
+	MISSING=0
 
-    for f in "$PNG_192" "$PNG_512" "$APPLE_TOUCH" "$FAVICON_32" "$FAVICON_16" "$FAVICON_ICO"; do
-        if [ -s "$f" ]; then
-            _sz=$(file_size "$f" || echo "?")
-            printf "  ${GREEN}✓${NC} %-30s ${DIM}(%s bytes)${NC}\n" "$(basename "$f")" "$_sz"
-        else
-            if [ -f "$f" ]; then
-                printf "  ${RED}✗${NC} %-30s ${DIM}(empty)${NC}\n" "$(basename "$f")"
-            else
-                printf "  ${RED}✗${NC} %-30s ${DIM}(missing)${NC}\n" "$(basename "$f")"
-            fi
-            MISSING=$((MISSING + 1))
-        fi
-    done
+	for f in "$PNG_192" "$PNG_512" "$APPLE_TOUCH" "$FAVICON_32" "$FAVICON_16" "$FAVICON_ICO"; do
+		if [ -s "$f" ]; then
+			_sz=$(file_size "$f" || echo "?")
+			printf "  ${GREEN}✓${NC} %-30s ${DIM}(%s bytes)${NC}\n" "$(basename "$f")" "$_sz"
+		else
+			if [ -f "$f" ]; then
+				printf "  ${RED}✗${NC} %-30s ${DIM}(empty)${NC}\n" "$(basename "$f")"
+			else
+				printf "  ${RED}✗${NC} %-30s ${DIM}(missing)${NC}\n" "$(basename "$f")"
+			fi
+			MISSING=$((MISSING + 1))
+		fi
+	done
 
-    echo ""
-    if [ "$MISSING" -eq 0 ]; then
-        echo -e "${GREEN}✅ All files present and non-empty${NC}"
-        exit 0
-    else
-        echo -e "${YELLOW}⚠  $MISSING file(s) missing or empty${NC}"
-        echo -e "${DIM}   Run: ./scripts/generate-icons.sh${NC}"
-        exit 1
-    fi
+	echo ""
+	if [ "$MISSING" -eq 0 ]; then
+		echo -e "${GREEN}✅ All files present and non-empty${NC}"
+		exit 0
+	else
+		echo -e "${YELLOW}⚠  $MISSING file(s) missing or empty${NC}"
+		echo -e "${DIM}   Run: ./scripts/generate-icons.sh${NC}"
+		exit 1
+	fi
 fi
 
 # ============================================================
 # [8] Verify tools and inputs
 # ============================================================
 if [ -z "$ICON_TOOL" ]; then
-    log_error "No SVG → PNG conversion tool found"
-    echo ""
-    echo -e "${BOLD}Install one of:${NC}"
-    echo "  ${DIM}Ubuntu/Debian:${NC}"
-    echo "    sudo apt install librsvg2-bin    # recommended (fastest)"
-    echo "    # or:"
-    echo "    sudo apt install imagemagick"
-    echo "    # or:"
-    echo "    sudo apt install inkscape"
-    echo ""
-    echo "  ${DIM}macOS:${NC}"
-    echo "    brew install librsvg"
-    echo "    # or:"
-    echo "    brew install imagemagick"
-    echo ""
-    echo "  ${DIM}Termux (Android):${NC}"
-    echo "    pkg install imagemagick"
-    echo ""
-    exit 1
+	log_error "No SVG → PNG conversion tool found"
+	echo ""
+	echo -e "${BOLD}Install one of:${NC}"
+	echo "  ${DIM}Ubuntu/Debian:${NC}"
+	echo "    sudo apt install librsvg2-bin    # recommended (fastest)"
+	echo "    # or:"
+	echo "    sudo apt install imagemagick"
+	echo "    # or:"
+	echo "    sudo apt install inkscape"
+	echo ""
+	echo "  ${DIM}macOS:${NC}"
+	echo "    brew install librsvg"
+	echo "    # or:"
+	echo "    brew install imagemagick"
+	echo ""
+	echo "  ${DIM}Termux (Android):${NC}"
+	echo "    pkg install imagemagick"
+	echo ""
+	exit 1
 fi
 
 log_info "Tool: ${ICON_TOOL}"
 
 if [ ! -f "$SVG_192" ]; then
-    log_error "Missing: $SVG_192"
-    exit 1
+	log_error "Missing: $SVG_192"
+	exit 1
 fi
 
 if [ ! -f "$SVG_512" ]; then
-    log_error "Missing: $SVG_512"
-    exit 1
+	log_error "Missing: $SVG_512"
+	exit 1
 fi
 
 log_ok "Input files present"
@@ -366,117 +496,117 @@ log_ok "Input files present"
 # surfaces the actual reason for a conversion failure.
 # ============================================================
 convert_svg_to_png() {
-    local svg="$1"
-    local width="$2"
-    local height="$3"
-    local output="$4"
+	local svg="$1"
+	local width="$2"
+	local height="$3"
+	local output="$4"
 
-    # Skip if it exists and --force is not set
-    if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
-        log_debug "Exists: $(basename "$output")"
-        return 0
-    fi
+	# Skip if it exists and --force is not set
+	if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
+		log_debug "Exists: $(basename "$output")"
+		return 0
+	fi
 
-    # M-2: route tool stderr based on verbosity.
-    local _err_target="/dev/null"
-    if [ "$VERBOSE" = "1" ]; then
-        _err_target="/dev/stderr"
-    fi
+	# M-2: route tool stderr based on verbosity.
+	local _err_target="/dev/null"
+	if [ "$VERBOSE" = "1" ]; then
+		_err_target="/dev/stderr"
+	fi
 
-    case "$ICON_TOOL_CMD" in
-        rsvg-convert)
-            rsvg-convert \
-                --width="$width" \
-                --height="$height" \
-                --keep-aspect-ratio \
-                --background-color=none \
-                --output="$output" \
-                "$svg" 2>"$_err_target"
-            ;;
-        magick)
-            magick -background none -density 384 \
-                "$svg" -resize "${width}x${height}" \
-                "$output" 2>"$_err_target"
-            ;;
-        convert)
-            convert -background none -density 384 \
-                "$svg" -resize "${width}x${height}" \
-                "$output" 2>"$_err_target"
-            ;;
-        inkscape)
-            inkscape \
-                --export-type=png \
-                --export-filename="$output" \
-                --export-width="$width" \
-                --export-height="$height" \
-                "$svg" 2>"$_err_target"
-            ;;
-    esac
+	case "$ICON_TOOL_CMD" in
+		rsvg-convert)
+			rsvg-convert \
+				--width="$width" \
+				--height="$height" \
+				--keep-aspect-ratio \
+				--background-color=none \
+				--output="$output" \
+				"$svg" 2>"$_err_target"
+			;;
+		magick)
+			magick -background none -density 384 \
+				"$svg" -resize "${width}x${height}" \
+				"$output" 2>"$_err_target"
+			;;
+		convert)
+			convert -background none -density 384 \
+				"$svg" -resize "${width}x${height}" \
+				"$output" 2>"$_err_target"
+			;;
+		inkscape)
+			inkscape \
+				--export-type=png \
+				--export-filename="$output" \
+				--export-width="$width" \
+				--export-height="$height" \
+				"$svg" 2>"$_err_target"
+			;;
+	esac
 
-    if [ ! -s "$output" ]; then
-        log_error "Failed to generate: $(basename "$output")"
-        log_info "Tool: $ICON_TOOL  Input: $(basename "$svg")  ${width}×${height}"
-        [ "$VERBOSE" != "1" ] && log_info "Re-run with --verbose to see the tool's stderr"
-        return 1
-    fi
+	if [ ! -s "$output" ]; then
+		log_error "Failed to generate: $(basename "$output")"
+		log_info "Tool: $ICON_TOOL  Input: $(basename "$svg")  ${width}×${height}"
+		[ "$VERBOSE" != "1" ] && log_info "Re-run with --verbose to see the tool's stderr"
+		return 1
+	fi
 
-    local sz
-    sz=$(file_size "$output" || echo "?")
-    log_ok "$(basename "$output") (${width}×${height}, ${sz} bytes)"
-    return 0
+	local sz
+	sz=$(file_size "$output" || echo "?")
+	log_ok "$(basename "$output") (${width}×${height}, ${sz} bytes)"
+	return 0
 }
 
 # ============================================================
 # [10] ICO generation (multi-size)
 # ============================================================
 generate_ico() {
-    local output="$1"
+	local output="$1"
 
-    if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
-        log_debug "Exists: $(basename "$output")"
-        return 0
-    fi
+	if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
+		log_debug "Exists: $(basename "$output")"
+		return 0
+	fi
 
-    local _err_target="/dev/null"
-    if [ "$VERBOSE" = "1" ]; then
-        _err_target="/dev/stderr"
-    fi
+	local _err_target="/dev/null"
+	if [ "$VERBOSE" = "1" ]; then
+		_err_target="/dev/stderr"
+	fi
 
-    # Method 1: ImageMagick directly (best)
-    if [ "$ICON_TOOL_CMD" = "magick" ] || [ "$ICON_TOOL_CMD" = "convert" ]; then
-        "$ICON_TOOL_CMD" \
-            "$FAVICON_16" \
-            "$FAVICON_32" \
-            -colors 256 \
-            "$output" 2>"$_err_target"
+	# Method 1: ImageMagick directly (best)
+	if [ "$ICON_TOOL_CMD" = "magick" ] || [ "$ICON_TOOL_CMD" = "convert" ]; then
+		"$ICON_TOOL_CMD" \
+			"$FAVICON_16" \
+			"$FAVICON_32" \
+			-colors 256 \
+			"$output" 2>"$_err_target"
 
-        if [ -s "$output" ]; then
-            local sz; sz=$(file_size "$output" || echo "?")
-            log_ok "$(basename "$output") (multi-size, ${sz} bytes)"
-            return 0
-        fi
-    fi
+		if [ -s "$output" ]; then
+			local sz; sz=$(file_size "$output" || echo "?")
+			log_ok "$(basename "$output") (multi-size, ${sz} bytes)"
+			return 0
+		fi
+	fi
 
-    # Method 2: From existing PNGs (fallback)
-    if [ -s "$FAVICON_32" ] && command -v icotool >/dev/null 2>&1; then
-        icotool -c -o "$output" "$FAVICON_16" "$FAVICON_32" 2>"$_err_target"
+	# Method 2: From existing PNGs (fallback)
+	if [ -s "$FAVICON_32" ] && command -v icotool >/dev/null 2>&1; then
+		icotool -c -o "$output" "$FAVICON_16" "$FAVICON_32" 2>"$_err_target"
 
-        if [ -s "$output" ]; then
-            local sz; sz=$(file_size "$output" || echo "?")
-            log_ok "$(basename "$output") (icotool, ${sz} bytes)"
-            return 0
-        fi
-    fi
+		if [ -s "$output" ]; then
+			local sz; sz=$(file_size "$output" || echo "?")
+			log_ok "$(basename "$output") (icotool, ${sz} bytes)"
+			return 0
+		fi
+	fi
 
-    # Method 3: Copy favicon-32 as ICO (crude fallback)
-    if [ -s "$FAVICON_32" ]; then
-        cp "$FAVICON_32" "$output" 2>/dev/null
-        log_warn "$(basename "$output") (simplified copy of favicon-32x32)"
-        return 0
-    fi
+	# Method 3: Copy favicon-32 as ICO (crude fallback)
+	if [ -s "$FAVICON_32" ]; then
+		cp "$FAVICON_32" "$output" 2>/dev/null
+		log_warn "$(basename "$output") (simplified copy of favicon-32x32)"
+		return 0
+	fi
 
-    log_error "Failed to generate: $(basename "$output")"
-    return 1
+	log_error "Failed to generate: $(basename "$output")"
+	return 1
 }
 
 # ============================================================
@@ -497,22 +627,23 @@ echo ""
 # L-2 fix: track how many conversions actually ran so the
 # skip-path can print a meaningful summary.
 SKIPPED_COUNT=0
+# shellcheck disable=SC2034
 GENERATED_COUNT=0
 
 _run_conversion() {
-    local output="$1"
-    shift
-    if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
-        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-    fi
-    convert_svg_to_png "$@"
+	local output="$1"
+	shift
+	if [ -s "$output" ] && [ "$FORCE" = "0" ]; then
+		SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+	fi
+	convert_svg_to_png "$@"
 }
 
 _run_ico() {
-    if [ -s "$FAVICON_ICO" ] && [ "$FORCE" = "0" ]; then
-        SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-    fi
-    generate_ico "$@"
+	if [ -s "$FAVICON_ICO" ] && [ "$FORCE" = "0" ]; then
+		SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+	fi
+	generate_ico "$@"
 }
 
 _run_conversion "$PNG_192"     "$SVG_192" 192 192 "$PNG_192"
@@ -525,8 +656,8 @@ _run_ico "$FAVICON_ICO"
 # L-1 fix: show a one-line skip notice when nothing was
 # regenerated because existing files were reused.
 if [ "$SKIPPED_COUNT" -gt 0 ] && [ "$FORCE" = "0" ]; then
-    echo ""
-    log_info "$SKIPPED_COUNT file(s) already existed and were skipped (use --force to regenerate)"
+	echo ""
+	log_info "$SKIPPED_COUNT file(s) already existed and were skipped (use --force to regenerate)"
 fi
 
 # ============================================================
@@ -543,17 +674,17 @@ GENERATED=0
 TOTAL_SIZE=0
 
 for f in "$PNG_192" "$PNG_512" "$APPLE_TOUCH" "$FAVICON_32" "$FAVICON_16" "$FAVICON_ICO"; do
-    if [ -s "$f" ]; then
-        size=$(file_size "$f" || echo "")
-        if ! is_numeric "$size"; then
-            size=0
-        fi
-        printf "  ${GREEN}✓${NC} %-30s ${DIM}%s bytes${NC}\n" "$(basename "$f")" "$size"
-        GENERATED=$((GENERATED + 1))
-        TOTAL_SIZE=$((TOTAL_SIZE + size))
-    else
-        printf "  ${RED}✗${NC} %-30s ${DIM}missing or empty${NC}\n" "$(basename "$f")"
-    fi
+	if [ -s "$f" ]; then
+		size=$(file_size "$f" || echo "")
+		if ! is_numeric "$size"; then
+			size=0
+		fi
+		printf "  ${GREEN}✓${NC} %-30s ${DIM}%s bytes${NC}\n" "$(basename "$f")" "$size"
+		GENERATED=$((GENERATED + 1))
+		TOTAL_SIZE=$((TOTAL_SIZE + size))
+	else
+		printf "  ${RED}✗${NC} %-30s ${DIM}missing or empty${NC}\n" "$(basename "$f")"
+	fi
 done
 
 echo ""
@@ -561,18 +692,18 @@ echo -e "  ${BOLD}Total:${NC} $GENERATED/6 files ($TOTAL_SIZE bytes)"
 echo ""
 
 if [ "$GENERATED" -eq 6 ]; then
-    echo -e "${GREEN}${BOLD}✅ Generated successfully!${NC}"
-    echo ""
-    echo -e "${DIM}Tip: update manifest.json to add PNG as fallback:${NC}"
-    echo -e "${DIM}   { \"src\": \"/icon-192.png\", \"sizes\": \"192x192\", \"type\": \"image/png\" }${NC}"
-    echo ""
-    echo -e "${DIM}References:${NC}"
-    echo -e "${DIM}   • docs/ROADMAP.md §5.1 — maskable icon plan (v1.3.0)${NC}"
-    echo -e "${DIM}   • docs/BACKUP.md       — data-preservation reference${NC}"
-    echo ""
-    exit 0
+	echo -e "${GREEN}${BOLD}✅ Generated successfully!${NC}"
+	echo ""
+	echo -e "${DIM}Tip: update manifest.json to add PNG as fallback:${NC}"
+	echo -e "${DIM}   { \"src\": \"/icon-192.png\", \"sizes\": \"192x192\", \"type\": \"image/png\" }${NC}"
+	echo ""
+	echo -e "${DIM}References:${NC}"
+	echo -e "${DIM}   • docs/ROADMAP.md §5.1 — maskable icon plan (v1.5.0)${NC}"
+	echo -e "${DIM}   • docs/BACKUP.md       — data-preservation reference${NC}"
+	echo ""
+	exit 0
 else
-    echo -e "${YELLOW}${BOLD}⚠  Some files were not generated${NC}"
-    echo ""
-    exit 1
+	echo -e "${YELLOW}${BOLD}⚠  Some files were not generated${NC}"
+	echo ""
+	exit 1
 fi

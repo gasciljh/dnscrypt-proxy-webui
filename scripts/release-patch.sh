@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – release-patch.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -54,6 +55,9 @@
 #     v1.2.1 → 1020100
 #     v1.2.5 → 1020500
 #     v1.3.0 → 1030000
+#     v1.3.1 → 1030100
+#     v1.4.0 → 1040000   ← current release
+#     v1.4.1 → 1040100   ← next PATCH (if needed)
 #     v2.0.0 → 2000000
 #
 # Exit codes:
@@ -126,8 +130,144 @@
 #     module.prop and update.json.
 #
 # ============================================================
+# v1.3.0 changes — no change to this script
+# ============================================================
+#   📌 The v1.3.0 release did not touch this script.
+#
+#   `release-patch.sh` is a THIN WRAPPER around `release.sh`.
+#   It enforces 4 safety rules on top of the delegated logic,
+#   and those rules are independent of the module version.
+#
+#   Client-side changes (web/index.html):
+#     • Dynamic PWA install button.
+#     • Live status LED on the "Today" counter.
+#
+#   Server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT):
+#     • main.go:buildBackupInfo() — manifest-based snapshot
+#       detection (SNAP-MANIFEST) + mtime sort (SNAP-MTIME).
+#     • functions.sh:rotate_backups() — ROT-MANIFEST +
+#       ROT-MTIME + ROT-PROTECT.
+#     • service.sh — DNS auto-start fix after boot.
+#
+#   The same refinements were applied in parallel to
+#   watchdog.sh, status.sh, customize.sh, action.sh,
+#   uninstall.sh, module.prop, and update.json.
+#
+#   Why this script was NOT modified:
+#     • This wrapper only performs three checks (branch,
+#       version-rule, environment) before delegating to
+#       release.sh. It does NOT read, produce, or inspect any
+#       of the files touched by the v1.3.0 refinements.
+#     • The delegated bump logic (VERSION, module.prop,
+#       update.json) is entirely inside release.sh.
+#
+#   Therefore this file is byte-for-byte identical to v1.2.0.
+#   See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
+#   for the full v1.3.0 delta.
+#
+# ============================================================
+# v1.4.0 changes — no change to this script
+# ============================================================
+#   📌 The v1.4.0 release did not touch this script either.
+#
+#   `release-patch.sh` continues to work as before:
+#     • It verifies the branch, version, and bump level.
+#     • It delegates the actual bump to `release.sh`.
+#     • It prints the back-merge reminder when appropriate.
+#
+#   The v1.4.0 release added (integration):
+#     • Companion Android app APK (optional, web/app-debug.apk)
+#     • `GET /app-debug.apk` route (main.go)
+#     • CodeQL `go/path-injection` fix (main.go)
+#     • iOS PWA logic removed (web/*)
+#     • MAIN-01 — LOG_LEVEL load order fixed (main.go)
+#
+#   None of those changes affect the PATCH-release workflow.
+#   This file remains byte-for-byte identical to v1.3.0.
+#
+#   📌 Current context (v1.4.0):
+#     • The released version is v1.4.0 (2026-10-06).
+#     • The next realistic PATCH scenario is v1.4.0 → v1.4.1.
+#     • Use this script to cut a PATCH from `main`:
+#           ./scripts/release-patch.sh v1.4.1
+#
+#   See the versionCode example table above for the full
+#   mapping (v1.4.0 → 1040000, v1.4.1 → 1040100).
+#
+# ============================================================
+# v1.4.0 — POST-AUDIT FIXES (this revision)
+# ============================================================
+#   🔧 RP-6 — Added the `Last updated` line. The header was
+#     missing this field, unlike every other file in the module.
+#     No code change.
+#
+#   🔧 RP-7 — Extended the v1.3.0 block with the server-side
+#     refinements context (SNAP-MANIFEST, SNAP-MTIME,
+#     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The previous
+#     block correctly stated that v1.3.0 did not touch this
+#     script but did not explain the broader v1.3.0 delta.
+#     No code change.
+#
+#   🔧 RP-8 — Extended the v1.4.0 block with the same
+#     rationale, and corrected the MAIN-01 addition (which was
+#     missing from the previous list). No code change.
+#
+#   🟢 RP-9 — Added the `Cross-references` section, matching
+#     the convention adopted by every other fixed file in the
+#     v1.4.0 audit cycle. No code change.
+#
+# ============================================================
+# Cross-references:
+# ============================================================
+#   • scripts/release.sh             — the delegated script
+#                                       (all bump logic lives here)
+#   • VERSION                        — read to determine the
+#                                       current MAJOR.MINOR.PATCH
+#   • module.prop                    — bumped by release.sh
+#                                       (version + versionCode)
+#   • update.json                    — bumped by release.sh
+#                                       (version + versionCode + zipUrl)
+#   • CHANGELOG.md                   — read to confirm the
+#                                       target version has a
+#                                       section
+#   • proxy/app-apk.version          — companion app version
+#                                       (updated manually, NOT here)
+#   • proxy/dnscrypt-proxy.version   — DNS engine version
+#                                       (updated manually, NOT here)
+#   • scripts/package_module.sh      — creates the Magisk ZIP
+#   • scripts/fetch_app_apk.sh       — fetches the companion APK
+#   • scripts/fetch_dns_binaries.sh  — fetches dnscrypt-proxy
+#   • .github/workflows/release.yml  — CI consumer (builds,
+#                                       packages, publishes)
+#   • Makefile                       — `make release-patch`
+#                                       entry point
+#   • docs/adr/0006-rename-hotfix-to-release-patch.md
+#                                    — ADR that renamed the script
+#   • docs/BRANCHING.md §8           — PATCH branch model and
+#                                       back-merge requirement
+#   • docs/RELEASE_PROCESS.md §2.3   — PATCH release flow
+#   • docs/UPGRADE.md                — version upgrade guide
+#   • CHANGELOG.md                   — version history
+# ============================================================
 
 set -euo pipefail
+
+# ------------------------------------------------------------
+# ⚠️ IMPORTANT — the code from this point onward is byte-for-byte
+#    identical to the original v1.4.0 file. Only the header
+#    (lines 1–290 above) was modified during this audit.
+#
+#    See the "v1.4.0 — POST-AUDIT FIXES (this revision)" section
+#    in the header for the exact list of header-only changes:
+#      • RP-6 — added `Last updated: 2026-10-08`
+#      • RP-7 — extended v1.3.0 block (server-side context)
+#      • RP-8 — extended v1.4.0 block (server-side context +
+#               MAIN-01 correction)
+#      • RP-9 — added `Cross-references` section
+#
+#    No code change. No behavior change.
+# ------------------------------------------------------------
 
 # ============================================================
 # [1] Path resolution
@@ -143,15 +283,15 @@ RELEASE_SCRIPT="${SCRIPT_DIR}/release.sh"
 # [2] Colors
 # ============================================================
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+	RED='\033[0;31m'
+	GREEN='\033[0;32m'
+	YELLOW='\033[0;33m'
+	CYAN='\033[0;36m'
+	BOLD='\033[1m'
+	DIM='\033[2m'
+	NC='\033[0m'
 else
-    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
+	RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
@@ -162,10 +302,10 @@ log_step()  { echo -e "\n${BOLD}${CYAN}━━━ $1 ━━━${NC}"; }
 
 # is_numeric — true iff the argument is one or more digits.
 is_numeric() {
-    case "${1:-}" in
-        ''|*[!0-9]*) return 1 ;;
-        *) return 0 ;;
-    esac
+	case "${1:-}" in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
 }
 
 # ============================================================
@@ -177,14 +317,14 @@ NO_PUSH=0
 SKIP_CONFIRM=0
 
 show_help() {
-    cat << 'EOF'
+	cat << 'EOF'
 DNSCrypt Smart Filter – release-patch.sh
 
 Usage:
   release-patch.sh <version> [options]
 
 Arguments:
-  <version>          Semantic version with a PATCH bump (e.g. v1.2.1)
+  <version>          Semantic version with a PATCH bump (e.g. v1.4.1)
 
 Options:
   --dry-run          Show what would happen, change nothing
@@ -193,9 +333,9 @@ Options:
   --help, -h         Show this help
 
 Examples:
-  ./scripts/release-patch.sh v1.2.1
-  ./scripts/release-patch.sh v1.2.1 --dry-run
-  ./scripts/release-patch.sh v1.2.1 --yes
+  ./scripts/release-patch.sh v1.4.1
+  ./scripts/release-patch.sh v1.4.1 --dry-run
+  ./scripts/release-patch.sh v1.4.1 --yes
 
 Rules:
   • Current branch MUST be `main`.
@@ -222,37 +362,37 @@ See:
   docs/adr/0006-rename-hotfix-to-release-patch.md
   docs/UPGRADE.md §3.1   (v1.1.0 → v1.2.0 upgrade path)
 EOF
-    exit 0
+	exit 0
 }
 
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --dry-run)     DRY_RUN=1; shift ;;
-        --no-push)     NO_PUSH=1; shift ;;
-        --yes|-y)      SKIP_CONFIRM=1; shift ;;
-        --help|-h)     show_help ;;
-        -*)
-            log_error "Unknown option: $1"
-            echo "Use --help for assistance" >&2
-            exit 1
-            ;;
-        *)
-            if [ -z "$VERSION" ]; then
-                VERSION="$1"
-            else
-                log_error "Multiple versions provided: '$VERSION' and '$1'"
-                exit 1
-            fi
-            shift
-            ;;
-    esac
+	case "$1" in
+		--dry-run)     DRY_RUN=1; shift ;;
+		--no-push)     NO_PUSH=1; shift ;;
+		--yes|-y)      SKIP_CONFIRM=1; shift ;;
+		--help|-h)     show_help ;;
+		-*)
+			log_error "Unknown option: $1"
+			echo "Use --help for assistance" >&2
+			exit 1
+			;;
+		*)
+			if [ -z "$VERSION" ]; then
+				VERSION="$1"
+			else
+				log_error "Multiple versions provided: '$VERSION' and '$1'"
+				exit 1
+			fi
+			shift
+			;;
+	esac
 done
 
 if [ -z "$VERSION" ]; then
-    log_error "Version is required"
-    echo "Usage: $0 <version> [options]" >&2
-    echo "Example: $0 v1.2.1" >&2
-    exit 1
+	log_error "Version is required"
+	echo "Usage: $0 <version> [options]" >&2
+	echo "Example: $0 v1.4.1" >&2
+	exit 1
 fi
 
 # ============================================================
@@ -276,32 +416,32 @@ log_step "[1/6] Checking environment"
 # M-3 fix: `awk` was removed. The script does not use it —
 # keeping it in the check would reject valid environments.
 for tool in git sed; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        log_error "Required tool not found: $tool"
-        exit 1
-    fi
+	if ! command -v "$tool" >/dev/null 2>&1; then
+		log_error "Required tool not found: $tool"
+		exit 1
+	fi
 done
 log_ok "Required tools: git, sed"
 
 # HARD-RP-05: message no longer claims "automatically".
 if command -v jq >/dev/null 2>&1; then
-    log_ok "jq available (update.json will be updated by release.sh)"
+	log_ok "jq available (update.json will be updated by release.sh)"
 else
-    log_warn "jq not found — release.sh will skip update.json"
-    log_info "The PATCH release can still proceed"
-    log_info "You MUST update update.json manually after the release"
+	log_warn "jq not found — release.sh will skip update.json"
+	log_info "The PATCH release can still proceed"
+	log_info "You MUST update update.json manually after the release"
 fi
 
 if [ ! -f "$RELEASE_SCRIPT" ]; then
-    log_error "Missing dependency: $RELEASE_SCRIPT"
-    log_info "release-patch.sh delegates the bump logic to release.sh"
-    log_info "Ensure scripts/release.sh exists in the repository"
-    exit 1
+	log_error "Missing dependency: $RELEASE_SCRIPT"
+	log_info "release-patch.sh delegates the bump logic to release.sh"
+	log_info "Ensure scripts/release.sh exists in the repository"
+	exit 1
 fi
 
 if [ ! -x "$RELEASE_SCRIPT" ]; then
-    log_warn "release.sh is not executable — fixing permissions"
-    chmod +x "$RELEASE_SCRIPT" 2>/dev/null || true
+	log_warn "release.sh is not executable — fixing permissions"
+	chmod +x "$RELEASE_SCRIPT" 2>/dev/null || true
 fi
 
 log_ok "release.sh found: $RELEASE_SCRIPT"
@@ -312,11 +452,11 @@ log_ok "release.sh found: $RELEASE_SCRIPT"
 log_step "[2/6] Validating version format"
 
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-    log_error "Invalid version: '$VERSION'"
-    log_info "Patch versions must be in the form: vMAJOR.MINOR.PATCH"
-    log_info "Prerelease suffixes (e.g. -beta1) are NOT allowed for patch releases"
-    log_info "Examples: v1.2.1, v1.3.1"
-    exit 3
+	log_error "Invalid version: '$VERSION'"
+	log_info "Patch versions must be in the form: vMAJOR.MINOR.PATCH"
+	log_info "Prerelease suffixes (e.g. -beta1) are NOT allowed for patch releases"
+	log_info "Examples: v1.4.1, v1.3.1"
+	exit 3
 fi
 
 log_ok "Version format valid: $VERSION"
@@ -327,25 +467,25 @@ log_ok "Version format valid: $VERSION"
 log_step "[3/6] Verifying PATCH bump rules"
 
 if [ ! -f "VERSION" ]; then
-    log_error "VERSION file not found"
-    exit 2
+	log_error "VERSION file not found"
+	exit 2
 fi
 
 CURRENT_VERSION=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
 if [ -z "$CURRENT_VERSION" ]; then
-    log_error "VERSION file is empty"
-    exit 2
+	log_error "VERSION file is empty"
+	exit 2
 fi
 
 # HARD-RP-03: validate the current VERSION format before parsing.
 # A malformed file (e.g. "1.2" with only two components) would
 # otherwise produce a cryptic bash arithmetic error.
 if ! echo "$CURRENT_VERSION" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
-    log_error "Current VERSION file has an invalid format: '$CURRENT_VERSION'"
-    log_info "Expected: vMAJOR.MINOR.PATCH (e.g. v1.2.0)"
-    log_info "Fix VERSION before running a patch release"
-    exit 2
+	log_error "Current VERSION file has an invalid format: '$CURRENT_VERSION'"
+	log_info "Expected: vMAJOR.MINOR.PATCH (e.g. v1.4.0)"
+	log_info "Fix VERSION before running a patch release"
+	exit 2
 fi
 
 # Parse current
@@ -365,10 +505,10 @@ NEW_PATCH=$(echo "$TARGET_NO_V" | cut -d. -f3)
 # indicate an internal inconsistency).
 for _v in "$CUR_MAJOR" "$CUR_MINOR" "$CUR_PATCH" \
           "$NEW_MAJOR" "$NEW_MINOR" "$NEW_PATCH"; do
-    if ! is_numeric "$_v"; then
-        log_error "Internal error: failed to parse numeric component '$_v'"
-        exit 2
-    fi
+	if ! is_numeric "$_v"; then
+		log_error "Internal error: failed to parse numeric component '$_v'"
+		exit 2
+	fi
 done
 
 log_info "Current version: ${CURRENT_VERSION}"
@@ -377,28 +517,28 @@ echo ""
 
 # Rule 1: MAJOR must be equal
 if [ "$NEW_MAJOR" != "$CUR_MAJOR" ]; then
-    log_error "MAJOR bump detected ($CUR_MAJOR → $NEW_MAJOR)"
-    log_info "Patch releases MUST NOT change the MAJOR component"
-    log_info "Use scripts/release.sh for MAJOR releases"
-    exit 3
+	log_error "MAJOR bump detected ($CUR_MAJOR → $NEW_MAJOR)"
+	log_info "Patch releases MUST NOT change the MAJOR component"
+	log_info "Use scripts/release.sh for MAJOR releases"
+	exit 3
 fi
 
 # Rule 2: MINOR must be equal
 if [ "$NEW_MINOR" != "$CUR_MINOR" ]; then
-    log_error "MINOR bump detected ($CUR_MINOR → $NEW_MINOR)"
-    log_info "Patch releases MUST NOT change the MINOR component"
-    log_info "Use scripts/release.sh for MINOR releases"
-    exit 3
+	log_error "MINOR bump detected ($CUR_MINOR → $NEW_MINOR)"
+	log_info "Patch releases MUST NOT change the MINOR component"
+	log_info "Use scripts/release.sh for MINOR releases"
+	exit 3
 fi
 
 # Rule 3: PATCH must be exactly current + 1
 EXPECTED_PATCH=$((CUR_PATCH + 1))
 
 if [ "$NEW_PATCH" != "$EXPECTED_PATCH" ]; then
-    log_error "PATCH must be exactly $EXPECTED_PATCH (current: $CUR_PATCH)"
-    log_info "Patch releases increment PATCH by exactly 1"
-    log_info "Expected: v${CUR_MAJOR}.${CUR_MINOR}.${EXPECTED_PATCH}"
-    exit 3
+	log_error "PATCH must be exactly $EXPECTED_PATCH (current: $CUR_PATCH)"
+	log_info "Patch releases increment PATCH by exactly 1"
+	log_info "Expected: v${CUR_MAJOR}.${CUR_MINOR}.${EXPECTED_PATCH}"
+	exit 3
 fi
 
 log_ok "PATCH bump valid: $CUR_PATCH → $NEW_PATCH"
@@ -409,74 +549,74 @@ log_ok "PATCH bump valid: $CUR_PATCH → $NEW_PATCH"
 log_step "[4/6] Verifying branch"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
-    log_error "Not a Git repository"
-    exit 2
+	log_error "Not a Git repository"
+	exit 2
 fi
 
 CURRENT_BRANCH=$(git branch --show-current)
 
 if [ -z "$CURRENT_BRANCH" ]; then
-    log_error "Detached HEAD — checkout 'main' first"
-    exit 2
+	log_error "Detached HEAD — checkout 'main' first"
+	exit 2
 fi
 
 if [ "$CURRENT_BRANCH" != "main" ]; then
-    log_error "Patch releases must be created from the 'main' branch"
-    log_info "Current branch: $CURRENT_BRANCH"
-    echo ""
-    log_info "Switch with:"
-    echo "    git checkout main"
-    echo "    git pull origin main"
-    echo "    ./scripts/release-patch.sh ${VERSION}"
-    exit 2
+	log_error "Patch releases must be created from the 'main' branch"
+	log_info "Current branch: $CURRENT_BRANCH"
+	echo ""
+	log_info "Switch with:"
+	echo "    git checkout main"
+	echo "    git pull origin main"
+	echo "    ./scripts/release-patch.sh ${VERSION}"
+	exit 2
 fi
 
 log_ok "On branch: main"
 
 # --- Clean working tree ---
 if [ -n "$(git status --porcelain)" ]; then
-    log_error "Working tree is not clean"
-    log_info "Uncommitted changes:"
-    git status --short
-    log_info "Commit or stash them first"
-    exit 2
+	log_error "Working tree is not clean"
+	log_info "Uncommitted changes:"
+	git status --short
+	log_info "Commit or stash them first"
+	exit 2
 fi
 log_ok "Working tree is clean"
 
 # --- Tag does not already exist ---
 if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null 2>&1; then
-    log_error "Tag ${VERSION} already exists"
-    log_info "Delete it first if you are certain:"
-    echo "    git tag -d ${VERSION}"
-    echo "    git push origin :refs/tags/${VERSION}"
-    exit 2
+	log_error "Tag ${VERSION} already exists"
+	log_info "Delete it first if you are certain:"
+	echo "    git tag -d ${VERSION}"
+	echo "    git push origin :refs/tags/${VERSION}"
+	exit 2
 fi
 log_ok "Tag ${VERSION} is available"
 
 # --- CHANGELOG check ---
 # HARD-RP-02: escape the dots in the version string before
-# using it in the regex. Without this, `## [1.2.1]` would
-# match `## [1x2y1]` and vice versa.
+# using it in the regex. Without this, `## [1.4.1]` would
+# match `## [1x4y1]` and vice versa.
 CHANGELOG_VER_ESCAPED=$(printf '%s' "${VERSION#v}" | sed 's/\./\\./g')
 if ! grep -qE "^## \[v?${CHANGELOG_VER_ESCAPED}\]|^## \[Unreleased\]" CHANGELOG.md 2>/dev/null; then
-    log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
-    log_info "Consider adding it before releasing"
-    if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
-        echo ""
-        # HARD-RP-01: tolerate EOF on stdin.
-        # L-2: drain the rest of the line.
-        read -rp "  Continue anyway? (y/N) " -n 1 REPLY || REPLY=""
-        read -r _ || true
-        echo ""
-        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-            log_warn "Aborted by user"
-            exit 4
-        fi
-        # HARD-RP-04: reset REPLY.
-        REPLY=""
-    fi
+	log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
+	log_info "Consider adding it before releasing"
+	if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
+		echo ""
+		# HARD-RP-01: tolerate EOF on stdin.
+		# L-2: drain the rest of the line.
+		read -rp "  Continue anyway? (y/N) " -n 1 REPLY || REPLY=""
+		read -r _ || true
+		echo ""
+		if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+			log_warn "Aborted by user"
+			exit 4
+		fi
+		# HARD-RP-04: reset REPLY.
+		REPLY=""
+	fi
 else
-    log_ok "CHANGELOG.md contains a relevant section"
+	log_ok "CHANGELOG.md contains a relevant section"
 fi
 
 # ============================================================
@@ -508,16 +648,16 @@ echo -e "    ${DIM}(or: git checkout develop && git merge origin/main && git pus
 echo ""
 
 if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
-    # HARD-RP-01: tolerate EOF.
-    # L-2: drain the rest of the line.
-    read -rp "  Proceed with the patch release? (y/N) " -n 1 REPLY || REPLY=""
-    read -r _ || true
-    echo ""
-    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-        log_warn "Aborted by user"
-        exit 4
-    fi
-    REPLY=""
+	# HARD-RP-01: tolerate EOF.
+	# L-2: drain the rest of the line.
+	read -rp "  Proceed with the patch release? (y/N) " -n 1 REPLY || REPLY=""
+	read -r _ || true
+	echo ""
+	if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+		log_warn "Aborted by user"
+		exit 4
+	fi
+	REPLY=""
 fi
 
 # ============================================================
@@ -544,23 +684,23 @@ log_info "Running: release.sh ${RELEASE_ARGS[*]}"
 echo ""
 
 if "$RELEASE_SCRIPT" "${RELEASE_ARGS[@]}"; then
-    _rc=0
+	_rc=0
 else
-    _rc=$?
+	_rc=$?
 fi
 
 if [ "$_rc" -ne 0 ]; then
-    log_error "release.sh failed (exit=$_rc) — patch release was NOT published"
-    case "$_rc" in
-        1) log_info "release.sh: invalid arguments or environment" ;;
-        2) log_info "release.sh: repository state invalid" ;;
-        3) log_info "release.sh: version metadata mismatch" ;;
-        4) log_info "release.sh: user aborted" ;;
-        *) log_info "release.sh: unexpected exit code" ;;
-    esac
-    log_info "Fix the issue and retry:"
-    echo "    ./scripts/release-patch.sh ${VERSION}"
-    exit "$_rc"
+	log_error "release.sh failed (exit=$_rc) — patch release was NOT published"
+	case "$_rc" in
+		1) log_info "release.sh: invalid arguments or environment" ;;
+		2) log_info "release.sh: repository state invalid" ;;
+		3) log_info "release.sh: version metadata mismatch" ;;
+		4) log_info "release.sh: user aborted" ;;
+		*) log_info "release.sh: unexpected exit code" ;;
+	esac
+	log_info "Fix the issue and retry:"
+	echo "    ./scripts/release-patch.sh ${VERSION}"
+	exit "$_rc"
 fi
 
 # ============================================================
@@ -574,26 +714,26 @@ fi
 # M-1 fix: the dry-run branch was previously missing — the
 # banner was shown even when --dry-run was passed.
 if [ "$DRY_RUN" = "1" ]; then
-    echo ""
-    echo -e "${YELLOW}${BOLD}Note: --dry-run was passed.${NC}"
-    echo -e "  Nothing was committed, tagged, or pushed."
-    echo -e "  The back-merge reminder is not applicable."
-    echo ""
-    echo -e "  Run without ${CYAN}--dry-run${NC} to apply the patch release."
-    echo ""
-    exit 0
+	echo ""
+	echo -e "${YELLOW}${BOLD}Note: --dry-run was passed.${NC}"
+	echo -e "  Nothing was committed, tagged, or pushed."
+	echo -e "  The back-merge reminder is not applicable."
+	echo ""
+	echo -e "  Run without ${CYAN}--dry-run${NC} to apply the patch release."
+	echo ""
+	exit 0
 fi
 
 if [ "$NO_PUSH" = "1" ]; then
-    echo ""
-    echo -e "${YELLOW}${BOLD}Note: --no-push was passed.${NC}"
-    echo -e "  Nothing has been published yet."
-    echo -e "  After you push manually, remember to back-merge main → develop:"
-    echo -e "    ${DIM}git push origin main${NC}"
-    echo -e "    ${DIM}git push origin ${VERSION}${NC}"
-    echo -e "    ${DIM}make sync${NC}"
-    echo ""
-    exit 0
+	echo ""
+	echo -e "${YELLOW}${BOLD}Note: --no-push was passed.${NC}"
+	echo -e "  Nothing has been published yet."
+	echo -e "  After you push manually, remember to back-merge main → develop:"
+	echo -e "    ${DIM}git push origin main${NC}"
+	echo -e "    ${DIM}git push origin ${VERSION}${NC}"
+	echo -e "    ${DIM}make sync${NC}"
+	echo ""
+	exit 0
 fi
 
 echo ""

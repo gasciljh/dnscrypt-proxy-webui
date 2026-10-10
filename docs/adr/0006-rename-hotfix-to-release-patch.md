@@ -12,7 +12,164 @@
 
 ---
 
-> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+> **Identifier inventory in this file (5 total)**:
+>   • HARD-ADR6-01 (v1.3.0 verification block extended with
+>     server-side rotation refinements context — v1.4.0)
+>   • HARD-ADR6-02 (v1.4.0 verification block extended with
+>     MAIN-01 + companion-APK-fetcher isolation context — v1.4.0)
+>   • HARD-ADR6-03 (References section extended with rotation /
+>     MAIN-01 cross-references — v1.4.0)
+>   • HARD-ADR6-04 (Header identifier inventory + cross-references
+>     added — v1.4.0)
+>   • HARD-ADR6-05 (Release verification entries v1.3.0 + v1.4.0
+>     extended with SNAP-*/ROT-* + MAIN-01 context — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](../ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/ARCHITECTURE.md §4.1, §11.37](../ARCHITECTURE.md) —
+>     MAIN-01 (`LOG_LEVEL` load-order fix)
+>   • [docs/COMPATIBILITY.md §10.3.5](../COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/GLOSSARY.md](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+>     Rotation Guardian badge
+>   • [docs/HALL_OF_FAME.md](../HALL_OF_FAME.md) — Rotation Guardian
+>     + Companion App Champion badges
+>   • [docs/BRANCHING.md §8](../BRANCHING.md) — hotfix / PATCH
+>     flow documentation
+>   • [docs/RELEASE_PROCESS.md §2.3](../RELEASE_PROCESS.md) — PATCH
+>     release type
+>   • [scripts/release.sh](../../scripts/release.sh) — the delegated
+>     primary release script
+>   • [CHANGELOG.md](../../CHANGELOG.md) — version history
+
+---
+
+> **Post-Release Verification (v1.4.0 — 2026-10-06)**:
+>
+> This ADR was reviewed during the v1.4.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The script has now been **present in the repository** as
+>     `scripts/release-patch.sh` for **five releases** (v1.0.0,
+>     v1.1.0, v1.2.0, v1.3.0, and v1.4.0).
+>   • The script's **behavior** (3 safety rules: branch=`main`,
+>     MAJOR equal, MINOR equal, PATCH = current + 1) remains
+>     unchanged.
+>   • The script has **still not been exercised for a real PATCH
+>     release**, because:
+>     - `v1.0.0` was a first stable release.
+>     - `v1.1.0` was a MINOR release (via `release.sh`).
+>     - `v1.2.0` was a MINOR release (via `release.sh`).
+>     - `v1.3.0` was a MINOR release (via `release.sh`).
+>     - `v1.4.0` was a MINOR release (via `release.sh`).
+>     - No `v1.x.y` PATCH has been needed.
+>   • The **naming decision** (`release-` prefix instead of
+>     `hotfix-`) remains correct:
+>     - It still aligns with `scripts/release.sh` alphabetically.
+>     - It accurately describes the version component (PATCH).
+>     - It avoids confusion with the `hotfix/*` **branch** prefix.
+>     - **v1.4.0 confirmed this**: the release used the `release/*`
+>       branch prefix and the `release.sh` script — a clear split
+>       from `hotfix/*` + `release-patch.sh` that this ADR
+>       established.
+>   • **v1.3.0 server-side refinements** — the release that preceded
+>     v1.4.0 shipped five new backup/rotation semantics (also used
+>     in `CHANGELOG.md` [v1.3.0] and
+>     [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13):
+>       - **SNAP-MANIFEST** — `main.go:buildBackupInfo()` detects a
+>         snapshot by `.manifest.json` presence, not by name pattern.
+>       - **SNAP-MTIME** — `last_backup_name` is selected by mtime,
+>         not by lexicographic name.
+>       - **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` rewritten with the same
+>         detection, the same mtime sort, and two protected targets
+>         (`.last_stable` + newest install).
+>     These were mirrored across `service.sh`, `watchdog.sh`,
+>     `status.sh`, `customize.sh`, `action.sh`, and `uninstall.sh`.
+>     **This is orthogonal to this ADR**: the naming decision governs
+>     the PATCH script's filename; the SNAP-*/ROT-* refinements
+>     govern runtime backup behavior. Neither interacts with the
+>     other — `release-patch.sh` delegates to `release.sh` and never
+>     reads or writes backup state.
+>   • **v1.4.0 integration additions** — the release shipped:
+>     - An optional companion Android app (`web/app-debug.apk`).
+>     - A new fetcher script (`scripts/fetch_app_apk.sh`) and a new
+>       `Makefile` target (`fetch-apk`).
+>     - The CodeQL `go/path-injection` fix in `removeModule`.
+>     - iOS PWA logic removal from `web/index.html`.
+>     - **MAIN-01** — `LOG_LEVEL` loaded immediately after
+>       `initPaths()` in `main.go`. See
+>       [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.1 and §11.37.
+>     **v1.4.0 confirmed the naming decision held**: a new
+>     `fetch_*` script (`fetch_app_apk.sh`) joined the existing
+>     `fetch_dns_binaries.sh`, and the `release-*` pair
+>     (`release.sh` + `release-patch.sh`) remained visually and
+>     alphabetically distinct from the `fetch_*` group — exactly
+>     the naming separation this ADR intended. The
+>     `release-patch.sh` workflow was **not affected** by the
+>     companion-APK-fetcher addition; the PATCH script still
+>     delegates to `release.sh` and does not interact with the new
+>     fetcher.
+>   • The **first realistic use** of the script remains the same:
+>     a critical bug in `v1.4.0` requiring a `v1.4.1` PATCH release
+>     (via `hotfix/*`). The `docs/RELEASE_PROCESS.md` rewrite for
+>     v1.4.0 now lists `v1.4.1` as the next PATCH example.
+>   • The **naming decision** has not caused any confusion in the
+>     documentation or contributor guides, including the
+>     `docs/RELEASE_PROCESS.md` rewrite for v1.4.0.
+>
+> **Result**: The decision is validated by its continued
+> integration into the codebase and documentation across five
+> releases, including one feature release with server-side
+> rotation refinements and one integration release with a new
+> fetcher script. Full runtime validation will follow the first
+> PATCH release. No superseding ADR is required.
+
+> **Post-Release Verification (v1.3.0 — 2026-10-02)**:
+>
+> This ADR was reviewed during the v1.3.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The script has been **present in the repository** as
+>     `scripts/release-patch.sh` for **four releases** (v1.0.0,
+>     v1.1.0, v1.2.0, and v1.3.0).
+>   • The script's **behavior** (3 safety rules) remains unchanged.
+>   • The script has **still not been exercised for a real PATCH
+>     release** — no `v1.x.y` PATCH has been needed.
+>   • The **naming decision** remains correct.
+>   • **v1.3.0 confirmed the split**: the release used the
+>     `release/*` branch prefix and the `release.sh` script,
+>     keeping `hotfix/*` + `release-patch.sh` reserved for
+>     emergency PATCH releases.
+>   • **v1.3.0 shipped server-side rotation refinements** that are
+>     independent of the PATCH workflow:
+>       - **SNAP-MANIFEST** + **SNAP-MTIME** — `main.go:buildBackupInfo()`
+>         detection + sort changes.
+>       - **ROT-MANIFEST** + **ROT-MTIME** + **ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` rewrite, mirrored across
+>         5 other shell scripts.
+>     See [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13.
+>     **The naming decision remained orthogonal to these
+>     refinements** — a release that ships new runtime semantics
+>     uses the same `release.sh` / `release-patch.sh` split as a
+>     purely client-side release. This further validates the naming
+>     separation between Git vocabulary (`hotfix/*`) and SemVer
+>     vocabulary (`release-patch.sh`).
+>   • The **first realistic use** of the script remains: a
+>     critical bug in `v1.3.0` requiring a `v1.3.1` PATCH release.
+>   • The **naming decision** has not caused any confusion.
+>
+> **Result**: The decision is validated by its continued
+> integration into the codebase and documentation across four
+> releases, including one feature release with server-side
+> rotation refinements. No superseding ADR is required.
+
+> **Post-Release Verification (v1.2.0 — 2026-09-29)** (retained as history):
 >
 > This ADR was reviewed during the v1.2.0 release cycle and
 > **remains in effect**. No amendments were needed.
@@ -49,9 +206,9 @@
 > **Result**: The decision is validated by its continued
 > integration into the codebase and documentation across three
 > releases. Full runtime validation will follow the first PATCH
-> release. No superseding ADR is required.
+> release.
 
-> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+> **Post-Release Verification (v1.1.0 — 2026-09-26)** (retained as history):
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
 > **remains in effect**. No amendments were needed.
@@ -82,7 +239,7 @@
 >
 > **Result**: The decision is validated by its integration into
 > the codebase and documentation. Full runtime validation will
-> follow the first PATCH release. No superseding ADR is required.
+> follow the first PATCH release.
 
 ---
 
@@ -150,6 +307,12 @@ does **not** cover:
   [ADR-0001](0001-two-branch-model.md).
 - The release workflow → see [ADR-0002](0002-automated-releases.md)
   and [ADR-0003](0003-post-release-sync.md).
+- The content of individual releases (e.g. the v1.3.0
+  SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME +
+  ROT-PROTECT server-side refinements documented in
+  [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13, or the
+  v1.4.0 MAIN-01 `LOG_LEVEL` load-order fix documented in §4.1
+  and §11.37) — this ADR concerns only the PATCH script's name.
 
 ---
 
@@ -177,12 +340,15 @@ scripts/
 ├── release.sh                  ← MINOR/MAJOR releases (from develop)
 ├── release-patch.sh            ← PATCH releases (from main)
 ├── fetch_dns_binaries.sh
+├── fetch_app_apk.sh            ← v1.4.0 — companion APK fetcher
 ├── generate-icons.sh
 └── package_module.sh
 ```
 
 The two release scripts now sit side by side, alphabetically
-adjacent, and share the `release-` prefix.
+adjacent, and share the `release-` prefix. The v1.4.0 addition
+`fetch_app_apk.sh` follows the same `fetch_*` convention as
+`fetch_dns_binaries.sh` (not the `release-*` pair).
 
 #### What changes
 
@@ -190,7 +356,7 @@ adjacent, and share the `release-` prefix.
 |---|---|---|
 | Script file | `scripts/hotfix.sh` | `scripts/release-patch.sh` |
 | Header comment | `DNSCrypt Smart Filter – hotfix.sh` | `DNSCrypt Smart Filter – release-patch.sh` |
-| Usage examples | `./scripts/hotfix.sh v1.0.1` | `./scripts/release-patch.sh v1.1.1` |
+| Usage examples | `./scripts/hotfix.sh v1.0.1` | `./scripts/release-patch.sh v1.4.1` |
 | Help text | `hotfix.sh <version>` | `release-patch.sh <version>` |
 | Error messages | "Hotfixes MUST NOT..." | "Patch releases MUST NOT..." |
 | Summary box | "Hotfix summary:" | "Patch release summary:" |
@@ -266,6 +432,11 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
 - ✅ **Future-proof.** If a MINOR-emergency or MAJOR-emergency
   variant is ever needed, the pattern `release-minor.sh`,
   `release-major.sh` extends naturally.
+- ✅ **(v1.4.0 confirmation)** The rename pattern held through a
+  fifth MINOR release without needing any adjustment — the sibling
+  convention (`release.sh` + `release-patch.sh`) remains clear,
+  even after a new `fetch_*` script (`fetch_app_apk.sh`) joined
+  the toolset.
 
 ### Negative
 
@@ -331,13 +502,25 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
 - [`Makefile`](../../Makefile) — updated target (`hotfix:` →
   `release-patch:`).
 - [`docs/BRANCHING.md`](../BRANCHING.md) §8 — hotfix flow
-  documentation.
+  documentation; §8.4 — the post-release back-merge for PATCH
+  releases.
 - [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §2.3 — PATCH
-  release type.
+  release type; §5 — the release-PR flow.
 - [`docs/ROADMAP.md`](../ROADMAP.md) §10.2 — workflow priorities.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0; the
-  PATCH flow will be relevant for v1.2.1 if needed).
+  (§3.1 covers v1.0.0 → v1.1.0; §3.2 covers v1.1.0 → v1.2.0;
+  §3.3 covers v1.2.0 → v1.3.0; §3.4 covers v1.3.0 → v1.4.0 — the
+  PATCH flow will be relevant for v1.4.1 if needed).
+- [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13 — v1.3.0
+  server-side rotation refinements (SNAP-*/ROT-*), orthogonal to
+  the PATCH workflow; §4.1 and §11.37 — MAIN-01 (`LOG_LEVEL`
+  load-order fix in v1.4.0), also orthogonal.
+- [`docs/COMPATIBILITY.md`](../COMPATIBILITY.md) §10.3.5 — on-device
+  SNAP-*/ROT-* verification procedure.
+- [`docs/GLOSSARY.md`](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+  Rotation Guardian badge.
+- [`docs/HALL_OF_FAME.md`](../HALL_OF_FAME.md) — Rotation Guardian
+  + Companion App Champion badges.
 - [`CHANGELOG.md`](../../CHANGELOG.md) — the rename is recorded
   here.
 
@@ -387,17 +570,63 @@ Emergency fix        ──▶   hotfix/*       ──▶  release-patch.sh ─�
   - No confusion in any updated documentation
     (`docs/RELEASE_PROCESS.md`, `docs/CONTRIBUTING.md`,
     `docs/UPGRADE.md`).
+- **v1.3.0** (2026-10-02) — fourth release cycle.
+  - No PATCH release was needed (v1.3.0 was a MINOR release via
+    `release.sh`).
+  - `scripts/release-patch.sh` remained unchanged.
+  - The naming decision continued to hold.
+  - **v1.3.0 shipped server-side rotation refinements** —
+    **SNAP-MANIFEST** + **SNAP-MTIME** (in
+    `main.go:buildBackupInfo()`) and **ROT-MANIFEST** +
+    **ROT-MTIME** + **ROT-PROTECT** (in
+    `functions.sh:rotate_backups()`), mirrored in 5 other shell
+    scripts. See [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
+    §4.13.
+  - **The naming decision remained orthogonal to these
+    refinements**: a release with new runtime semantics uses the
+    same `release.sh` / `release-patch.sh` split as a purely
+    client-side release. This further validates the separation
+    between Git vocabulary (`hotfix/*`) and SemVer vocabulary
+    (`release-patch.sh`).
+  - `docs/BRANCHING.md` §8 continued to use `v1.2.1` as the
+    placeholder PATCH example.
+  - No confusion in any updated documentation.
+- **v1.4.0** (2026-10-06) — fifth release cycle.
+  - No PATCH release was needed (v1.4.0 was a MINOR release via
+    `release.sh`).
+  - `scripts/release-patch.sh` remained unchanged.
+  - **v1.4.0 added two new pipeline artifacts** — a new fetcher
+    script (`scripts/fetch_app_apk.sh`) and a new `Makefile`
+    target (`fetch-apk`). The new script followed the existing
+    `fetch_*` convention (`fetch_dns_binaries.sh`), while the
+    `release-*` pair (`release.sh` + `release-patch.sh`) remained
+    visually and alphabetically distinct — **exactly the naming
+    separation this ADR intended**.
+  - The `release-patch.sh` workflow was **not affected** by the
+    companion-APK-fetcher addition; the PATCH script still
+    delegates to `release.sh` and does not interact with the new
+    fetcher.
+  - **v1.4.0 also shipped** the CodeQL `go/path-injection` fix in
+    `removeModule`, iOS PWA logic removal from `web/index.html`,
+    and **MAIN-01** (`LOG_LEVEL` loaded immediately after
+    `initPaths()` in `main.go`) — all orthogonal to the PATCH
+    workflow.
+  - `docs/RELEASE_PROCESS.md` was rewritten for v1.4.0 and now
+    uses `v1.4.1` as the next PATCH example.
+  - No confusion in any updated documentation.
 - **First real PATCH release** — **not yet exercised**.
-  - Expected scenario: `v1.2.0 → v1.2.1` via `hotfix/*`.
+  - Expected scenario: `v1.4.0 → v1.4.1` via `hotfix/*`.
   - The 3 safety rules will be validated in production.
   - See [`docs/BRANCHING.md`](../BRANCHING.md) §8.2 for the
     procedure.
-- **Naming consistency** — verified across three releases:
+- **Naming consistency** — verified across five releases:
   - `ls scripts/release*.sh` lists both `release.sh` and
     `release-patch.sh`.
   - No remaining references to `hotfix.sh` in the codebase.
-- **Next review**: after the first PATCH release (v1.2.1 or
-  later), or the v1.3.0 cycle, whichever comes first.
+  - The v1.4.0 `fetch_*` addition (`fetch_app_apk.sh`) did not
+    disrupt the `release-*` prefix group.
+- **Next review**: after the first PATCH release (v1.4.1 or
+  later), or the v1.5.0 cycle, whichever comes first.
 - See `CHANGELOG.md` for the full release history.
 
 ---

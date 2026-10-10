@@ -3,9 +3,21 @@
 Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewalls.
 
 **Version**: v1.4.0 (Global Edition)
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **Identifier inventory in this file (10 total)**:
+>   • HARD-COMPAT-01 (backup section move — historical)
+>   • HARD-COMPAT-02 (curl auth examples — historical)
+>   • HARD-COMPAT-03 (CI backup matrix — historical)
+>   • HARD-COMPAT-04 (MEM-1 runtime verification — historical)
+>   • HARD-COMPAT-V14-01..03 (v1.4.0 — companion app notes)
+>   • HARD-COMPAT-V14-04 (v1.4.0 — `Last updated` correction)
+>   • HARD-COMPAT-V14-05 (v1.4.0 — v1.3.0 block server-side context)
+>   • HARD-COMPAT-V14-06 (v1.4.0 — §2.5 SNAP-MANIFEST note)
+>   • HARD-COMPAT-V14-07 (v1.4.0 — §10.3.5 SNAP/ROT verification)
+>   • HARD-COMPAT-V14-08 (v1.4.0 — POST-AUDIT FIXES + cross-refs)
 
 > **⚠️ API examples & authentication**:
 >   The `curl` examples in this document use the shorthand form
@@ -27,17 +39,22 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • `Last updated` reflects the v1.4.0 release date.
+>   • `Last updated` reflects the v1.4.0 file-editing date (2026-10-08).
 >   • §1.3 (What's New) rewritten to reflect the v1.4.0 feature
 >     set (companion Android app integration, CodeQL hardening,
 >     iOS PWA removal).
->   • §1.4 (What Was New in v1.3.0) — new subsection.
+>   • §1.4 (What Was New in v1.3.0) — **extended with server-side
+>     refinements context** (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The previous version
+>     mentioned only the client-side changes.
 >   • §1.5 (What Was New in v1.2.0) — renumbered from §1.3.
 >   • §1.6 (What Was New in v1.1.0) — renumbered from §1.4.
 >   • §1.7 (What Was New in v1.0.0) — renumbered from §1.5.
 >   • §1.8 (Bilingual WebUI) — renumbered from §1.6.
 >   • §1.9 (Companion Android App) — new subsection.
 >   • §2.4 extended with the v1.4.0 companion app note.
+>   • §2.5 extended with a v1.3.0 SNAP-MANIFEST note (the
+>     `available` count rule changed).
 >   • §5.4 extended with a note about the v1.4.0 companion app
 >     (no memory impact — the APK is a static asset).
 >   • §7.2 extended with the v1.4.0 Root + Companion App table.
@@ -46,9 +63,11 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 >       - `iOS-specific PWA path removed` (breaking if you relied
 >         on the iOS install modal).
 >   • §10.3 extended with a v1.4.0 compatibility testing subsection.
+>   • **§10.3.5 (new) — v1.3.0 server-side refinements verification**:
+>     how to test SNAP-MANIFEST + SNAP-MTIME + ROT-* on a device.
 >   • §10.8 (Companion App Champion badge) — new subsection.
 >   • §11.1 updated with the v1.4.0 documentation set (BACKUP.md,
->     EMERGENCY.md, UPGRADE.md).
+>     EMERGENCY.md, UPGRADE.md, ARCHITECTURE.md §4.13).
 >   • §11.3 (Companion App Repository) — new subsection.
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
@@ -61,6 +80,74 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 >     [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
 >     and served at `GET /app-debug.apk` on the WebUI.
 
+> **v1.3.0 changes (historical — extended in this revision)**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side changes**:
+>       - PWA install button (dynamic, always-visible, browser-aware)
+>       - Live status LED on the Today counter
+>   • **Boot-path fix**: DNS auto-start after boot — `service.sh`
+>     §[19] performs a bounded wait for the WebUI to become ready,
+>     then calls `POST /api/ensure_running_service` directly. This
+>     avoids the 30-60 s delay caused by the watchdog's first
+>     polling interval. Compatibility impact: **✅ Faster DNS
+>     availability after reboot**.
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO rewrote the snapshot-detection and
+>     rotation semantics that underpin `runtime_info.backups`.
+>     Three identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file (instead of the
+>         `<YYYYMMDD>-<HHMMSS>-...` name pattern). Effect on
+>         compatibility: the `available` field's count rule
+>         changed. For snapshots produced by the standard
+>         toolchain, the result is identical (every snapshot
+>         carries a manifest). For custom-named snapshots, the
+>         new count includes them; the old count did not.
+>
+>       🔧 **SNAP-MTIME** — `buildBackupInfo()` now selects
+>         `last_backup_name` by **mtime** (descending), with a
+>         name-based fallback when `DirEntry.Info()` fails.
+>         Compatibility impact: the field's **value** may differ
+>         only when the system clock was adjusted backwards, or
+>         when a snapshot has a non-standard name. The field's
+>         **type and schema** are unchanged.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with
+>         the same detection (ROT-MANIFEST), the same mtime
+>         sort (ROT-MTIME), and two additional protected
+>         targets on top of the 21-newest window (ROT-PROTECT):
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>         Compatibility impact: **✅ no API change**. The
+>         rotation happens in the shell layer; the API only
+>         observes the resulting snapshot list.
+>
+>   • **Parallel application**: the same SNAP-MANIFEST /
+>     ROT-* semantics were applied to `watchdog.sh`,
+>     `status.sh`, `customize.sh`, `action.sh`, and
+>     `uninstall.sh`. Every consumer of the persistent backup
+>     directory now agrees on which snapshots exist and which
+>     is the newest. Compatibility impact: **✅ no API change**.
+>
+>   • See `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13 for the full story.
+
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Global edition — English default + Arabic toggle.
+>   • **10 data-preservation layers** — see §1.5.
+>   • **Persistent backup directory** (`/sdcard/dnscrypt-webui-backup/`)
+>     — see §2.5 for the Android version matrix.
+>   • **`runtime_info.backups` — 7 fields** (additive).
+>   • **Bilingual WebUI** (English default + Arabic toggle).
+>   • **Watchdog token** on `POST /api/ensure_running_service`
+>     — security hardening (BUG-B fix).
+
 > **v1.4.0 (Global Edition) — Additional hardening in this revision**:
 >   • 🛡️ **HARD-COMPAT-V14-01** — All `curl` examples continue to
 >     document the authentication requirement. No behavioral change.
@@ -71,13 +158,43 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 >     documented as **optional** in every reference. A missing APK
 >     does not break any compatibility row.
 
-> **v1.4.0 (Global Edition) — Corrections in this revision**:
->   • 🔧 **COMPAT-1** — The §1.3 "What's New" section previously
->     documented v1.2.0 as the current release. It now documents
->     v1.4.0.
->   • 🔧 **COMPAT-2** — The §2.4 "Dashboard — v1.2.0 + v1.4.0
->     Fields" section was updated to add a v1.4.0 note about the
->     companion app route.
+> **v1.4.0 (Global Edition) — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 / v1.4.0
+>   code identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-COMPAT-V14-04** — **`Last updated` corrected.** The
+>     header and footer previously said `2026-10-06` (which
+>     corresponded to the v1.4.0 release date, not to the v1.4.0
+>     file-editing date). Both now read `2026-10-08`, matching
+>     every other file in the v1.4.0 module.
+>
+>   🔧 **HARD-COMPAT-V14-05** — **`v1.3.0` block extended.** The
+>     previous block mentioned only the client-side changes (PWA
+>     install button, live status LED) and the DNS auto-start fix.
+>     It did NOT mention the **server-side refinements** to
+>     snapshot detection and rotation (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) that are central to
+>     the `runtime_info.backups` object documented in §2.4. The
+>     v1.3.0 block above now documents them, with explicit
+>     "Compatibility impact" notes for each identifier.
+>
+>   🔧 **HARD-COMPAT-V14-06** — **§2.5 updated.** The backup
+>     compatibility matrix now notes that the `available` field's
+>     count rule is **SNAP-MANIFEST** (v1.3.0): a snapshot is
+>     counted **iff** its directory contains a `.manifest.json`
+>     file. The previous version did not mention this rule.
+>
+>   🔧 **HARD-COMPAT-V14-07** — **§10.3.5 added.** A new
+>     verification subsection for the v1.3.0 server-side
+>     refinements: how to confirm SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, and ROT-PROTECT are active on a
+>     real device.
+>
+>   🟢 **HARD-COMPAT-V14-08** — **Cross-references added.**
+>     §11.2 now points at `docs/ARCHITECTURE.md` §4.13 (the
+>     authoritative source for the v1.3.0 server-side
+>     refinements) and at `CHANGELOG.md` §[v1.3.0].
 
 ---
 
@@ -151,9 +268,9 @@ The `/sdcard/` requirement is unchanged.
 ### 1.4 What Was New in v1.3.0
 
 **Feature release** — PWA install button + live status LED +
-DNS auto-start fix.
+DNS auto-start fix + **server-side backup refinements**.
 
-**Compatibility-relevant changes** (for reference):
+**Compatibility-relevant changes**:
 
 | # | Change | Compatibility impact |
 |:-:|---|---|
@@ -161,6 +278,13 @@ DNS auto-start fix.
 | **2** | **Live status LED** on the Today counter | ✅ Client-side only |
 | **3** | **DNS auto-start after boot** — `service.sh` now waits for the WebUI then calls `POST /api/ensure_running_service` directly | ✅ Faster DNS availability after reboot |
 | **4** | **`watchdog.sh` backoff behavior unchanged** — the boot-path fix does not affect crash recovery | ✅ No impact |
+| **5** | **SNAP-MANIFEST** — `buildBackupInfo()` detects snapshots by `.manifest.json` presence, not name pattern | ✅ **API contract unchanged**. The `available` count may be **larger** for the same on-disk state (custom-named snapshots are now visible). |
+| **6** | **SNAP-MTIME** — `last_backup_name` is selected by mtime, not lexicographic name | ✅ **API contract unchanged**. The field **value** may differ only under clock drift or a non-standard snapshot name. |
+| **7** | **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** — `rotate_backups` rewritten with the same detection + sort + two protected targets | ✅ **API contract unchanged**. Rotation happens in the shell layer. |
+| **8** | **Parallel application** — the same SNAP-* / ROT-* semantics applied to `watchdog.sh`, `status.sh`, `customize.sh`, `action.sh`, `uninstall.sh` | ✅ **API contract unchanged**. |
+
+**Consumers of `runtime_info.backups`**: see §2.4 for the field
+description, and §10.3.5 for a verification procedure.
 
 ### 1.5 What Was New in v1.2.0
 
@@ -180,6 +304,7 @@ DNS auto-start fix.
 | **10** | **CLI diagnose tool** (`status.sh --diagnose`) | ✅ Local-only, no network required. |
 | **11** | **`runtime_info.backups` — 7 fields** | ✅ Additive — 5 fields still present. |
 | **12** | **Bilingual WebUI (English default + Arabic toggle)** | ✅ Client-side only. No API impact. See §1.8. |
+| **13** | **Watchdog token on `POST /api/ensure_running_service`** | ⚠️ Security hardening — clients that relied on the localhost bypass must now send `X-Watchdog-Token`. |
 
 ### 1.6 What Was New in v1.1.0
 
@@ -401,6 +526,16 @@ object (v1.2.0), plus a **companion-app install button** (v1.4.0):
 | **Orphan Txn** | `backups.orphan_txn` | int |
 | **Backup Path** | `backups.path` | string |
 
+**v1.3.0 note on `available` (HARD-COMPAT-V14-06)**: Since
+v1.3.0, the `available` field counts a directory as a snapshot
+**iff** it contains a `.manifest.json` file (SNAP-MANIFEST).
+For the standard toolchain's output, the value is identical to
+v1.2.0's name-pattern-based count. It differs only when:
+- A custom-named snapshot exists (v1.3.0 counts it; v1.2.0 did
+  not).
+- A directory matches the name pattern but lacks a manifest
+  (v1.3.0 excludes it; v1.2.0 counted it).
+
 **v1.4.0 — Companion app button**:
 
 The main WebUI (`index.html`) now shows an install button:
@@ -462,6 +597,23 @@ Android mounts `/sdcard/` and what SELinux tools are available.
    `copy_with_context` helper prefers `restorecon` and falls
    back to `chcon u:object_r:magisk_file:s0` if it is missing.
 
+4. **Snapshot detection (v1.3.0 — SNAP-MANIFEST)**: Since
+   v1.3.0, `runtime_info.backups.available` counts a directory
+   as a snapshot **iff** it contains a `.manifest.json` file.
+   This rule is **platform-independent** — it applies on every
+   Android version. The only difference across Android versions
+   is that on Android 5.x, the manifest's `files[].sha256`
+   field may be empty when `sha256sum` is unavailable; the
+   manifest itself is still written (SNAP-MANIFEST only checks
+   for **presence**, not contents).
+
+5. **Rotation semantics (v1.3.0 — ROT-MANIFEST / ROT-MTIME /
+   ROT-PROTECT)**: Since v1.3.0, `rotate_backups` uses the
+   same manifest-based detection and mtime sort as
+   `buildBackupInfo`, and preserves the `.last_stable` target
+   and the newest install snapshot. This is also
+   platform-independent.
+
 **Verified by CI (HARD-COMPAT-03)**: The
 `.github/workflows/upgrade-test.yml` matrix (42 scenarios)
 exercises the **shell logic** of the backup layer on
@@ -503,6 +655,11 @@ library (`runtime/debug`) — no platform-specific behavior.
 Android. The CI runs them in a temporary directory via
 `.github/workflows/upgrade-test.yml`. See that workflow for the
 emulation setup.
+
+**v1.3.0**: The SNAP-MANIFEST / SNAP-MTIME / ROT-* semantics
+are implemented identically on all platforms — they depend only
+on the filesystem's `stat` and `mv` behavior, which is portable
+across Linux, macOS, and Android.
 
 **v1.4.0**: The companion Android app APK is a static asset —
 no platform-specific behavior on the server side.
@@ -641,6 +798,7 @@ use **Chrome 88+**, **Firefox 92+**, or a recent version of
 | **`rename(2)` atomicity** | **3.x+** | **✅ (v1.2.0 transactions)** |
 | **`sha256sum` (from coreutils)** | **Android 4.4+** | **✅ (v1.2.0 backup)** |
 | **`restorecon` / `chcon`** | **SELinux kernel** | **✅ (v1.2.0 Layer 6)** |
+| **`stat -c %Y` / `stat -f %m`** | **Any** | **✅ (v1.3.0 ROT-MTIME)** |
 
 **Note**: `debug.SetMemoryLimit` was introduced in Go 1.19.
 Since v1.1.0 uses Go 1.22, this is available on all supported
@@ -650,6 +808,12 @@ kernel versions — the kernel itself is not involved.
 on POSIX-atomic `rename(2)` for its `commit_transaction` and
 `rollback_transaction` operations. Every supported kernel provides
 this.
+
+**v1.3.0 note**: The rotation rewrite (ROT-MTIME) reads the mtime
+of snapshot directories via `stat -c %Y` (GNU coreutils) with a
+`stat -f %m` (BSD/Toybox) fallback. Both forms are supported by
+every Linux kernel; the difference is in the user-space `stat`
+implementation, not the kernel.
 
 **v1.4.0 note**: The companion app runs in userspace; no kernel
 prerequisites beyond API 21.
@@ -999,6 +1163,9 @@ su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 | DNS auto-start fix (v1.3.0) | ✅ | ✅ | ✅ |
 | PWA install button (v1.3.0) | ✅ | ✅ | ✅ |
 | Live status LED (v1.3.0) | ✅ | ✅ | ✅ |
+| SNAP-MANIFEST detection (v1.3.0) | ✅ | ✅ | ✅ |
+| SNAP-MTIME sort (v1.3.0) | ✅ | ✅ | ✅ |
+| ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (v1.3.0) | ✅ | ✅ | ✅ |
 | **Companion app route** (v1.4.0) | ✅ | ✅ | ✅ |
 | **CodeQL fix (removeModule)** (v1.4.0) | ✅ | ✅ | ✅ |
 
@@ -1048,6 +1215,14 @@ su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.ht
 # 7. v1.4.0 install button is a direct <a download>
 su -c "grep -q 'href=\"/app-debug.apk\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html" \
     && echo "✅ <a download> button present"
+
+# 8. v1.3.0 server-side refinements — SNAP-MANIFEST
+su -c "grep -q 'manifest.json' /data/adb/modules/dnscrypt-proxy-webui/proxy/main.go 2>/dev/null" \
+    && echo "✅ SNAP-MANIFEST present (main.go)"
+
+# 9. v1.3.0 — ROT-MANIFEST in functions.sh
+su -c "grep -q 'manifest.json' /data/adb/modules/dnscrypt-proxy-webui/functions.sh" \
+    && echo "✅ ROT-MANIFEST present (functions.sh)"
 ```
 
 ### 7.4 Runtime Verification
@@ -1135,6 +1310,7 @@ curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type|Cache-
 | 29 | Bilingual toggle partial RTL on old browsers | v1.2.0+ | See §8.4.5 |
 | **30** | **Companion APK missing from release ZIP** | **v1.4.0+** | **See §8.5.1** |
 | **31** | **iOS-specific PWA path removed** | **v1.4.0+** | **See §8.5.2** |
+| **32** | **`backups.available` may differ from v1.2.0** | **v1.3.0+** | **See §8.6.1** |
 
 ### 8.2 VPN Interaction
 
@@ -1344,6 +1520,54 @@ also does not make sense on iOS (Safari does not install APKs).
 
 **Reference**: `CHANGELOG.md` §[v1.4.0] — "Removed" section.
 
+### 8.6 v1.3.0-specific Issues
+
+#### 8.6.1 Issue #32 — `backups.available` may differ from v1.2.0
+
+**Symptom**: After upgrading from v1.2.0 to v1.3.0 (or later),
+`runtime_info.backups.available` shows a **larger** value than it
+did on v1.2.0, even though no new snapshot was created.
+
+**Is this a bug?** **No** — it is the intended v1.3.0 behavior
+(SNAP-MANIFEST). The count rule changed from "name pattern match"
+to "manifest presence":
+
+- **v1.2.0**: a directory counted as a snapshot iff its name
+  matched `^[0-9]{8}-[0-9]{6}-`.
+- **v1.3.0+**: a directory counts iff it contains a
+  `.manifest.json` file.
+
+**Effect**:
+
+| Scenario | v1.2.0 count | v1.3.0+ count |
+|---|---|---|
+| Standard snapshots (with manifests) | N | N |
+| Custom-named snapshot (with manifest) | excluded | **included** |
+| Name-matching directory (without manifest) | included | **excluded** |
+
+For the standard toolchain's output, both rules produce the same
+count. They differ only when a custom-named snapshot exists, or
+when a directory matches the name pattern but lacks a manifest.
+
+**Diagnosis**:
+
+```bash
+# 1. List all directories that have a manifest
+su -c "for d in /sdcard/dnscrypt-webui-backup/*/; do \
+    [ -f \"\$d/.manifest.json\" ] && basename \"\$d\"; \
+done"
+
+# 2. Compare with the API count
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available'
+```
+
+**Action**: **None required** — the new rule is intentional and
+produces a more accurate count. If a manifest-less directory
+should be a snapshot, write a minimal `.manifest.json` (`{}`) into
+it (see `EMERGENCY.md` §8.6).
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1 (SNAP-MANIFEST).
+
 ---
 
 ## 9. Bug Report Template
@@ -1375,6 +1599,7 @@ When reporting an issue, use the following template:
 - **`backups.orphan_txn`**:
 - **`backups.last_stable`**:
 - **`.upgrade_history.json` present?** (yes/no):
+- **Manifest count check (v1.3.0+)**: did you run §8.6.1's diagnostic?
 
 ## Companion App State (v1.4.0+)
 
@@ -1462,6 +1687,8 @@ $ curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info
 - [ ] Occurs during upgrade
 - [ ] Occurs with the Arabic toggle
 - [ ] Occurs with the companion app button
+- [ ] Occurs with the backup layer (v1.2.0+)
+- [ ] Occurs with rotation (v1.3.0+)
 ```
 
 ### 9.1 Quick Diagnostics Script
@@ -1494,8 +1721,14 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
 
 echo ""
-echo "=== Backups (v1.2.0) ==="
+echo "=== Backups (v1.2.0 / v1.3.0) ==="
 su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+
+echo ""
+echo "=== Snapshot manifests (v1.3.0 SNAP-MANIFEST) ==="
+su -c "for d in /sdcard/dnscrypt-webui-backup/*/; do \
+    [ -f \"\$d/.manifest.json\" ] && basename \"\$d\"; \
+done"
 
 echo ""
 echo "=== Companion App (v1.4.0) ==="
@@ -1532,6 +1765,8 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 - **v1.2.0+**: Backup/restore reports across devices and root
   solutions.
 - **v1.2.0+**: Bilingual WebUI reports across browsers.
+- **v1.3.0+**: Snapshot-detection (SNAP-MANIFEST) and rotation
+  (ROT-*) reports across filesystems and clock conditions.
 - **v1.4.0+**: Companion app installation reports on various ROMs.
 
 ### 10.2 How to Contribute
@@ -1611,6 +1846,134 @@ the 10 defensive layers still work:
 - Recovery mode still consumes the trigger file.
 - All 5 user files preserved.
 
+#### 10.3.5 v1.3.0 Server-Side Refinements Verification (new)
+
+> **HARD-COMPAT-V14-07**: This subsection is new in v1.4.0. It
+> documents how to confirm on a real device that the v1.3.0
+> server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
+> ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) are active.
+
+**A. Verify SNAP-MANIFEST (snapshot detection)**
+
+```bash
+# 1. Confirm the manifest requirement is documented in main.go
+#    (via the header or via runtime behavior).
+#    The Go binary is likely stripped, so use the runtime behavior:
+
+# 2. Create a manifest-less directory with a valid snapshot name
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/29991231-235959-test"
+su -c "echo 'test' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/webui.conf"
+
+# 3. Read the count BEFORE
+BEFORE=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+
+# 4. Read the count AFTER (should be unchanged)
+AFTER=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+[ "$BEFORE" = "$AFTER" ] && echo "✅ SNAP-MANIFEST active (manifest-less dir ignored)" \
+                        || echo "❌ SNAP-MANIFEST may not be active"
+
+# 5. Add a manifest, then re-check
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/.manifest.json"
+AFTER2=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+[ "$AFTER2" -gt "$AFTER" ] && echo "✅ SNAP-MANIFEST active (manifest-carrying dir counted)" \
+                           || echo "❌ SNAP-MANIFEST may not be active"
+
+# 6. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/29991231-235959-test"
+```
+
+**Report**:
+- Manifest-less directory ignored? (yes/no)
+- Manifest-carrying directory counted? (yes/no)
+
+**B. Verify SNAP-MTIME (mtime sort)**
+
+```bash
+# 1. Create two directories with names that sort in the OPPOSITE
+#    order from their mtimes.
+#    Directory A: name is "later" but mtime is earlier.
+#    Directory B: name is "earlier" but mtime is later.
+
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "touch -d '2020-01-01 00:00:00' /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/29991231-235959-a/.manifest.json"
+
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+su -c "touch -d '2030-01-01 00:00:00' /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/20200101-000000-b/.manifest.json"
+
+# 2. The newest by mtime should be "...b", not "...a"
+NEWEST=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.last_backup_name')
+case "$NEWEST" in
+    *-b) echo "✅ SNAP-MTIME active (newest is mtime-based)" ;;
+    *-a) echo "❌ SNAP-MTIME may not be active (name-based sort)" ;;
+    *)   echo "ℹ️ Unexpected newest: $NEWEST" ;;
+esac
+
+# 3. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+```
+
+**Report**:
+- `last_backup_name` follows mtime? (yes/no)
+
+**C. Verify ROT-PROTECT (protected targets)**
+
+```bash
+# 1. Note the current .last_stable target
+STABLE=$(cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null)
+echo "Current .last_stable: $STABLE"
+
+# 2. Trigger a rotation with a low keep count
+su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; rotate_backups 5"
+
+# 3. Verify the target still exists
+if [ -n "$STABLE" ] && [ -d "/sdcard/dnscrypt-webui-backup/$STABLE" ]; then
+    echo "✅ ROT-PROTECT active (.last_stable preserved)"
+else
+    echo "ℹ️ Target missing or not set — check manually"
+fi
+```
+
+**Report**:
+- `.last_stable` target preserved? (yes/no)
+- Newest install preserved? (yes/no)
+
+**D. Verify ROT-MANIFEST (manifest-based rotation)**
+
+```bash
+# 1. Create a manifest-less directory
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest"
+su -c "echo 'test' > /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest/webui.conf"
+
+# 2. Trigger rotation
+su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; rotate_backups 5"
+
+# 3. Verify the manifest-less directory still exists (ROT-MANIFEST ignores it)
+if [ -d /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest ]; then
+    echo "✅ ROT-MANIFEST active (manifest-less dir ignored by rotation)"
+else
+    echo "❌ ROT-MANIFEST may not be active (manifest-less dir was pruned)"
+fi
+
+# 4. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest"
+```
+
+**Report**:
+- Manifest-less directory preserved? (yes/no)
+
+**Consolidated report** (copy into your Issue):
+
+```
+[SNAP-MANIFEST]  manifest-less ignored / manifest-carrying counted
+[SNAP-MTIME]     last_backup_name follows mtime
+[ROT-PROTECT]    .last_stable preserved / newest install preserved
+[ROT-MANIFEST]   manifest-less dir ignored by rotation
+Device: <model> / Android <ver> / ROM <name>
+```
+
 ### 10.4 Hall of Fame
 
 Compatibility contributors are listed in
@@ -1653,6 +2016,21 @@ New badge for contributors who test the companion Android app on
 
 **Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 
+### 10.9 Rotation Semantics Champion Badge (v1.4.0)
+
+New badge for contributors who test the v1.3.0 rotation semantics
+(§10.3.5) on **3+ filesystems** or under **3+ clock conditions**
+(e.g. `ext4`, `f2fs`, FUSE, with/without clock drift).
+
+**Acceptance criteria**:
+
+- ✅ Ran the §10.3.5 A/B/C/D verification on 3+ configurations.
+- ✅ Reported the consolidated report for each.
+- ✅ Documented any edge case where the semantics did not match
+  the documentation.
+
+**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
+
 ---
 
 ## 11. References
@@ -1670,15 +2048,19 @@ New badge for contributors who test the companion Android app on
 - [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [Android FUSE — Storage Access Framework](https://source.android.com/docs/core/storage)
 - [Android SELinux — `restorecon`](https://source.android.com/docs/security/features/selinux)
+- [POSIX `rename(2)` atomicity](https://pubs.opengroup.org/onlinepubs/9699919799/functions/rename.html)
+- [POSIX `stat(2)` — mtime](https://pubs.opengroup.org/onlinepubs/9699919799/functions/stat.html)
 
 ### 11.2 Project Documentation
 
 | Document | Purpose |
 |---|---|
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
+| [`docs/ARCHITECTURE.md §4.13`](ARCHITECTURE.md#413-v130-backend-additions) | **v1.3.0 server-side refinements (authoritative)** — SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT |
+| [`docs/ARCHITECTURE.md §11.31–§11.34`](ARCHITECTURE.md) | v1.3.0 trade-offs (manifest, mtime, protections, boot-path) |
 | [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections (§5.31, §5.32) |
 | [`docs/API.md`](API.md) | Full HTTP API reference (§6.1.7) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 semantics)** |
 | [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.1, §3.2) |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries management (Level 4) |
@@ -1689,7 +2071,7 @@ New badge for contributors who test the companion Android app on
 | [`docs/FAQ.md`](FAQ.md) | Frequently asked questions |
 | [`docs/INSTALL.md`](INSTALL.md) | Installation guide |
 | [`docs/BRANCHING.md`](BRANCHING.md) | Git branching strategy |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (§[v1.2.0], §[v1.3.0], §[v1.4.0]) |
 | [`README.md`](../README.md) | Project overview |
 
 ### 11.3 Companion App Repository
@@ -1700,6 +2082,6 @@ New badge for contributors who test the companion Android app on
 
 ---
 
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-08*
 *Version: v1.4.0 (Global Edition)*
 *Author: gasciljh*

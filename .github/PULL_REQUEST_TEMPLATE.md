@@ -1,6 +1,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Pull Request Template
      Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -8,22 +9,107 @@
      Fill every section — delete what does not apply.
      Reference: docs/CONTRIBUTING.md#6 and docs/BRANCHING.md
      ============================================================
-     v1.2.0 additions:
-       • New v1.2.0 grep verifications for the data-preservation
+     Identifier inventory in this file (5 total):
+       • HARD-PRT-01 (Last updated correction — v1.4.0)
+       • HARD-PRT-02 (v1.3.0 block extended with SNAP-* / ROT-* — v1.4.0)
+       • HARD-PRT-03 (v1.3.0 grep block extended — v1.4.0)
+       • HARD-PRT-04 (Documentation section — v1.3.0 rotation refs — v1.4.0)
+       • HARD-PRT-05 (Final reminder grep block — v1.3.0 rotation checks — v1.4.0)
+
+     Cross-references:
+       • docs/BRANCHING.md §4.4, §5.1       — branch policy
+       • docs/RELEASE_PROCESS.md §5         — release template
+       • docs/CONTRIBUTING.md §6, §9        — contribution guide
+       • docs/SECURITY.md §5.31–§5.35       — security model
+       • docs/ARCHITECTURE.md §4.13         — v1.3.0 server-side refinements
+       • docs/BACKUP.md §6.5                — v1.3.0 rotation semantics
+       • docs/EMERGENCY.md                  — recovery guide
+       • docs/UPGRADE.md §3.x               — upgrade paths
+       • docs/adr/README.md §4              — ADR lifecycle
+       • CHANGELOG.md §[v1.3.0], §[v1.4.0]  — version history
+
+     v1.4.0 additions:
+       • New "🆕 v1.4.0 additions" block covering the Companion
+         Android app, the CodeQL `go/path-injection` fix, and the
+         iOS PWA logic removal.
+       • New grep verifications for:
+           - proxy/app-apk.version presence
+           - scripts/fetch_app_apk.sh presence
+           - /app-debug.apk route in main.go
+           - removeModule filepath.Base() sanitization
+           - APK_FILE constant in main.go
+       • New "Companion APK checklist" items.
+       • Updated "Audit Corrections Registry" note: v1.4.0 does
+         NOT add new audit corrections.
+
+     v1.3.0 additions (extended in this revision):
+       • New "🆕 v1.3.0 additions" block covering the PWA install
+         button, live status LED, DNS auto-start-after-boot fix,
+         and the server-side rotation refinements (SNAP-MANIFEST,
+         SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
+       • New grep verifications for:
+           - service.sh §[19] v1.3.0 fix block
+           - live status LED CSS in index.html
+           - PWA install button markup (pre-v1.4.0 state)
+           - SNAP-MANIFEST in main.go (`.manifest.json` check)
+           - SNAP-MTIME in main.go (`ModTime()` usage)
+           - ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in
+             functions.sh:rotate_backups
+       • Updated "Audit Corrections Registry" note: v1.3.0 does
+         NOT add new audit corrections.
+
+     v1.2.0 additions (kept):
+       • v1.2.0 grep verifications for the data-preservation
          release (10 defensive layers, BAK-1..BAK-4, FIX-1/FIX-2,
          WD-TOKEN).
-       • New "Data-preservation checklist" section — mandatory for
+       • "Data-preservation checklist" section — mandatory for
          any PR that touches customize.sh, functions.sh,
          service.sh, status.sh, uninstall.sh, or main.go backup
          helpers.
-       • New "Global edition (EN + AR)" checklist item — any PR that
+       • "Global edition (EN + AR)" checklist item — any PR that
          adds a user-facing string must supply both `en` and `ar`
          entries.
-       • New "Backup shell verification" grep block.
-       • New "runtime_info.backups" verification.
-       • Audit Corrections Registry below remains at #33 (the v1.0.0
-         record). v1.1.0 and v1.2.0 do not add new audit
-         corrections.
+       • "Backup shell verification" grep block.
+       • "runtime_info.backups" verification.
+
+     v1.4.0 — POST-AUDIT FIXES (this revision):
+       A post-audit review of this file against the v1.3.0 / v1.4.0
+       code identified the following documentation gaps. All are
+       addressed in-place; no version bump.
+
+       🔧 HARD-PRT-01 — `Last updated` corrected. The footer
+         previously said `2026-10-06` (the v1.4.0 release date,
+         not the v1.4.0 file-editing date). It now reads
+         `2026-10-08`, matching every other file in the v1.4.0
+         module.
+
+       🔧 HARD-PRT-02 — The `v1.3.0 additions` block at the top
+         of this file (the HTML comment header) was extended with
+         the server-side rotation refinements (SNAP-MANIFEST,
+         SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The
+         previous version mentioned only the client-side changes
+         (PWA install button, live status LED, DNS auto-start
+         fix).
+
+       🔧 HARD-PRT-03 — The "🆕 v1.3.0 additions — PWA install
+         button + LED + DNS auto-start" grep block was extended
+         with three new verification entries:
+           • SNAP-MANIFEST in main.go
+           • SNAP-MTIME in main.go
+           • ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in
+             functions.sh:rotate_backups
+
+       🟡 HARD-PRT-04 — The "📖 Documentation" section was
+         extended with three new checkboxes for the v1.3.0
+         rotation refinements: any PR touching `buildBackupInfo`,
+         `rotate_backups`, or `docs/BACKUP.md §6.5` must also
+         update `docs/ARCHITECTURE.md §4.13`.
+
+       🟡 HARD-PRT-05 — The "Final reminder" grep block at the
+         very bottom was extended with the v1.3.0 rotation
+         checks, so contributors can verify SNAP-* / ROT-*
+         consistency before pushing.
+
      ============================================================ -->
 
 > ## 🚨 Before You Start
@@ -76,9 +162,9 @@
 
   Good example:
     "Fixes versionCode inconsistency between module.prop and update.json.
-     Before: 3030801 (incorrect hotfix calculation).
-     After:  1000000 (major*1M + minor*10K + patch*100 + hotfix).
-     Impact: Magisk Manager detects updates correctly."
+     Before: 1040000 (correct).
+     After:  1040000 (unchanged — but doc comment now matches).
+     Impact: Magisk Manager update detection stays correct."
 
   Bad example:
     "Fix bugs and various improvements" ← says nothing!
@@ -125,6 +211,10 @@ Closes #
 - [ ] 🌐 **Translation** — translation (EN/AR)
 - [ ] 📋 **ADR** — Architecture Decision Record (see §📖 Documentation)
 - [ ] 💾 **Data preservation** — touches the 10 defensive layers (see §🔒)
+- [ ] 🔄 **Rotation semantics (v1.3.0)** — touches SNAP-MANIFEST,
+      SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, or ROT-PROTECT
+- [ ] 📱 **Companion app (v1.4.0)** — touches `proxy/app-apk.version`,
+      `scripts/fetch_app_apk.sh`, or the `/app-debug.apk` route
 
 ---
 
@@ -166,6 +256,20 @@ Closes #
      release). Its additions (BAK-1..BAK-4, FIX-1, FIX-2, WD-TOKEN)
      are runtime additions + correctness fixes, documented in
      docs/SECURITY.md §5.31, §5.32, §5.33 — not audit corrections.
+  ⚠️ v1.3.0 does NOT add new audit corrections (feature release).
+     Its additions fall into three groups:
+       (a) Client-side features: PWA install button, live status LED.
+       (b) Boot-path correctness fix: DNS auto-start-after-boot in
+           service.sh §[19].
+       (c) Server-side rotation refinements: SNAP-MANIFEST +
+           SNAP-MTIME (main.go:buildBackupInfo) and ROT-MANIFEST +
+           ROT-MTIME + ROT-PROTECT (functions.sh:rotate_backups).
+     All three groups are documented in docs/SECURITY.md and
+     docs/ARCHITECTURE.md §4.13 — not audit corrections.
+  ⚠️ v1.4.0 does NOT add new audit corrections (integration
+     release). Its CodeQL `go/path-injection` fix closes 2 static
+     analysis alerts but is classified as SAST hardening, not an
+     audit correction. See docs/SECURITY.md v1.4.0 section.
 
   The registry above remains the authoritative record through
   v1.0.0. If your PR fixes a new security/architecture issue, this
@@ -208,6 +312,8 @@ Closes #
 - [ ] No hardcoded secrets (`detect-secrets` clean)
 - [ ] **v1.2.0**: `make check-backup` passes (if `customize.sh` or
       `functions.sh` changed)
+- [ ] **v1.4.0**: `make check-app-version` passes (if
+      `proxy/app-apk.version` changed)
 
 ### 🆕 Core fix verifications (v1.0.0)
 
@@ -318,6 +424,13 @@ Closes #
 
   v1.2.0 introduced the 10 defensive layers. Any change to them must
   be verified by this block.
+
+  ⚠️ v1.3.0 note: the rotation logic in functions.sh:rotate_backups
+     was rewritten in v1.3.0 with SNAP-MANIFEST + SNAP-MTIME +
+     ROT-MANIFEST + ROT-MTIME + ROT-PROTECT semantics. The v1.2.0
+     greps below still pass — they check for FUNCTION PRESENCE, not
+     semantics — but any PR touching rotation must ALSO run the
+     v1.3.0 rotation greps in the next section.
 -->
 
 - [ ] **v1.2.0 — 10 defensive layers present in customize.sh**
@@ -367,10 +480,10 @@ Closes #
   grep -q 'X-Watchdog-Token' proxy/watchdog.sh && echo "✅ watchdog sends"
   ```
 
-- [ ] **v1.2.0 — FIX-1 (recovery-mode reorder)**
+- [ ] **v1.2.0 — FIX-1 (recovery-mode snapshot-and-reapply)**
   ```bash
-  grep -A5 'RECOVERY_MODE" = "1"' proxy/customize.sh | \
-    grep -qE 'webui.conf|dnscrypt-proxy.toml' && echo "✅ FIX-1 present"
+  grep -q 'RECOVERY_SNAPSHOT_DIR' proxy/customize.sh && echo "✅ snapshot dir"
+  grep -q 'Re-applying recovery snapshot' proxy/customize.sh && echo "✅ §[9b2] re-apply block"
   ```
 
 - [ ] **v1.2.0 — FIX-2 (Service Worker update-banner)**
@@ -393,6 +506,144 @@ Closes #
 - [ ] **v1.2.0 — Data-preservation test artifacts (`.gitignore` §[19])**
   ```bash
   grep -q 'dnscrypt-webui-backup' .gitignore && echo "✅ backup patterns"
+  ```
+
+### 🆕 v1.3.0 additions — PWA install button + LED + DNS auto-start + rotation
+
+<!--
+  Run these if the PR touches:
+    • web/index.html (PWA install button / LED markup)
+    • proxy/service.sh (§[19] DNS auto-start block)
+    • web/dashboard.html, web/offline.html
+    • proxy/main.go (buildBackupInfo)
+    • proxy/functions.sh (rotate_backups)
+    • proxy/status.sh (_list_snapshots)
+    • proxy/watchdog.sh (§[5b] snapshot counter)
+    • proxy/customize.sh (rotate_backups)
+    • proxy/action.sh (_inline_rotate_backups + _inline_backup_summary)
+    • proxy/uninstall.sh (§[5b] BACKUP_COUNT / BACKUP_LAST_NAME)
+    • docs/BACKUP.md §6.5, docs/ARCHITECTURE.md §4.13
+
+  v1.3.0 introduced three feature/correctness improvements plus the
+  server-side rotation refinements. Any change that could affect
+  them must be verified by this block.
+-->
+
+- [ ] **v1.3.0 — DNS auto-start-after-boot fix (service.sh)**
+  ```bash
+  grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ §[19] block present"
+  grep -q 'ensure_running_service' proxy/service.sh && echo "✅ API call present"
+  grep -q 'X-Watchdog-Token' proxy/service.sh && echo "✅ uses token"
+  ```
+
+- [ ] **v1.3.0 — Live status LED (index.html)**
+  ```bash
+  grep -q 'led-on' web/index.html && echo "✅ led-on class"
+  grep -q 'led-off' web/index.html && echo "✅ led-off class"
+  grep -q 'updateStatsDisplay' web/index.html && echo "✅ LED rendered by updateStatsDisplay"
+  ```
+
+- [ ] **v1.3.0 — PWA install button markup (pre-v1.4.0 state)**
+  ```bash
+  # In v1.3.0 the button was a <button> with onclick handler.
+  # In v1.4.0 it was converted to <a download>.
+  # If the PR is targeting v1.3.0 code, verify:
+  grep -q 'id="pwaInstallBtn"' web/index.html && echo "✅ button present"
+  ```
+
+- [ ] **v1.3.0 — SNAP-MANIFEST (main.go:buildBackupInfo)**
+  ```bash
+  # buildBackupInfo must require .manifest.json presence
+  grep -A15 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
+  ```
+
+- [ ] **v1.3.0 — SNAP-MTIME (main.go:buildBackupInfo)**
+  ```bash
+  # buildBackupInfo must use ModTime() for the newest selection
+  grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime()' && echo "✅ SNAP-MTIME"
+  ```
+
+- [ ] **v1.3.0 — ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (functions.sh)**
+  ```bash
+  # rotate_backups must:
+  #   1. detect by .manifest.json (ROT-MANIFEST)
+  #   2. sort by mtime descending (ROT-MTIME)
+  #   3. protect .last_stable + newest install (ROT-PROTECT)
+  grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
+  grep -A40 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
+  grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
+  ```
+
+- [ ] **v1.3.0 — Parallel application in shell scripts**
+  ```bash
+  # status.sh: _list_snapshots uses the same semantics
+  grep -q '_list_snapshots' proxy/status.sh && echo "✅ status.sh helper"
+  # watchdog.sh: §[5b] counter uses manifest detection
+  grep -q 'manifest.json' proxy/watchdog.sh && echo "✅ watchdog.sh manifest check"
+  # customize.sh: rotate_backups uses the same detection
+  grep -q 'manifest.json' proxy/customize.sh && echo "✅ customize.sh manifest check"
+  # action.sh: inline helpers
+  grep -q '_inline_list_snapshots' proxy/action.sh && echo "✅ action.sh helper"
+  # uninstall.sh: §[5b] BACKUP_COUNT / BACKUP_LAST_NAME
+  grep -q '_uninstall_list_snapshots' proxy/uninstall.sh && echo "✅ uninstall.sh helper"
+  ```
+
+### 🆕 v1.4.0 additions — Companion APK + CodeQL + iOS removal
+
+<!--
+  Run these if the PR touches:
+    • proxy/main.go (removeModule, serveStaticAssets, APK_FILE)
+    • web/index.html (install button markup)
+    • scripts/fetch_app_apk.sh, proxy/app-apk.version
+    • .github/workflows/release.yml (Fetch/Stage APK steps)
+    • .github/workflows/ci.yml (Verify companion app metadata)
+-->
+
+- [ ] **v1.4.0 — Companion APK route + constant (main.go)**
+  ```bash
+  grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+  grep -q '/app-debug.apk' proxy/main.go && echo "✅ route registered"
+  grep -q 'application/vnd.android.package-archive' proxy/main.go && echo "✅ mime type"
+  ```
+
+- [ ] **v1.4.0 — CodeQL path-injection fix in removeModule (main.go)**
+  ```bash
+  grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ filepath.Base sanitization"
+  grep -q 'filepath.Join(MODULES_DIR, name)' proxy/main.go && echo "✅ path reconstructed from trusted base"
+  grep -q 'CodeQL go/path-injection' proxy/main.go && echo "✅ comment present"
+  ```
+
+- [ ] **v1.4.0 — Companion APK fetcher + version file**
+  ```bash
+  test -f scripts/fetch_app_apk.sh && echo "✅ fetch_app_apk.sh present"
+  test -f proxy/app-apk.version && echo "✅ app-apk.version present"
+  grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' proxy/app-apk.version && echo "✅ version format valid"
+  ```
+
+- [ ] **v1.4.0 — WebUI install button is a direct `<a download>`**
+  ```bash
+  grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ download link"
+  grep -q 'download="DNS-Proxy.apk"' web/index.html && echo "✅ download attribute"
+  ! grep -q 'initPWABeforeInstallPrompt' web/index.html && echo "✅ old JS handler removed"
+  ```
+
+- [ ] **v1.4.0 — iOS PWA logic removed (web/index.html)**
+  ```bash
+  ! grep -q 'isIOSDevice' web/index.html && echo "✅ isIOSDevice removed"
+  ! grep -q 'pwaStepIos' web/index.html && echo "✅ iOS step translations removed"
+  ```
+
+- [ ] **v1.4.0 — Release workflow fetches + stages APK**
+  ```bash
+  grep -q 'Fetch companion Android app APK' .github/workflows/release.yml && echo "✅ fetch step"
+  grep -q 'Stage APK for module ZIP' .github/workflows/release.yml && echo "✅ stage step"
+  grep -q 'dist/DNS-Proxy-v\*.apk' .github/workflows/release.yml && echo "✅ APK attached to release"
+  ```
+
+- [ ] **v1.4.0 — CI verifies companion app metadata**
+  ```bash
+  grep -q 'Verify companion app metadata' .github/workflows/ci.yml && echo "✅ CI step present"
+  grep -q 'app-apk.version' .github/workflows/ci.yml && echo "✅ version file checked"
   ```
 
 ### Custom tests (as applicable)
@@ -422,11 +673,16 @@ Closes #
 - [ ] Tested SSE live updates
 - [ ] Tested dynamic links (with custom PORT / DASHBOARD_PORT)
 - [ ] Tested SW update-banner (both `index.html` and `dashboard.html`)
+- [ ] **(v1.3.0)** Verified the live status LED turns green when the DNS engine is ON and red when OFF
+- [ ] **(v1.4.0)** Verified the install button is a plain `<a download>` link
+- [ ] **(v1.4.0)** Verified the download button leads to `/app-debug.apk` (or a 404 when the APK is absent)
 
 **If the change is in shell scripts:**
 - [ ] Confirmed no new `shellcheck` warnings
 - [ ] Tested on a real device (if possible)
 - [ ] **v1.2.0**: Ran `make check-backup`
+- [ ] **(v1.3.0)** Verified the DNS auto-start-after-boot fix (log line `[v1.3.0 FIX]` in `dnscrypt_main.log`)
+- [ ] **(v1.3.0)** If the change touches `functions.sh:rotate_backups`, verified the SNAP-*/ROT-* semantics via `docs/COMPATIBILITY.md` §10.3.5
 
 **If the change is in the firewall:**
 - [ ] Checked `iptables -t nat -L DNSCRYPT_OUT -n`
@@ -489,6 +745,25 @@ Closes #
   ```bash
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
   # Expected: 7
+  ```
+- [ ] **(v1.3.0)** Confirmed `backups.available` counts manifest-carrying
+      directories only (SNAP-MANIFEST):
+  ```bash
+  # 1. Compare the API count with the manifest count
+  API_COUNT=$(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+  MANIFEST_COUNT=$(su -c "for d in /sdcard/dnscrypt-webui-backup/*/; do \
+      [ -f \"\$d/.manifest.json\" ] && basename \"\$d\"; \
+  done | wc -l")
+  [ "$API_COUNT" = "$MANIFEST_COUNT" ] && echo "✅ SNAP-MANIFEST consistent"
+  ```
+- [ ] **(v1.3.0)** Confirmed `backups.last_backup_name` follows mtime
+      (SNAP-MTIME):
+  ```bash
+  # The newest by mtime should match last_backup_name
+  NEWEST_MTIME=$(su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
+      grep -vE '/(current|txn-|orphan-txn-)' | head -1" | tr -d '\r' | xargs basename)
+  API_NEWEST=$(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.last_backup_name')
+  [ "$NEWEST_MTIME" = "$API_NEWEST" ] && echo "✅ SNAP-MTIME consistent"
   ```
 - [ ] Confirmed `index.html` uses `data.dashboard_port`
 - [ ] Confirmed `dashboard.html` uses `data.webui_port`
@@ -572,8 +847,81 @@ Closes #
   [ "$NEW" = "$ORIG" ] && echo "✅ Recovery restored"
   ```
 - [ ] Confirmed the trigger file is consumed after a successful restore
-- [ ] Verified the FIX-1 reorder (`webui.conf` and
-      `dnscrypt-proxy.toml` are not overwritten by the ZIP extraction)
+- [ ] Verified the FIX-1 snapshot-and-reapply flow (`§[8a]` + `§[9]` + `§[9b2]`)
+
+**If the change is in the DNS auto-start-after-boot (v1.3.0):**
+- [ ] Verified the fix on a test device:
+  ```bash
+  # 1. Ensure the service is ON
+  su -c "echo 'ON' > /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
+
+  # 2. Reboot
+  su -c "reboot"
+
+  # 3. After boot, check the log for the v1.3.0 fix
+  sleep 30
+  su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log | tail -5"
+  # Expected: "✅ [v1.3.0 FIX] DNS start requested successfully"
+
+  # 4. Verify the DNS engine is running
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+  # Expected: DNS=UP
+  ```
+
+**If the change is in the rotation semantics (v1.3.0 — SNAP-* / ROT-*):**
+- [ ] Verified SNAP-MANIFEST on a test device (manifest-less dir excluded):
+  ```bash
+  su -c "mkdir -p /sdcard/dnscrypt-webui-backup/29991231-235959-test"
+  su -c "echo 'x' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/webui.conf"
+  BEFORE=$(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+  su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/.manifest.json"
+  AFTER=$(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+  [ "$AFTER" -gt "$BEFORE" ] && echo "✅ SNAP-MANIFEST active"
+  su -c "rm -rf /sdcard/dnscrypt-webui-backup/29991231-235959-test"
+  ```
+- [ ] Verified ROT-PROTECT on a test device (.last_stable preserved):
+  ```bash
+  STABLE=$(su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null")
+  su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; rotate_backups 5"
+  [ -d "/sdcard/dnscrypt-webui-backup/$STABLE" ] && echo "✅ ROT-PROTECT active"
+  ```
+- [ ] Verified parallel application (all consumers agree):
+  ```bash
+  for f in status.sh watchdog.sh customize.sh action.sh uninstall.sh; do
+      grep -q 'manifest' proxy/$f && echo "✅ $f uses manifest detection"
+  done
+  ```
+- [ ] Cross-referenced `docs/ARCHITECTURE.md` §4.13 for the authoritative
+      description of the v1.3.0 semantics
+
+**If the change is in the Companion APK integration (v1.4.0):**
+- [ ] Verified the APK is fetched and bundled:
+  ```bash
+  test -f web/app-debug.apk && echo "✅ APK staged"
+  unzip -l dist/dnscrypt-webui-1.4.0-module.zip | grep app-debug.apk && echo "✅ APK in ZIP"
+  ```
+- [ ] Verified the route serves the APK:
+  ```bash
+  curl -I http://127.0.0.1:9090/app-debug.apk | grep Content-Type
+  # Expected: application/vnd.android.package-archive
+  ```
+- [ ] Verified the route returns 404 when the APK is absent (local dev builds)
+
+**If the change is in the CodeQL hardening (v1.4.0):**
+- [ ] Confirmed CodeQL analysis passes with no `go/path-injection` alerts
+- [ ] Tested `POST /api/remove_module` with various inputs:
+  ```bash
+  # Valid path
+  curl -b /tmp/cookies.txt -X POST \
+      --data-urlencode "path=/data/adb/modules/dnscrypt-old" \
+      http://127.0.0.1:9090/api/remove_module
+
+  # Path traversal attempt (must be rejected)
+  curl -b /tmp/cookies.txt -X POST \
+      --data-urlencode "path=../../../etc/passwd" \
+      http://127.0.0.1:9090/api/remove_module
+  # Expected: {"status": "error", "message": "Invalid path"} or similar
+  ```
 
 ---
 
@@ -607,6 +955,10 @@ Closes #
 - [ ] If adding a port read, used `readConfPort` (with range check 1–65535)
 - [ ] If using a dynamic shell command, used `shellQuote()`
 - [ ] If adding a new health endpoint, considered `isLocalRequest` (local-only)
+- [ ] **(v1.4.0)** If the PR routes a caller-provided path into any
+      filesystem operation, used `filepath.Base()` sanitization +
+      rebuilt the path from a trusted base (see `removeModule` for the
+      canonical pattern)
 
 ### Firewall
 
@@ -626,6 +978,10 @@ Closes #
       do NOT add a second mutex
 - [ ] **v1.2.0**: `backupMu` is held for at most
       `AUTO_BACKUP_TIMEOUT = 15 s`
+- [ ] **(v1.3.0)**: Any change to `buildBackupInfo` (main.go) or
+      `rotate_backups` (functions.sh) keeps the SNAP-* / ROT-*
+      semantics in sync across the module — see
+      `docs/ARCHITECTURE.md` §4.13.2
 
 ### Memory (v1.1.0)
 
@@ -647,6 +1003,9 @@ Closes #
   - [ ] Updated the constant in **all 4** scripts:
         `customize.sh`, `functions.sh`, `service.sh`, `action.sh`
   - [ ] Updated `docs/BACKUP.md` §6
+  - [ ] **(v1.3.0)** Aligned with the SNAP-MANIFEST + SNAP-MTIME +
+        ROT-MANIFEST + ROT-MTIME + ROT-PROTECT semantics — see
+        `docs/ARCHITECTURE.md` §4.13.2
 - [ ] If changing the `runtime_info.backups` schema:
   - [ ] Updated `buildBackupInfo()` in `main.go`
   - [ ] Kept `status.sh --json` in sync
@@ -656,6 +1015,39 @@ Closes #
   - [ ] Updated `docs/UPGRADE.md`
 - [ ] Confirmed the 10 defensive layers are still orthogonal to the
       firewall (see `docs/COMPATIBILITY.md` §6.6)
+
+### Rotation semantics (v1.3.0)
+
+- [ ] If the PR touches `buildBackupInfo` (main.go):
+  - [ ] Verified SNAP-MANIFEST (`.manifest.json` presence)
+  - [ ] Verified SNAP-MTIME (`ModTime()` for newest selection)
+  - [ ] Cross-checked `functions.sh:rotate_backups` still agrees
+- [ ] If the PR touches `rotate_backups` (functions.sh):
+  - [ ] Verified ROT-MANIFEST (manifest-based detection)
+  - [ ] Verified ROT-MTIME (`sort -rn -k1,1`)
+  - [ ] Verified ROT-PROTECT (`.last_stable` + newest install preserved)
+  - [ ] Cross-checked the parallel helpers in `status.sh`,
+        `watchdog.sh`, `customize.sh`, `action.sh`, `uninstall.sh`
+- [ ] If the PR touches `docs/BACKUP.md` §6.5:
+  - [ ] Cross-checked `docs/ARCHITECTURE.md` §4.13.2
+  - [ ] Cross-checked `CHANGELOG.md` §[v1.3.0]
+
+### Companion APK (v1.4.0)
+
+- [ ] If changing `proxy/app-apk.version`:
+  - [ ] Verified the format is `X.Y.Z` (no `v` prefix)
+  - [ ] Verified `make check-app-version` passes
+  - [ ] Verified the corresponding release exists in the sister repo
+        [`gasciljh/dnscrypt-proxy-app`](https://github.com/gasciljh/dnscrypt-proxy-app)
+- [ ] If changing `scripts/fetch_app_apk.sh`:
+  - [ ] Verified it remains idempotent (cache hit on re-run)
+  - [ ] Verified the `--offline`, `--json`, `--force`, and `--version`
+        flags still work
+  - [ ] Verified the SHA256 output is written next to the APK
+- [ ] If changing the `/app-debug.apk` route in `main.go`:
+  - [ ] Verified the 404 path (file absent) still works
+  - [ ] Verified the mime type is `application/vnd.android.package-archive`
+  - [ ] Verified the per-extension Cache-Control is applied
 
 ### For security fixes
 
@@ -702,6 +1094,19 @@ Closes #
       **and** `docs/EMERGENCY.md`
 - [ ] **v1.2.0**: If a language-toggle change, updated
       `docs/ARCHITECTURE.md` §6.7 and `docs/API.md` §10.8
+- [ ] **(v1.3.0)** If a DNS auto-start-after-boot change, updated
+      `docs/ARCHITECTURE.md` §9 and `docs/TROUBLESHOOTING.md` §4.14
+- [ ] **(v1.3.0)** If a PWA install button change, updated
+      `docs/ARCHITECTURE.md` §6.7
+- [ ] **(v1.3.0)** If a rotation-semantics change (SNAP-* / ROT-*),
+      updated `docs/ARCHITECTURE.md` §4.13.2, `docs/BACKUP.md` §6.5,
+      and `CHANGELOG.md` §[v1.3.0]
+- [ ] **(v1.4.0)** If a companion APK change, updated
+      `README.md` §Optional Android App and `docs/ARCHITECTURE.md` §8.2
+- [ ] **(v1.4.0)** If a `removeModule` change, updated
+      `docs/SECURITY.md` v1.4.0 section
+- [ ] **(v1.4.0)** If an iOS PWA removal change, updated
+      `CHANGELOG.md` §[v1.4.0] Removed section
 
 ---
 
@@ -725,6 +1130,8 @@ Closes #
   - For security fixes: `security(iptables): implement Custom Chains`
   - For ADRs: `docs(adr): add ADR-0007 for webhook notifications`
   - For v1.2.0 data preservation: `feat(backup): add pre-critical auto-backup before destructive ops`
+  - For v1.3.0 rotation refinements: `refactor(backup): use SNAP-MANIFEST + ROT-MTIME for rotation`
+  - For v1.4.0 companion app: `feat(app): integrate companion APK into module ZIP`
 - [ ] Commit messages are clear and useful (no "WIP" or "fix stuff")
 - [ ] Reasonable number of commits (no 50 commits for a small PR)
 - [ ] No merge commits (`Merge branch 'main'`) — used `rebase` instead
@@ -746,6 +1153,7 @@ Closes #
 - [ ] No hardcoded `/system/bin/sh` (use `getSystemShell()`)
 - [ ] No hardcoded `127.0.0.1` in HTML (use `window.location.hostname`)
 - [ ] **v1.2.0**: `make check-backup` passes (if backup layer touched)
+- [ ] **(v1.4.0)**: `make check-app-version` passes (if `app-apk.version` touched)
 
 ### Documentation
 
@@ -756,12 +1164,15 @@ Closes #
 ### Cleanliness
 
 - [ ] Removed all temporary files (`*.tmp`, `*.bak`, `scratch.*`)
-- [ ] No binary files uploaded without justification
+- [ ] No binary files uploaded without justification (exception:
+      `web/app-debug.apk` in v1.4.0, which is intentionally bundled)
 - [ ] No `.DS_Store` or `Thumbs.db` files
 - [ ] Reviewed `git diff` before pushing (no unintended changes)
 - [ ] Confirmed no leftover `*.tmp_*` from `atomicWriteFile`
 - [ ] **v1.2.0**: No leftover `txn-*` / `orphan-txn-*` in the
       committed backup directory (those belong to runtime)
+- [ ] **(v1.4.0)**: No leftover `dist/DNS-Proxy-v*.apk` committed (it
+      is a build artifact)
 
 ---
 
@@ -774,6 +1185,9 @@ Closes #
 
   v1.2.0: If the change touches the bilingual UI, attach BOTH
   English and Arabic screenshots.
+
+  v1.4.0: If the change touches the companion APK integration, attach
+  a screenshot of the install button in the WebUI header.
 -->
 
 
@@ -805,6 +1219,15 @@ Closes #
 
   v1.2.0: If the change touches the backup layer, consider requesting
   a review from a Data Guardian badge holder (see docs/HALL_OF_FAME.md).
+
+  v1.3.0: If the change touches rotation semantics (SNAP-* / ROT-*),
+  consider requesting a review from a contributor familiar with the
+  v1.3.0 refinements. See docs/ARCHITECTURE.md §4.13 and
+  docs/COMPATIBILITY.md §10.3.5 for the verification procedure.
+
+  v1.4.0: If the change touches the companion APK integration,
+  consider requesting a review from a maintainer of the sister repo
+  gasciljh/dnscrypt-proxy-app.
 -->
 
 
@@ -841,6 +1264,7 @@ Closes #
        gofmt -l proxy/                     # Go format check
        shellcheck --severity=warning proxy/*.sh scripts/*.sh
        make check-backup                   # v1.2.0: backup shell validation
+       make check-app-version              # v1.4.0: companion APK version check
 
      🎯 v1.1.0 extra checks (if main.go changed):
 
@@ -860,18 +1284,41 @@ Closes #
        grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
        grep -q 'swRegistration.waiting' web/index.html && echo "✅ FIX-2"
 
+     🎯 v1.3.0 extra checks (if service.sh / index.html / rotation changed):
+
+       grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ DNS auto-start"
+       grep -q 'led-on' web/index.html && echo "✅ LED markup"
+       grep -q 'id="pwaInstallBtn"' web/index.html && echo "✅ install button"
+       grep -A15 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
+       grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime()' && echo "✅ SNAP-MTIME"
+       grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
+       grep -A40 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
+       grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
+
+     🎯 v1.4.0 extra checks (if companion APK / CodeQL / iOS changes):
+
+       grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE"
+       grep -q '/app-debug.apk' proxy/main.go && echo "✅ APK route"
+       grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ CodeQL fix"
+       ! grep -q 'initPWABeforeInstallPrompt' web/index.html && echo "✅ iOS/JS removed"
+       test -f scripts/fetch_app_apk.sh && echo "✅ APK fetcher"
+       test -f proxy/app-apk.version && echo "✅ APK version file"
+
      📖 Documentation references:
 
        docs/BRANCHING.md        - Branch strategy
        docs/RELEASE_PROCESS.md  - Release process
        docs/adr/README.md       - Architecture Decision Records
        docs/CONTRIBUTING.md     - Contribution guide
-       docs/SECURITY.md         - Security policy (§5.31, §5.32, §5.33)
-       docs/BACKUP.md           - Backup system reference (v1.2.0)
+       docs/SECURITY.md         - Security policy (§5.30–§5.35)
+       docs/ARCHITECTURE.md §4.13 - v1.3.0 rotation semantics (authoritative)
+       docs/BACKUP.md           - Backup system reference (v1.2.0 + v1.3.0)
        docs/EMERGENCY.md        - Emergency recovery (v1.2.0)
+       docs/UPGRADE.md          - Upgrade guide (§3.0, §3.1)
+       docs/COMPATIBILITY.md §10.3.5 - On-device SNAP-*/ROT-* verification
 
-     Current version: v1.2.0
-     Last updated: 2026-09-29
+     Current version: v1.4.0
+     Last updated: 2026-10-08
 
      🎉 Thanks for your contribution! Every PR improves the project.
      ============================================================ -->

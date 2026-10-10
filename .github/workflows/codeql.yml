@@ -1,6 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CodeQL Workflow
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -60,10 +61,22 @@
 #   CodeQL only analyzes Go source code. It does NOT analyze:
 #
 #     • Shell scripts (proxy/*.sh, scripts/*.sh)
-#       → Covered by shellcheck + bash -n in
-#         .github/workflows/ci.yml → `backup-smoke-test` job.
-#         See the CI-2 note in that file for the exact scope of
-#         the shellcheck coverage (5 of 8 scripts).
+#       → Covered by `bash -n` in
+#         .github/workflows/ci.yml → `backup-smoke-test` job
+#         (syntax check on all 8 shell scripts) plus the
+#         project-specific "Verify Layer 1-10 function presence"
+#         check.
+#
+#         ⚠️ Historical note: shellcheck WAS used in ci.yml
+#            until 2026-09-30, when it was REMOVED entirely
+#            (see ci.yml HARD-CI-10). The removal rationale:
+#            even with `--shell=bash` and four excluded warning
+#            classes, shellcheck emitted false positives that
+#            blocked PRs without catching real bugs. Static
+#            analysis of the shell scripts is now the joint
+#            responsibility of CodeQL (for the Go code those
+#            scripts call) and developer-side pre-commit hooks
+#            (for the shell scripts themselves).
 #
 #     • YAML workflows (.github/workflows/*.yml)
 #       → Covered by actionlint (developer-side, via pre-commit)
@@ -163,9 +176,16 @@
 #        `.gitignore` — not to this workflow.
 #
 #   🔧 CQ-2 — The "What CodeQL does NOT cover" section points
-#     at the CI-2 note in ci.yml, which documents the exact
-#     scope of shellcheck coverage (5 of 8 scripts) and the
-#     rationale for the exclusion.
+#     at the backup-smoke-test job in ci.yml for the shell-script
+#     coverage story.
+#
+#     ⚠️ Historical note: the reference was originally to the
+#        "CI-2 note in ci.yml, which documents the exact scope of
+#        shellcheck coverage (5 of 8 scripts)". That reference
+#        became stale on 2026-09-30 when shellcheck was removed
+#        from ci.yml entirely (see ci.yml HARD-CI-10). The
+#        section above has been rewritten to reflect the current
+#        state: only `bash -n` + the layer-presence check remain.
 #
 # ============================================================
 # v1.2.0 (Global Edition) — Additional hardening in this revision
@@ -213,6 +233,75 @@
 #     The fix belongs in `.gitignore`, not in this workflow.
 #
 # ============================================================
+# v1.3.0 — No changes to the CodeQL configuration
+# ============================================================
+#   The v1.3.0 release is primarily a feature release (PWA
+#   install button, live status LED, DNS auto-start after
+#   boot). None of those changes touch Go source code:
+#     • PWA install button  → web/index.html (client-side JS/HTML)
+#     • Live status LED     → web/index.html (client-side CSS/JS)
+#     • DNS auto-start fix  → proxy/service.sh (shell)
+#
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#
+#   However, this workflow (codeql.yml) was NOT modified in
+#   v1.3.0. Its query suite, trigger matrix, `category` field,
+#   build step, and action versions are all unchanged from
+#   v1.2.0. CodeQL automatically analyzed the updated main.go
+#   (SNAP-MANIFEST + SNAP-MTIME) on the next scheduled or
+#   push-triggered run; the workflow did not need to know about
+#   the semantic change.
+#
+#   ⚠️ CodeQL DID report 6 of the 8 original alerts during the
+#      v1.3.0 development cycle, but those alerts were closed
+#      by fixes in the Go source (main.go and, transitively,
+#      the modules the affected code touched) — not by a change
+#      to this workflow file.
+#
+#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13.
+# ============================================================
+# v1.4.0 — Companion Android app integration + CodeQL closure
+# ============================================================
+#   🎯 CQ-V14-01 — The last 2 outstanding CodeQL alerts
+#     (`go/path-injection` in `removeModule`, alerts #1 and #2)
+#     were CLOSED in v1.4.0. The fix is in
+#     `proxy/main.go::removeModule`:
+#
+#       • The caller-provided path is sanitized via
+#         `filepath.Base()` before any path construction.
+#       • The final path is rebuilt from the trusted
+#         `MODULES_DIR` constant + the sanitized basename.
+#       • No user-controlled data reaches any path expression.
+#       • A defence-in-depth prefix check is retained as a
+#         second layer (but does NOT participate in path
+#         construction).
+#
+#     ⚠️ The fix is in the GO SOURCE, not in this workflow.
+#        This workflow continues to analyze `proxy/main.go`
+#        with the same `security-extended` query suite. The
+#        alerts are now closed because the code no longer
+#        contains the pattern CodeQL was flagging.
+#
+#   🎯 CQ-V14-02 — No change to this workflow's structure:
+#     • Same `security-extended` query suite.
+#     • Same trigger matrix (push, PR, weekly, manual).
+#     • Same `category: "/language:go"`.
+#     • Same build step (`go build ./...`).
+#     • Same `github/codeql-action@v3`.
+#
+#   🎯 CQ-V14-03 — The companion Android app APK
+#     (`web/app-debug.apk`) is NOT analyzed by this workflow.
+#     It is a pre-built binary fetched from a separate
+#     repository (gasciljh/dnscrypt-proxy-app). CodeQL for Go
+#     has nothing to analyze in an APK.
+#
+# ============================================================
 # Repository hygiene (HARD-CQ-08):
 # ============================================================
 #   The `.codeql-analyze` binary is a build artifact and MUST
@@ -233,6 +322,11 @@
 #      workflow as part of a security audit, confirm that
 #      `.gitignore` contains the entry. The original audit
 #      (H-02) flagged this as an open item.
+#
+#      v1.4.0 status: the entry IS present in the current
+#      `.gitignore` (both `/.codeql-analyze` and
+#      `proxy/.codeql-analyze`). The HARD-CQ-08 note is
+#      retained as a reminder for future contributors.
 # ============================================================
 
 name: CodeQL

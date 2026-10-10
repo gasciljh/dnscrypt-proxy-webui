@@ -3,13 +3,49 @@
 > Recognition for everyone who has contributed to this project.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
+> **Identifier inventory in this file (10 total)**:
+>   • HARD-HOF-01 (`Last updated` correction — v1.4.0)
+>   • HARD-HOF-02 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-HOF-03 (New **Rotation Guardian (v1.3.0)** badge added —
+>     v1.4.0)
+>   • HARD-HOF-04 (§"Changelog for Contributors" v1.3.0 section
+>     extended with rotation refinements — v1.4.0)
+>   • HARD-HOF-05 (§"Audit Corrections Registry" v1.3.0 note
+>     updated with rotation refinements — v1.4.0)
+>   • HARD-HOF-06 (§References extended with §4.13 and §10.3.5 —
+>     v1.4.0)
+>   • HARD-HOF-07 (§"Special Thanks" extended with v1.3.0 rotation
+>     acknowledgments — v1.4.0)
+>   • HARD-HOF-08 (§PWA Champion acceptance criteria updated for
+>     v1.4.0 iOS removal — v1.4.0)
+>   • HARD-HOF-09 (§"How to Get Added" extended with Rotation
+>     Guardian criteria — v1.4.0)
+>   • HARD-HOF-10 (header + footer `Last updated` sync — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections Registry
+>   • [docs/CONTRIBUTING.md](CONTRIBUTING.md) — contribution guide
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/FAQ.md](FAQ.md) — Q104 (badges), Q129 (Data Guardian),
+>     Q131–Q140 (v1.3.0), Q141–Q150 (v1.4.0)
+>   • [docs/GLOSSARY.md](GLOSSARY.md) — terms (SNAP-*/ROT-*,
+>     Rotation Guardian)
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • `Last updated` reflects the v1.4.0 release date.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
 >   • **New badge**: 🏆 **Companion App Champion (v1.4.0)** —
 >     recognizes contributors who test the optional companion
 >     Android app (`web/app-debug.apk`) on 3+ devices or ROMs.
@@ -25,9 +61,9 @@
 >   • "How to Get Added" extended with the Companion App Champion
 >     acceptance criteria.
 >   • "Changelog for Contributors" extended with a v1.3.0 section
->     (PWA install button, live status LED, DNS auto-start fix)
->     and a v1.4.0 section (companion app, CodeQL fix, iOS PWA
->     removal).
+>     (PWA install button, live status LED, DNS auto-start fix,
+>     **server-side rotation refinements**) and a v1.4.0 section
+>     (companion app, CodeQL fix, iOS PWA removal).
 >   • `References` extended with the companion app repository and
 >     the v1.4.0 documentation set.
 >   • **Global edition — English default + Arabic toggle**: the
@@ -39,11 +75,40 @@
 
 > **v1.3.0 changes**:
 >   • Version bumped from v1.2.0 to v1.3.0.
->   • `Last updated` reflects the v1.3.0 release date
+>   • `Last updated` reflected the v1.3.0 release date
 >     (2026-10-02).
 >   • **New badge**: 🔔 **PWA Champion (v1.3.0)** — recognizes
 >     contributors who test the smart PWA install button across
 >     Chromium / Firefox / Samsung Internet.
+>   • **New badge**: 🎯 **Rotation Guardian (v1.3.0)** —
+>     recognizes contributors who verify the snapshot-detection
+>     and rotation semantics (`SNAP-MANIFEST`, `SNAP-MTIME`,
+>     `ROT-MANIFEST`, `ROT-MTIME`, `ROT-PROTECT`) on a real
+>     device.
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Three
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets: the `.last_stable`
+>         recovery pointer and the newest install snapshot.
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
 >   • "Changelog for Contributors" extended with a v1.3.0
 >     section.
 >   • `References` extended with the v1.3.0 documentation set.
@@ -86,6 +151,32 @@
 >     "expected in v1.3.x". Since v1.3.0 did not add any audit
 >     correction, the line now reads "expected in a future
 >     release".
+>   • 🔧 **HOF-3** — The v1.3.0 block in the header previously
+>     listed only the client-side changes (PWA install button,
+>     live status LED) and the boot-path fix, but **omitted** the
+>     server-side rotation refinements (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) that touched 8 files
+>     in v1.3.0. The block now documents them, and the
+>     corresponding **Rotation Guardian** badge is defined in the
+>     badge section below.
+>   • 🔧 **HOF-4** — The v1.3.0 entry in "Changelog for
+>     Contributors" now lists the server-side rotation
+>     refinements alongside the client-side features.
+>   • 🟡 **HOF-5** — The v1.3.0 note in "Audit Corrections
+>     Registry" now mentions the rotation refinements as
+>     functional changes (not audit corrections).
+>   • 🟡 **HOF-6** — `References` extended with
+>     `docs/ARCHITECTURE.md` §4.13 and
+>     `docs/COMPATIBILITY.md` §10.3.5.
+>   • 🟢 **HOF-7** — "Special Thanks" extended with the v1.3.0
+>     rotation-refinements acknowledgments.
+>   • 🟢 **HOF-8** — `PWA Champion` acceptance criteria updated
+>     to note that the iOS-specific install path was removed in
+>     v1.4.0.
+>   • 🟢 **HOF-9** — "How to Get Added" extended with the
+>     Rotation Guardian criteria.
+>   • 🟢 **HOF-10** — Header and footer `Last updated`
+>     synchronized.
 
 ---
 
@@ -174,6 +265,8 @@ compatibility.*
 - Testing on non-Android platforms (Linux, macOS, WSL2).
 - **(v1.2.0)** Testing the bilingual WebUI on multiple browsers.
 - **(v1.3.0)** Testing the PWA install button on 3+ browsers.
+- **(v1.3.0)** Verifying the rotation semantics (SNAP-*/ROT-*)
+  on a real device — see `docs/COMPATIBILITY.md` §10.3.5.
 - **(v1.4.0)** Testing the companion app install button on 3+
   devices.
 
@@ -237,8 +330,7 @@ adapts to the browser:
   Internet) — clicking opens the native
   `beforeinstallprompt` dialog.
 - **iOS Safari** — clicking shows step-by-step "Add to Home
-  Screen" instructions (*removed in v1.4.0 — see the Data
-  Guardian note below*).
+  Screen" instructions (*removed in v1.4.0 — see the note below*).
 - **Unsupported browsers** (Firefox, Opera Mini, older
   browsers) — clicking shows a friendly modal listing supported
   alternatives with Play Store links.
@@ -246,7 +338,10 @@ adapts to the browser:
 **v1.4.0 note**: The iOS-specific install path was **removed** in
 v1.4.0 — the project is Android-only. The PWA install button
 still works for Chromium-based browsers; unsupported browsers
-receive the unified "unsupported browser" modal.
+receive the unified "unsupported browser" modal. In v1.4.0, the
+button was further simplified into a direct
+`<a download href="/app-debug.apk">` link (see the **Companion App
+Champion** badge below).
 
 **Acceptance criteria**:
 
@@ -283,7 +378,107 @@ never left without guidance when their browser does not support
 the native install flow.
 
 **Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §6.4;
-[`docs/FAQ.md`](FAQ.md) (PWA questions).
+[`docs/FAQ.md`](FAQ.md) Q133, Q135.
+
+---
+
+### 🎯 Rotation Guardian (v1.3.0)
+
+*Those who verify the snapshot-detection and rotation semantics
+on a real device.*
+
+| Contributor | Test scope | Version | Reference |
+|---------|:---------:|:-------:|-----------|
+| [@gasciljh](https://github.com/gasciljh) | SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME + ROT-PROTECT design + implementation + testing on 3 devices | v1.3.0 | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.2 |
+| *Your spot is reserved* | — | — | — |
+
+**What this badge recognizes**:
+
+The v1.3.0 release refined the **snapshot-detection and rotation
+semantics** used by every consumer of the persistent backup
+directory:
+
+- **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now detects a
+  snapshot by the presence of a `.manifest.json` file, not by the
+  v1.2.0 name pattern (`^[0-9]{8}-[0-9]{6}-`).
+- **SNAP-MTIME** — `last_backup_name` is now selected by **mtime**
+  descending, not lexicographic directory name.
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+  `functions.sh:rotate_backups()` uses the same manifest-based
+  detection + mtime sort, and preserves two additional targets on
+  top of the 21-newest window: the `.last_stable` recovery pointer
+  and the newest install snapshot (name matching `-v<digit>`).
+
+These refinements were mirrored in **8 files**: `main.go`,
+`functions.sh`, `service.sh`, `watchdog.sh`, `status.sh`,
+`customize.sh`, `action.sh`, and `uninstall.sh`.
+
+Contributors who provide **concrete, reproducible verification** of
+these semantics on real devices earn this badge.
+
+**Acceptance criteria**:
+
+- ✅ Tested on **3+ devices** or **3+ root solutions**
+  (Magisk / KernelSU / APatch).
+- ✅ Verified that a directory **without** a `.manifest.json` file
+  is **not** counted as a snapshot by `runtime_info.backups`.
+- ✅ Verified that a directory **with** a `.manifest.json` file is
+  counted even if its name doesn't match the timestamp pattern.
+- ✅ Verified that rotation sorts by **mtime** (not by directory
+  name).
+- ✅ Verified that the `.last_stable` target is **preserved** by
+  rotation even when it falls outside the 21-newest window.
+- ✅ Verified that the newest install snapshot (name matching
+  `-v<digit>`) is **preserved** by rotation.
+- ✅ Reported the 7-field `backups` object before/after each
+  scenario.
+- ✅ Reported `status.sh --diagnose` output.
+
+**Recommended scenarios to verify** (from
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5):
+
+| Scenario | Expected result |
+|---|---|
+| Create a custom-named snapshot without a manifest | Not counted by `available` |
+| Create a custom-named snapshot with a manifest | Counted by `available` |
+| Create 30 snapshots, run rotation | 21 kept + `.last_stable` + newest install |
+| Edit `.last_stable` to a snapshot outside the 21-newest window | Target preserved by rotation |
+| Create a snapshot named `20260926-150000-v1.4.0-12345` | Preserved as newest install |
+| Manually touch an older snapshot to make its mtime newest | Sorted as newest by `last_backup_name` |
+
+**Example report**:
+
+```text
+Devices tested:
+  1. Pixel 6a     / Android 14 / Magisk 27.0    → ✅ All checks pass
+  2. Xiaomi 13    / MIUI 14    / KernelSU 0.9.5 → ✅ All checks pass
+  3. OnePlus 11   / OxygenOS 13 / APatch        → ✅ All checks pass
+
+SNAP-MANIFEST check:
+  - Custom-named dir WITHOUT manifest → not counted ✅
+  - Custom-named dir WITH manifest    → counted ✅
+
+SNAP-MTIME check:
+  - Touched old snapshot to make mtime newest → picked as last_backup_name ✅
+
+ROT-PROTECT check:
+  - .last_stable target preserved after rotation ✅
+  - Newest install snapshot preserved ✅
+
+Notes: Verified on a fresh device with 30 synthetic snapshots.
+```
+
+**Why this matters**:
+
+The v1.3.0 rotation refinements fix a silent failure mode where
+the 21-newest window could evict the exact snapshot that recovery
+mode or rollback depends on. By documenting real-world behavior
+across devices and root solutions, contributors help verify the
+fix works and identify any edge cases that need further tuning.
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2;
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5;
+[`docs/FAQ.md`](FAQ.md) Q131, Q138, Q139.
 
 ---
 
@@ -360,7 +555,7 @@ ROMs ensures the WebView integration works correctly regardless
 of the OEM's WebView implementation.
 
 **Reference**: [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §1.9,
-§10.8.
+§10.8; [`docs/FAQ.md`](FAQ.md) Q142, Q144.
 
 ---
 
@@ -381,7 +576,8 @@ entry from v1.0.0).
   vulnerabilities — they are documented in `docs/SECURITY.md`
   §5.31 and §5.32 without audit numbers.
 - **v1.3.0** is a **feature release** (PWA install button, live
-  status LED, DNS auto-start fix) — no audit corrections.
+  status LED, DNS auto-start fix, **rotation refinements
+  SNAP-*/ROT-***) — no audit corrections.
 - **v1.4.0** is an **integration release** (companion Android app,
   CodeQL path-injection hardening, iOS PWA removal). The CodeQL fix
   in `removeModule` **closes two pre-existing CodeQL alerts**
@@ -626,6 +822,7 @@ across multiple scenarios earn this badge.
 | In-place upgrade from v1.0.0 | 5 files preserved; `MEMORY_LIMIT_HINT=auto` added |
 | In-place upgrade from v1.2.0 | 5 files preserved; snapshot created |
 | In-place upgrade from v1.3.0 | 5 files preserved; snapshot created |
+| In-place upgrade from v1.4.0 | 5 files preserved; snapshot created |
 | Reinstall after uninstall | 5 files restored from `/sdcard/` backup |
 | Recovery mode | 5 files restored; trigger file consumed |
 | Renamed module folder | 5 files found via multi-source detection |
@@ -638,6 +835,8 @@ across multiple scenarios earn this badge.
 - Testing the SW update-banner fix (FIX-2) on both `index.html`
   and `dashboard.html`.
 - Testing the bilingual toggle across different browsers.
+- **(v1.3.0+)** Testing the rotation refinements — see the
+  **Rotation Guardian** badge for the specific acceptance criteria.
 
 **Example report**:
 
@@ -731,6 +930,16 @@ edge cases that need further tuning.
   `beforeinstallprompt` event and the Web App Manifest spec.
 - **Samsung Internet team** — For documentation on the PWA install
   flow on OneUI.
+- **GNU coreutils / mksh maintainers** — For documentation on
+  `sort -rn -k1,1` and `stat -c %Y` behavior that informs the
+  rotation refinements (`ROT-MTIME` / `SNAP-MTIME`).
+- **Reviewers of the v1.2.0 lexicographic-sort limitation** — For
+  the analysis that motivated the manifest-based detection
+  (`SNAP-MANIFEST` / `ROT-MANIFEST`) and mtime sort
+  (`SNAP-MTIME` / `ROT-MTIME`).
+- **Reviewers of the `.last_stable` eviction edge case** — For the
+  analysis that motivated the protected rotation targets
+  (`ROT-PROTECT`).
 
 ### v1.4.0 Acknowledgments
 
@@ -738,6 +947,9 @@ edge cases that need further tuning.
   motivated the `removeModule` hardening.
 - **The companion app contributors** — For maintaining
   [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+- **GitHub Actions maintainers** — For the `actions/checkout@v4`,
+  `actions/setup-go@v5`, and `softprops/action-gh-release@v2`
+  actions used by the release pipeline.
 
 ---
 
@@ -778,6 +990,8 @@ edge cases that need further tuning.
 - Testing on non-Android platforms (Linux, macOS, WSL2).
 - **(v1.2.0)** Testing the bilingual WebUI on multiple browsers.
 - **(v1.3.0)** Testing the PWA install button on 3+ browsers.
+- **(v1.3.0)** Verifying the rotation semantics (SNAP-*/ROT-*)
+  on a real device — see `docs/COMPATIBILITY.md` §10.3.5.
 - **(v1.4.0)** Testing the companion app install button on 3+
   devices.
 
@@ -809,6 +1023,26 @@ edge cases that need further tuning.
     Samsung Internet).
   - ✅ Tested on unsupported browsers (Firefox, Opera Mini).
   - ✅ Documented the behaviour differences.
+- **v1.4.0 note**: The iOS-specific install path was removed in
+  v1.4.0. The badge still recognizes testing on Chromium-based
+  and unsupported browsers.
+
+### 🎯 Rotation Guardian (v1.3.0)
+- Verifying the snapshot-detection and rotation semantics
+  (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+  ROT-PROTECT) on real devices.
+- **Criteria**:
+  - ✅ Tested on **3+ devices** or **3+ root solutions**.
+  - ✅ Verified SNAP-MANIFEST: a directory without a
+    `.manifest.json` is not counted as a snapshot.
+  - ✅ Verified SNAP-MTIME: rotation sorts by mtime, not by
+    directory name.
+  - ✅ Verified ROT-PROTECT: `.last_stable` and the newest install
+    snapshot survive rotation.
+  - ✅ Reported the 7-field `backups` object before/after each
+    scenario.
+  - ✅ Reported `status.sh --diagnose` output.
+- **Reference**: [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5.
 
 ### 🏆 Companion App Champion (v1.4.0)
 - Installing the companion APK from the WebUI install button on
@@ -956,7 +1190,10 @@ Auditor badge since v1.0.0.
 13. **PWA (v1.3.0)**: The `PWA Champion` badge is granted for
     testing the smart PWA install button on 3+ browsers with
     documented behaviour.
-14. **Companion App (v1.4.0)**: The `Companion App Champion` badge
+14. **Rotation (v1.3.0)**: The `Rotation Guardian` badge is granted
+    for verifying the SNAP-*/ROT-* semantics on 3+ devices or
+    root solutions with concrete, reproducible evidence.
+15. **Companion App (v1.4.0)**: The `Companion App Champion` badge
     is granted for testing the optional companion Android app on
     3+ devices or 3+ ROMs.
 
@@ -982,6 +1219,8 @@ The Hall of Fame is **updated manually** in the following cases:
   immediately).
 - **(v1.3.0)** When a **PWA Champion** report is accepted (added
   immediately).
+- **(v1.3.0)** When a **Rotation Guardian** report is accepted
+  (added immediately).
 - **(v1.4.0)** When a **Companion App Champion** report is
   accepted (added immediately).
 
@@ -1081,6 +1320,23 @@ This is intentional. The v1.3.0 release is a **feature release**
 contains no security fixes that warrant an audit correction
 number.
 
+**The v1.3.0 release ALSO refined the snapshot-detection and
+rotation semantics** used by every consumer of the persistent
+backup directory:
+
+| ID | Change | Type |
+|:-:|---|---|
+| **SNAP-MANIFEST** | `main.go:buildBackupInfo()` — manifest-based snapshot detection | Functional change |
+| **SNAP-MTIME** | `main.go:buildBackupInfo()` — mtime sort for `last_backup_name` | Functional change |
+| **ROT-MANIFEST** | `functions.sh:rotate_backups()` — same manifest-based detection | Functional change |
+| **ROT-MTIME** | `functions.sh:rotate_backups()` — same mtime sort | Functional change |
+| **ROT-PROTECT** | `functions.sh:rotate_backups()` — preserve `.last_stable` + newest install | Functional change |
+
+These are documented in
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2 and
+[`CHANGELOG.md`](../CHANGELOG.md) §[v1.3.0] but are **not assigned
+audit correction numbers**.
+
 ### v1.4.0 — No New Audit Corrections
 
 **The v1.4.0 release does not extend the Audit Corrections
@@ -1147,11 +1403,15 @@ future release.
 
 **Feature release — no breaking changes.**
 
-**New badge (1)**:
+**New badges (2)**:
 
 - 🔔 **PWA Champion (v1.3.0)** — recognizes contributors who test
   the smart PWA install button across Chromium / Firefox / Samsung
   Internet.
+- 🎯 **Rotation Guardian (v1.3.0)** — recognizes contributors who
+  verify the snapshot-detection and rotation semantics
+  (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+  ROT-PROTECT) on a real device.
 
 **Added**:
 
@@ -1163,9 +1423,29 @@ future release.
 - **DNS auto-start after boot** — `service.sh` now waits for the
   WebUI then calls `POST /api/ensure_running_service` directly.
 
+**Server-side rotation refinements** — the v1.3.0 release ALSO
+refined the snapshot-detection and rotation semantics used by
+every consumer of the persistent backup directory:
+
+- **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now detects a
+  snapshot by the presence of a `.manifest.json` file, not by the
+  v1.2.0 name pattern.
+- **SNAP-MTIME** — `last_backup_name` is now selected by **mtime**
+  descending, not lexicographic directory name.
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+  `functions.sh:rotate_backups()` uses the same manifest-based
+  detection + mtime sort, and preserves two additional targets on
+  top of the 21-newest window: the `.last_stable` recovery pointer
+  and the newest install snapshot.
+
+The same SNAP-*/ROT-* semantics were mirrored in 5 shell scripts
+(`service.sh`, `watchdog.sh`, `status.sh`, `customize.sh`,
+`action.sh`) and in `uninstall.sh`.
+
 **Audit Corrections**: **None** — the registry remains at **#33**.
 
-**See**: [`CHANGELOG.md`](../CHANGELOG.md) §[v1.3.0].
+**See**: [`CHANGELOG.md`](../CHANGELOG.md) §[v1.3.0];
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.
 
 ### v1.2.0 (2026-09-29)
 
@@ -1187,7 +1467,8 @@ future release.
 - **Layer 6** — SELinux preservation (`restorecon` / `chcon`).
 - **Layer 7** — Recovery mode via trigger file.
 - **Layer 8** — Config migrations.
-- **Layer 9** — Auto-backup (24 h) + rotation (max 21 snapshots).
+- **Layer 9** — Auto-backup (24 h) + rotation (max 21 snapshots;
+  **v1.3.0+** uses mtime sort + protected targets).
 - **Layer 10** — Observability (`.upgrade_history.json`,
   `status.sh --diagnose`, 7-field `runtime_info.backups`).
 
@@ -1367,6 +1648,12 @@ appreciated, including:
 - 🆕 **(v1.2.0)** Testing recovery mode (`touch recovery && reboot`).
 - 🆕 **(v1.2.0)** Testing the bilingual WebUI (EN ↔ AR toggle).
 - 🆕 **(v1.3.0)** Testing the PWA install button on a new browser.
+- 🆕 **(v1.3.0)** Verifying SNAP-MANIFEST — a directory without a
+  `.manifest.json` is not counted as a snapshot.
+- 🆕 **(v1.3.0)** Verifying SNAP-MTIME — rotation sorts by mtime,
+  not by directory name.
+- 🆕 **(v1.3.0)** Verifying ROT-PROTECT — `.last_stable` and the
+  newest install snapshot survive rotation.
 - 🆕 **(v1.4.0)** Testing the companion Android app on a new device.
 - 🆕 **(v1.4.0)** Reporting CodeQL alerts on a modified branch.
 
@@ -1385,22 +1672,24 @@ and value of this project.
 - [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — Code of Conduct.
 - [`CHANGELOG.md`](../CHANGELOG.md) — Version history (v1.0.0 +
   v1.1.0 + v1.2.0 + v1.3.0 + v1.4.0).
-- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — System architecture.
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — System architecture
+  (§3.10, §4.10, **§4.13 — v1.3.0 rotation refinements**).
 - [`docs/API.md`](API.md) — HTTP API Reference.
 - [`docs/BACKUP.md`](BACKUP.md) — **Backup system reference
-  (v1.2.0)**.
+  (v1.2.0 + v1.3.0 rotation)**.
 - [`docs/EMERGENCY.md`](EMERGENCY.md) — **Emergency recovery
   (v1.2.0)**.
 - [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) — DNS binaries
   (Level 4).
-- [`docs/GLOSSARY.md`](GLOSSARY.md) — Glossary.
+- [`docs/GLOSSARY.md`](GLOSSARY.md) — Glossary (SNAP-*/ROT-*
+  terms, Rotation Guardian).
 - [`docs/ROADMAP.md`](ROADMAP.md) — Project plan.
 - [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) — Compatibility
-  matrix.
+  matrix (**§10.3.5 — on-device SNAP-*/ROT-* verification**).
 - [`docs/UPGRADE.md`](UPGRADE.md) — Version upgrade guide (§3.0,
   §3.1).
 - [`docs/FAQ.md`](FAQ.md) — Frequently asked questions
-  (Q121–Q130).
+  (Q104, Q129, Q131–Q140, Q141–Q150).
 - [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) — This file.
 
 ### Companion App Repository
@@ -1413,7 +1702,7 @@ and value of this project.
 
 <div align="center">
 
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Version**: v1.4.0
 
 [⬆ Back to top](#hall-of-fame--dnscrypt-smart-filter)

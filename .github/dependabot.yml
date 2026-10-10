@@ -1,6 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – Dependabot Configuration
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -158,7 +159,7 @@
 #     English-only. No Arabic strings exist in this file.
 #
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
 # ============================================================
 # A pre-release audit of this file found NO implementation
 # issues. The YAML body, the schedules, the grouping rules,
@@ -187,9 +188,102 @@
 #     No behavior change. No YAML change.
 #
 # ============================================================
+# v1.3.0 — No changes to the Dependabot configuration
+# ============================================================
+#   The v1.3.0 release is primarily a feature release (PWA
+#   install button, live status LED, DNS auto-start after
+#   boot). All three changes are client-side or shell-side:
+#     • PWA install button  → web/index.html (client-side)
+#     • Live status LED     → web/index.html (client-side)
+#     • DNS auto-start fix  → proxy/service.sh (shell)
+#
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#
+#   This file (dependabot.yml) was NOT modified in v1.3.0. Its
+#   scope is dependency updates for three ecosystems
+#   (github-actions, gomod, devcontainers), none of which were
+#   affected by the v1.3.0 changes. No new Go import was added,
+#   no new GitHub Action was referenced, and no dev container
+#   feature was introduced. The three ecosystem entries, the
+#   schedules, the grouping rules, and the ignore patterns are
+#   all unchanged from v1.2.0.
+#
+#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13.
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   🆕 DB-V14-01 — No new package ecosystem is added. The
+#     companion Android app (`web/app-debug.apk`) is fetched
+#     from a SEPARATE repository (gasciljh/dnscrypt-proxy-app)
+#     at release time by `scripts/fetch_app_apk.sh`. It has no
+#     dependency manifest in this repository, and its version
+#     is tracked by `proxy/app-apk.version` — a project-owned
+#     file, not a package manifest.
+#
+#     Dependabot therefore does NOT track the companion APK.
+#     The existing three ecosystems (github-actions, gomod,
+#     devcontainers) remain unchanged.
+#
+#   🆕 DB-V14-02 — `proxy/app-apk.version` is added to the
+#     "What Dependabot does NOT track" section below, alongside
+#     `proxy/dnscrypt-proxy.version`, `VERSION`, and `module.prop`.
+#     This prevents a future reader (or a security auditor) from
+#     mistakenly expecting Dependabot to bump the companion app.
+#
+#   🆕 DB-V14-03 — The inline `HARD-DEP-01` marker near the
+#     `ignore:` block under the github-actions ecosystem is
+#     now ALSO documented here in the header. Prior revisions
+#     referenced HARD-DEP-01 only inline, which was
+#     inconsistent with the project convention (every other
+#     `HARD-*` identifier in the module is documented in its
+#     file's header). See the block below for the full
+#     rationale.
+#
+#   🆕 DB-V14-04 — The "How Dependabot interacts with the
+#     release process" section now cross-references
+#     `docs/DNS_BINARIES.md` in addition to `docs/BACKUP.md`
+#     and `docs/EMERGENCY.md`, matching the reference list
+#     that the v1.4.0 release adds to other files.
+#
+# ============================================================
+# HARD-DEP-01 — Major-version guard for github-actions
+# ============================================================
+#   Dependabot repeatedly proposed major-version updates that
+#   did NOT exist on GitHub (actions/checkout@v7,
+#   actions/upload-artifact@v7, softprops/action-gh-release@v3,
+#   github/codeql-action@v4). This matches the v1.1.0 incident
+#   documented in `release.yml` as HARD-REL-13 and in
+#   `ci.yml` as HARD-CI-01: speculative major-version
+#   references that break the workflow if they do not exist.
+#
+#   FIX: the github-actions ecosystem now carries an `ignore:`
+#   block that excludes `version-update:semver-major` for the
+#   four affected dependency names:
+#
+#     • actions/*                   (checkout, setup-go, ...)
+#     • softprops/action-gh-release
+#     • github/codeql-action
+#     • nttld/setup-ndk
+#
+#   Patch and minor updates are still proposed — only MAJOR
+#   bumps are blocked, because those are the ones that can
+#   introduce breaking changes without warning.
+#
+#   Major-version bumps should be applied manually after
+#   reviewing the upstream changelog. The `dependabot.yml`
+#   file is the correct place for this guard (not each
+#   workflow file), because the guard applies to every
+#   workflow that references the affected Actions.
+# ============================================================
 # What Dependabot does NOT track:
 # ============================================================
-# There are three files in this repository that contain a
+# There are four files in this repository that contain a
 # "version" string but are NOT dependency manifests. Dependabot
 # will never open a PR against them. This is intentional.
 #
@@ -200,18 +294,25 @@
 #      ─ Updated manually when the upstream DNSCrypt project
 #        ships a new release. See docs/DNS_BINARIES.md §10.
 #
-#   2. VERSION
-#      ─ The module version (e.g. "v1.2.0").
+#   2. proxy/app-apk.version  (v1.4.0)
+#      ─ The companion Android app version (e.g. "1.0.0", no "v").
+#      ─ Managed by scripts/fetch_app_apk.sh, which reads it as
+#        the Single Source of Truth.
+#      ─ Updated manually when the companion app project
+#        (gasciljh/dnscrypt-proxy-app) ships a new release.
+#
+#   3. VERSION
+#      ─ The module version (e.g. "v1.4.0").
 #      ─ Managed by scripts/release.sh (and release-patch.sh).
 #      ─ Updated automatically at each release.
 #
-#   3. module.prop
+#   4. module.prop
 #      ─ The Magisk / KernelSU module definition.
-#      ─ Contains `version=v1.2.0` and `versionCode=1020000`.
+#      ─ Contains `version=v1.4.0` and `versionCode=1040000`.
 #      ─ Both fields are updated together by scripts/release.sh.
 #
 # If you ever see a Dependabot PR that touches one of these
-# three files, it is a false positive. Close the PR and open an
+# four files, it is a false positive. Close the PR and open an
 # Issue — the .github/dependabot.yml configuration may need a
 # `directory` / `package-ecosystem` adjustment.
 #
@@ -234,7 +335,7 @@ version: 2
 #   • any new workflow
 #
 # Example automatic PR:
-#   "ci: bump actions/checkout from v6 to v7"
+#   "ci: bump actions/checkout from v4 to v5"
 # ============================================================
 updates:
   - package-ecosystem: "github-actions"
@@ -246,13 +347,14 @@ updates:
       timezone: "Etc/UTC"
     open-pull-requests-limit: 5
     ignore:
-      # HARD-DEP-01: Dependabot repeatedly proposes major
-      # versions that do not exist on GitHub Actions
+      # HARD-DEP-01: see the header block with the full
+      # rationale (v1.4.0). Dependabot repeatedly proposed
+      # major versions that do not exist on GitHub Actions
       # (checkout@v7, upload-artifact@v7, action-gh-release@v3,
       # codeql-action@v4). This matches the v1.1.0 incident
-      # documented in release.yml as HARD-REL-13.
-      # Block ONLY major-version updates. Patch and minor
-      # updates are still proposed (they are safe).
+      # documented in release.yml as HARD-REL-13 and in ci.yml
+      # as HARD-CI-01. Block ONLY major-version updates. Patch
+      # and minor updates are still proposed (they are safe).
       - dependency-name: "actions/*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "softprops/action-gh-release"
@@ -301,6 +403,12 @@ updates:
   #   cleanupOldTransactions) uses only the Go standard library
   #   (os, filepath, strings, fmt, time) — all already imported
   #   in v1.1.0. The dependency-free policy is preserved.
+  #
+  # v1.4.0 note:
+  #   The v1.4.0 release does not add any new import either.
+  #   The CodeQL path-injection fix in `removeModule` uses
+  #   `path/filepath` (already imported). The companion APK
+  #   integration does not touch Go code.
   #
   # Future benefit:
   #   • If a package is added (e.g. golang.org/x/sys), Dependabot
@@ -400,9 +508,14 @@ updates:
 # docs/RELEASE_PROCESS.md §2.3 for the PATCH release flow.
 #
 # v1.2.0 cross-references:
-#   • docs/BACKUP.md      — backup system reference
-#   • docs/EMERGENCY.md   — emergency recovery guide
+#   • docs/BACKUP.md       — backup system reference
+#   • docs/EMERGENCY.md    — emergency recovery guide
 #   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
+#
+# v1.4.0 cross-references:
+#   • docs/DNS_BINARIES.md — DNS binaries (Level 4)
+#   • docs/BACKUP.md       — backup system reference
+#   • docs/EMERGENCY.md    — emergency recovery guide
 #
 # ============================================================
 # How to verify the configuration

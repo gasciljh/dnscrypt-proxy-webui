@@ -1,6 +1,7 @@
 // ============================================================
 // DNSCrypt Smart Filter – main.go
 // Version: v1.4.0 (Global Edition)
+// Last updated: 2026-10-08
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -21,6 +22,8 @@
 //     • Auto-backup before destructive operations (v1.2.0)
 //     • Rotation trigger after successful pre-critical backup (v1.2.0)
 //     • Startup cleanup of orphan transaction dirs (v1.2.0)
+//     • Companion APK route /app-debug.apk (v1.4.0)
+//     • CodeQL path-injection hardening in removeModule (v1.4.0)
 //
 // Section structure:
 //   [0]  Build version variables
@@ -80,6 +83,7 @@
 //   • backupMu       — sync.Mutex    — serializes auto-backup calls (v1.2.0)
 //   • watchdogTokMu  — sync.RWMutex  — watchdog token (v1.2.0 + R2-02)
 //   • funcScriptOnce — sync.Once     — functions.sh path resolution (R2-01)
+//   • lastUpdateMu   — sync.Mutex    — last_update TTL cache (BUG-H)
 //
 // ============================================================
 // v1.2.0 — Post-audit corrections applied in THIS revision
@@ -103,8 +107,8 @@
 //
 //   🔧 BUG-B — CSRF bypass on `/api/ensure_running_service`:
 //     `checkAuth` returned `true` unconditionally for any
-//     localhost POST to that endpoint. Any web page loaded in
-//     a browser on the same device could silently trigger a
+//     localhost POST to that endpoint. Any web page loaded in a
+//     browser on the same device could silently trigger a
 //     service restart.
 //
 //     FIX: The bypass is replaced by a watchdog token:
@@ -372,6 +376,102 @@
 //     The corrected comment now reads "7 shell scripts".
 //     No code change was required — the runtime behaviour of
 //     `getFunctionsScript()` is unaffected by the count.
+//
+// ============================================================
+// v1.3.0 — Client-side features + server-side refinements
+// ============================================================
+// The v1.3.0 release introduced two client-side features plus
+// two server-side refinements that DO touch main.go.
+//
+//   • Client-side (web/index.html — no main.go impact):
+//       - Smart dynamic PWA install button. The button adapts
+//         to the browser: Chromium → beforeinstallprompt dialog;
+//         iOS Safari → step-by-step instructions; unsupported →
+//         friendly modal with alternatives. Language-aware
+//         (EN + AR). This chain was later removed in v1.4.0 in
+//         favour of a direct <a download> link.
+//       - Live status LED on the Today counter (pure CSS + JS,
+//         aligned with .status-dot and updateStatsDisplay()).
+//
+//   • Boot-path correctness fix (proxy/service.sh — no
+//     main.go impact):
+//       - DNS auto-start after boot via direct API call.
+//         `service.sh` now performs a bounded wait for the
+//         WebUI to become ready (up to 60 s, checking the
+//         watchdog token file + the WebUI TCP port) and then
+//         calls POST /api/ensure_running_service itself, with
+//         the X-Watchdog-Token header. This short-circuits a
+//         race where the watchdog's 30 s initial backoff left
+//         DNS unavailable for minutes after boot.
+//
+//   • Server-side refinements (proxy/main.go — v1.3.0):
+//       - SNAP-MANIFEST: `buildBackupInfo()` now detects
+//         snapshots by `.manifest.json` presence rather than
+//         by directory-name pattern. Custom-named snapshots
+//         (e.g. "pre-v130-manual-...") are now visible to the
+//         API and to rotation.
+//       - SNAP-MTIME: `buildBackupInfo()` now sorts snapshots
+//         by mtime (not lexicographic directory name) for
+//         `last_backup_name`. This aligns runtime_info.backups
+//         with the shell-side status.sh --json object and is
+//         robust against clock drift and manual renames.
+//
+// These v1.3.0 refinements REVERSE the v1.2.0 BUG-3 decision
+// (which had aligned buildBackupInfo with lexicographic
+// sorting). The reversal is deliberate: it makes the API and
+// the shell agree on a single, portable sort key, and it
+// eliminates the "custom-named snapshot" blind spot.
+//
+// ⚠️ Historical correction: earlier drafts of this header
+//    claimed "main.go is byte-for-byte identical between
+//    v1.2.0 and v1.3.0". That claim was inaccurate — the
+//    buildBackupInfo() refinements above were introduced in
+//    v1.3.0. The current header reflects the actual code.
+//
+// See docs/ARCHITECTURE.md §4.13 for the full reference.
+// ============================================================
+//
+// ============================================================
+// v1.4.0 — Companion Android app integration
+// ============================================================
+//   📱 APK-01 — New constant `APK_FILE` points at
+//     `WEB_DIR/app-debug.apk`. The file is OPTIONAL: it is
+//     staged by `.github/workflows/release.yml` (via
+//     `scripts/fetch_app_apk.sh`) before packaging. Local
+//     developer builds may omit it.
+//
+//   📱 APK-02 — `serveStaticAssets` registers the
+//     `/app-debug.apk` route with mime type
+//     `application/vnd.android.package-archive`.
+//
+//   📱 APK-03 — `serveFile` now applies a per-extension
+//     Cache-Control header: `.apk` files get
+//     `public, max-age=3600, immutable` (safe to cache — the
+//     APK is versioned by URL), everything else keeps
+//     `no-cache, no-store, must-revalidate`.
+//
+//   🛡️ APK-04 — `removeModule` hardened against CodeQL
+//     `go/path-injection` (alerts #1 and #2). The caller-
+//     provided path is now routed through `filepath.Base()`
+//     and the final path is rebuilt from the trusted
+//     `MODULES_DIR` constant + the sanitized basename. No
+//     user-controlled data reaches any path expression.
+//
+//   📱 APK-05 — iOS PWA logic removed (Android-only project).
+//     This affects only web/index.html; main.go has no iOS
+//     awareness.
+//
+//   🛡️ MAIN-01 — `currentLogLevel = loadLogLevel()` is now
+//     called immediately after `initPaths()` in `main()`, so
+//     every subsequent log call respects the configured
+//     `LOG_LEVEL`. Previously the load happened after
+//     `readSelectedProfile()`, `applyMemoryLimit()`,
+//     `getWatchdogToken()`, `checkPendingNotifications()`, and
+//     `cleanupOldTransactions()` — those early log lines were
+//     always emitted at the default "info" level, even when
+//     the user had set `LOG_LEVEL=error`. See
+//     docs/ARCHITECTURE.md §4.1 and §11.37.
+//
 // ============================================================
 
 package main
@@ -978,20 +1078,6 @@ func isExposedBind(addr string) bool {
 // ============================================================
 // [9c] isSecureCookie
 // ============================================================
-// isSecureCookie reports whether session cookies should carry
-// the `Secure` attribute.
-//
-// Rationale (Global Edition clarification):
-//   - On loopback addresses (127.0.0.1 / ::1 / localhost) the
-//     modern browser security model treats the origin as a
-//     "secure context" — the Secure attribute is honoured over
-//     plain HTTP, so marking the cookie Secure prevents it
-//     from ever leaking to a real network origin.
-//   - On any other bind address the transport is plain HTTP
-//     with no TLS terminator assumed; forcing Secure=true
-//     would make the cookie unusable in some browsers. We
-//     therefore leave it off, and the operator is expected to
-//     front the module with HTTPS if it is exposed.
 func isSecureCookie() bool {
 	switch serverBindAddr {
 	case "127.0.0.1", "::1", "localhost":
@@ -1029,7 +1115,7 @@ func readSelectedProfile() string {
 }
 
 // memoryLimitForProfile returns the soft memory limit for a
-// given profile key. See MEMORY_LIMIT_* constants.
+// given profile key.
 func memoryLimitForProfile(key string) int64 {
 	switch strings.ToLower(strings.TrimSpace(key)) {
 	case "light":
@@ -1048,13 +1134,7 @@ func memoryLimitForProfile(key string) int64 {
 }
 
 // applyMemoryLimit sets the Go runtime soft memory limit based
-// on the active profile. The old limit is returned via the
-// runtime, and we log the transition.
-//
-// Note: debug.SetMemoryLimit is a SOFT limit — the runtime will
-// prefer to run GC more aggressively rather than OOM. Setting
-// it too low causes GC overhead; setting it too high wastes RAM.
-// Hence the per-profile values.
+// on the active profile.
 func applyMemoryLimit(key string) {
 	memLimitMu.Lock()
 	defer memLimitMu.Unlock()
@@ -1064,17 +1144,8 @@ func applyMemoryLimit(key string) {
 		return
 	}
 
-	// Capture the previous *tracked* limit BEFORE calling
-	// debug.SetMemoryLimit. On the very first call, the runtime
-	// returns math.MaxInt64 (there is no previous limit), which
-	// would produce a nonsensical log line. Using currentMemLimit
-	// gives a stable, human-meaningful value across every call.
 	prevLimit := currentMemLimit
 
-	// debug.SetMemoryLimit returns the PREVIOUS limit. We call it
-	// here for its side effect (applying the new soft limit) and
-	// intentionally discard its return value — see the comment
-	// above for the rationale.
 	_ = debug.SetMemoryLimit(limit)
 
 	currentMemLimit = limit
@@ -1105,9 +1176,6 @@ func logWithLevel(level, msg string) {
 		msg = msg[:MAX_LOG_MSG_SIZE] + "...[truncated]"
 	}
 
-	// Rotation: when the live log exceeds MAX_LOG_SIZE, rename
-	// it to a nanosecond-suffixed `.old` file and gzip it in the
-	// background. HARD-04: the rename error is now logged.
 	if fi, err := os.Stat(LOG_FILE); err == nil && fi.Size() > MAX_LOG_SIZE {
 		timestampFile := fmt.Sprintf("%s.%d.old", LOG_FILE, time.Now().UnixNano())
 		if err := os.Rename(LOG_FILE, timestampFile); err != nil {
@@ -1138,9 +1206,6 @@ func logWithLevel(level, msg string) {
 
 func logEvent(msg string) { logWithLevel("info", msg) }
 
-// compressLogFile gzips a rotated log file. HARD-04: the target
-// `.gz` is created with O_EXCL to avoid clobbering an existing
-// archive on the (extremely unlikely) nanosecond collision.
 func compressLogFile(filePath string) {
 	defer func() { recover() }()
 	src, err := os.Open(filePath)
@@ -1152,7 +1217,6 @@ func compressLogFile(filePath string) {
 	gzPath := filePath + ".gz"
 	dest, err := os.OpenFile(gzPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 	if err != nil {
-		// Collision or permission error — leave the .old in place.
 		logWithLevel("warn", "⚠️ log compress: cannot create "+gzPath+": "+err.Error())
 		return
 	}
@@ -1176,9 +1240,7 @@ func compressLogFile(filePath string) {
 // most MAX_GZ_FILES of them.
 //
 // HARD-01 (was C-01): the glob is scoped to our own rotated
-// archives only (`dnscrypt_main.log.*.gz`). The previous glob
-// (`*.gz`) could delete unrelated compressed files that share
-// the /data/local/tmp directory with other apps and modules.
+// archives only (`dnscrypt_main.log.*.gz`).
 func cleanupOldGz(dir string) {
 	defer func() { recover() }()
 	pattern := filepath.Join(dir, filepath.Base(LOG_FILE)+".*.gz")
@@ -1238,16 +1300,6 @@ func atomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 
 // atomicWriteStream writes via a caller-supplied callback to a
 // temp file, then atomically renames it into place.
-//
-// HARD-06: the Chmod error is now checked (previously ignored,
-// which could leave the file with a restrictive umask-derived
-// mode, e.g. 0600 instead of the requested 0644).
-//
-// R2-03: the Chmod is now applied AFTER the write callback and
-// Flush/Sync succeed, and immediately before Close, mirroring
-// the sequence used by atomicWriteFile. There is no behavioural
-// change on the success path; the two atomic writers are now
-// consistent.
 func atomicWriteStream(filename string, perm os.FileMode, writeFn func(io.Writer) error) error {
 	dir := filepath.Dir(filename)
 
@@ -1316,26 +1368,6 @@ func getSystemShell() string {
 
 // getFunctionsScript returns the absolute path to the module's
 // functions.sh helper.
-//
-// R2-01: defence-in-depth lookup for functions.sh. The
-// canonical location is MODDIR/functions.sh — customize.sh §[9]
-// copies SEVEN shell scripts to the module root during
-// installation (service.sh, post-fs-data.sh, action.sh,
-// status.sh, uninstall.sh, functions.sh, watchdog.sh), and
-// every Magisk/KernelSU/APatch install produces this layout.
-// The PROXYDIR fallback exists only for manual/developer
-// installs where functions.sh was left in the build directory;
-// it is checked second so a well-formed install always wins.
-// The helper caches the first existing hit and, if neither
-// candidate exists, returns the canonical MODDIR path so any
-// subsequent shell invocation fails with a clear "not found"
-// error rather than silently sourcing nothing.
-//
-// R3-01: the doc-comment previously said "8 shell scripts".
-// Verification against the actual §[9] unzip argument list in
-// customize.sh shows SEVEN shell scripts (module.prop is also
-// extracted, but is not a script). The count has been corrected
-// here; no code change was required.
 func getFunctionsScript() string {
 	funcScriptOnce.Do(func() {
 		candidates := []string{
@@ -1348,20 +1380,13 @@ func getFunctionsScript() string {
 				return
 			}
 		}
-		// Canonical fallback: the shell invocation will fail
-		// loudly if neither path exists.
 		funcScriptPath = filepath.Join(MODDIR, "functions.sh")
 	})
 	return funcScriptPath
 }
 
 // shellQuote wraps s in single quotes if it contains any shell
-// metacharacter, escaping embedded single quotes via the
-// standard backslash-two-single-quotes sequence.
-//
-// v1.1.0: extended to cover {, }, \n, \t in addition to the
-// original set. This protects against brace expansion and
-// whitespace-based word splitting.
+// metacharacter.
 func shellQuote(s string) string {
 	for _, r := range s {
 		if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
@@ -1399,12 +1424,7 @@ func runShell(cmd string) error {
 }
 
 // runShellWithTimeout is like runShell but with a caller-provided
-// timeout. Used by the v1.2.0 auto-backup path where the shell
-// call can take longer than the default 10 seconds.
-//
-// BUG-K fix: the log message now distinguishes a context-deadline
-// timeout (child killed by exec.CommandContext) from a plain
-// non-zero exit. The elapsed time is included in both cases.
+// timeout.
 func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1532,15 +1552,6 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 // [15] Statistics
 // ============================================================
-
-// getBlockedStats returns the number of blocked queries logged
-// for today.
-//
-// HARD-13 (was M-10): the previous implementation shelled out
-// to `grep -c <today> <logfile>`. `grep` is not guaranteed to
-// be present on every Android build (some minimal Toybox
-// configurations omit it). The scan is now performed in pure Go
-// with a bounded buffer.
 func getBlockedStats() string {
 	statsMutex.Lock()
 	defer statsMutex.Unlock()
@@ -1630,22 +1641,11 @@ func getClientIP(r *http.Request) string {
 // ============================================================
 // [17] Authentication
 // ============================================================
-
-// getMonitoringAuth returns the (username, password) pair used
-// for Basic Auth on /api/* and for the metrics proxy.
-//
-// BUG-C fix: empty results are no longer cached. Previously, if
-// the TOML file was temporarily unreadable, the ("", "") result
-// was cached for 60 s — during which checkAuth treated every
-// request as "no auth required". Now a read failure is
-// re-attempted on the next request, which closes the bypass.
 func getMonitoringAuth() (username, password string) {
 	authCacheMu.RLock()
 	if !authCacheTime.IsZero() && time.Since(authCacheTime) < AUTH_CACHE_TTL {
 		u, p := authCacheUser, authCachePass
 		authCacheMu.RUnlock()
-		// Return cached value ONLY if it is non-empty.
-		// This prevents the empty-cache bypass.
 		if u != "" || p != "" {
 			return u, p
 		}
@@ -1656,13 +1656,11 @@ func getMonitoringAuth() (username, password string) {
 	user, pass := readMonitoringAuthFromFile()
 
 	authCacheMu.Lock()
-	// Cache only non-empty results.
 	if user != "" || pass != "" {
 		authCacheUser = user
 		authCachePass = pass
 		authCacheTime = time.Now()
 	} else {
-		// Invalidate the cache so the next call re-reads.
 		authCacheUser = ""
 		authCachePass = ""
 		authCacheTime = time.Time{}
@@ -1734,19 +1732,7 @@ func readMonitoringAuthFromFile() (username, password string) {
 // ============================================================
 // [17b] Watchdog token (BUG-B fix)
 // ============================================================
-// The watchdog token replaces the previous "localhost bypass"
-// for /api/ensure_running_service. The token is:
-//   - Generated on first startup (256 bits from crypto/rand).
-//   - Persisted to $RUN_DIR/.watchdog_token (mode 0600) so it
-//     survives restarts and can be read by watchdog.sh.
-//   - Compared in constant-time against the X-Watchdog-Token
-//     header sent by the caller.
-//
-// If the token file cannot be written (e.g. read-only run dir),
-// ensure_running_service falls back to requiring normal auth.
-// This is fail-closed.
 func loadOrCreateWatchdogToken() string {
-	// Try to read an existing token first (persistence).
 	if data, err := os.ReadFile(WATCHDOG_TOKEN_FILE); err == nil {
 		tok := strings.TrimSpace(string(data))
 		if len(tok) >= 32 {
@@ -1754,7 +1740,6 @@ func loadOrCreateWatchdogToken() string {
 		}
 	}
 
-	// Generate a new token.
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		logWithLevel("warn", "⚠️ Failed to generate watchdog token: "+err.Error())
@@ -1762,29 +1747,14 @@ func loadOrCreateWatchdogToken() string {
 	}
 	tok := hex.EncodeToString(b)
 
-	// Write atomically (BUG-L fix).
 	if err := atomicWriteFile(WATCHDOG_TOKEN_FILE, []byte(tok), 0600); err != nil {
 		logWithLevel("warn", "⚠️ Failed to persist watchdog token: "+err.Error())
-		// Continue with the in-memory token — the file will
-		// simply be regenerated on the next startup.
 	}
 
 	return tok
 }
 
-// getWatchdogToken returns the cached watchdog token, loading
-// or creating it on first call.
-//
-// R2-02: the previous implementation performed a read-lock
-// check, released it, then called `loadOrCreateWatchdogToken`
-// outside any lock, and finally re-acquired the write lock.
-// Two concurrent first-callers could therefore both read the
-// token file (or both attempt to create it). The function now
-// acquires the write lock once and performs a double-check
-// inside the critical section, so the load happens exactly
-// once.
 func getWatchdogToken() string {
-	// Fast path: already populated.
 	watchdogTokMu.RLock()
 	if !watchdogTokTime.IsZero() {
 		v := watchdogTokValue
@@ -1793,7 +1763,6 @@ func getWatchdogToken() string {
 	}
 	watchdogTokMu.RUnlock()
 
-	// Slow path: load under the write lock, with double-check.
 	watchdogTokMu.Lock()
 	defer watchdogTokMu.Unlock()
 	if !watchdogTokTime.IsZero() {
@@ -1806,19 +1775,15 @@ func getWatchdogToken() string {
 	return tok
 }
 
-// verifyWatchdogToken returns true if the request carries the
-// correct X-Watchdog-Token header (constant-time comparison).
 func verifyWatchdogToken(r *http.Request) bool {
 	expected := getWatchdogToken()
 	if expected == "" {
-		// No token — fail closed.
 		return false
 	}
 	provided := r.Header.Get(WATCHDOG_TOKEN_HEADER)
 	if provided == "" {
 		return false
 	}
-	// Constant-time compare. Lengths must match first.
 	if len(provided) != len(expected) {
 		return false
 	}
@@ -1902,22 +1867,7 @@ func destroySession(token string) {
 	sessionsMu.Unlock()
 }
 
-// checkAuth returns true if the request is authenticated.
-//
-// BUG-B fix: the previous version bypassed auth entirely for
-// any localhost POST to /api/ensure_running_service. That is a
-// CSRF hole — any web page loaded in a browser on the same
-// device could trigger a service restart. The bypass is now
-// replaced by a token check (X-Watchdog-Token).
-//
-// R2-05: `isLocalRequest(r)` matches on `RemoteAddr`, which is
-// the proxy's address when a local reverse proxy fronts the
-// WebUI. That is intentional — only the watchdog (which runs
-// on the same host and knows the token) is allowed this path.
-// A reverse proxy would forward the original client IP in
-// `X-Forwarded-For`, but we deliberately do NOT trust it here.
 func checkAuth(r *http.Request) bool {
-	// Local watchdog token path (no user credentials required).
 	if hasEndpoint(r.URL.Path, "ensure_running_service") {
 		if r.Method == http.MethodPost && isLocalRequest(r) {
 			if verifyWatchdogToken(r) {
@@ -2057,14 +2007,6 @@ func isLockedOut(ip string) bool {
 // ============================================================
 // [19] Process and port checks
 // ============================================================
-
-// isPidAlive returns true if the given PID currently refers to
-// a process whose comm is exactly one of the DNSCrypt binaries.
-//
-// BUG-J fix: the previous version used a substring match
-// (`strings.Contains(comm, "dnscrypt")`), which could produce
-// false positives after PID reuse. The check now requires an
-// exact match against the two known command names.
 func isPidAlive(pid int) bool {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
 	if err != nil {
@@ -2141,13 +2083,6 @@ func isPortOpenCached(port int) bool {
 	return open
 }
 
-// getStatusUncached probes the DNS engine and returns "ON" or
-// "OFF".
-//
-// BUG-G fix: the function now uses a named return value so that
-// the deferred recover sets it to "OFF" on panic. Previously
-// the function returned the zero-value "" (empty string) on
-// panic, which some callers treated as truthy.
 func getStatusUncached() (status string) {
 	status = "OFF"
 	defer func() {
@@ -2269,8 +2204,6 @@ func stopService() {
 
 	runShell("pkill -9 dnscrypt-proxy")
 	runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
-	// HARD-11: log the removal error if the file exists but
-	// cannot be deleted (rare, but useful for post-mortems).
 	if err := os.Remove(PID_FILE); err != nil && !os.IsNotExist(err) {
 		logWithLevel("debug", "stopService: remove PID file: "+err.Error())
 	}
@@ -2307,14 +2240,6 @@ func restartService() {
 // ============================================================
 // [21] getEntriesCount + validate + internet + progress
 // ============================================================
-
-// getEntriesCount returns the number of lines in blocklist.txt,
-// with a (size, mtime) cache.
-//
-// HARD-08 (was M-05): the previous cache key was size alone, so
-// a same-size replacement (e.g. restored by an operator) would
-// return a stale count. The cache now requires both the size
-// and the modification time to match.
 func getEntriesCount() int {
 	defer func() { recover() }()
 
@@ -2819,15 +2744,6 @@ func restoreFile(path string, data []byte) {
 // ============================================================
 // [26] Wrappers
 // ============================================================
-
-// saveAllowlist — v1.2.0: creates a pre-critical backup before
-// writing the new content, but only when the content actually
-// changes. If the backup fails, we log a warning but proceed
-// (backups are best-effort, never block user actions).
-//
-// HARD-12 (was M-09): the "no-op backup" path is short-
-// circuited. A save request that produces an identical hash
-// returns immediately without consuming a snapshot slot.
 func saveAllowlist(content, expectedHash string) map[string]interface{} {
 	prev := getRulesState()
 	if expectedHash != "" && expectedHash != prev.AllowlistHash {
@@ -2855,7 +2771,6 @@ func saveAllowlist(content, expectedHash string) map[string]interface{} {
 	}, "allow")
 }
 
-// saveDenylist — same HARD-12 short-circuit as saveAllowlist.
 func saveDenylist(content, expectedHash string) map[string]interface{} {
 	prev := getRulesState()
 	if expectedHash != "" && expectedHash != prev.DenylistHash {
@@ -2883,8 +2798,6 @@ func saveDenylist(content, expectedHash string) map[string]interface{} {
 	}, "deny")
 }
 
-// saveCustomRulesCombined — HARD-12 short-circuit when neither
-// list changes.
 func saveCustomRulesCombined(allow, deny string) map[string]interface{} {
 	prev := getRulesState()
 	allowChanged := contentHash([]byte(allow)) != prev.AllowlistHash
@@ -2908,25 +2821,6 @@ func saveCustomRulesCombined(allow, deny string) map[string]interface{} {
 	}, "allow")
 }
 
-// appendDenylist (v1.2.0, revised) appends the given content to
-// the current denylist and saves it.
-//
-// BUG-A fix: The previous version accepted no arguments and
-// re-saved the existing denylist unchanged — an effective no-op
-// that still triggered a pre-critical backup. The new signature
-// takes `content`:
-//
-//   - If `content` is empty (after trimming) → the request is
-//     rejected and NO backup is created. This preserves the
-//     "never waste a snapshot slot" invariant.
-//   - If `content` is non-empty → it is appended to the current
-//     denylist (with newline normalization) and the result is
-//     saved via `saveDenylist`, which triggers the pre-critical
-//     backup and rebuilds the blocklist.
-//
-// BUG-1 historical note: `saveDenylist` is the *only* path that
-// creates the pre-critical backup. This function does not call
-// `createAutoBackup` directly, so no double backup occurs.
 func appendDenylist(content string) map[string]interface{} {
 	content = strings.TrimSpace(content)
 	if content == "" {
@@ -2945,7 +2839,6 @@ func appendDenylist(content string) map[string]interface{} {
 	}
 
 	combined := string(existing)
-	// Normalize newlines before appending.
 	if combined != "" && !strings.HasSuffix(combined, "\n") {
 		combined += "\n"
 	}
@@ -2983,11 +2876,6 @@ func buildProfileResponse() map[string]interface{} {
 	}
 	entries := getEntriesCount()
 
-	// BUG-H fix: refresh last_update via a 5-second TTL cache
-	// instead of a process-lifetime sync.Once. If blocklist.txt
-	// is refreshed externally (e.g. by customize.sh during a
-	// restore), the WebUI will now report the new timestamp
-	// within 5 seconds.
 	lastUpdateMu.Lock()
 	if time.Since(lastUpdateTime) >= LAST_UPDATE_CACHE_TTL || lastUpdateCache == "" {
 		if fi, err := os.Stat(BLOCKLIST_FILE); err == nil {
@@ -3011,26 +2899,6 @@ func buildProfileResponse() map[string]interface{} {
 // ============================================================
 // [28] Update profile
 // ============================================================
-
-// updateProfile downloads a new blocklist, rebuilds it, and
-// restarts the DNS engine.
-//
-// HARD-05 (was H-04): the entire service-lifecycle section is
-// now serialised by `serviceMutex`. Previously, a concurrent
-// `toggle_service` or `restart_service` request could race the
-// implicit stop/start inside this function, producing two
-// `dnscrypt-proxy` processes, two PID-file writes, and two
-// firewall applications. The lock is held only around the
-// stop → rebuild → start window; the download itself happens
-// BEFORE the lock so it never blocks other service operations
-// for the full download duration.
-//
-// R2-07: the fixed 1.5 s sleep after `writeProgress(5, ...)` is
-// intentional. It gives SSE clients (including slow mobile
-// browsers) a chance to receive and render the "Connecting…"
-// event before the download begins producing new progress
-// events. Removing it caused the first few percent updates to
-// be coalesced on some clients.
 func updateProfile(key string) map[string]interface{} {
 	defer func() {
 		if r := recover(); r != nil {
@@ -3055,12 +2923,12 @@ func updateProfile(key string) map[string]interface{} {
 		return map[string]interface{}{"status": "error", "message": "Invalid profile"}
 	}
 
-	// --- v1.2.0: pre-critical backup before a profile change ---
 	createAutoBackup("pre-profile-change")
 
 	writeProgress(5, "Connecting to blocklist servers...")
-	// R2-07: see function doc — this delay lets SSE clients
-	// render the first progress event.
+	// R2-07: the 1.5 s delay is intentional — it lets the first
+	// SSE progress event reach slow clients before the download
+	// begins.
 	time.Sleep(1500 * time.Millisecond)
 
 	tempFile := RAW_BLOCKLIST_FILE + ".tmp"
@@ -3094,10 +2962,6 @@ func updateProfile(key string) map[string]interface{} {
 	}
 
 	writeProgress(88, "Preparing base file...")
-	// HARD-14 (was M-11): the previous fallback read the whole
-	// temp file into memory. It now streams via atomicWriteStream
-	// + io.Copy, so a large blocklist never allocates the full
-	// contents on the Go heap.
 	if err := os.Rename(tempFile, RAW_BLOCKLIST_FILE); err != nil {
 		src, oerr := os.Open(tempFile)
 		if oerr != nil {
@@ -3118,8 +2982,6 @@ func updateProfile(key string) map[string]interface{} {
 	writeProgress(90, "Applying custom rules...")
 	time.Sleep(500 * time.Millisecond)
 
-	// HARD-05: serialise the service-lifecycle section against
-	// toggle_service and restart_service.
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
 
@@ -3140,7 +3002,6 @@ func updateProfile(key string) map[string]interface{} {
 
 	atomicWriteFile(SELECTED_FILE, []byte(key), 0666)
 
-	// v1.1.0 — adjust memory limit based on the new profile
 	applyMemoryLimit(key)
 
 	writeProgress(95, "Restarting DNSCrypt engine...")
@@ -3316,15 +3177,6 @@ func removeModule(modulePath string) map[string]interface{} {
 // ============================================================
 // [30] Log file management
 // ============================================================
-// sanitizeLogFileName validates and returns a CodeQL-safe log
-// file name. On success, the returned string is guaranteed to
-// be a single path component (no separators, no "..", no NUL).
-//
-// This function is the canonical sanitizer for every path
-// construction that consumes a client-provided file name. It
-// resolves the CodeQL go/path-injection alerts by routing the
-// tainted input through filepath.Base(), which CodeQL
-// recognizes as an effective sanitizer.
 func sanitizeLogFileName(name string) (string, bool) {
 	if name == "" || len(name) > 200 {
 		return "", false
@@ -3338,10 +3190,6 @@ func sanitizeLogFileName(name string) (string, bool) {
 	if !strings.HasPrefix(name, "dnscrypt") {
 		return "", false
 	}
-	// CodeQL-recognized sanitizer: filepath.Base returns only
-	// the final path component. Requiring base == name also
-	// rejects any input containing path separators (defence in
-	// depth, redundant with the check above).
 	base := filepath.Base(name)
 	if base != name || base == "." || base == ".." {
 		return "", false
@@ -3442,14 +3290,6 @@ func listLogFiles() map[string]interface{} {
 	}
 }
 
-// readLogFile — read the tail (or head, as fallback) of a
-// permitted log file.
-//
-// BUG-4 fix: previously, if `Seek` failed (e.g. on a special
-// file, FIFO, or /proc entry), the file offset silently remained
-// at 0 and the function returned the FIRST 500 KB instead of the
-// LAST 500 KB — a misleading result. Now the failure is handled
-// explicitly with a documented fallback.
 func readLogFile(name, confirm string) map[string]interface{} {
 	safeName, ok := sanitizeLogFileName(name)
 	if !ok {
@@ -3518,15 +3358,11 @@ func readLogFile(name, confirm string) map[string]interface{} {
 		readSize := info.Size()
 		if readSize > LOG_MAX_READ_BYTES {
 			truncated = true
-			// Fast path: seek to the last N bytes.
 			if _, seekErr := f.Seek(-LOG_MAX_READ_BYTES, io.SeekEnd); seekErr == nil {
 				data := make([]byte, LOG_MAX_READ_BYTES)
 				n, _ := io.ReadFull(f, data)
 				content = string(data[:n])
 			} else {
-				// Slow path: backward seek failed. Read all (bounded)
-				// and slice the last N bytes in memory, so the user
-				// still sees the newest entries.
 				logWithLevel("warn", "readLogFile: backward seek failed for "+name+", using slow path")
 				limited := io.LimitReader(f, LOG_MAX_READ_BYTES*2)
 				data, _ := io.ReadAll(limited)
@@ -3659,32 +3495,6 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 // [31] runtime_info
 // ============================================================
-
-// buildBackupInfo returns the `backups` sub-object for
-// runtime_info (v1.2.0 — BAK-1).
-//
-// It enumerates the persistent backup directory and reports
-// **7 fields** (matching the schema produced by
-// status.sh --json, minus the two fields that are exclusive to
-// the shell tool — `status` and `last_backup_age_seconds`):
-//
-//   - available         — number of snapshots (excludes
-//     current/, txn-*, orphan-txn-*)
-//   - in_flight_txn     — number of `txn-*` directories
-//   - orphan_txn        — number of `orphan-txn-*` directories
-//   - last_backup       — human-readable timestamp of the newest
-//     snapshot (or null)
-//   - last_backup_name  — directory name of the newest snapshot
-//     (or null)
-//   - last_stable       — content of .last_stable (or null)
-//   - path              — absolute path of the backup directory
-//
-// All operations are best-effort: any error results in a
-// consistent, safe shape (all counters 0, all nullable fields
-// null, path set).
-//
-// BUG-3 fix: snapshots are sorted by directory NAME, not by
-// mtime. See the original BUG-3 comment for rationale.
 func buildBackupInfo() map[string]interface{} {
 	info := map[string]interface{}{
 		"available":        0,
@@ -3723,10 +3533,10 @@ func buildBackupInfo() map[string]interface{} {
 			continue
 		}
 
-		// v1.3.0: detect snapshots by manifest presence, not by
-		// name pattern. This makes custom-named snapshots
-		// (e.g. "pre-v130-manual-...") visible to rotation and
-		// to the API.
+		// v1.3.0 (SNAP-MANIFEST): detect snapshots by manifest
+		// presence, not by name pattern. This makes custom-named
+		// snapshots (e.g. "pre-v130-manual-...") visible to
+		// rotation and to the API.
 		manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
 		if _, err := os.Stat(manifestPath); err != nil {
 			continue
@@ -3740,9 +3550,9 @@ func buildBackupInfo() map[string]interface{} {
 	info["orphan_txn"] = orphanTxn
 
 	if len(snapshots) > 0 {
-		// v1.3.0: sort by mtime, not by name. Name-based sorting
-		// fails when custom names are present or when the system
-		// clock has drifted.
+		// v1.3.0 (SNAP-MTIME): sort by mtime, not by name.
+		// Robust against clock drift and custom snapshot names.
+		// Aligns runtime_info.backups with status.sh --json.
 		sort.Slice(snapshots, func(i, j int) bool {
 			fi, errI := snapshots[i].Info()
 			fj, errJ := snapshots[j].Info()
@@ -3769,23 +3579,6 @@ func buildBackupInfo() map[string]interface{} {
 	return info
 }
 
-// buildRuntimeInfo returns the JSON payload for the
-// /api?action=runtime_info endpoint and for the direct
-// /api/runtime_info handler.
-//
-// BUG-I fix: `profile_key` now reflects the value read from
-// selected_profile.txt (via readSelectedProfile), matching what
-// `get_profile.key` returns. Previously it used `currentProfile`
-// (in-memory), which could diverge from the file after a
-// customize.sh-driven restore.
-//
-// `memory_limit_mb` continues to report the currently-applied
-// runtime limit — it reflects what `debug.SetMemoryLimit` was
-// last called with, which is authoritative until the next call.
-//
-// Note: this endpoint exposes absolute paths (`run_dir`,
-// `status_file`, ...). They are useful for on-device debugging
-// and are already gated by `checkAuth`; no redaction is applied.
 func buildRuntimeInfo() map[string]interface{} {
 	fileProfile := readSelectedProfile()
 
@@ -3919,18 +3712,6 @@ func hasEndpoint(path, name string) bool {
 	return false
 }
 
-// requireFormContentType enforces a form-encoded body on the
-// save endpoints.
-//
-// HARD-03 (was H-02): the previous implementation called
-// `r.FormValue` unconditionally. When a client sent a JSON body
-// (Content-Type: application/json), `r.FormValue` returned the
-// empty string, and the endpoint silently wrote an empty file —
-// destroying the user's rules. We now reject non-form
-// Content-Types with HTTP 415.
-//
-// An empty Content-Type is still accepted (legacy clients that
-// rely on the default `application/x-www-form-urlencoded`).
 func requireFormContentType(w http.ResponseWriter, r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
 	if ct == "" {
@@ -3980,6 +3761,17 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// NOTE: `auth/logout` deliberately runs BEFORE checkAuth.
+	// Rationale: logout is a client-side cleanup. It must be
+	// possible to POST /api/auth/logout even when the session
+	// cookie is stale, expired, or was never valid — the goal
+	// is to clear it. The handler never touches another user's
+	// session (it only destroys the session referenced by the
+	// caller's OWN cookie), so it is safe to expose without
+	// authentication. Any anonymous POST is a no-op.
+	// (Docs table in README.md / ARCHITECTURE.md §4.2 labels
+	// this endpoint "Auth: Yes" — meaning a *real* logout
+	// requires a live session; the guard is the cookie itself.)
 	if hasEndpoint(r.URL.Path, "auth/logout") {
 		if r.Method != http.MethodPost {
 			w.Header().Set("Allow", "POST")
@@ -4077,7 +3869,6 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 			if !requireFormContentType(w, r) {
 				return
 			}
-			// BUG-A fix: read the `content` form field.
 			content := r.FormValue("content")
 			result := appendDenylist(content)
 			json.NewEncoder(w).Encode(result)
@@ -4097,7 +3888,6 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hasEndpoint(r.URL.Path, "clear_logs") {
-			// BUG-F fix: report the actual truncate result.
 			if err := os.Truncate(LOG_FILE, 0); err != nil {
 				logWithLevel("error", "❌ clear_logs failed: "+err.Error())
 				w.WriteHeader(http.StatusInternalServerError)
@@ -4158,9 +3948,6 @@ func handleAPI(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if hasEndpoint(r.URL.Path, "ensure_running_service") {
-			// BUG-B fix: auth is now enforced by checkAuth
-			// (watchdog token for localhost, or normal user
-			// auth). No additional bypass here.
 			statusData, _ := os.ReadFile(STATUS_FILE)
 			userIntent := strings.TrimSpace(string(statusData))
 			if userIntent == "" {
@@ -4674,64 +4461,7 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 // [36b] v1.2.0 — Auto-backup + notifications
 // ============================================================
-
-// createAutoBackup (v1.2.0) triggers a snapshot of the 5 user
-// config files before a destructive operation. The backup is
-// written by the shell layer (functions.sh:backup_user_files)
-// because:
-//   - The user files include formats best handled by shell tools.
-//   - The rotation logic already lives in functions.sh.
-//   - Keeping the backup policy in one place avoids duplication.
-//
-// Failure of the backup NEVER blocks the user action — the
-// function logs a warning and returns. This preserves the
-// "best-effort backup" semantic: a missing backup must not
-// prevent the user from changing settings.
-//
-// Serialization:
-//
-//	A single mutex (backupMu) ensures that two rapid user
-//	actions cannot trigger overlapping backups on the same
-//	source directory. The second call waits for the first.
-//
-// ============================================================
-// v1.2.0 — post-audit improvements applied here
-// ============================================================
-//
-//   - BUG-D fix: After a successful backup, rotate_backups 21
-//     is invoked in the same shell call. This prevents unbounded
-//     accumulation of pre-critical snapshots when a user saves
-//     the denylist many times in a session.
-//
-//   - BUG-E fix: The target directory is now generated by
-//     main.go with a unique suffix
-//     (`<timestamp>-manual-<pid>-<rand4>`) and passed to
-//     `backup_user_files` as the second argument. This avoids
-//     the timestamp collision with `action.sh --backup`.
-//
-//   - BUG-K fix: The log message now distinguishes timeout
-//     from exit non-zero (handled by runShellWithTimeout).
-//
-//   - HARD-10 (was M-07) fix: the shell line is now
-//     consistent — stderr from `backup_user_files` is captured
-//     by `runShellWithTimeout`; the two best-effort helpers
-//     (`ensure_backup_dir` and `rotate_backups`) are silenced
-//     explicitly. No `2>&1` is used anywhere on this line.
-//
-//   - R2-08: the functions.sh path is resolved via
-//     `getFunctionsScript()`. The FIRST argument to the shell
-//     line is the source directory for `backup_user_files` —
-//     `MODDIR/proxy` — which is a DIFFERENT argument from the
-//     functions.sh path. It intentionally stays hard-coded,
-//     because the 5 user config files (webui.conf,
-//     dnscrypt-proxy.toml, selected_profile.txt, allowlist.txt,
-//     denylist.txt) always live in the module's proxy/
-//     directory regardless of where functions.sh ends up.
 func createAutoBackup(reason string) {
-	// Non-blocking guard: if the backup directory does not exist
-	// yet (fresh install before the first snapshot), do not
-	// create it from main.go — leave that responsibility to the
-	// shell layer.
 	if _, err := os.Stat(PERSISTENT_BACKUP); err != nil {
 		logWithLevel("debug", fmt.Sprintf(
 			"auto-backup skipped (%s): %s not initialized", reason, PERSISTENT_BACKUP))
@@ -4747,7 +4477,6 @@ func createAutoBackup(reason string) {
 		return
 	}
 
-	// Sanitize the reason string for the log line only.
 	safeReason := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
 			(r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
@@ -4756,10 +4485,6 @@ func createAutoBackup(reason string) {
 		return -1
 	}, reason)
 
-	// BUG-E fix: generate a unique target directory. The suffix
-	// uses PID + 4 random hex chars so that two concurrent
-	// callers (main.go and action.sh) cannot collide even in
-	// the same wall-clock second.
 	ts := time.Now().Format("20060102-150405")
 	randBytes := make([]byte, 2)
 	_, _ = rand.Read(randBytes)
@@ -4767,19 +4492,6 @@ func createAutoBackup(reason string) {
 	targetDir := fmt.Sprintf("%s/%s-manual-%d-%s",
 		PERSISTENT_BACKUP, ts, os.Getpid(), randSuffix)
 
-	// Build the shell command. The reason string is NOT passed
-	// to the shell — it is only logged on the Go side.
-	//
-	// HARD-10: consistent stderr handling. Only the two
-	// best-effort helpers are silenced; the actual backup call
-	// keeps its stderr for diagnostics.
-	//
-	// BUG-D fix: rotate_backups runs in the same shell call.
-	//
-	// R2-08 note: the second format argument (MODDIR/proxy) is
-	// the SOURCE directory containing the 5 user config files.
-	// It is NOT a functions.sh path and must not be replaced
-	// by getFunctionsScript().
 	cmd := fmt.Sprintf(
 		". %s; ensure_backup_dir >/dev/null 2>&1; "+
 			"backup_user_files %s %s && "+
@@ -4799,13 +4511,6 @@ func createAutoBackup(reason string) {
 			"⚠️ auto-backup failed (reason=%s, took=%v): %v",
 			safeReason, elapsed, err))
 
-		// v1.2.0 fix: cleanup partial backup on failure
-		// The shell was SIGKILLed on timeout; children (cp,
-		// sha256sum) may briefly survive and finish writing to
-		// targetDir. Give them a short grace period, then remove
-		// the partial directory. rotate_backups already ignores
-		// manifest-less dirs (v1.2.0 change), but cleanup keeps
-		// the SD card tidy and the operator unconfused.
 		time.Sleep(500 * time.Millisecond)
 		if _, statErr := os.Stat(targetDir); statErr == nil {
 			if rmErr := os.RemoveAll(targetDir); rmErr != nil {
@@ -4826,9 +4531,6 @@ func createAutoBackup(reason string) {
 		safeReason, elapsed, filepath.Base(targetDir)))
 }
 
-// checkPendingNotifications (v1.2.0) reads the
-// .pending_notification file in the persistent backup directory
-// and forwards its content to the log.
 func checkPendingNotifications() {
 	path := PENDING_NOTIFY_FILE
 
@@ -4838,7 +4540,6 @@ func checkPendingNotifications() {
 			return
 		}
 		logWithLevel("warn", "checkPendingNotifications: read failed: "+err.Error())
-		// Attempt cleanup so a stuck file does not loop forever.
 		_ = os.Remove(path)
 		return
 	}
@@ -4856,7 +4557,6 @@ func checkPendingNotifications() {
 			"checkPendingNotifications: oversized (%d bytes), truncating to %d",
 			len(data), maxNotificationBytes))
 		data = data[:maxNotificationBytes]
-		// Back off any rune cut in half by the slice.
 		for len(data) > 0 && !utf8.Valid(data) {
 			data = data[:len(data)-1]
 		}
@@ -4885,23 +4585,6 @@ func checkPendingNotifications() {
 // ============================================================
 // [36c] v1.2.0 — Transaction cleanup at startup
 // ============================================================
-
-// cleanupOldTransactions (v1.2.0) removes leftover COMMIT'd
-// txn-* directories from previous interrupted installs.
-//
-// ROLLBACK and START transactions are PRESERVED — they may
-// contain the only copy of a user's data if an install was
-// interrupted mid-flight.
-//
-// orphan-txn-* directories are ALSO preserved.
-//
-// R2-06: `.state.tmp` files (left behind by an interrupted
-// atomic write of `.state`) are deliberately ignored. They are
-// not a reliable source of truth about the transaction's
-// outcome, and deleting them could destroy evidence during
-// post-mortem recovery. They are left for manual inspection.
-//
-// Called once at startup from main().
 func cleanupOldTransactions() {
 	if _, err := os.Stat(PERSISTENT_BACKUP); err != nil {
 		return
@@ -4956,13 +4639,27 @@ func main() {
 
 	initPaths()
 
-	// v1.1.0 — dynamic memory limit based on the active profile
+	// v1.4.0 (MAIN-01): load LOG_LEVEL immediately after
+	// initPaths() so that every subsequent log call respects
+	// the user's configured level.
+	//
+	// Previously this was done after readSelectedProfile(),
+	// applyMemoryLimit(), getWatchdogToken(),
+	// checkPendingNotifications(), and cleanupOldTransactions().
+	// Those early log lines were therefore always emitted at the
+	// default "info" level, even when the user had set
+	// LOG_LEVEL=error or LOG_LEVEL=warn.
+	//
+	// After this fix, the first user-visible log line is the
+	// startup banner below, and every line between initPaths()
+	// and the banner is filtered at the correct level.
+	//
+	// See docs/ARCHITECTURE.md §4.1 and §11.37.
+	currentLogLevel = loadLogLevel()
+
 	initialProfile := readSelectedProfile()
 	applyMemoryLimit(initialProfile)
 
-	// BUG-B fix — load or create the watchdog token. This must
-	// happen before the HTTP servers start so the first request
-	// can already authenticate against a stable token.
 	watchdogToken := getWatchdogToken()
 	if watchdogToken == "" {
 		logWithLevel("warn", "⚠️ watchdog token unavailable — ensure_running_service will require user auth")
@@ -4970,10 +4667,8 @@ func main() {
 		logWithLevel("debug", "🔑 watchdog token loaded")
 	}
 
-	// v1.2.0 — read any pending notification
 	checkPendingNotifications()
 
-	// v1.2.0 — clean up leftover COMMIT'd transaction dirs
 	cleanupOldTransactions()
 
 	signal.Ignore(syscall.SIGPIPE)
@@ -5020,12 +4715,6 @@ func main() {
 		}
 	}
 
-	currentLogLevel = loadLogLevel()
-
-	// HARD-07 / R2-04: single reassignment of USER_AGENT once the
-	// runtime is fully initialised. This replaces the package-
-	// init value (which only contained the version string) with
-	// the full user-agent string sent on outbound requests.
 	USER_AGENT = fmt.Sprintf("DNSCrypt-SmartFilter/%s (Android; +%s)",
 		strings.TrimPrefix(BuildVersion, "v"), ProjectURL)
 
@@ -5049,7 +4738,7 @@ func main() {
 	logEvent("🆕 v1.0.0: login POST-only + /readyz local-only + readConfPort range + auth cache")
 	logEvent("🆕 v1.0.0: rebuildMu (RACE-1) + runtime_info ports (PORT-2)")
 	logEvent("✅ v1.0.0: metricsProxyHandler → /api/metrics (JSON pass-through)")
-	logEvent("🎨 Asset Serving: 11 static files (SVG + PNG + ICO + offline.html)")
+	logEvent("🎨 Asset Serving: 12 static files (SVG + PNG + ICO + offline.html + APK)")
 	logEvent(fmt.Sprintf("🧠 v1.1.0: dynamic memory limit — profile=%s, limit=%d MB",
 		currentProfile, currentMemLimit/(1024*1024)))
 	logEvent("🧠 v1.1.0: shellQuote extended ({, }, \\n, \\t)")
@@ -5067,6 +4756,11 @@ func main() {
 	logEvent("🔧 v1.2.0 (Global R2): R2-01..R2-08 post-review corrections applied (8 corrections)")
 	logEvent("🔧 v1.2.0 (Global R2): functions.sh resolved via " + getFunctionsScript())
 	logEvent("🔧 v1.2.0 (Global R3): R3-01 doc-comment fix applied (1 correction)")
+	logEvent("🆕 v1.3.0: client-side PWA install button + live status LED")
+	logEvent("🆕 v1.3.0: buildBackupInfo — manifest-based snapshot detection (SNAP-MANIFEST)")
+	logEvent("🆕 v1.3.0: buildBackupInfo — mtime sort for last_backup_name (SNAP-MTIME)")
+	logEvent("🆕 v1.3.0: service.sh — boot-path DNS auto-start (bounded wait + direct API call)")
+	logEvent("🔧 v1.4.0: currentLogLevel loaded right after initPaths (MAIN-01)")
 	logEvent("🆕 v1.4.0: CodeQL path-injection fix in removeModule (filepath.Base)")
 	logEvent("🆕 v1.4.0: iOS PWA logic removed (Android-only build)")
 	logEvent("📱 v1.4.0: companion APK served at /app-debug.apk (optional)")
@@ -5123,7 +4817,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
-	// HARD-09: route net/http internal logs through logWithLevel.
 	httpLogger := log.New(&httpServerLogWriter{}, "", 0)
 
 	mainMux := http.NewServeMux()
@@ -5131,8 +4824,6 @@ func main() {
 	mainMux.HandleFunc("/healthz", handleHealthz)
 	mainMux.HandleFunc("/readyz", handleReadyz)
 
-	// BUG-6 fix: register BOTH `/api/runtime_info` and
-	// `/api/runtime_info/` (with trailing slash).
 	mainMux.HandleFunc("/api/runtime_info", handleRuntimeInfo)
 	mainMux.HandleFunc("/api/runtime_info/", handleRuntimeInfo)
 	mainMux.HandleFunc("/api/download_log", handleDownloadLog)

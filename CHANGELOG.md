@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
+**Last updated**: 2026-10-08
 
 ---
 
@@ -15,46 +16,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > Changes that will land in the next release (`v1.5.0` or a future PATCH).
 > Keep this section empty at the moment of each release.
 
-### Planned (see `docs/ROADMAP.md` §5)
+### Planned (see `docs/ROADMAP.md` §5 and §6)
 
-- Remove `'unsafe-inline'` from CSP (CSP hardening) — v1.5.0.
-- Unify WebUI + Dashboard on a single port (PWA dual-origin fix) — v1.5.0.
-- Dedicated maskable icon (`icon-maskable.svg` / `icon-maskable.png`) — v1.5.0.
-- Backup integrity hardening (`BACKUP_INTEGRITY_MODE=enforce`) — v1.5.0.
-- WebUI uses `append_denylist` with a `content` parameter — v1.5.0.
-- Data Guardian badge tooling (`scripts/report-backup.sh`) — v1.5.0.
-- Extended multi-language support (FR, DE, ES, RU, ZH) — v1.5.0.
-- 2FA + Audit Logging — v1.5.0.
+**v1.5.0 (Q1 2027)** — Feature release:
+- Remove `'unsafe-inline'` from CSP (CSP hardening).
+- Unify WebUI + Dashboard on a single port (PWA dual-origin fix).
+- Dedicated maskable icon (`icon-maskable.svg` / `icon-maskable.png`).
+- Backup integrity hardening (`BACKUP_INTEGRITY_MODE=enforce`).
+- WebUI uses `append_denylist` with a `content` parameter.
+- Data Guardian badge tooling (`scripts/report-backup.sh`).
+- Companion app deep-links (`dnsproxy://webui`, `dnsproxy://dashboard`).
+- Companion app version bump automation (`make check-app-version` helper).
+
+**v1.6.0 (Q2 2027)** — Feature release:
+- Extended multi-language support (FR, DE, ES, RU, ZH).
+- 2FA + Audit Logging.
+- JWT authentication.
+- Improved Resolver Health UI.
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) §5 (v1.5.0) and §6 (v1.6.0)
+for the full plan.
+
 ---
 
 ## [v1.4.0] - 2026-10-06
 
-> **Integration release** -- companion Android app + CodeQL cleanup + iOS removal.
+> **Integration release** — companion Android app + CodeQL cleanup
+> + iOS removal + `LOG_LEVEL` startup-order fix.
 
 ### Added
 
-- **Companion Android app integration** -- a signed APK from the
+- **Companion Android app integration** — a signed APK from the
   sister repository [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
   is now bundled into the module ZIP as `web/app-debug.apk` (OPTIONAL
-  -- the build succeeds without it).
+  — the build succeeds without it).
 
-  - `proxy/app-apk.version` -- Single Source of Truth for the app
+  - `proxy/app-apk.version` — Single Source of Truth for the app
     version (currently `1.0.0`, no `v` prefix).
-  - `scripts/fetch_app_apk.sh` -- new fetcher (cache, download,
+  - `scripts/fetch_app_apk.sh` — new fetcher (cache, download,
     SHA256, `.manifest.json`, JSON output, offline mode,
     `--version` override). Options mirror `scripts/fetch_dns_binaries.sh`.
-  - `GET /app-debug.apk` -- new static route in `proxy/main.go`
+  - `GET /app-debug.apk` — new static route in `proxy/main.go`
     (mime: `application/vnd.android.package-archive`, Cache-Control
     `public, max-age=3600, immutable`).
-  - **WebUI install button** -- converted from a JavaScript modal
+  - **WebUI install button** — converted from a JavaScript modal
     (`beforeinstallprompt`) to a direct `<a download>` link pointing
     at `/app-debug.apk`. No browser-specific logic, no
     unsupported-browser modal.
-  - **Module ZIP** -- `scripts/package_module.sh` now bundles
+  - **Module ZIP** — `scripts/package_module.sh` now bundles
     `web/app-debug.apk` when present. Missing APK is a warning only,
     not a build failure (parity with `release.yml`).
 
-- **CI/CD integration** -- the release pipeline now:
+- **CI/CD integration** — the release pipeline now:
   1. Fetches the companion APK into `dist/` (`.github/workflows/release.yml`).
   2. Stages it at `web/app-debug.apk` before packaging.
   3. Attaches `dist/DNS-Proxy-v*.apk` + `.sha256` to the GitHub Release.
@@ -63,35 +76,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (validates `proxy/app-apk.version` format, checks
   `scripts/fetch_app_apk.sh` presence).
 
-- **Makefile targets** -- `make fetch-apk` and
+- **Makefile targets** — `make fetch-apk` and
   `make check-app-version`. `package` now depends on `fetch-apk`;
   `check-all` now depends on `check-app-version`.
 
 ### Changed
 
-- **Version bump across all metadata** -- `VERSION` (`v1.3.0` to
+- **Version bump across all metadata** — `VERSION` (`v1.3.0` to
   `v1.4.0`), `module.prop` (`versionCode=1040000`), `update.json`
   (`version` + `versionCode` + `versionName` + `releaseDate` +
   `zipUrl`), `web/index.html` (`var VERSION`, `<title>`, badge,
   footer). `proxy/main.go` header + `removeModule` comments.
 
-- **`proxy/main.go`** -- new `APK_FILE` constant + `serveStaticAssets`
+- **`proxy/main.go`** — new `APK_FILE` constant + `serveStaticAssets`
   entry for `/app-debug.apk`. `serveFile` now applies per-extension
-  Cache-Control (`.apk` -> 1 h immutable, everything else ->
+  Cache-Control (`.apk` → 1 h immutable, everything else →
   no-store).
 
-- **`web/index.html`** -- install button is now
+- **`web/index.html`** — install button is now
   `<a id="pwaInstallBtn" href="/app-debug.apk" download="DNS-Proxy.apk">`.
   The `initPWABeforeInstallPrompt()` call was removed from `boot()`.
 
-- **`scripts/package_module.sh`** -- `WEB_FILES_REQUIRED` and
+- **`scripts/package_module.sh`** — `WEB_FILES_REQUIRED` and
   `REQUIRED_IN_ZIP` now include `app-debug.apk` / `web/app-debug.apk`
   with an OPTIONAL-handling branch in all three check sites
   (sections `[13]`, `[16]`, `[19]`).
 
+- **`web/dashboard.html`** — version header, `<title>`, and footer
+  updated from `v1.3.0` to `v1.4.0` (they had been left behind in
+  the v1.3.0 → v1.4.0 release).
+
 ### Fixed
 
-- **CodeQL `go/path-injection` in `removeModule` (proxy/main.go)** --
+- **MAIN-01 — `LOG_LEVEL` was loaded too late in `main()`**
+  (`proxy/main.go`). The call `currentLogLevel = loadLogLevel()`
+  ran **after** `readSelectedProfile()`, `applyMemoryLimit()`,
+  `getWatchdogToken()`, `checkPendingNotifications()`, and
+  `cleanupOldTransactions()`. Those early log lines were therefore
+  always emitted at the default `"info"` level, even when the user
+  had set `LOG_LEVEL=error` or `LOG_LEVEL=warn` in `webui.conf`.
+
+  **Fix**: the load now happens **immediately after `initPaths()`**,
+  before any other log-emitting call. Every subsequent log line
+  respects the configured level. See `docs/ARCHITECTURE.md` §4.1
+  and §11.37.
+
+  **Observability**: a new startup log line
+  `🔧 v1.4.0: currentLogLevel loaded right after initPaths (MAIN-01)`
+  documents the fix at runtime.
+
+- **CodeQL `go/path-injection` in `removeModule` (proxy/main.go)** —
   two alerts (#1, #2) closed by routing the caller-provided path
   through `filepath.Base()` and rebuilding the final path from the
   trusted `MODULES_DIR` constant + the sanitized basename. No
@@ -100,7 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- **iOS PWA logic** (`web/index.html`) -- Android-only project.
+- **iOS PWA logic** (`web/index.html`) — Android-only project.
   Roughly 35 lines removed:
   - `isIOSDevice()` helper.
   - `pwaStepIos1/2/3` translations (EN + AR).
@@ -112,11 +146,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "unsupported" message that lists supported alternatives
   (Chrome / Edge / Brave) with Play Store links.
 
+  **Note**: `web/apple-touch-icon.png` is **retained** — it is used
+  by Android launchers as an icon fallback and by the `manifest.json`
+  icons array. It is not "iOS-only".
+
 ### Security
 
 - **No new audit corrections.** The Audit Corrections Registry remains
   at **#33** (last entry from v1.0.0).
-- **CodeQL status** -- 6 of 8 alerts closed in v1.3.0, remaining 2
+- **CodeQL status** — 6 of 8 alerts closed in v1.3.0, remaining 2
   (`go/path-injection` in `removeModule`) closed in this release.
   No outstanding CodeQL alerts.
 - **All v1.0.0 / v1.1.0 / v1.2.0 / v1.3.0 security fixes remain in
@@ -137,23 +175,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-#### Companion app -- optional by design
+#### Companion app — optional by design
 
 The APK is treated as a best-effort asset throughout the pipeline:
 
 | Stage | Behaviour if missing |
 |---|---|
 | `scripts/fetch_app_apk.sh` | exits 0 on cache hit, exits 1 on `--offline` + no cache |
-| `release.yml` Fetch step | logs `::warning::` -- release continues |
-| `release.yml` Stage step | logs `::warning::` -- packaging continues |
-| `scripts/package_module.sh` | logs warning -- ZIP built without APK |
+| `release.yml` Fetch step | logs `::warning::` — release continues |
+| `release.yml` Stage step | logs `::warning::` — packaging continues |
+| `scripts/package_module.sh` | logs warning — ZIP built without APK |
 | `proxy/main.go` route | returns 404 for `/app-debug.apk` |
 | WebUI install button | click leads to 404 (browser "file not found") |
 
 This design lets local developer builds succeed without a network
 fetch, while release builds ship the APK.
 
-#### Version Files -- Where to Update
+#### Companion APK — git tracking and caching
+
+- **Not tracked by git**: `web/app-debug.apk` is a build artifact.
+  See `.gitignore` §[20]. The APK lives in the working tree only
+  after `fetch_app_apk.sh` has run. The repository contains **89
+  tracked files + 1 build artifact** (90 in the working tree after
+  a release build).
+- **Not precached by the Service Worker**: the path
+  `/app-debug.apk` is listed in `shouldBypass()` (rule 9). The SW
+  never stores a copy in its runtime cache. The browser's own HTTP
+  cache (with `Cache-Control: public, max-age=3600, immutable`) is
+  the primary and only storage layer. See
+  `docs/ARCHITECTURE.md` §6.2 and §4.12.1.
+
+#### Version Files — Where to Update
 
 At each release, the version string appears in:
 
@@ -168,15 +220,23 @@ At each release, the version string appears in:
 | `web/manifest.json` | `.version` | `1.4.0` (no `v`) |
 | `web/sw.js` | `CACHE_VERSION` | `v1.4.0` |
 | `web/index.html` | `var VERSION` | `v1.4.0` |
+| `web/dashboard.html` | `var VERSION` | `v1.4.0` |
 | `proxy/main.go` | `USER_AGENT` | `v1.4.0` |
 | `proxy/app-apk.version` | entire file | `1.0.0` (companion app, no `v`) |
 
 ---
 
-
 ## [v1.3.0] - 2026-10-02
 
-> **Feature release** — PWA install button + live status LED.
+> **Feature release + server-side refinements** — PWA install button,
+> live status LED, boot-path DNS auto-start, and two previously
+> undocumented server-side refinements in `main.go` and `functions.sh`.
+>
+> **📌 Documentation correction**: An earlier draft of this changelog
+> listed v1.3.0 as a strictly client-side release. That was inaccurate:
+> `proxy/main.go` and `proxy/functions.sh` contained server-side
+> refinements that shipped with the tag but were not documented here.
+> This section now records them accurately.
 
 ### Added
 
@@ -198,41 +258,64 @@ At each release, the version string appears in:
   `web/index.html` section [13c] and reflected in
   `web/manifest.json` via the new `x-note-v130` field.
 
+  **Note**: this `beforeinstallprompt` chain was **removed in
+  v1.4.0** in favour of a direct `<a download>` link pointing at
+  `/app-debug.apk`. The SW was not involved in either approach.
+
 - **Live status LED on the Today counter (WebUI)** — the
-  "Today" stat now carries a 12x12 LED that pulses green when
+  "Today" stat now carries a 12×12 LED that pulses green when
   the DNS engine is running and turns solid red when the
   service is stopped. Implemented as pure CSS + JS, aligned
   with the existing `.status-dot` styling and the
   `updateStatsDisplay()` handler in `web/index.html`.
 
-### 🐛 Fixed
+- **SNAP-MANIFEST — manifest-based snapshot detection**
+  (`proxy/main.go:buildBackupInfo()`). A directory is now
+  recognized as a snapshot **iff** it contains a
+  `.manifest.json` file:
 
-- **`service.sh` — DNS auto-start after boot** (v1.3.0
-  critical fix) — the DNS engine was not starting
-  automatically after a device reboot when the user had
-  previously left the service in the ON state. Root cause:
-  `watchdog.sh` waits a fixed 30-second interval before its
-  first API call, and by the time it fires
-  `POST /api/ensure_running_service`, the WebUI may not have
-  finished binding to its port. The watchdog would retry with
-  exponential backoff (30s → 60s → 120s → ...), leaving DNS
-  unavailable for minutes after boot.
+  ```go
+  // v1.3.0 (SNAP-MANIFEST): detect snapshots by manifest
+  // presence, not by name pattern. This makes custom-named
+  // snapshots (e.g. "pre-v130-manual-...") visible to
+  // rotation and to the API.
+  manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
+  if _, err := os.Stat(manifestPath); err != nil {
+      continue
+  }
+  ```
 
-  **Fix:** `service.sh` now performs a direct, bounded wait
-  for the WebUI to become ready (up to 60 seconds, checking
-  for the watchdog token file + the WebUI TCP port), then
-  calls `POST /api/ensure_running_service` itself. This
-  guarantees DNS starts within a few seconds of the WebUI
-  coming up, without depending on the watchdog's polling
-  interval.
+  **Before v1.3.0**: a snapshot was recognized only if its
+  directory name matched the `<YYYYMMDD>-<HHMMSS>-...`
+  pattern. Custom-named snapshots were silently skipped, and
+  `runtime_info.backups.available` undercounted.
 
-  **Verified on-device:** DNS engine reaches "ON" state
-  within 5 seconds of `service.sh` startup, with 3 processes
-  running (webui + proxy + watchdog). See log block
-  `[v1.3.0 FIX]` in `service.sh` section [19]. The
-  `watchdog.sh` backoff behavior is left intact for crash
-  recovery during normal runtime — it is only the boot path
-  that now takes the direct route.
+  **After v1.3.0**: any directory containing `.manifest.json`
+  counts, regardless of its name.
+
+- **SNAP-MTIME — mtime sort for `last_backup_name`**
+  (`proxy/main.go:buildBackupInfo()`). The "newest" snapshot is
+  now chosen by **mtime**, not by lexicographic directory name:
+
+  ```go
+  // v1.3.0 (SNAP-MTIME): sort by mtime, not by name.
+  // Robust against clock drift and custom snapshot names.
+  sort.Slice(snapshots, func(i, j int) bool {
+      fi, errI := snapshots[i].Info()
+      fj, errJ := snapshots[j].Info()
+      if errI != nil || errJ != nil {
+          return snapshots[i].Name() < snapshots[j].Name()
+      }
+      return fi.ModTime().Before(fj.ModTime())
+  })
+  ```
+
+  This aligns `runtime_info.backups` with the shell-side
+  `status.sh --json` object (which already used mtime) and
+  makes the API robust against clock drift and manual renames.
+
+  **Note**: this **reverses** the v1.2.0 BUG-3 decision. See
+  the "Reversed Decisions" note in the v1.2.0 section below.
 
 ### Changed
 
@@ -255,6 +338,80 @@ At each release, the version string appears in:
   documentation comments (IDX-* and DASH-* audit fixes) now
   carry the `v1.3.0` header. No behavioral change.
 
+- **`proxy/functions.sh:rotate_backups()` — professional
+  rotation logic rewrite** (ROT-MANIFEST, ROT-MTIME,
+  ROT-PROTECT). The previous implementation:
+
+  - Identified snapshots by directory-name pattern
+    (identical limitation to `buildBackupInfo` pre-v1.3.0).
+  - Sorted candidates by lexicographic directory name
+    (`ls | sort -r`).
+  - Preserved only the "keep 21" window; the `.last_stable`
+    pointer and the newest install snapshot were **not**
+    explicitly protected.
+
+  The v1.3.0 implementation:
+
+  - **ROT-MANIFEST**: detects a snapshot iff it contains
+    `.manifest.json` (excluding `current/`, `txn-*`, and
+    `orphan-txn-*`).
+  - **ROT-MTIME**: sorts candidates by mtime descending
+    (`sort -rn -k1,1`).
+  - **ROT-PROTECT**: preserves two additional targets on
+    top of the 21-newest window:
+      • the `.last_stable` target (recovery pointer);
+      • the newest install snapshot (name matches `-v<digit>`).
+
+  ```sh
+  # v1.3.0 — Professional rotation logic
+  # Sorting:
+  #   by mtime (numeric, descending) — robust vs clock drift
+  #   and against custom snapshot names.
+  # Preservation:
+  #   • .last_stable target        (recovery pointer)
+  #   • newest install snapshot    (name contains -v<digit>)
+  ```
+
+  **Why**: without these protections, the 21-newest window
+  could silently evict the exact snapshot that recovery mode
+  (via `.last_stable`) or rollback (via `.upgrade_history`)
+  depends on. The manifest-based detection ensures custom-named
+  snapshots participate in rotation rather than leaking.
+
+- **`proxy/service.sh`** — boot-path DNS auto-start via direct
+  API call (DNS-AUTOSTART). Root cause and fix documented in
+  the "Fixed" section below.
+
+### Fixed
+
+- **`service.sh` — DNS auto-start after boot** (v1.3.0
+  critical fix) — the DNS engine was not starting
+  automatically after a device reboot when the user had
+  previously left the service in the ON state. Root cause:
+  `watchdog.sh` waits a fixed 30-second interval before its
+  first API call, and by the time it fires
+  `POST /api/ensure_running_service`, the WebUI may not have
+  finished binding to its port. The watchdog would retry with
+  exponential backoff (30s → 60s → 120s → ...), leaving DNS
+  unavailable for minutes after boot.
+
+  **Fix:** `service.sh` now performs a direct, bounded wait
+  for the WebUI to become ready (up to 60 seconds, checking
+  for the watchdog token file + the WebUI TCP port), then
+  calls `POST /api/ensure_running_service` itself, with the
+  `X-Watchdog-Token` header (introduced in v1.2.0). This
+  guarantees DNS starts within a few seconds of the WebUI
+  coming up, without depending on the watchdog's polling
+  interval.
+
+  **Verified on-device:** DNS engine reaches "ON" state
+  within 5 seconds of `service.sh` startup, with 3 processes
+  running (webui + proxy + watchdog). See log block
+  `[v1.3.0 FIX]` in `service.sh` section [19]. The
+  `watchdog.sh` backoff behavior is left intact for crash
+  recovery during normal runtime — it is only the boot path
+  that now takes the direct route.
+
 ### Notes
 
 - **Backward compatibility**: no breaking API changes.
@@ -263,108 +420,33 @@ At each release, the version string appears in:
   model (introduced in v1.2.0) is unchanged. The persistent
   backup directory `/sdcard/dnscrypt-webui-backup/` continues
   to protect the 5 user config files across upgrades,
-  reinstalls, and uninstalls.
+  reinstalls, and uninstalls. The v1.3.0 rotation rewrite
+  changes **which** snapshots are kept (manifest-based
+  detection, mtime sort, additional protections), but not
+  **where** they live or **what** they contain.
 - **`docs/*.md`**: version headers remain at `v1.2.0` where
   they document historical behavior. Files that describe the
   current release have been updated separately.
+- **File headers in `main.go` and `functions.sh`**: these
+  headers originally claimed that the respective files were
+  "byte-for-byte identical between v1.2.0 and v1.3.0" (or
+  equivalent wording). That claim has been corrected in v1.4.0
+  to accurately reflect the v1.3.0 server-side refinements
+  documented above.
+
+#### Reversed Decisions
+
+| Original Decision | Reversal | Rationale |
+|---|---|---|
+| v1.2.0 BUG-3: `buildBackupInfo` sorts by directory **name** | v1.3.0 SNAP-MTIME: sorts by **mtime** | Robustness against clock drift and manual renames; alignment with `status.sh --json`; eliminates the "custom-named snapshot" blind spot. |
+| v1.2.0 `rotate_backups`: name-pattern detection, name sort | v1.3.0 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT | Same rationale, plus explicit protection of `.last_stable` and the newest install snapshot. |
+
+Both reversals were silent in the v1.3.0 release notes. This
+changelog section corrects that retroactively.
 
 ---
 
-## [v1.2.0] - 2026-09-30
-
-> **Bug-fix release** — no new features, no breaking changes.
-
-### 🐛 Fixed
-
-- **`readLogFile` (main.go)** — the backward-seek fallback
-  previously returned the OLDEST N bytes instead of the newest
-  when `f.Seek(-N, io.SeekEnd)` failed. Now uses an
-  `io.LimitReader` + tail-slice so the user always sees the
-  most recent log entries.
-
-- **`checkPendingNotifications` (main.go)** — the pending
-  notification file is now validated before being forwarded to
-  `logEvent`:
-  - Non-`os.IsNotExist` read errors are logged at warn level.
-  - Oversized payloads (>4 KB) are truncated with rune-boundary
-    backoff (no multi-byte character is cut in half).
-  - Invalid UTF-8 is rejected with a clear warning.
-  - On read failure, a best-effort cleanup is attempted so a
-    stuck file cannot loop indefinitely.
-
-- **`rotate_backups` (functions.sh)** — retention counting now
-  ignores snapshot directories that are empty or missing
-  `.manifest.json`. Previously, partial/failed copies were
-  counted and could displace valid snapshots from the
-  retention window.
-
-- **`verify_backup_integrity` (functions.sh)** — added an
-  opt-in strict mode (`verify_backup_integrity <dir> 1`) that
-  turns several silent skips into explicit failures:
-  - Missing `.manifest.json` -> immediate return 1.
-  - `sha256sum` unavailable -> immediate return 1.
-  - Missing `sha256` entry in the manifest -> counted as error.
-  - `checked != files_count` (from manifest) -> counted as error.
-  Default behavior (strict=0) is unchanged and fully backward
-  compatible.
-
-- **`createAutoBackup` (main.go)** — on timeout, the partial
-  target directory is now cleaned up after a 500 ms grace
-  period, preventing accumulation of orphan snapshots on the
-  SD card. Cleanup failures are logged at debug level only
-  (non-fatal).
-
-### Added
-
-- **`--version` flag** on all six shell scripts
-  (`action.sh`, `service.sh`, `status.sh`, `uninstall.sh`,
-  `watchdog.sh`, `customize.sh`). Prints `<script>: v1.2.0`
-  and exits 0. Note: `status.sh` already uses `-V` as an alias
-  for `--verbose`, so only the long form is provided.
-
-- **Observability:** `verify_backup_integrity` now always logs
-  a `checked=N errors=M` summary line, regardless of mode.
-
-- **`customize.sh` — content-based module discovery** — replaces
-  the hardcoded `CANDIDATE_SOURCES` list with a scan of every
-  `/data/adb/modules/*/` folder. The module is identified by
-  `id=dnscrypt-proxy-webui` in `module.prop`, regardless of the
-  folder name (renames, case variations, stale coexisting
-  copies). When multiple candidates tie on file count, the
-  HIGHEST VERSION wins; on version tie, the folder whose name
-  equals `dnscrypt-proxy-webui` wins. This fixes silent data
-  loss on upgrade when the module folder had been renamed.
-
-- **`customize.sh` — stale module folder disambiguation** —
-  after a successful restore, every other module folder with
-  `id=dnscrypt-proxy-webui` (not the new `$MODPATH`, not the
-  active source) is marked as disabled by touching a `disable`
-  file. Magisk/KernelSU/APatch honor this flag. The change is
-  reversible (`rm <dir>/disable`) and non-destructive.
-
-- **`customize.sh` — blocklist reuse** — when upgrading, the
-  previously generated `blocklist.raw` and `blocklist.txt`
-  are copied from the active source install into the new one,
-  saving ~30 seconds of network fetch on each upgrade. Both
-  files remain regenerable (they are still omitted from the
-  persistent backup, so no disk usage increase).
-
-### Breaking Changes
-
-None. Fully backward-compatible with v1.1.0 and v1.0.0.
-
-### Notes
-
-- The Magisk installer copy of `verify_backup_integrity` in
-  `customize.sh` is duplicated for installer-context reasons
-  and was not updated in this release. It will be aligned in
-  a follow-up change.
-- A deeper `runShellWithTimeout` fix (process-group kill via
-  `SysProcAttr.Setpgid`) is planned for a future release.
-
----
-
-## [v1.2.0-pre] - 2026-09-29
+## [v1.2.0] - 2026-09-29
 
 > **Data-Preservation Release** — the biggest reliability improvement
 > since v1.0.0.
@@ -380,6 +462,11 @@ None. Fully backward-compatible with v1.1.0 and v1.0.0.
 > correctness fixes (FIX-1, FIX-2) close a data-loss bug and harden
 > the write path. See `docs/SECURITY.md` §5.31, §5.32, and §5.33 for
 > the distinction.
+>
+> **Note**: some post-release fixes were committed on **2026-09-30**,
+> immediately after the initial tag. They are documented at the end
+> of the "Added" and "Fixed" sections below as **Post-Release
+> Fixes (2026-09-30)**. They shipped as part of the v1.2.0 cycle.
 
 ### 📊 Overview
 
@@ -468,7 +555,9 @@ None. Fully backward-compatible with v1.1.0 and v1.0.0.
 - **`functions.sh:restore_user_files`** — restores with SELinux
   context + verification.
 - **`functions.sh:rotate_backups`** — prunes to `keep_count`
-  (default 21), sorted by directory name (not mtime).
+  (default 21). **Note**: the v1.2.0 implementation sorted by
+  directory name. This was rewritten in v1.3.0 (see the v1.3.0
+  section above).
 - **`functions.sh:auto_backup_if_needed`** — periodic backup
   (24 h).
 - **`functions.sh:cleanup_old_transactions`** — removes leftover
@@ -544,149 +633,96 @@ None. Fully backward-compatible with v1.1.0 and v1.0.0.
 #### Documentation — v1.2.0
 
 - **`docs/BACKUP.md`** — **new file** (backup system reference).
-  Covers the 10 defensive layers, directory layout, triggers,
-  file formats, rotation, manual operations, programmatic access,
-  verification, troubleshooting, migration, and security model.
 - **`docs/EMERGENCY.md`** — **new file** (emergency recovery).
-  Covers bootloop recovery, data-loss recovery, WebUI
-  unreachability, firewall issues, corrupted backup directory,
-  recovery mode, and last-resort recovery.
 - **`docs/ARCHITECTURE.md` §3.10** — Backup & Restore Flow.
-- **`docs/ARCHITECTURE.md` §4.10** — v1.2.0 Backend Additions
-  (BAK-1..BAK-4, WD-TOKEN).
-- **`docs/ARCHITECTURE.md` §6.7** — Bilingual WebUI (language toggle).
+- **`docs/ARCHITECTURE.md` §4.10** — v1.2.0 Backend Additions.
+- **`docs/ARCHITECTURE.md` §6.7** — Bilingual WebUI.
 - **`docs/API.md` §6.1.7** — 7-field `backups` schema.
-- **`docs/API.md` §10.6** — Backup diagnostics examples.
-- **`docs/API.md` §10.7** — Recovery mode examples.
-- **`docs/API.md` §10.8** — Language-neutral API.
-- **`docs/SECURITY.md` §5.31** — Data Preservation Security Model.
-- **`docs/SECURITY.md` §5.32** — Correctness Fixes (FIX-1, FIX-2).
-- **`docs/SECURITY.md` §5.33** — Watchdog Token (WD-TOKEN).
-- **`docs/SECURITY.md` §14.25–§14.30** — 6 new audit checklist
-  sections.
-- **`docs/COMPATIBILITY.md` §2.5** — Backup Compatibility by
-  Android Version.
-- **`docs/COMPATIBILITY.md` §8.4** — v1.2.0-specific Issues
-  (backup directory missing, recovery mode runs twice, orphan-txn
-  preserved, backups returns 7 fields, bilingual toggle partial
-  RTL).
-- **`docs/TROUBLESHOOTING.md` §4.13, §4.14, §5.15, §7.8, §10.4,
-  §12.8, §12.9, §13.4, §13.5, §14.5, §15.14, §15.15** — backup
-  + recovery diagnostics.
-- **`docs/FAQ.md` Q121–Q130** — 10 new v1.2.0-specific questions.
-- **`docs/CONTRIBUTING.md` §8.9–§8.11, §9.5, §9.6** — backup
-  testing, matrix testing, bilingual testing, documentation
-  patterns. Golden Rule #22 / #23.
-- **`docs/DEVELOPMENT.md` §8.12–§8.14** — backup debugging,
-  matrix testing, bilingual debugging.
-- **`docs/INSTALL.md` §4.3, §4.4, §7.12, §7.13, §10.7, §10.8** —
-  10-layer install, backup layer verification, manual backup,
-  preserved backup after uninstall, recovery mode.
-- **`docs/UPGRADE.md` §1.4, §3.1, §5.9–§5.12, §6.8** — data
-  preservation model, v1.1.0→v1.2.0 upgrade, new API fields,
-  append_denylist content, watchdog token, recovery mode.
-- **`docs/GLOSSARY.md`** — 20+ new terms for v1.2.0
-  (Persistent Backup, Transactional Upgrade, `txn-*`,
-  `orphan-txn-*`, `backupMu`, `createAutoBackup`,
-  `cleanupOldTransactions`, `checkPendingNotifications`,
-  `copy_with_context`, `write_manifest`,
-  `verify_backup_integrity`, Data Guardian, Root-Solution
-  Detection, BAK-1..BAK-4, FIX-1/FIX-2, Bilingual WebUI).
-  Plus 4 new abbreviations (FBE, MTP, FUSE, OTA).
-- **`docs/HALL_OF_FAME.md`** — Data Guardian badge (v1.2.0).
-- **`docs/ROADMAP.md` §4, §12** — v1.2.0 delivered section +
-  Data-Preservation Registry.
-- **`docs/BRANCHING.md`** — v1.2.0 changes block + version
-  examples updated.
-- **`docs/RELEASE_PROCESS.md` §1.6, §8.3, §10.5** — v1.2.0
-  reference, verification steps, sync note.
-- **`docs/DNS_BINARIES.md`** — v1.2.0 changes block + §11.8–§11.10.
+- **`docs/SECURITY.md` §5.31–§5.33** — Data Preservation Security
+  Model, Correctness Fixes, Watchdog Token.
 - **`README.md`** — Version badge, 10-layer description, Data
-  Preservation section, Persistent Backup Directory tree,
-  Backup Storage metrics, Data Guardian badge.
+  Preservation section, Persistent Backup Directory tree.
+
+#### Post-Release Fixes (2026-09-30)
+
+The following additions were committed immediately after the v1.2.0
+tag on 2026-09-29. They shipped as part of the v1.2.0 cycle.
+
+- **`--version` flag** on all six shell scripts.
+- **Observability:** `verify_backup_integrity` now always logs
+  a `checked=N errors=M` summary line.
+- **`customize.sh` — content-based module discovery** — replaces
+  the hardcoded `CANDIDATE_SOURCES` list with a scan of every
+  `/data/adb/modules/*/` folder.
+- **`customize.sh` — stale module folder disambiguation** — marks
+  other folders with the same module ID as disabled.
+- **`customize.sh` — blocklist reuse** — copies `blocklist.raw`
+  and `blocklist.txt` from the active source install during
+  upgrade, saving ~30 s per upgrade.
 
 ### Changed
 
 #### Backend (Go)
 
-- **`main.go`** — Version string `v1.1.0` → `v1.2.0` (in
-  `USER_AGENT`).
+- **`main.go`** — Version string `v1.1.0` → `v1.2.0`.
 - **`main.go`** — `handleAPI` now calls `createAutoBackup(reason)`
   before 5 destructive endpoints.
 - **`main.go`** — `handleAPI` now registers `/api/runtime_info/`
   (trailing slash) in addition to `/api/runtime_info`.
 - **`main.go`** — `appendDenylist` now requires a `content`
-  parameter and appends it. Returns distinct messages for
-  `"Processed N rules"` vs `"No changes detected"`.
+  parameter.
 - **`main.go`** — `buildRuntimeInfo()` now exposes the 7-field
   `backups` object.
-- **`main.go`** — `buildBackupInfo()` sorts snapshots by directory
-  **name** (not mtime) for stability across `rsync` copies.
+- **`main.go`** — `buildBackupInfo()` sorted snapshots by directory
+  **name** (BUG-3). **⚠️ Superseded in v1.3.0** — the current
+  sort is by mtime (SNAP-MTIME). See the "Reversed Decisions"
+  note in the v1.3.0 section.
 - **`main.go`** — `runShellWithTimeout` now distinguishes timeout
-  from exit non-zero in the log.
+  from exit non-zero.
 - **`main.go`** — `cleanupOldTransactions()` called at startup.
 - **`main.go`** — `checkPendingNotifications()` called at startup.
 
 #### Shell Scripts
 
 - **`customize.sh`** — rewritten for the 10 defensive layers.
-  Snapshot-and-reapply strategy for recovery mode (FIX-1).
-- **`customize.sh`** — `createAutoBackup` is no longer called
-  twice from `appendDenylist` (BUG-1). One snapshot per call.
+- **`customize.sh`** — `createAutoBackup` no longer called twice
+  from `appendDenylist` (BUG-1).
 - **`functions.sh`** — `backup_user_files` and
   `auto_backup_if_needed` append `-$$` (PID) to their default
-  target directory names (FSH-10) to prevent same-second
-  collisions.
+  target directory names (FSH-10).
 - **`service.sh`** — runs the periodic auto-backup + rotation +
   transaction cleanup at boot.
 - **`status.sh`** — default output gains a "Backup & Recovery"
   section.
 - **`action.sh`** — `--check` output gains a "Backup & Recovery"
   section.
-- **`uninstall.sh`** — preserves the persistent backup directory,
-  renames `txn-*` with `.state=START` to `orphan-txn-*`, removes
-  the external recovery trigger (`/data/adb/dnscrypt-recovery`).
-- **`watchdog.sh`** — no longer participates in any of the 10
-  defensive layers. Read-only with respect to the backup
-  directory. Sends `X-Watchdog-Token` header on every call.
+- **`uninstall.sh`** — preserves the persistent backup directory.
+- **`watchdog.sh`** — read-only w.r.t. the backup directory. Sends
+  `X-Watchdog-Token` header on every call.
 
 #### Frontend (PWA)
 
 - **`web/sw.js`** — `CACHE_VERSION` bumped from `v1.1.0` to
-  `v1.2.0`. Documented SW independence from the backup layer.
+  `v1.2.0`.
 - **`web/index.html`** — `var VERSION = 'v1.2.0'`. Bilingual
-  toggle added. `[dir="rtl"]` CSS rules. `langToggle` button in
-  the header. SW update-banner fix (FIX-2).
+  toggle added. `[dir="rtl"]` CSS rules.
 - **`web/dashboard.html`** — `var VERSION = 'v1.2.0'`. Same
-  bilingual additions. SW update-banner fix completed
-  (FIX-2). Added `<div id="swUpdateBanner">`.
-- **`web/offline.html`** — `var VERSION = 'v1.2.0'`. Bilingual
-  additions. `[dir="rtl"]` CSS rules.
+  bilingual additions. SW update-banner fix completed (FIX-2).
+- **`web/offline.html`** — `var VERSION = 'v1.2.0'`.
 - **`web/manifest.json`** — `version` field bumped to `1.2.0`.
-  `lang=en` (default), `dir=ltr` (default). New meta notes.
 
 #### Build & Configuration
 
 - **`VERSION`** — `v1.1.0` → `v1.2.0`.
 - **`module.prop`** — `version=v1.2.0`, `versionCode=1020000`.
-- **`update.json`** — `version=v1.2.0`, `versionCode=1020000`,
-  `zipUrl` updated to reference the `v1.2.0` tag.
+- **`update.json`** — `version=v1.2.0`, `versionCode=1020000`.
 - **`.github/workflows/ci.yml`** — new `backup-smoke-test` job.
-- **`.github/workflows/upgrade-test.yml`** — **new file**
-  (42-scenario matrix).
-- **`.github/PULL_REQUEST_TEMPLATE.md`** — new "Data-preservation
-  checklist" section + "Global edition (EN + AR)" checklist item.
-- **`.github/PULL_REQUEST_TEMPLATE/release.md`** — new v1.2.0
-  data-preservation checks.
-- **`.github/CODEOWNERS`** — enumerates data-preservation files.
+- **`.github/workflows/upgrade-test.yml`** — **new file**.
 - **`Makefile`** — new `check-backup`, `check-all`,
   `diagnose-help` targets.
-- **`README.md`** — Version badge `v1.1.0` → `v1.2.0`. Data
-  Preservation section. Persistent Backup Directory tree.
-  Backup Storage metrics table. Data Guardian badge reference.
-- **`SECURITY.md`** (root) — v1.2.0 changes summary +
-  BAK-1..BAK-4 summary.
-- **`.gitignore`** — new backup staging patterns in §[19].
+- **`README.md`** — Version badge, Data Preservation section.
+- **`SECURITY.md`** (root) — v1.2.0 changes summary.
+- **`.gitignore`** — new backup staging patterns.
 - **`.gitattributes`** — `proxy/dnscrypt-proxy.version` rule added.
 - **`.editorconfig`** — `[proxy/run/*.tmp_*]` pattern added.
 
@@ -707,24 +743,12 @@ None. Fully backward-compatible with v1.1.0 and v1.0.0.
   draft, the ZIP extraction step (`customize.sh §[9]`) ran
   **after** the recovery restore (`§[8a]`) and overwrote
   `webui.conf` and `dnscrypt-proxy.toml` with the ZIP's defaults.
-  The subsequent restore step (`§[9c]`) was skipped in recovery
-  mode, so 2 of the 5 restored files were silently lost.
-  Fixed with a **snapshot-and-reapply** strategy:
-  `§[8a]` restores the 5 files **and** copies each to
-  `$MODPATH/.recovery_snapshot/`; `§[9]` extracts the ZIP
-  normally (extraction logic untouched, so the normal-install
-  path stays byte-for-byte identical); `§[9b2]` re-applies the 5
-  files from the snapshot. The snapshot directory is preserved
-  only if the re-apply is partial, so it never appears in the
-  final module layout.
+  Fixed with a **snapshot-and-reapply** strategy.
 - **FIX-2 — Service Worker update-banner** — The v1.1.0 fix
-  applied only to `index.html`. The [Reload] button sent
-  `SKIP_WAITING` to `navigator.serviceWorker.controller` (the
-  **old** worker), which ignored it. The new worker stayed in the
-  `waiting` state, so the banner reappeared on every page reload.
-  Fixed by sending `SKIP_WAITING` to `swRegistration.waiting`,
-  reloading on `controllerchange`, and guarding double-clicks.
-  Applied to **both** `index.html` and `dashboard.html`.
+  applied only to `index.html`. Fixed by sending `SKIP_WAITING`
+  to `swRegistration.waiting`, reloading on `controllerchange`,
+  and guarding double-clicks. Applied to **both** `index.html`
+  and `dashboard.html`.
 
 #### Post-Audit Corrections (BUG-1..BUG-6, N-1, N-4)
 
@@ -735,33 +759,47 @@ The v1.2.0 post-audit pass applied 7 corrections to
 |---|---|---|
 | **BUG-1** | `appendDenylist` — pre-critical backup performed **once** | One snapshot per call instead of two |
 | **BUG-2** | `createAutoBackup` — stderr no longer discarded | Failed backups now visible in log |
-| **BUG-3** | `buildBackupInfo` — sort by directory **name** not mtime | `last_backup_name` matches `status.sh --json` |
+| **BUG-3** | `buildBackupInfo` — sort by directory **name** not mtime | `last_backup_name` matches `status.sh --json` ⚠️ **Reversed in v1.3.0** (SNAP-MTIME) |
 | **BUG-4** | `readLogFile` — failed `Seek` handled explicitly | `?action=read_log` no longer silently returns wrong slice |
 | **BUG-5** | `appendDenylist` — response distinguishes "applied" from "no changes" | See `docs/API.md` §6.2.7 |
 | **BUG-6** | `main()` registers `/api/runtime_info/` (trailing slash) | See `docs/API.md` §6.1.7 |
 | **N-1** | `USER_AGENT` derived from `BuildVersion` | Custom `-ldflags` no longer leave stale UA |
 | **N-4** | `getEntriesCount` caches `lastSize` even when count is `0` | Fewer full scans on "no blocklist yet" |
 
+**Note on BUG-3**: This decision was **reversed in v1.3.0** in
+favour of mtime sorting (SNAP-MTIME). Rationale: robustness
+against clock drift and manual renames, and alignment with
+`status.sh --json`. See the v1.3.0 section for the full
+rationale and the "Reversed Decisions" table.
+
 #### Minor
 
 - **`append_denylist`** — the endpoint no longer acts as a
-  no-op when called without arguments. It now requires a
-  `content` parameter (BUG-A fix in early drafts). Callers that
-  relied on the no-op behavior must now send a `content`.
+  no-op when called without arguments.
 - **`isPidAlive`** — matches exact command names (no substring).
 - **Watchdog token file** — written atomically (BUG-L).
 
+#### Post-Release Fixes (2026-09-30)
+
+- **`readLogFile` (main.go)** — the backward-seek fallback
+  now returns the newest bytes (was the oldest).
+- **`checkPendingNotifications` (main.go)** — the pending
+  notification file is now validated before being forwarded to
+  `logEvent`.
+- **`rotate_backups` (functions.sh)** — retention counting now
+  ignores snapshot directories that are empty or missing
+  `.manifest.json`.
+- **`verify_backup_integrity` (functions.sh)** — added an
+  opt-in strict mode.
+- **`createAutoBackup` (main.go)** — on timeout, the partial
+  target directory is now cleaned up after a 500 ms grace
+  period.
+
 ### Removed
 
-- **Legacy `BACKUP_TMP` mechanism** — the v1.0.0 backup flow
-  (`/data/local/tmp/dnscrypt-upgrade-backup-$$`) is **superseded**
-  by the v1.2.0 persistent backup at
-  `/sdcard/dnscrypt-webui-backup/`. The mechanism itself was
-  removed from `customize.sh`; the directory name is still cleaned
-  up by `uninstall.sh` for users upgrading from v1.0.0.
-- **Legacy v1.0.0 backup directory** —
-  `/data/local/tmp/dnscrypt_backup_uninstall/` is removed
-  automatically by `uninstall.sh`.
+- **Legacy `BACKUP_TMP` mechanism** — superseded by the v1.2.0
+  persistent backup.
+- **Legacy v1.0.0 backup directory**.
 - **No features were removed.** All v1.0.0 and v1.1.0 APIs and
   endpoints remain functional.
 
@@ -772,28 +810,15 @@ The v1.2.0 post-audit pass applied 7 corrections to
 ### Security
 
 - **No new audit corrections.** The Audit Corrections Registry
-  remains at **#33** (last entry from v1.0.0).
+  remains at **#33**.
 - **Watchdog token (WD-TOKEN)** — closes a CSRF hole on
-  `POST /api/ensure_running_service`. Replaces the previous
-  implicit "localhost bypass" that allowed any page in a browser
-  on the same device to silently trigger a service restart. See
-  `docs/SECURITY.md` §5.33.
-- **`backupMu`** — serializes pre-critical backups. Prevents two
-  rapid user actions from corrupting a snapshot.
+  `POST /api/ensure_running_service`.
+- **`backupMu`** — serializes pre-critical backups.
 - **Backup directory permissions** — `0700` on directories,
   `0600` on files.
 - **SHA256 integrity verification** — advisory per-file checksum.
-  A mismatch is logged but does not block a restore.
-- **SELinux context preservation** — `restorecon` (preferred) or
-  `chcon u:object_r:magisk_file:s0` (fallback) on every restored
-  file.
-- **All v1.0.0 and v1.1.0 security fixes remain in place** —
-  Login POST-only, `/readyz` localhost-only, `shellQuote`,
-  `readConfPort` range check, Basic Auth rate limiting,
-  `rebuildMu` mutex, auth cache, Custom Chains, STATUS_FILE
-  semantics, `hasEndpoint` exact matching, `runtime_info` dynamic
-  ports, dynamic memory limit per profile, extended `shellQuote`
-  charset, `MONITORING_UI_PORT` constant.
+- **SELinux context preservation** — `restorecon` or `chcon`.
+- **All v1.0.0 and v1.1.0 security fixes remain in place.**
 
 ### Breaking Changes
 
@@ -811,7 +836,7 @@ additive.
   - **Migration**: Send `content` (URL-encoded). Or use
     `POST /api/save_denylist` with the full new content.
   - **WebUI**: does not currently use this endpoint (it uses
-    `save_denylist`). The WebUI-side update is planned for v1.3.0.
+    `save_denylist`). The WebUI-side update is planned for v1.5.0.
 
 **Everything else is additive**:
 
@@ -821,20 +846,16 @@ additive.
   same format.
 - All shell script CLI flags work the same way, plus two new
   ones (`--backup`, `--diagnose`).
-- All previously-issued v1.1.0 tokens and cookies remain valid
-  (session GC schedule unchanged).
-- The 7-field `backups` object is strictly additive — clients
-  that read only the original 5 fields continue to work.
-- The bilingual WebUI is a client-side concern only — the API is
-  language-neutral.
+- All previously-issued v1.1.0 tokens and cookies remain valid.
+- The 7-field `backups` object is strictly additive.
+- The bilingual WebUI is a client-side concern only.
 
 ### Notes
 
 #### Audit Corrections Registry — Unchanged
 
 `v1.2.0` does **not** extend the Audit Corrections Registry. The
-last entry is #33 (from v1.0.0). New audit corrections will resume
-at **#34** in v1.3.x. See `docs/SECURITY.md` §17.
+last entry is #33 (from v1.0.0).
 
 #### What is Preserved
 
@@ -900,19 +921,16 @@ Your settings (5 files) remain preserved during rollback.
 The following items were considered and intentionally **not**
 added in `v1.2.0`:
 
-- **CSP hardening** (removing `'unsafe-inline'` from
-  `script-src`) — deferred to v1.3.0.
-- **PWA port unification** (serving Dashboard from `9090/dashboard`)
-  — deferred to v1.3.0.
+- **CSP hardening** — deferred to v1.5.0.
+- **PWA port unification** — deferred to v1.5.0.
 - **Dedicated maskable icon** — deferred to v1.5.0.
-- **Backup integrity enforcing mode** (`BACKUP_INTEGRITY_MODE=enforce`)
-  — deferred to v1.3.0. Currently advisory only.
+- **Backup integrity enforcing mode** — deferred to v1.5.0.
 - **WebUI uses `append_denylist`** — deferred to v1.5.0.
 - **Data Guardian badge tooling** — deferred to v1.5.0.
 - **Extended multi-language support** (FR, DE, ES, RU, ZH) —
-  deferred to v1.4.0.
+  deferred to v1.6.0.
 - **JWT authentication alternative to cookies** — deferred to
-  v1.4.0.
+  v1.6.0.
 
 ---
 
@@ -970,63 +988,40 @@ added in `v1.2.0`:
 - **`readSelectedProfile() string`** — reads the active profile from
   `selected_profile.txt`, falls back to `"pro"` for unknown values.
 - **`memLimitMu sync.Mutex`** + `currentMemLimit int64` +
-  `currentProfile string` — new concurrency primitives for the
-  memory-limit state.
+  `currentProfile string` — new concurrency primitives.
 - **`runtime_info` new fields** — `profile_key`, `memory_limit_mb`.
 - **`get_profile` new field** — `memory_limit_mb`.
 
 #### Shell Scripts — v1.1.0
 
-- **`functions.sh:get_profile_memory_hint()`** — read-only helper
-  returning `"120 MB (pro)"` style strings for user-facing display.
-- **Inline fallback `_inline_get_profile_memory_hint`** in 4 scripts
-  (`service.sh`, `action.sh`, `status.sh`, `watchdog.sh`) — keeps
-  logs informative even if `functions.sh` is unavailable.
-- **`customize.sh`** — computes and prints the expected memory limit
-  at install time (informational only; `main.go` remains the authority).
+- **`functions.sh:get_profile_memory_hint()`** — read-only helper.
+- **Inline fallback `_inline_get_profile_memory_hint`** in 4 scripts.
+- **`customize.sh`** — computes and prints the expected memory limit.
 - **`status.sh --check`** — new fields: `PROFILE=pro | MEM=120 MB (pro)`.
-- **`status.sh --json`** — new `profile` object with `key`, `name`,
-  `memory_limit_mb`.
-- **`status.sh`** — new "Profile & Memory" section in default output.
+- **`status.sh --json`** — new `profile` object.
 - **`service.sh`** — logs active profile + memory hint at boot.
 - **`action.sh --check`** — new "Profile & Memory" section.
-- **`watchdog.sh`** — logs profile + memory hint at startup.
 
 #### Frontend (PWA) — v1.1.0
 
 - **`web/index.html`** — System Info panel now displays
-  `profile_key` + `memory_limit_mb` (v1.1.0 fields).
+  `profile_key` + `memory_limit_mb`.
 - **`web/dashboard.html`** — same System Info additions.
 - **`web/manifest.json`** — added `x-note-memory`,
-  `x-note-runtime-info`, `x-note-icon-source` (documentation fields).
-- **`web/icon-192.svg`** — header clarified: purpose `any` (not maskable).
-- **`web/icon-512.svg`** — header corrected: this SVG is the source
-  for 4 PNGs, NOT all of them. Honest safe-zone assessment added.
+  `x-note-runtime-info`, `x-note-icon-source`.
+- **`web/icon-192.svg`** — header clarified: purpose `any`.
+- **`web/icon-512.svg`** — header corrected: source for 4 PNGs.
 
 #### Documentation — v1.1.0
 
-- **`docs/SECURITY.md` §5.30** — new section documenting MEM-1, MEM-2,
-  MEM-3 from a security-posture perspective.
-- **`docs/SECURITY.md` §14.22–14.24** — three new audit checklist
-  sections.
+- **`docs/SECURITY.md` §5.30** — MEM-1, MEM-2, MEM-3.
 - **`docs/ARCHITECTURE.md` §3.9** — Memory Limit Flow diagram.
 - **`docs/ARCHITECTURE.md` §4.9** — v1.1.0 Backend Additions.
-- **`docs/ARCHITECTURE.md` §11.22** — dynamic vs static memory limit
-  trade-off.
+- **`docs/ARCHITECTURE.md` §11.22** — dynamic vs static memory limit.
 - **`docs/API.md` §2.1** — Memory limits per profile table.
-- **`docs/API.md` §6.1.7** — `runtime_info` updated schema.
-- **`docs/COMPATIBILITY.md` §5.4** — Memory profile by device RAM.
-- **`docs/COMPATIBILITY.md` §8.3** — four v1.1.0-specific issues.
-- **`docs/TROUBLESHOOTING.md` §4.12, §5.14, §6.10** — memory-limit
-  diagnostics.
-- **`docs/TROUBLESHOOTING.md` §15.13** — memory diagnostics helper.
-- **`docs/FAQ.md` Q111–Q120** — 10 new v1.1.0-specific questions.
-- **`docs/INSTALL.md` §4.4** — expected memory limit line in the
-  install summary.
-- **`docs/UPGRADE.md` §3.0** — full v1.0.0 → v1.1.0 upgrade guide.
 - **`docs/GLOSSARY.md`** — MEM-1, MEM-2, MEM-3, `profile_key`,
   `memory_limit_mb`, "soft limit" terms.
-- **`docs/HALL_OF_FAME.md`** — Memory Architect badge (v1.1.0).
+- **`docs/HALL_OF_FAME.md`** — Memory Architect badge.
 
 #### Dev Workflow Infrastructure
 
@@ -1036,93 +1031,43 @@ cycle and are now part of `v1.1.0`.
 ##### Branching & Release Documentation
 
 - **`docs/BRANCHING.md`** — complete Git branching strategy guide.
-  - Two-branch model: `main` (stable releases) + `develop` (integration).
-  - Short-lived branch conventions: `feature/*`, `fix/*`, `docs/*`,
-    `chore/*`, `refactor/*`, `test/*`, `release/*`, `hotfix/*`.
-  - Naming rules, workflows, PR rules, and protection policy.
-  - Hotfix flow with back-merge requirement.
-  - 10 sections, ~28 KB.
-
 - **`docs/RELEASE_PROCESS.md`** — complete release process guide.
-  - Release types: Stable, Prerelease, Hotfix.
-  - Version bumping (SemVer + `versionCode` formula).
-  - `scripts/release.sh` usage (5 modes).
-  - GitHub Actions pipeline (11 steps) explained in detail.
-  - Post-release verification (Cosign, SBOM, SHA-256, PIE check).
-  - Rollback procedures and emergency actions.
-  - 12 sections, ~30 KB.
 
 ##### Release Scripts
 
 - **`scripts/release.sh`** — local release automation script.
-  - Validates SemVer format (`vMAJOR.MINOR.PATCH[-prerelease]`).
-  - Computes `versionCode` from the SemVer formula.
-  - Checks branch (`develop` or `release/*`), working tree, and tag
-    availability.
-  - Updates `VERSION`, `module.prop`, and `update.json` atomically.
-  - Creates a `release: vX.Y.Z` commit + signed tag.
-  - Pushes to `origin` (unless `--no-push`).
-  - Modes: `--dry-run`, `--no-push`, `--yes`, `--help`.
-  - Rollback on failure (trap + atomic writes).
-
-- **`scripts/release-patch.sh`** — local PATCH-release automation script.
-  - Wraps `scripts/release.sh` with **3 additional safety rules**:
-    1. Branch **must** be `main` (not `develop`).
-    2. `MAJOR` and `MINOR` components **must not** change.
-    3. `PATCH` **must** be exactly `current + 1`.
-  - Rejects MAJOR/MINOR bumps — those use `release.sh`.
-  - Delegates the actual bump to `release.sh` (no logic duplication).
-  - Reminds the maintainer to back-merge `main → develop`.
-  - Modes: `--dry-run`, `--no-push`, `--yes`, `--help`.
+- **`scripts/release-patch.sh`** — local PATCH-release automation.
 
 ##### Architecture Decision Records (ADRs)
 
 - **`docs/adr/README.md`** — ADR index, template, and methodology.
-  - Explains the ADR lifecycle (Proposed / Accepted / Deprecated /
-    Superseded).
-  - Provides a canonical ADR template for future decisions.
-  - Documents the relationship between ADRs and `CHANGELOG.md`.
-  - 10 sections, ~15 KB.
-
-- **`docs/adr/0001-two-branch-model.md`** — Adopts `main` + `develop`.
-- **`docs/adr/0002-automated-releases.md`** — Adopts `release.sh` +
-  `release.yml`.
-- **`docs/adr/0003-post-release-sync.md`** — Auto-syncs `main → develop`.
-- **`docs/adr/0004-unified-pr-template.md`** — Single PR template
-  (⚠️ Superseded by ADR-0005).
-- **`docs/adr/0005-release-specific-pr-template.md`** — Release PR
-  template (reverses ADR-0004).
-- **`docs/adr/0006-rename-hotfix-to-release-patch.md`** — Renames the
-  PATCH script.
+- **`docs/adr/0001-two-branch-model.md`**.
+- **`docs/adr/0002-automated-releases.md`**.
+- **`docs/adr/0003-post-release-sync.md`**.
+- **`docs/adr/0004-unified-pr-template.md`** (⚠️ Superseded by ADR-0005).
+- **`docs/adr/0005-release-specific-pr-template.md`**.
+- **`docs/adr/0006-rename-hotfix-to-release-patch.md`**.
 
 ##### Contributor Templates
 
 - **`.github/PULL_REQUEST_TEMPLATE/release.md`** — dedicated PR template
-  for releases (`release/*` → `main` and `hotfix/*` → `main`).
-  - Concise (< 100 lines of content).
-  - Version-first layout (`version` + `versionCode` at the top).
-  - Post-merge checklist (tag push, `release.yml` trigger, back-merge).
-  - Rollback plan section.
-  - Reviewer checklist tailored to releases.
-  - Opened via `?template=release.md` (see `docs/BRANCHING.md` §4.4).
+  for releases.
 
 ### Changed
 
 #### Backend (Go)
 
-- **`main.go`** — Version string `v1.0.0` → `v1.1.0` (in `USER_AGENT`).
+- **`main.go`** — Version string `v1.0.0` → `v1.1.0`.
 - **`main.go`** — `main()` no longer calls `debug.SetMemoryLimit(80MB)`
   directly. Instead:
   ```go
   initialProfile := readSelectedProfile()
   applyMemoryLimit(initialProfile)
   ```
-- **`main.go`** — `updateProfile()` calls `applyMemoryLimit(key)` after
-  `atomicWriteFile(SELECTED_FILE)` succeeds.
-- **`main.go`** — `shellQuote()` now escapes `{`, `}`, `\n`, `\t` in
-  addition to the original 20 characters.
+- **`main.go`** — `updateProfile()` calls `applyMemoryLimit(key)`.
+- **`main.go`** — `shellQuote()` now escapes `{`, `}`, `\n`, `\t`.
 - **`main.go`** — `metricsProxyHandler` builds the upstream URL from
-  `MONITORING_UI_PORT` instead of the literal `"8080"`.
+  `MONITORING_UI_PORT`.
 - **`main.go`** — `buildRuntimeInfo()` exposes `profile_key` +
   `memory_limit_mb`.
 - **`main.go`** — `buildProfileResponse()` exposes `memory_limit_mb`.
@@ -1130,74 +1075,31 @@ cycle and are now part of `v1.1.0`.
 #### Shell Scripts
 
 - **`customize.sh`** — Port collision resolution: the check order
-  changed from `equality → 8080` to `8080 → equality`. Fixes the
-  case where both ports were `9091` (previously no-op).
+  changed from `equality → 8080` to `8080 → equality`.
 - **`customize.sh`** — now computes and prints the expected memory
   limit for the active profile.
 - **`functions.sh`** — added `SELECTED_PROFILE_FILE` global and
   `get_profile_memory_hint()` function.
-- **`action.sh`** — `--check` output restructured with new sections.
+- **`action.sh`** — `--check` output restructured.
 - **`service.sh`** — logs profile + memory hint at startup.
-- **`status.sh`** — `--check`, `--json`, and default output extended
-  with profile + memory info.
+- **`status.sh`** — `--check`, `--json`, and default output extended.
 - **`watchdog.sh`** — logs profile + memory hint at startup.
 
 #### Frontend (PWA)
 
 - **`web/sw.js`** — `CACHE_VERSION` bumped from `v1.0.0` to `v1.1.0`.
-  Removed the misleading comment about `sync_versions.sh` (no such
-  script exists).
-- **`web/index.html`** — `var VERSION = 'v1.1.0'`. Title updated.
-- **`web/dashboard.html`** — `var VERSION = 'v1.1.0'`. Title updated.
-- **`web/offline.html`** — Version badge updated to `v1.1.0`. Critical
-  CSP fix (see Fixed section below).
+- **`web/index.html`** — `var VERSION = 'v1.1.0'`.
+- **`web/dashboard.html`** — `var VERSION = 'v1.1.0'`.
+- **`web/offline.html`** — Version badge updated to `v1.1.0`.
 - **`web/manifest.json`** — `version` field bumped to `1.1.0`.
-  `description` extended with v1.1.0 features.
 
 #### Build & Configuration
 
 - **`VERSION`** — `v1.0.0` → `v1.1.0`.
 - **`module.prop`** — `version=v1.1.0`, `versionCode=1010000`.
-  Description extended with v1.1.0 features.
-- **`update.json`** — `version=v1.1.0`, `versionCode=1010000`,
-  `zipUrl` updated to reference the `v1.1.0` tag.
-- **`proxy/go.mod`** — documentation comments updated to reflect the
-  v1.1.0 memory-limit behavior (still dependency-free).
-- **`proxy/dnscrypt-proxy.toml`** — documentation section [14]
-  extended with the per-profile soft limit table.
-- **`proxy/webui.conf`** — documentation extended with the v1.1.0
-  memory information.
-- **`proxy/build.sh`** — documentation comments updated (no behavior
-  change).
-- **`.editorconfig`** — removed `indent_size = 4` from `[*.go]` because
-  Go always uses tabs (the setting was ignored by most editors).
-- **`.gitignore`** — removed the no-op negation `!proxy/dnscrypt-proxy.version`
-  (it did not match any preceding pattern).
-- **`.github/workflows/ci.yml`** — added `develop` to `push.branches`
-  and `pull_request.branches`.
-- **`.github/workflows/codeql.yml`** — added `develop` to `push.branches`
-  and `pull_request.branches`.
-- **`.github/workflows/release.yml`** — added "Sync main → develop"
-  step. Uses `continue-on-error: true`.
-- **`.github/PULL_REQUEST_TEMPLATE.md`** — added `🎯 Target Branch`
-  section (develop vs main).
-- **`.github/CODEOWNERS`** — added `/docs/adr/`,
-  `/scripts/release-patch.sh`, `/.github/PULL_REQUEST_TEMPLATE/`,
-  repo hygiene files.
+- **`update.json`** — `version=v1.1.0`, `versionCode=1010000`.
 - **`Makefile`** — added `release`, `release-patch`, `sync` targets.
-  Renamed `hotfix:` → `release-patch:` (see ADR-0006).
-- **`README.md`** — Version badge `v1.0.0` → `v1.1.0`. Added RAM-by-profile
-  table. Added "v1.1.0 additions" to Security. Extended Performance
-  section. Added CI badge + Dev Workflow references.
-- **`docs/CONTRIBUTING.md`** — added "Branching & Release" callout.
-  Section 4 delegates to `docs/BRANCHING.md`. Section 10 delegates to
-  `docs/RELEASE_PROCESS.md`. Added Golden Rule #18.
-- **`docs/DEVELOPMENT.md`** — added "Branching & Release" callout.
-  Section 2 adds `git checkout develop`. Section 5 all steps branch
-  from `develop`. Section 6 summarizes and delegates.
-- **`docs/ROADMAP.md`** — Section 2.6 statistics updated. Section 2.7
-  features added. Section 2.8 lessons added. Section 10 workflow
-  priorities updated.
+- **`README.md`** — Version badge + RAM-by-profile table.
 
 ### Fixed
 
@@ -1205,37 +1107,22 @@ cycle and are now part of `v1.1.0`.
 
 - **`web/offline.html`** — Removed the restrictive CSP meta tag
   (`default-src 'none'`) that silently blocked the page's own inline
-  `<script>`. The page rendered correctly but **every interactive
-  feature** (Retry, Diagnose, language toggle, auto-retry) silently
-  failed. The CSP was redundant: the page has no user data, no forms,
-  no network calls after load, and uses only `textContent`. If a
-  future version adds dynamic content from untrusted sources, CSP
-  must be reintroduced — preferably with a nonce rather than
-  `'unsafe-inline'`.
+  `<script>`.
 
 #### Important
 
-- **`proxy/customize.sh`** — Port collision fix. When both `PORT` and
-  `DASHBOARD_PORT` were `9091`, the previous logic detected the
-  collision but reset dashboard to `9091` (no actual change). New
-  logic: if `PORT=9091` → dashboard becomes `9092`; otherwise →
-  dashboard becomes `9091`.
+- **`proxy/customize.sh`** — Port collision fix.
 - **`web/sw.js`** — Removed the misleading comment claiming
   `CACHE_VERSION` was "updated automatically by sync_versions.sh".
-  No such script exists. The value is updated manually at each
-  release. See "How to update CACHE_VERSION" in the file header.
 
 #### Minor
 
 - **`.gitignore`** — Removed the no-op negation
-  `!proxy/dnscrypt-proxy.version` (did not match any preceding pattern).
-- **`.editorconfig`** — Removed `indent_size = 4` from `[*.go]`
-  (ignored by editors when `indent_style = tab`).
+  `!proxy/dnscrypt-proxy.version`.
+- **`.editorconfig`** — Removed `indent_size = 4` from `[*.go]`.
 
 ### Removed
 
-- **`web/manifest.json`** — No items removed. The `screenshots` array
-  was already removed in v1.0.0.
 - **No features were removed.** All v1.0.0 APIs and endpoints remain
   functional.
 
@@ -1246,38 +1133,16 @@ cycle and are now part of `v1.1.0`.
 ### Security
 
 - **No new audit corrections.** The Audit Corrections Registry remains
-  at **#33** (last entry from v1.0.0).
+  at **#33**.
 - **MEM-1, MEM-2, MEM-3** are documented in `docs/SECURITY.md` §5.30
   and §17.1 as **runtime improvements**, not as audit corrections.
-  They close edge cases rather than fix known exploitable
-  vulnerabilities.
-- **All v1.0.0 security fixes remain in place** — Login POST-only,
-  `/readyz` localhost-only, `shellQuote`, `readConfPort` range check,
-  Basic Auth rate limiting, `rebuildMu` mutex, auth cache, Custom
-  Chains, STATUS_FILE semantics, `hasEndpoint` exact matching,
-  `runtime_info` dynamic ports.
+- **All v1.0.0 security fixes remain in place.**
 
 ### Breaking Changes
 
-**None.** `v1.1.0` is fully backward compatible with `v1.0.0`:
-
-- All API endpoints work with the same paths, methods, and auth.
-- All config files (`webui.conf`, `dnscrypt-proxy.toml`) keep the same
-  format.
-- All shell script CLI flags work the same way.
-- All previously-issued v1.0.0 tokens and cookies remain valid (session
-  GC schedule unchanged).
-- The two new `runtime_info` fields (`profile_key`, `memory_limit_mb`)
-  are strictly additive. Clients that ignore unknown fields are
-  unaffected.
+**None.** `v1.1.0` is fully backward compatible with `v1.0.0`.
 
 ### Notes
-
-#### Audit Corrections Registry — Unchanged
-
-`v1.1.0` does **not** extend the Audit Corrections Registry. The last
-entry is #33 (from v1.0.0). New audit corrections will resume at
-**#34** in v1.2.x. See `docs/SECURITY.md` §17.
 
 #### Memory Limit — Semantics
 
@@ -1286,28 +1151,6 @@ kill the process when the limit is reached — it runs GC more
 aggressively instead. Setting the limit too low causes CPU waste
 (GC overhead); too high wastes RAM. The per-profile values balance
 this trade-off.
-
-#### Version Files — Where to Update
-
-At each release, the version string appears in:
-
-| File | Field | v1.1.0 value |
-|---|---|---|
-| `VERSION` | entire file | `v1.1.0` |
-| `module.prop` | `version=` | `v1.1.0` |
-| `module.prop` | `versionCode=` | `1010000` |
-| `update.json` | `.version` | `v1.1.0` |
-| `update.json` | `.versionCode` | `1010000` |
-| `web/manifest.json` | `.version` | `1.1.0` (no `v`) |
-| `web/sw.js` | `CACHE_VERSION` | `v1.1.0` |
-| `web/index.html` | `var VERSION` | `v1.1.0` |
-| `web/dashboard.html` | `var VERSION` | `v1.1.0` |
-| `proxy/main.go` | `USER_AGENT` | `v1.1.0` |
-
-`scripts/release.sh` updates the first five automatically. The rest
-must be updated manually if they reference the version (or via
-`generate-icons.sh --force` for icons, but icons don't embed the
-version).
 
 #### Reversed Decisions (from v1.0.0 cycle)
 
@@ -1330,22 +1173,14 @@ for the full methodology.
 The following items were considered and intentionally **not** added
 in `v1.1.0`:
 
-- **CSP hardening** — removing `'unsafe-inline'` from `script-src` is
-  planned for `v1.2.0` (requires converting all `onclick=` to
-  `addEventListener`). **Note**: Deferred further to v1.3.0.
-- **PWA port unification** — serving Dashboard from `9090/dashboard`
-  instead of `9091` is planned for `v1.2.0`. **Note**: Deferred
-  further to v1.3.0.
-- **Dedicated maskable icon** — `icon-maskable.svg` + `.png` planned
-  for `v1.2.0`. **Note**: Deferred further to v1.3.0.
+- **CSP hardening** — deferred to a future release.
+- **PWA port unification** — deferred to a future release.
+- **Dedicated maskable icon** — deferred to a future release.
 - **`.github/workflows/sync-main-to-develop.yml`** — the sync logic
-  is embedded directly in `release.yml` to keep the workflow count
-  minimal. See [ADR-0003](docs/adr/0003-post-release-sync.md).
-- **`.github/workflows/pr-check.yml`** — `ci.yml` already covers PR
-  builds for both `main` and `develop`.
-- **Signed commits (GPG / Sigstore)** — planned for a future
+  is embedded directly in `release.yml`.
+- **Signed commits (GPG / Sigstore)** — deferred to a future
   workflow version.
-- **Automated changelog from Conventional Commits** — planned for a
+- **Automated changelog from Conventional Commits** — deferred to a
   future workflow version.
 
 ---
@@ -1465,29 +1300,16 @@ in `v1.1.0`:
 - **`service.sh`** — boot service with standalone Watchdog launcher.
 - **`post-fs-data.sh`** — early boot cleanup with Custom Chain cleanup.
 - **`watchdog.sh`** — standalone process with exponential backoff.
-- **`action.sh`** — Magisk Action handler (browser opener with
-  fallbacks).
-- **`status.sh`** — status display with 4 modes (default, `--short`,
-  `--json`, `--check`).
+- **`action.sh`** — Magisk Action handler.
+- **`status.sh`** — status display with 4 modes.
 - **`uninstall.sh`** — cleanup with backup preservation.
 - **`functions.sh`** — shared library with Custom Chains + Port Guard.
-- **`build.sh`** — cross-compilation for 4 architectures with
-  reproducible builds.
+- **`build.sh`** — cross-compilation for 4 architectures.
 
 #### Build & Packaging
 
-- **`scripts/fetch_dns_binaries.sh`** — Level 4 DNS binaries fetcher:
-  - GitHub API + 4 fallback URL formats + jsDelivr CDN.
-  - SHA256 verification.
-  - Local cache + `.manifest.json`.
-  - Offline mode (`--offline`).
-  - JSON output (`--json`).
-  - Retry logic (3 attempts).
-- **`scripts/package_module.sh`** — builds the Magisk ZIP:
-  - 32-file verification.
-  - Web asset verification (PNG + ICO + SVG + offline.html).
-  - i386 ↔ x86 mapping for `customize.sh`.
-  - Reproducible timestamps.
+- **`scripts/fetch_dns_binaries.sh`** — Level 4 DNS binaries fetcher.
+- **`scripts/package_module.sh`** — builds the Magisk ZIP.
 - **`scripts/generate-icons.sh`** — generates PNG + ICO from SVG.
 
 #### CI/CD
@@ -1523,8 +1345,7 @@ in `v1.1.0`:
 - **Cookie-only sessions** — no token in JSON responses — Audit #15-a.
 - **SameSite=Lax + HttpOnly + Secure (conditional)** — cookie flags.
 - **Session GC** — periodic cleanup of expired sessions.
-- **Auth cache (60 s)** — Fix NEW-6 — reduces file I/O on every
-  request.
+- **Auth cache (60 s)** — Fix NEW-6 — reduces file I/O.
 
 **Input validation and sanitization**
 
@@ -1551,8 +1372,7 @@ in `v1.1.0`:
 - **`/readyz` localhost-only** — Fix NEW-4 (Audit #30).
 - **BIND_ADDR enforcement** — refuses to start if exposed without
   credentials.
-- **IPv6-safe `getClientIP()`** — `net.SplitHostPort` instead of
-  `strings.Split` — Audit #19.
+- **IPv6-safe `getClientIP()`** — `net.SplitHostPort` — Audit #19.
 
 **State and concurrency**
 
@@ -1590,20 +1410,16 @@ in `v1.1.0`:
 
 ### Architecture
 
-- **Custom iptables chains** (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`) — no
-  orphans.
+- **Custom iptables chains** (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`).
 - **nftables support** — via `dnscrypt_filter` table.
-- **Legacy cleanup** — `_legacy_cleanup_*` for migration from older
-  shells.
-- **Watchdog as standalone process** — correct PID (`$$` in own file).
+- **Legacy cleanup** — `_legacy_cleanup_*` for migration.
+- **Watchdog as standalone process** — correct PID.
 - **Streaming blocklist rebuild** — ~2 MB peak memory instead of
   ~150 MB.
 - **Auth cache** — 60 s TTL, `sync.RWMutex` protected.
 - **Per-port cache** — `portCacheMap` with independent entries.
-- **Platform-agnostic shell** — `getSystemShell()` works on
-  Android/Linux/macOS.
-- **Structured metrics** — Prometheus → JSON via `parsePrometheus` +
-  `buildDashboardJSON`.
+- **Platform-agnostic shell** — `getSystemShell()`.
+- **Structured metrics** — Prometheus → JSON.
 - **Dynamic ports** — `runtime_info` returns `webui_port` +
   `dashboard_port`.
 
@@ -1654,33 +1470,23 @@ in `v1.1.0`:
 
 | Issue | Priority | Target |
 |-------|:--------:|:------:|
-| CSP `'unsafe-inline'` in `script-src` | 🟡 Medium | v1.3.0 |
-| `pgrep -x` may not work on Android 5.x | 🟢 Low | v1.3.0 |
-| `awk` parser may fail with `]` in comment | 🟢 Low | v1.3.0 |
-| PWA dual-origin limitation (9090 vs 9091) | 🟡 Medium | v1.3.0 |
-| `manifest.json` shortcuts do not read `runtime_info` | 🟢 Low | v1.3.0 |
-| Dashboard does not show `bind_addr` (only in `runtime_info`) | 🟢 Low | v1.3.0 |
+| CSP `'unsafe-inline'` in `script-src` | 🟡 Medium | v1.5.0 |
+| `pgrep -x` may not work on Android 5.x | 🟢 Low | v1.5.0 |
+| `awk` parser may fail with `]` in comment | 🟢 Low | v1.5.0 |
+| PWA dual-origin limitation (9090 vs 9091) | 🟡 Medium | v1.5.0 |
+| `manifest.json` shortcuts do not read `runtime_info` | 🟢 Low | v1.5.0 |
+| Dashboard does not show `bind_addr` (only in `runtime_info`) | 🟢 Low | v1.5.0 |
 
 ### Notes
 
 #### First Release
 
-This is the **first public release** of DNSCrypt Smart Filter. There
-are no previous versions. All features, security fixes, and
-infrastructure were developed and consolidated into this single
-stable `v1.0.0` release.
+This is the **first public release** of DNSCrypt Smart Filter.
 
 #### Audit Corrections
 
 All 33 Audit Corrections are documented in
-[`docs/SECURITY.md`](docs/SECURITY.md) with full details:
-- Problem description
-- Catastrophic scenario
-- Impact analysis
-- Solution applied
-- Reference to the corresponding section
-
-See §17 — Audit Corrections Registry for the complete list.
+[`docs/SECURITY.md`](docs/SECURITY.md) with full details.
 
 #### Repository Layout
 
@@ -1804,7 +1610,7 @@ The complete list of 33 Audit Corrections applied in v1.0.0:
 **Total**: 33 Audit Corrections.
 
 **Last**: #33 (v1.0.0).
-**Next expected**: #34 (v1.3.x).
+**Next expected**: #34 (v1.5.x).
 
 ### v1.1.0 Runtime Improvements (Not Audit Corrections)
 
@@ -1826,7 +1632,7 @@ they do not fix a known exploitable vulnerability.
 | **BAK-2** | `createAutoBackup` + `backupMu` + rotation | Pre-critical backup before 5 destructive endpoints |
 | **BAK-3** | `cleanupOldTransactions` | Removes leftover `COMMIT`'d `txn-*` dirs at startup |
 | **BAK-4** | `checkPendingNotifications` | Reads `.pending_notification` at startup |
-| **FIX-1** | Recovery-mode **snapshot-and-reapply** | Correctness fix — `§[8a]` restores + snapshots the 5 files to `$MODPATH/.recovery_snapshot/`; `§[9]` extracts the ZIP normally (extraction logic untouched); `§[9b2]` re-applies the 5 files from the snapshot. The snapshot directory is cleaned up in `§[9b2]` unless the re-apply is partial. |
+| **FIX-1** | Recovery-mode **snapshot-and-reapply** | Correctness fix — `§[8a]` restores + snapshots the 5 files to `$MODPATH/.recovery_snapshot/`; `§[9]` extracts the ZIP normally; `§[9b2]` re-applies the 5 files from the snapshot. |
 | **FIX-2** | Service Worker update-banner | Correctness fix (send `SKIP_WAITING` to correct worker) |
 | **WD-TOKEN** | Watchdog token | Closes a CSRF hole on `ensure_running_service` |
 
@@ -1835,6 +1641,38 @@ for completeness but are not assigned audit correction numbers
 because they do not fix a known exploitable vulnerability in an
 earlier v1.2.0 draft (except WD-TOKEN, which closes a real — though
 low-severity — CSRF surface that existed since v1.0.0).
+
+### v1.3.0 Feature & Correctness Additions (Not Audit Corrections)
+
+| ID | Change | Rationale |
+|:-:|---|---|
+| **PWA-BTN** | Dynamic PWA install button | Feature — client-side only, no new attack surface |
+| **LED** | Live status LED on Today counter | Feature — pure CSS + JS, no network calls |
+| **DNS-AUTOSTART** | DNS auto-start after boot via direct API call | Correctness fix — closes a boot race in `service.sh`. Uses the same `X-Watchdog-Token` introduced in v1.2.0. |
+| **SNAP-MANIFEST** | `buildBackupInfo` — manifest-based snapshot detection | Correctness fix — makes custom-named snapshots visible to the API and to rotation. |
+| **SNAP-MTIME** | `buildBackupInfo` — mtime sort for `last_backup_name` | Correctness fix — robust against clock drift and manual renames; aligns `runtime_info` with `status.sh --json`. |
+| **ROT-MANIFEST** | `rotate_backups` — manifest-based detection | Correctness fix — same rationale as SNAP-MANIFEST. |
+| **ROT-MTIME** | `rotate_backups` — mtime sort | Correctness fix — same rationale as SNAP-MTIME. |
+| **ROT-PROTECT** | `rotate_backups` — preserve `.last_stable` + newest install | Correctness fix — without these protections, the 21-newest window could silently evict the exact snapshot recovery mode depends on. |
+
+These are documented in `docs/SECURITY.md` v1.3.0 section for
+completeness but are not assigned audit correction numbers because
+they do not fix a known exploitable vulnerability.
+
+### v1.4.0 Integration Additions (Not Audit Corrections)
+
+| ID | Change | Rationale |
+|:-:|---|---|
+| **APK** | Companion Android app integration | Feature — static asset, served publicly at `/app-debug.apk`, no server-side logic |
+| **CodeQL** | `go/path-injection` fix in `removeModule` | Security hardening — closes two CodeQL alerts (#1, #2) |
+| **iOS-REMOVAL** | iOS PWA logic removed | Cleanup — reduces browser-detection surface |
+| **MAIN-01** | `LOG_LEVEL` loaded immediately after `initPaths()` | Correctness fix — ensures every log line respects the user's configured level |
+
+These are documented in `docs/SECURITY.md` v1.4.0 section for
+completeness but are not assigned audit correction numbers because
+they are not audit corrections of the v1.0.0 registry. The CodeQL fix
+is the closest to an audit correction but is classified as a static
+analysis hardening, not an architectural vulnerability.
 
 ---
 

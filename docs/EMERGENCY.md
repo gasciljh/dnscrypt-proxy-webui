@@ -3,21 +3,28 @@
 Step-by-step procedures for recovering from catastrophic failures.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **Identifier inventory in this file (5 total)**:
+>   • HARD-EM-01 (Last updated correction — v1.4.0)
+>   • HARD-EM-02 (v1.3.0 block extended with SNAP-* / ROT-* — v1.4.0)
+>   • HARD-EM-03 (§9.4 ROT-PROTECT note — v1.4.0)
+>   • HARD-EM-04 (§4.3 SNAP-MTIME / ROT-MTIME note — v1.4.0)
+>   • HARD-EM-05 (Cross-references + POST-AUDIT block — v1.4.0)
 
 > **📖 Related documents**:
 > - Backup system reference → [`BACKUP.md`](BACKUP.md)
 > - Upgrade guide → [`UPGRADE.md`](UPGRADE.md)
 > - Troubleshooting → [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
 > - Security model → [`SECURITY.md`](SECURITY.md) §5.31, §5.32
-> - Architecture → [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.10
-> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0]
+> - Architecture → [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.10, §4.13
+> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0], §[v1.3.0], §[v1.4.0]
 
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • `Last updated` reflects the v1.4.0 release date.
+>   • `Last updated` reflects the v1.4.0 file-editing date (2026-10-08).
 >   • **New §12 — Companion App Recovery (v1.4.0)**: how to
 >     diagnose and recover from a missing, corrupted, or
 >     incompatible `web/app-debug.apk` asset.
@@ -41,7 +48,7 @@ Step-by-step procedures for recovering from catastrophic failures.
 >     sequence (e.g. `вҖ”` instead of `—`, `вҶ’` instead of `→`)
 >     has been replaced with proper UTF-8.
 
-> **v1.3.0 changes** (previously undocumented in this file):
+> **v1.3.0 changes**:
 >   • Version bumped from v1.2.0 to v1.3.0.
 >   • **DNS auto-start after boot fix** — `service.sh` §[19]
 >     performs a direct, bounded wait for the WebUI to become
@@ -52,6 +59,56 @@ Step-by-step procedures for recovering from catastrophic failures.
 >     by recovery procedures.
 >   • **Live status LED** on the Today counter — unaffected by
 >     recovery procedures.
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO rewrote the snapshot-detection and
+>     rotation semantics that underpin the recovery procedures
+>     described in this file. Three identifiers document the
+>     change (also used in `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file (instead of the
+>         `<YYYYMMDD>-<HHMMSS>-...` name pattern). Effect on
+>         this file: the "newest snapshot" lookup in §4.3 and
+>         §8.4 relies on the API's `last_backup_name` (which
+>         now reflects the manifest-based count), not on a
+>         name-pattern grep.
+>
+>       🔧 **SNAP-MTIME** — `buildBackupInfo()` now selects
+>         `last_backup_name` by **mtime** (descending), with a
+>         name-based fallback when `DirEntry.Info()` fails.
+>         Effect on this file: the shell commands in §4.3 and
+>         §8.4 that pick the newest snapshot use `ls -1dt`
+>         (mtime sort), which matches the new API behavior.
+>         The v1.2.0 behavior (lexicographic name sort) is
+>         preserved as historical context in `BACKUP.md` §6.5.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with
+>         the same detection (ROT-MANIFEST), the same mtime
+>         sort (ROT-MTIME), and two additional protected
+>         targets on top of the 21-newest window (ROT-PROTECT):
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>         Effect on this file: §9.4 (recovery source priority)
+>         can now rely on the `.last_stable` target being
+>         preserved by rotation, not just present in the
+>         directory. If `.last_stable` points to a snapshot
+>         that would otherwise have been pruned, the
+>         ROT-PROTECT guarantee keeps it alive.
+>
+>   • **Parallel application**: the same SNAP-MANIFEST /
+>     ROT-* semantics were applied to `watchdog.sh` (§[5b]
+>     snapshot counter), `status.sh` (`_list_snapshots`),
+>     `customize.sh` (`rotate_backups`), `action.sh`
+>     (`_inline_list_snapshots` + `_inline_rotate_backups` +
+>     `_inline_backup_summary`), and `uninstall.sh` (§[5b]
+>     `BACKUP_COUNT` / `BACKUP_LAST_NAME`). Every consumer of
+>     the persistent backup directory now agrees on which
+>     snapshots exist and which is the newest.
+>
 >   • **§11.8 (new)** — DNS auto-start markers in the log.
 >   • No structural changes to the recovery procedures.
 
@@ -67,6 +124,45 @@ Step-by-step procedures for recovering from catastrophic failures.
 >   • **§11 (extended)** — Emergency reference card now includes
 >     the 7-field `runtime_info.backups` object and
 >     `status.sh --diagnose`.
+
+> **v1.4.0 — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 / v1.4.0
+>   code identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-EM-01** — **`Last updated` corrected.** The header
+>     and footer previously said `2026-10-06` (which corresponded
+>     to the v1.4.0 release date, not to the v1.4.0 file-editing
+>     date). Both now read `2026-10-08`, matching every other
+>     file in the v1.4.0 module.
+>
+>   🔧 **HARD-EM-02** — **`v1.3.0` block extended.** The previous
+>     block mentioned only the DNS auto-start fix, the PWA install
+>     button, and the live status LED. It did NOT mention the
+>     **server-side refinements** to snapshot detection and
+>     rotation (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+>     ROT-MTIME, ROT-PROTECT) that are central to the recovery
+>     procedures documented here. The v1.3.0 block above now
+>     documents them, with explicit "Effect on this file" notes
+>     for each identifier.
+>
+>   🔧 **HARD-EM-03** — **§9.4 updated.** The recovery-source
+>     priority table now notes that `.last_stable` is a
+>     **ROT-PROTECT target**: it is never pruned by
+>     `rotate_backups`, so the priority-1 source is guaranteed
+>     to be alive (unless explicitly deleted by the user).
+>
+>   🔧 **HARD-EM-04** — **§4.3 and §8.4 commands clarified.**
+>     The "find the newest snapshot" commands now explicitly
+>     note that the `ls -1dt` sort matches the v1.3.0
+>     SNAP-MTIME / ROT-MTIME behavior (mtime descending). The
+>     v1.2.0 behavior (lexicographic name sort) is preserved
+>     as historical context in `BACKUP.md` §6.5.
+>
+>   🟢 **HARD-EM-05** — **Cross-references section added** and
+>     **references updated** in §13.2 with
+>     `docs/ARCHITECTURE.md` §4.13 (the authoritative source for
+>     the v1.3.0 server-side refinements).
 
 ---
 
@@ -430,6 +526,17 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backup
 ```
 
 **Step 3**: Find the newest snapshot:
+
+> **v1.3.0 note (HARD-EM-04)**: The `ls -1dt` below sorts by
+> **mtime**, matching the v1.3.0 SNAP-MTIME / ROT-MTIME behavior
+> in `main.go:buildBackupInfo()` and
+> `functions.sh:rotate_backups()`. In v1.2.0, the shell commands
+> used a lexicographic directory-name sort; that behavior is
+> preserved as historical context in `BACKUP.md` §6.5.
+>
+> For maximum consistency with the API, prefer reading
+> `last_backup_name` from the 7-field object (Step 2) instead
+> of re-implementing the sort.
 
 ```bash
 SNAP=$(su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
@@ -1090,6 +1197,11 @@ su -c "find /sdcard/dnscrypt-webui-backup -type f -exec chmod 0600 {} \\;"
 If `current/` is missing or empty, rebuild it from the newest
 snapshot:
 
+> **v1.3.0 note (HARD-EM-04)**: The `ls -1dt` below sorts by
+> **mtime**, matching the v1.3.0 SNAP-MTIME / ROT-MTIME behavior.
+> In v1.2.0, the shell commands used a lexicographic directory-name
+> sort.
+
 ```bash
 # Find the newest valid snapshot
 SNAP=$(su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
@@ -1113,6 +1225,13 @@ su -c "echo '$NEWEST' > /sdcard/dnscrypt-webui-backup/.last_stable"
 ### 8.6 Solution D — Rebuild `.manifest.json`
 
 If a snapshot is missing its manifest:
+
+> **v1.3.0 note (HARD-EM-04)**: Since v1.3.0, a `.manifest.json`
+> file is required for a directory to be **counted as a snapshot**
+> by `main.go:buildBackupInfo()` (SNAP-MANIFEST) and by
+> `functions.sh:rotate_backups()` (ROT-MANIFEST). A snapshot
+> directory without a manifest is invisible to the API and to
+> rotation — which is why this section exists.
 
 ```bash
 cd "$SNAP"
@@ -1242,11 +1361,19 @@ su -c "ls /data/adb/dnscrypt-recovery 2>/dev/null"
 
 | Priority | Source | When used |
 |:--------:|--------|-----------|
-| 1 | `$PERSISTENT_BACKUP/<.last_stable>/` | If the pointer file exists |
-| 2 | `$PERSISTENT_BACKUP/current/` | If `.last_stable` is missing |
+| 1 | `$PERSISTENT_BACKUP/<.last_stable>/` | If the pointer file exists — **and (v1.3.0, HARD-EM-03) the ROT-PROTECT guarantee ensures the target is not pruned by rotation** |
+| 2 | `$PERSISTENT_BACKUP/current/` | If `.last_stable` is missing, or the `.last_stable` target was manually deleted |
 | 3 | In-place `proxy/` directory | If no backup exists |
 
 If all three fail, `customize.sh` aborts with an error message.
+
+**v1.3.0 note (HARD-EM-03)**: Since v1.3.0, `rotate_backups`
+preserves the `.last_stable` target on top of the 21-newest
+window (ROT-PROTECT). This means priority-1 is guaranteed to be
+alive unless the user explicitly deleted it. In v1.2.0, the
+`.last_stable` target could be silently pruned if it fell
+outside the 21-newest window — which would have made priority-2
+the only available recovery source.
 
 ### 9.5 What recovery does NOT do
 
@@ -1604,12 +1731,12 @@ output:
 
 | Field | Type | Meaning |
 |---|---|---|
-| `available` | int | Snapshot count (excludes `current/`, `txn-*`, `orphan-txn-*`) |
+| `available` | int | Snapshot count (excludes `current/`, `txn-*`, `orphan-txn-*`). **v1.3.0 (SNAP-MANIFEST)**: counted iff the directory contains a `.manifest.json`. |
 | `in_flight_txn` | int | `txn-*` directories (install in progress or interrupted) |
 | `orphan_txn` | int | `orphan-txn-*` directories (preserved interrupted installs) |
 | `last_backup` | string \| null | Timestamp of newest snapshot |
-| `last_backup_name` | string \| null | Directory name of newest snapshot |
-| `last_stable` | string \| null | Content of `.last_stable` pointer |
+| `last_backup_name` | string \| null | Directory name of newest snapshot. **v1.3.0 (SNAP-MTIME)**: sorted by mtime, descending. |
+| `last_stable` | string \| null | Content of `.last_stable` pointer. **v1.3.0 (ROT-PROTECT)**: this target is never pruned by rotation. |
 | `path` | string | Backup root path |
 
 ### 11.3 Paths reference
@@ -1627,7 +1754,7 @@ output:
 | `/data/adb/dnscrypt-recovery` | Recovery trigger (external) |
 | `/sdcard/dnscrypt-webui-backup/` | Persistent backups |
 | `/sdcard/dnscrypt-webui-backup/current/` | Live snapshot |
-| `/sdcard/dnscrypt-webui-backup/.last_stable` | Recovery pointer |
+| `/sdcard/dnscrypt-webui-backup/.last_stable` | Recovery pointer (ROT-PROTECT target) |
 | `/sdcard/dnscrypt-webui-backup/txn-*/` | In-flight transactions |
 | `/sdcard/dnscrypt-webui-backup/orphan-txn-*/` | Preserved interrupted installs |
 | `/data/local/tmp/dnscrypt_main.log` | Main log |
@@ -1948,21 +2075,21 @@ out of scope for the backup/restore system.
 | [`SECURITY.md`](SECURITY.md) | Security model + §5.31, §5.32 |
 | [`API.md`](API.md) | API reference |
 | [`FAQ.md`](FAQ.md) | Frequently asked questions |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture (§3.10, §4.10, §4.13) |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contribution guide |
 | [`DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries reference (Level 4) |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (§[v1.2.0], §[v1.3.0], §[v1.4.0]) |
 
 ### 13.2 Project files
 
 | File | Role |
 |------|------|
 | `proxy/customize.sh` | Contains Layer 7 (recovery mode) and the v1.2.0 fix (§[8a], §[9b2]) |
-| `proxy/functions.sh` | Backup helpers |
+| `proxy/functions.sh` | Backup helpers + rotation (`rotate_backups` uses v1.3.0 ROT-* semantics) |
 | `proxy/service.sh` | Auto-backup trigger + DNS auto-start (v1.3.0) |
-| `proxy/main.go` | Pre-critical backup + notification + APK route (v1.4.0) |
-| `proxy/status.sh` | `--diagnose` tool |
-| `proxy/action.sh` | Manual backup trigger |
+| `proxy/main.go` | Pre-critical backup + notification + APK route (v1.4.0) + `buildBackupInfo` (v1.3.0 SNAP-*) |
+| `proxy/status.sh` | `--diagnose` tool + `_list_snapshots` helper (v1.3.0 SNAP-*) |
+| `proxy/action.sh` | Manual backup trigger + `_inline_rotate_backups` (v1.3.0 ROT-*) |
 | `proxy/uninstall.sh` | Preserves backup + cleans orphan transactions |
 | `scripts/fetch_dns_binaries.sh` | DNS binaries fetcher (Level 4) |
 | `scripts/fetch_app_apk.sh` | Companion APK fetcher (v1.4.0) |
@@ -1992,6 +2119,6 @@ out of scope for the backup/restore system.
 
 ---
 
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-08*
 *Version: v1.4.0*
 *Author: gasciljh*

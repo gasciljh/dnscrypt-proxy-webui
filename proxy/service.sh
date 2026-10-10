@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – service.sh
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -215,19 +217,116 @@
 #         ├── allowlist.txt
 #         ├── denylist.txt
 #         └── run/
-
+#
 # ============================================================
-# v1.4.0 \u2014 Companion Android app integration
+# v1.3.0 — DNS auto-start after boot (critical fix)
 # ============================================================
-#   \U0001f4f1 SVC-V14-01 \u2014 No behavior change. The companion app
+#   The v1.3.0 release fixes a critical boot-time bug:
+#   the DNS engine was not starting automatically after a
+#   device reboot when the user had previously left the
+#   service in the ON state.
+#
+#   Root cause:
+#     `watchdog.sh` waits a fixed 30-second interval before its
+#     first API call, and by the time it fired
+#     `POST /api/ensure_running_service`, the WebUI may not
+#     have finished binding to its port. The watchdog would
+#     retry with exponential backoff (30s → 60s → 120s → ...),
+#     leaving DNS unavailable for minutes after boot.
+#
+#   Fix (in section [19]):
+#     service.sh now performs a direct, bounded wait for the
+#     WebUI to become ready (up to 60 seconds, checking for the
+#     watchdog token file + the WebUI TCP port), then calls
+#     `POST /api/ensure_running_service` itself. This
+#     guarantees DNS starts within a few seconds of the WebUI
+#     coming up, without depending on the watchdog's polling
+#     interval.
+#
+#   Verified on-device:
+#     DNS engine reaches "ON" state within 5 seconds of
+#     service.sh startup, with 3 processes running
+#     (webui + proxy + watchdog). See log block
+#     `[v1.3.0 FIX]` in section [19].
+#
+#   The watchdog.sh backoff behavior is left intact for crash
+#   recovery during normal runtime — it is only the boot path
+#   that now takes the direct route.
+#
+#   ⚠️ Note on parity: the inline fallback `_inline_rotate_
+#   backups` (section [5d]) was rewritten in this file to
+#   mirror the v1.3.0 canonical rotation logic (manifest-based
+#   detection, mtime sort, protected targets). See SVC-V14-03
+#   below for the documentation-sync correction that was
+#   applied in v1.4.0.
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 SVC-V14-01 — No behavior change. The companion app
 #     APK (web/app-debug.apk) is not part of the boot service
 #     lifecycle. It is served by main.go; the boot path is
 #     unchanged.
 #
-#   \U0001f4f1 SVC-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
+#   📱 SVC-V14-02 — Version bump v1.3.0 → v1.4.0.
 #     Documentation only.
 #
-# ============================================================
+#   📚 SVC-V14-03 — Documentation-sync correction for v1.3.0.
+#     The doc-block above `_inline_rotate_backups` (section
+#     [5d]) previously described the v1.2.0 rotation logic
+#     ("Sorts by DIRECTORY NAME (not mtime). Preserves
+#     current/, txn-*, orphan-txn-*, and metadata files
+#     (README.md, .last_stable, .upgrade_history.*)") while
+#     the actual code in the same function performed the
+#     v1.3.0 rotation logic (manifest-based detection, mtime
+#     sort, protected targets). This file therefore contradicted
+#     itself: the outer doc-block said v1.2.0, the inner comment
+#     at the top of the function body said "v1.3.0 —
+#     Professional rotation (parity with functions.sh)", and
+#     the code matched the latter.
+#
+#     The doc-block has been rewritten to describe the actual
+#     behaviour, mirroring the SVC-V14-03 correction applied to
+#     functions.sh (FSH-18) and to main.go (the v1.3.0 header
+#     block). Identifiers ROT-MANIFEST, ROT-MTIME, and
+#     ROT-PROTECT are now referenced from the doc-block, in
+#     line with CHANGELOG.md [v1.3.0] and
+#     docs/ARCHITECTURE.md §4.13.2.
+#
+#     No code changed — this is a documentation-only
+#     correction. The version header on line 4 is bumped to
+#     v1.4.0 for traceability, consistent with the other
+#     module files (functions.sh, main.go).
+#
+#   🛡️ SVC-V14-04 — Functional correction: manifest-less
+#     snapshots produced by the inline fallback were never
+#     rotated. The v1.3.0 rotation logic (both canonical and
+#     inline) detects a snapshot iff it contains a
+#     `.manifest.json` file. `_inline_auto_backup_if_needed`
+#     was documented (SVC-1) as intentionally NOT writing a
+#     manifest — the rationale being that `write_manifest`
+#     lives in functions.sh, which is precisely the file whose
+#     absence triggered the inline path.
+#
+#     Consequence: every inline-created snapshot (up to one
+#     per 24 h, ~30–100 KB each) accumulated forever, because
+#     the manifest-based rotation could not see it.
+#
+#     Fix: `_inline_auto_backup_if_needed` now writes a
+#     minimal, self-contained `.manifest.json` (fields:
+#     `version`, `timestamp`, `source="inline-fallback"`,
+#     `root_solution="unknown"`, `files_count`, `files=[]`).
+#     No `sha256` entries are written, because hashing is
+#     advisory and `verify_backup_integrity` already tolerates
+#     missing hashes in non-strict mode. The inline rotation
+#     now sees inline-created snapshots and prunes them
+#     normally.
+#
+#     The corresponding section [5c] doc-block was updated to
+#     remove the "Does NOT write a .manifest.json" divergence
+#     from the "INTENTIONALLY DIVERGES" list, and to describe
+#     the minimal manifest that is now written.
+#
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables (see
@@ -290,6 +389,7 @@ WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
 STATUS_FILE="/data/local/tmp/dnscrypt.status"
 CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
 
+# shellcheck disable=SC2034
 TOML_FILE="$MODDIR/proxy/dnscrypt-proxy.toml"
 SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
@@ -328,7 +428,8 @@ log_msg() {
         local _size
         _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
         if [ -n "$_size" ] && [ "$_size" -gt 52428800 ]; then
-            local _emg="${LOG_FILE}.emergency.$(date +%s)"
+            local _emg
+            _emg="${LOG_FILE}.emergency.$(date +%s)"
             mv -f "$LOG_FILE" "$_emg" 2>/dev/null
             : > "$LOG_FILE"
         fi
@@ -625,12 +726,19 @@ _inline_get_profile_memory_hint() {
 #       (HARD-SVC-05 — after this revision, matching FSH-10).
 #     • SELinux context preservation when restorecon exists.
 #     • Per-file chmod 0600.
+#     • A minimal .manifest.json is written so that the
+#       manifest-based rotation (both canonical and inline,
+#       ROT-MANIFEST in v1.3.0) can detect and prune the
+#       snapshot. See SVC-V14-04 in the file header for the
+#       rationale of this revision.
 #
 #   ❌ INTENTIONALLY DIVERGES (documented differences):
-#     • Does NOT write a .manifest.json. The canonical version
-#       does this via `write_manifest`, which is unavailable
-#       here (it lives in functions.sh, precisely the file
-#       that failed to load).
+#     • The .manifest.json contains no per-file SHA256 hashes
+#       (the canonical version writes them via `write_manifest`,
+#       which lives in functions.sh — precisely the file whose
+#       absence triggered this fallback). Only the metadata
+#       fields are written. This is compatible with
+#       `verify_backup_integrity` in non-strict mode.
 #     • Does NOT call rotation internally. The caller
 #       (service.sh [14c]) invokes `do_rotate_backups` right
 #       after this function returns.
@@ -710,6 +818,26 @@ _inline_auto_backup_if_needed() {
         return 1
     fi
 
+    # SVC-V14-04: write a minimal .manifest.json so that the
+    # manifest-based rotation (ROT-MANIFEST, v1.3.0) can detect
+    # and prune this snapshot. Fields mirror the canonical
+    # write_manifest in functions.sh, except that the per-file
+    # `files` array is empty (no SHA256 hashes are written in
+    # the fallback path — see the doc-block above).
+    local ts_iso
+    ts_iso=$(date +%Y%m%d-%H%M%S 2>/dev/null)
+    {
+        printf '{\n'
+        printf '  "version": "%s",\n' "$MODULE_VERSION"
+        printf '  "timestamp": "%s",\n' "$ts_iso"
+        printf '  "source": "inline-fallback",\n'
+        printf '  "root_solution": "unknown",\n'
+        printf '  "files_count": %d,\n' "$count"
+        printf '  "files": []\n'
+        printf '}\n'
+    } > "$target/.manifest.json" 2>/dev/null
+    chmod 0600 "$target/.manifest.json" 2>/dev/null
+
     touch "$marker" 2>/dev/null
 
     log_msg "✅ auto_backup (inline): $count file(s) → $target"
@@ -720,12 +848,41 @@ _inline_auto_backup_if_needed() {
 # [5d] v1.2.0 — Fallback: rotate_backups
 # ============================================================
 # Mirrors the canonical functions.sh:rotate_backups on the
-# points that matter:
-#   • Sorts by DIRECTORY NAME (not mtime).
-#   • Preserves current/, txn-*, orphan-txn-*, and metadata
-#     files (README.md, .last_stable, .upgrade_history.*).
-#   • Logs a "removing" line before pruning and a "done" line
-#     after.
+# points that matter, using the SAME v1.3.0 rotation semantics
+# (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT):
+#
+#   • ROT-MANIFEST — a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file. Directories named
+#     current/, txn-*/, and orphan-txn-*/ are always excluded
+#     by name. This makes custom-named snapshots visible to
+#     rotation.
+#
+#   • ROT-MTIME — candidates are sorted by mtime (numeric,
+#     descending, `sort -rn -k1,1`), not by directory name.
+#     Robust against clock drift and manual renames.
+#
+#   • ROT-PROTECT — two additional targets are preserved on top
+#     of the 21-newest window:
+#       - the `.last_stable` target (recovery pointer);
+#       - the newest install snapshot (name matching
+#         `-v<digit>`, used by rollback).
+#     Without these protections, the 21-newest window could
+#     silently evict the exact snapshot that recovery mode or
+#     rollback depends on.
+#
+# The function logs a "removing" line before pruning, a
+# per-target line for each Preserved / Removed decision, and a
+# "done" line after — matching the canonical version.
+#
+# ⚠️ SVC-V14-03 (documentation-sync correction): earlier
+# revisions of this doc-block described the v1.2.0 rotation
+# logic ("Sorts by DIRECTORY NAME (not mtime). Preserves
+# current/, txn-*, orphan-txn-*, and metadata files
+# (README.md, .last_stable, .upgrade_history.*)") while the
+# actual code in the same function already performed the
+# v1.3.0 rotation logic. The doc-block was rewritten in v1.4.0
+# to match the code. See the file header for the full
+# rationale.
 #
 # Divergence from canonical: the log function used here is
 # `log_msg` (this script's logger), not `log_fn`. Since this
@@ -747,6 +904,9 @@ _inline_rotate_backups() {
     }
 
     # v1.3.0 — Professional rotation (parity with functions.sh)
+    #   ROT-MANIFEST: detect by .manifest.json presence.
+    #   ROT-MTIME:    order by mtime, descending.
+    #   ROT-PROTECT:  preserve .last_stable target + newest install.
     local _protected=""
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
         _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
@@ -801,7 +961,7 @@ _inline_rotate_backups() {
             log_msg "  🛡️ Preserved (newest install): $_name"
             continue
         fi
-        if rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null; then
+        if rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null; then
             log_msg "  🗑️ Removed: $_name"
         fi
     done <<EOF
@@ -914,8 +1074,10 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
 
     # SVC-FIX-M1: firewall cleanup wrapper.
     if command -v manage_firewall >/dev/null 2>&1; then
+        # shellcheck disable=SC2329  # wrapper — invoked later in service lifecycle
         do_cleanup_firewall() { manage_firewall 0; }
     else
+        # shellcheck disable=SC2329  # invoked indirectly / via dispatch
         do_cleanup_firewall() { _inline_cleanup_firewall; }
     fi
 
@@ -954,7 +1116,9 @@ else
     do_mem_hint()       { _inline_get_profile_memory_hint; }
     do_auto_backup()    { _inline_auto_backup_if_needed "${1:-86400}"; }
     do_rotate_backups() { _inline_rotate_backups "${1:-21}"; }
+    # shellcheck disable=SC2329  # wrapper — invoked later in service lifecycle
     do_cleanup_transactions() { _inline_cleanup_old_transactions; }
+    # shellcheck disable=SC2329  # invoked indirectly / via dispatch
     do_cleanup_firewall()     { _inline_cleanup_firewall; }
 fi
 
@@ -1254,10 +1418,9 @@ fi
 # --- v1.2.0 — collect backup state for the summary ---
 if [ -d "$PERSISTENT_BACKUP" ]; then
     BACKUP_COUNT=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
+        ls -1d ./*/ 2>/dev/null | \
         sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        wc -l | tr -d ' ')
+        grep -cE '^[0-9]{8}-[0-9]{6}-' | tr -d ' ')
     [ -z "$BACKUP_COUNT" ] && BACKUP_COUNT=0
 fi
 
@@ -1394,18 +1557,22 @@ log_msg "───────────────────────�
 # ============================================================
 # [19] v1.3.0 FIX — Ensure DNS starts after boot
 # ============================================================
-# السبب الجذري (مُشخّص 2026-10-02):
-#   Watchdog يدخل حلقة انتظار 30s قبل أول محاولة DNS.
-#   عند محاولته، WebUI لم يكن جاهزاً بعد → API call failed.
-#   النتيجة: DNS لا يبدأ تلقائياً حتى يُفتح WebUI يدوياً.
+# Root cause (diagnosed 2026-10-02):
+#   The watchdog enters a 30 s wait loop before its first DNS
+#   attempt. By the time it fires, the WebUI may not have
+#   finished binding yet → the API call fails. Result: DNS
+#   does not start automatically until the user opens the
+#   WebUI manually.
 #
-# الحلّ:
-#   service.sh ينتظر WebUI، ثم يستدعي API مباشرة.
-#   يضمن بدء DNS خلال ثوانٍ بدل 30-60 ثانية.
+# Fix:
+#   service.sh waits for the WebUI to become ready, then
+#   calls the API directly. This guarantees DNS starts within
+#   seconds instead of 30-60 seconds.
 # ============================================================
 log_msg "🔧 [v1.3.0 FIX] Ensuring DNS starts after boot..."
 
-# Guard: WATCHDOG_TOKEN_FILE قد لا يُعرَّف إذا فشل تحميل functions.sh
+# Guard: WATCHDOG_TOKEN_FILE may be undefined if functions.sh
+# failed to load.
 if [ -z "$WATCHDOG_TOKEN_FILE" ]; then
     WATCHDOG_TOKEN_FILE="$(dirname "$STATUS_FILE")/.watchdog_token"
 fi

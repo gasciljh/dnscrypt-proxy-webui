@@ -4,13 +4,32 @@ Complete guide to the project's Git workflow: branches, naming
 conventions, merge rules, and protection policies.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
+> **Identifier inventory in this file (5 total)**:
+>   • HARD-BRN-01 (`Last updated` correction — v1.4.0)
+>   • HARD-BRN-02 (v1.3.0 block added — v1.4.0)
+>   • HARD-BRN-03 (§1.3 ADR-count note extended — v1.4.0)
+>   • HARD-BRN-04 (§7.3 + §10.1/§10.3 v1.3.0 rotation refs — v1.4.0)
+>   • HARD-BRN-05 (§9.4 rotation-related mistakes — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/RELEASE_PROCESS.md](RELEASE_PROCESS.md) — step-by-step release guide
+>   • [docs/adr/README.md](adr/README.md) — ADR index + methodology
+>   • [docs/CONTRIBUTING.md](CONTRIBUTING.md) — contribution guide
+>   • [docs/UPGRADE.md](UPGRADE.md) — version upgrade paths (§3.0–§3.2)
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference (v1.2.0 + v1.3.0 rotation)
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery (v1.2.0)
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0 server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device SNAP-*/ROT-* verification
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history (v1.0.0 → v1.4.0)
+
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • `Last updated` reflects the v1.4.0 release date.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
 >   • **Companion Android app** — the module ZIP may now contain
 >     `web/app-debug.apk` (optional). No branching-strategy change
 >     is required; the APK is treated as an optional asset.
@@ -35,6 +54,60 @@ conventions, merge rules, and protection policies.
 >     protection policies are unchanged.
 >   • Documentation text is English-only by project convention.
 
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • `Last updated` reflected the v1.3.0 release date.
+>   • Client-side changes (WebUI): PWA install button (later
+>     replaced in v1.4.0) + live status LED on the Today
+>     counter.
+>   • Boot-path fix: DNS auto-start after boot via a direct API
+>     call in `service.sh` §[19].
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO refined the snapshot-detection and
+>     rotation semantics that underpin the persistent backup
+>     directory. Three identifiers document the change (also
+>     used in `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending), with a name-based fallback.
+>         This supersedes the v1.2.0 BUG-3 lexicographic-name
+>         rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort,
+>         and two additional protected targets on top of the
+>         21-newest window:
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>
+>   • **Parallel application** — the same SNAP-* / ROT-*
+>     semantics were applied to `watchdog.sh` (§[5b] snapshot
+>     counter), `status.sh` (`_list_snapshots`),
+>     `customize.sh` (`rotate_backups`), `action.sh`
+>     (`_inline_list_snapshots` + `_inline_rotate_backups` +
+>     `_inline_backup_summary`), and `uninstall.sh` (§[5b]
+>     `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+>
+>   • **No branching-strategy change** was required for v1.3.0.
+>     The two-branch model (`main` + `develop`), naming rules,
+>     merge rules, and protection policies are unchanged from
+>     v1.2.0. All affected files (`main.go`, `functions.sh`,
+>     `service.sh`, `watchdog.sh`, `status.sh`, `customize.sh`,
+>     `action.sh`, `uninstall.sh`) follow the standard
+>     `feature/*` / `fix/*` PR flow — no new branch type was
+>     introduced.
+>
+>   • **Version chain** — the release chain table in §8.1 now
+>     includes v1.3.0 between v1.2.0 and v1.4.0.
+
 > **v1.2.0 changes (historical)**:
 >   • Version bumped from v1.1.0 to v1.2.0.
 >   • Introduced the `backup-smoke-test` job as a required status
@@ -45,6 +118,48 @@ conventions, merge rules, and protection policies.
 >   • Introduced the v1.2.0 data-preservation release. See
 >     [`docs/BACKUP.md`](BACKUP.md) for the full model.
 
+> **v1.4.0 — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 / v1.4.0
+>   code identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-BRN-01** — `Last updated` corrected. The header
+>     and footer previously said `2026-10-06` (the v1.4.0
+>     release date, not the v1.4.0 file-editing date). Both now
+>     read `2026-10-08`, matching every other file in the v1.4.0
+>     module.
+>
+>   🔧 **HARD-BRN-02** — `v1.3.0` block added. The file
+>     previously jumped directly from the v1.4.0 block to the
+>     v1.2.0 (historical) block, with **no mention at all** of
+>     the v1.3.0 release. The block above now documents the
+>     client-side changes, the boot-path fix, and the
+>     server-side rotation refinements (SNAP-MANIFEST,
+>     SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT), and
+>     explains why no branching-strategy change was required.
+>
+>   🔧 **HARD-BRN-03** — §1.3 (Architecture Decisions) extended
+>     with a v1.3.0 note confirming that the ADR count remains
+>     at 6 (no new ADR was added by v1.3.0 or v1.4.0). The
+>     rotation refinements are functional changes, not
+>     architectural decisions.
+>
+>   🟡 **HARD-BRN-04** — §7.3 (Release Automation) and §10.1 /
+>     §10.3 (References / Project Files) extended with the
+>     v1.3.0 server-side refinements and the v1.4.0 companion
+>     APK files. `docs/ARCHITECTURE.md` §4.13 and
+>     `docs/COMPATIBILITY.md` §10.3.5 are now cited.
+>
+>   🟡 **HARD-BRN-05** — §9.4 (Common Mistakes) extended with
+>     two rotation-related entries:
+>       • Editing a `txn-*` directory manually.
+>       • Adding an English string without the matching Arabic
+>         entry (this was already in the previous version — kept
+>         for clarity).
+>     The rotation-related entry references `BACKUP.md` §10.5
+>     and `ARCHITECTURE.md` §4.13.2 for the correct handling
+>     of in-flight transactions.
+
 > **📖 Related documents**:
 > - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
 > - Architecture Decision Records → [`docs/adr/README.md`](adr/README.md)
@@ -52,6 +167,8 @@ conventions, merge rules, and protection policies.
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 > - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
 > - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
+> - Architecture (v1.3.0 rotation semantics) → [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13
+> - Compatibility matrix → [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5
 
 ---
 
@@ -117,6 +234,16 @@ The decisions that shaped this strategy are documented as **ADRs**:
 The `release-patch.sh` script named in ADR-0006 is now in active
 use — for example, `v1.4.0 → v1.4.1` would be a PATCH release
 processed by that script (see §8).
+
+**v1.3.0 note**: The v1.3.0 release cycle did **not** add any new
+ADR. The client-side features (PWA install button, live status
+LED), the boot-path fix (DNS auto-start in `service.sh`), and the
+server-side rotation refinements (SNAP-MANIFEST + SNAP-MTIME in
+`main.go:buildBackupInfo`; ROT-MANIFEST + ROT-MTIME + ROT-PROTECT
+in `functions.sh:rotate_backups`) are all documented as functional
+changes in [`CHANGELOG.md`](../CHANGELOG.md) §[v1.3.0] and
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13 — not as
+architectural decisions. The ADR count remains at 6.
 
 **v1.4.0 note**: The v1.4.0 release cycle did **not** add any new
 ADR. The companion APK integration, the CodeQL path-injection
@@ -489,6 +616,13 @@ metadata` step that validates `proxy/app-apk.version` (format
 `X.Y.Z`) and confirms `scripts/fetch_app_apk.sh` is present. This
 step is **non-blocking** — the companion app is OPTIONAL.
 
+**v1.3.0 addition**: any PR that touches the rotation semantics
+(SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT)
+must keep the invariants in sync across `main.go`,
+`functions.sh`, and the five shell scripts that mirror them. See
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2 for the full
+reference. This is not a new CI check — it is a review guideline.
+
 **v1.2.0 language check**: Any PR that adds a **new user-facing
 string** to the WebUI must supply **both** an English and an
 Arabic entry. The default language must remain English.
@@ -521,6 +655,8 @@ Use **Conventional Commits** for the PR title:
 - `docs(api): add runtime_info schema`
 - `feat(backup): add multi-source detection` (v1.2.0 example)
 - `feat(webui): add Arabic translation for X` (v1.2.0 example)
+- `refactor(backup): use SNAP-MANIFEST + ROT-MTIME for rotation` (v1.3.0 example)
+- `feat(service): boot-path DNS auto-start via direct API call` (v1.3.0 example)
 - `feat(app): integrate companion Android app` (v1.4.0 example)
 
 ### 5.4 Merge Strategy
@@ -621,7 +757,7 @@ use a regular `git merge` (see §8.4), not `--force`.
 ### 6.3 Tags
 
 > **⚠️ Important — this section was rewritten in v1.1.0 and
-> verified in v1.2.0 and v1.4.0.**
+> verified in v1.2.0, v1.3.0, and v1.4.0.**
 >
 > The previous version of this document described the deprecated
 > "Protected tags" page (Classic Branch Protection). GitHub now
@@ -774,6 +910,36 @@ the Ruleset that protects `develop`.
 
 Full process: [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
 
+### 7.3.1 Server-Side Rotation Refinements (v1.3.0)
+
+The v1.3.0 release did **not** change the CI/CD pipeline itself.
+However, it did change the internal semantics of eight files that
+are covered by the pipeline's `backup-smoke-test` job:
+
+| File | Change |
+|---|---|
+| `proxy/main.go` | SNAP-MANIFEST + SNAP-MTIME in `buildBackupInfo` |
+| `proxy/functions.sh` | ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in `rotate_backups` |
+| `proxy/service.sh` | Boot-path DNS auto-start (§[19]) |
+| `proxy/watchdog.sh` | §[5b] snapshot counter uses manifest detection |
+| `proxy/status.sh` | `_list_snapshots` uses manifest detection |
+| `proxy/customize.sh` | `rotate_backups` uses ROT-* semantics |
+| `proxy/action.sh` | `_inline_list_snapshots` + `_inline_rotate_backups` |
+| `proxy/uninstall.sh` | §[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME` |
+
+**No CI configuration change was required** for v1.3.0:
+- The `backup-smoke-test` job in `ci.yml` verifies **function
+  presence** (via grep), not internal semantics. The v1.3.0
+  refinements kept the same function names, so the smoke test
+  passed unchanged.
+- The `42-scenario matrix` in `upgrade-test.yml` was updated
+  separately (see its own file header for the L9-02/L9-03 fix).
+- The semantic verification of SNAP-*/ROT-* is deferred to
+  on-device testing — see
+  [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5.
+
+**Full reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2.
+
 ### 7.4 Language Policy in CI (v1.2.0+)
 
 The WebUI is **bilingual (English default + Arabic toggle)**. This
@@ -836,7 +1002,7 @@ would be `v1.4.0 → v1.4.1`. The chain of releases is:
 |---|---|---|
 | `v1.0.0` | `v1.1.0` | MINOR (features) |
 | `v1.1.0` | `v1.2.0` | MINOR (data preservation) |
-| `v1.2.0` | `v1.3.0` | MINOR (PWA install button + live LED) |
+| `v1.2.0` | `v1.3.0` | MINOR (PWA install button + live LED + rotation refinements) |
 | `v1.3.0` | `v1.4.0` | MINOR (companion APK + CodeQL cleanup) |
 | `v1.4.0` | `v1.4.1` | PATCH (hotfix, if needed) |
 | `v1.4.1` | `v1.5.0` | MINOR (features) |
@@ -953,6 +1119,26 @@ standard hotfix flow. Additional considerations:
   the HTML **once** — the toggle operates on the DOM. No cache
   bump is required for language changes.
 
+### 8.7 Hotfix and the Backup Layer (v1.2.0+)
+
+A hotfix that touches the backup layer (data-preservation layers)
+or the rotation semantics follows the standard hotfix flow.
+Additional considerations:
+
+- **Do NOT edit `txn-*` / `orphan-txn-*` directories manually**.
+  These are managed automatically by `main.go` and `service.sh`.
+  See [`docs/BACKUP.md`](BACKUP.md) §10.5.
+- **Preserve the `.last_stable` pointer**. If the hotfix changes
+  snapshot detection, it must not break the ROT-PROTECT guarantee.
+- **Test recovery mode**. After the hotfix, verify that the
+  recovery trigger (`touch recovery && reboot`) still works.
+- **Verify the rotation invariants**:
+  - SNAP-MANIFEST (`.manifest.json` presence)
+  - SNAP-MTIME (mtime sort)
+  - ROT-MANIFEST + ROT-MTIME + ROT-PROTECT
+- **Full reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2
+  and [`docs/BACKUP.md`](BACKUP.md) §6.5.
+
 ---
 
 ## 9. Quick Reference
@@ -1037,6 +1223,8 @@ make sync
 | Enable `Restrict creations` without a Bypass entry | Add `Repository admin` to the Bypass list (see §6.3) |
 | Edit a `txn-*` directory manually | Let `main.go` + `service.sh` handle cleanup (see [`BACKUP.md`](BACKUP.md) §10.5) |
 | Add an English string without the matching Arabic entry | Add both `en` and `ar` entries in the `translations` object |
+| Prune the `.last_stable` target manually | Let `rotate_backups` handle rotation — ROT-PROTECT keeps this target alive (see [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2) |
+| Create a snapshot without `.manifest.json` | Every snapshot must have a manifest — SNAP-MANIFEST / ROT-MANIFEST requires it (see [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.1) |
 
 ---
 
@@ -1051,10 +1239,12 @@ make sync
 | [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) | Step-by-step release process |
 | [`docs/adr/README.md`](adr/README.md) | Architecture Decision Records index |
 | [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1, §3.2) |
-| [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections (§5.31, §5.32) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0+)** |
-| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0+)** |
+| [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections (§5.31–§5.35) |
+| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 rotation semantics)** |
+| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | System architecture (§3.10, §4.10) |
+| **[`docs/ARCHITECTURE.md` §4.13](ARCHITECTURE.md)** | **v1.3.0 server-side refinements (SNAP-* / ROT-* — authoritative)** |
+| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Device matrix + on-device SNAP-*/ROT-* verification (§10.3.5) |
 | [`docs/API.md`](API.md) | HTTP API reference (§6.1.7) |
 | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting guide |
 | [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
@@ -1093,11 +1283,16 @@ make sync
 | `Makefile` | `make release`, `make release-patch`, `make sync`, `make fetch-apk`, `make check-app-version` |
 | `VERSION` | Single source of truth (module version) |
 | `proxy/app-apk.version` | **Single source of truth (companion app version, v1.4.0)** |
+| `proxy/main.go` | **SNAP-MANIFEST + SNAP-MTIME in `buildBackupInfo` (v1.3.0)** |
+| `proxy/functions.sh` | **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in `rotate_backups` (v1.3.0)** |
+| `proxy/service.sh` | **Boot-path DNS auto-start (§[19], v1.3.0)** |
 | `module.prop` | Magisk module definition |
 | `update.json` | Auto-update metadata |
 | `docs/UPGRADE.md` | Version upgrade guide |
-| `docs/BACKUP.md` | Backup system reference (v1.2.0+) |
-| `docs/EMERGENCY.md` | Emergency recovery (v1.2.0+) |
+| `docs/BACKUP.md` | Backup system reference (v1.2.0 + v1.3.0 rotation) |
+| `docs/EMERGENCY.md` | Emergency recovery (v1.2.0) |
+| `docs/ARCHITECTURE.md` §4.13 | v1.3.0 server-side refinements (authoritative) |
+| `docs/COMPATIBILITY.md` §10.3.5 | On-device SNAP-*/ROT-* verification procedure |
 
 ### 10.4 External Resources
 
@@ -1113,6 +1308,6 @@ make sync
 
 ---
 
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-08*
 *Version: v1.4.0*
 *Author: gasciljh*

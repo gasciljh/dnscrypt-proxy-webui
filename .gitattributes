@@ -1,6 +1,7 @@
 # ============================================================
 # Git Attributes for DNSCrypt Smart Filter
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # https://git-scm.com/docs/gitattributes
@@ -15,7 +16,7 @@
 # v1.1.0 notes (kept):
 #   • `merge=union` is used ONLY for `CHANGELOG.md` and
 #     `VERSION`. It is deliberately NOT used for files with
-#     ordered content (SECURITY.md, docs/adr/README.md, etc.).
+#     ordered content.
 #   • The `export-ignore` list was reviewed — it excludes
 #     development-only files from `git archive` and release
 #     tarballs.
@@ -25,55 +26,18 @@
 #   • Version bumped from v1.1.0 to v1.2.0.
 #
 #   • 🔧 FIX (this revision): Removed the `-diff` attribute from
-#     `proxy/dnscrypt-proxy.version`.
-#
-#     Background:
-#       `-diff` tells Git to treat a file as binary for the
-#       purposes of `git diff` — it skips the text-based diff
-#       algorithm and shows "Binary files ... differ" instead.
-#
-#     Why `-diff` was wrong here:
-#       `proxy/dnscrypt-proxy.version` is a single-line text
-#       file (e.g. "2.1.18"). When the upstream DNS engine
-#       version is bumped, the change is exactly one line:
-#         -2.1.18
-#         +2.1.19
-#       Suppressing this diff with `-diff` HIDES the change
-#       from every `git log -p`, `git show`, and PR review view.
-#       That is the opposite of what we want for a file that is
-#       the Single Source of Truth for the DNS engine version.
-#
-#     Why the ORIGINAL intent (never CRLF-normalize) does not
-#     require `-diff`:
-#       The `text eol=lf` attributes already handle line-ending
-#       normalization. `-diff` only affects the diff display,
-#       not the stored line endings.
-#
-#     The v1.1.0 change note for this file claimed `-diff` was
-#     added as a preventive measure against binary treatment.
-#     That was based on a misunderstanding: `-diff` does not
-#     prevent binary treatment; it CAUSES it. The correct
-#     attributes are `text eol=lf` alone.
+#     `proxy/dnscrypt-proxy.version`. The `-diff` attribute
+#     caused the file to be treated as binary for diff purposes,
+#     hiding version bumps from `git log -p` and PR reviews.
+#     The correct attributes are `text eol=lf` alone.
 #
 #   • The `merge=union` list was re-verified:
 #       - CHANGELOG.md  → still union (append-only)
-#       - VERSION       → still union (single-line, but
-#                         conflicts here are rare and
-#                         resolvable by hand)
-#     No new file was added to this list. In particular:
-#       - docs/BACKUP.md      → NOT union (numbered sections)
-#       - docs/EMERGENCY.md   → NOT union (numbered scenarios)
-#       - docs/UPGRADE.md     → NOT union (versioned §3.X)
-#     These files have ordered content and a union merge would
-#     produce duplicated or interleaved sections.
+#       - VERSION       → still union (single-line)
+#     No new file was added to this list.
 #
 #   • The `export-ignore` list was re-verified. The v1.2.0
-#     release did NOT need any new export-ignore entry:
-#       - docs/ already covers BACKUP.md, EMERGENCY.md, and
-#         UPGRADE.md
-#       - scripts/ already covers release-patch.sh
-#       - .github/ already covers upgrade-test.yml and the
-#         release PR template
+#     release did NOT need any new export-ignore entry.
 #
 #   • Added a "Data preservation (v1.2.0)" note in the
 #     export-ignore section: the runtime backup directory
@@ -81,14 +45,74 @@
 #     repository, so no export-ignore rule is needed for it.
 #
 #   • Global English edition: all comments are English-only.
-#     No Arabic strings exist in this file.
 #
-# Cross-references (v1.2.0):
-#   • docs/BACKUP.md      — backup system reference
-#   • docs/EMERGENCY.md   — emergency recovery guide
-#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
-#   • Makefile            — `make package` creates dist/,
-#                           `make check-docs` verifies docs
+# ============================================================
+# v1.3.0 changes:
+#   • Version bumped from v1.2.0 to v1.3.0.
+#   • No new file extensions or line-ending rules were required
+#     by the v1.3.0 release. The client-side changes
+#     (PWA install button + live status LED) live entirely in
+#     `web/index.html`, which is already covered by the
+#     `*.html` rule. The server-side refinements shipped in
+#     v1.3.0 (SNAP-MANIFEST + SNAP-MTIME in `main.go`,
+#     ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in
+#     `functions.sh`, and the boot-path DNS auto-start in
+#     `service.sh`) touched only `.go` and `.sh` files —
+#     both already covered by the `*.go` and `*.sh` rules.
+#     No new attribute pattern was needed.
+#
+#   • Re-audited all sections against the v1.3.0 file
+#     inventory. No new pattern was required. See
+#     CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
+#     for the full v1.3.0 delta.
+#
+#   • The `proxy/dnscrypt-proxy.version` rule was re-verified:
+#     `text eol=lf` is sufficient; no `-diff` attribute.
+#
+# ============================================================
+# v1.4.0 changes (this revision):
+#   • Version bumped from v1.3.0 to v1.4.0.
+#
+#   • 🔧 SILENT APPLICATION FIXED: The previous revision of this
+#     file already contained a rule for `proxy/app-apk.version`
+#     but did NOT document it in the "v1.4.0 changes" section.
+#     This revision documents the rule and its rationale.
+#
+#     The companion Android app version is a single-line text
+#     file (e.g. "1.0.0", no "v" prefix). It is read by
+#     `scripts/fetch_app_apk.sh`. Any whitespace or CRLF would
+#     break the version check regex
+#     (`^[0-9]+\.[0-9]+\.[0-9]+$`).
+#
+#   • Added the `web/app-debug.apk` binary rule. The companion
+#     APK is a binary file (a ZIP-formatted Android package) and
+#     MUST NOT have line-ending conversion, diff, or merge
+#     applied.
+#
+#   • The `merge=union` list was re-verified:
+#       - CHANGELOG.md  → still union (append-only)
+#       - VERSION       → still union (single-line)
+#     No new file was added to this list. In particular:
+#       - docs/BACKUP.md    → NOT union (numbered sections)
+#       - docs/EMERGENCY.md → NOT union (numbered scenarios)
+#       - docs/UPGRADE.md   → NOT union (versioned §3.X)
+#
+#   • The `export-ignore` list was re-verified. The v1.4.0
+#     release did NOT need any new export-ignore entry:
+#       - `scripts/fetch_app_apk.sh` is COVERED by the existing
+#         `scripts/` export-ignore rule → excluded from release
+#         tarballs
+#       - `proxy/app-apk.version` is NOT export-ignored (it is
+#         needed by the release pipeline) → keep as-is
+#       - `web/app-debug.apk` is NOT export-ignored (it is
+#         staged at build time, not at archive time)
+#
+#   • Cross-references:
+#       - `CHANGELOG.md`      §[v1.4.0] for the full delta
+#       - `docs/ARCHITECTURE.md` §4.13 for v1.3.0 server-side
+#                              refinements
+#       - `docs/BACKUP.md`    backup system reference (v1.2.0)
+#       - `docs/EMERGENCY.md` emergency recovery (v1.2.0)
 # ============================================================
 
 # ============================================================
@@ -109,6 +133,9 @@
 #
 # v1.2.0 note: scripts/release-patch.sh and scripts/release.sh
 # are covered by `*.sh`. No new explicit entry was needed.
+#
+# v1.4.0 note: scripts/fetch_app_apk.sh (new in v1.4.0) is
+# also covered by `*.sh`. No new explicit entry was needed.
 # ============================================================
 *.sh          text eol=lf
 *.bash        text eol=lf
@@ -127,11 +154,21 @@ watchdog.sh   text eol=lf
 # Go 1.22 is the current toolchain (see proxy/go.mod). Go source
 # files use tabs for indentation (enforced by gofmt), but line
 # endings must be LF on every platform.
+#
+# v1.3.0 note: main.go was modified in v1.3.0 (SNAP-MANIFEST +
+# SNAP-MTIME in buildBackupInfo). No rule change was needed.
 # ============================================================
 *.go          text eol=lf
 
 # ============================================================
 # Web: LF only
+# ============================================================
+# v1.3.0 note: web/index.html was modified in v1.3.0 (PWA
+# install button + live status LED). No rule change needed.
+#
+# v1.4.0 note: web/index.html was modified again in v1.4.0
+# (install button changed to <a download>, iOS logic removed).
+# No rule change needed.
 # ============================================================
 *.html        text eol=lf
 *.css         text eol=lf
@@ -177,24 +214,17 @@ VERSION       text eol=lf
 #
 # This file is NOT the module version (that is VERSION).
 # It is updated manually when the upstream DNSCrypt project
-# ships a new release. See docs/DNS_BINARIES.md §10.
-#
-# Any whitespace or CRLF would break the version check regex
-# (`^[0-9]+\.[0-9]+\.[0-9]+$`) in fetch_dns_binaries.sh.
+# ships a new release.
 #
 # 🔧 v1.2.0 FIX: The `-diff` attribute was REMOVED from this
 #    rule. It is a single-line text file; `-diff` would hide
 #    the version bump from `git log -p`, `git show`, and PR
-#    reviews. The `text eol=lf` attributes are sufficient to
-#    guarantee correct line endings and text treatment.
-#
-#    See the file header ("v1.2.0 changes" → 🔧 FIX) for the
-#    full rationale.
+#    reviews. The `text eol=lf` attributes are sufficient.
 # ============================================================
 proxy/dnscrypt-proxy.version  text eol=lf
 
 # ============================================================
-# proxy/app-apk.version: LF only, single line
+# proxy/app-apk.version: LF only, single line (v1.4.0)
 # ============================================================
 # Companion Android app version (e.g. "1.0.0", no "v" prefix).
 # Read by scripts/fetch_app_apk.sh. Any whitespace or CRLF
@@ -203,7 +233,11 @@ proxy/dnscrypt-proxy.version  text eol=lf
 #
 # This file is NOT the module version (that is VERSION).
 # It is updated manually when the companion app ships a new
-# release. See proxy/app-apk.version for details.
+# release.
+#
+# The `text eol=lf` attributes are sufficient — do NOT add
+# `-diff` here (same rationale as the dnscrypt-proxy.version
+# rule above).
 # ============================================================
 proxy/app-apk.version  text eol=lf
 
@@ -212,9 +246,6 @@ proxy/app-apk.version  text eol=lf
 # ============================================================
 # go.mod and go.sum are formatted by the Go toolchain. Do not
 # run formatters on them.
-#
-# v1.2.0 note: proxy/go.mod is unchanged from v1.1.0. No new
-# imports were added by the data-preservation release.
 # ============================================================
 go.mod        text eol=lf
 go.sum        text eol=lf
@@ -225,9 +256,9 @@ go.sum        text eol=lf
 # The `SHELL` variable and recipe lines use tabs. Git must not
 # convert them. LF-only is mandatory.
 #
-# v1.2.0 note: the Makefile gained four new targets
-# (check-backup, check-all, check-docs, diagnose-help). All
-# use tabs in their recipes. No rule change was needed.
+# v1.4.0 note: the Makefile gained `fetch-apk` and
+# `check-app-version` targets. All use tabs in their recipes.
+# No rule change was needed.
 # ============================================================
 Makefile      text eol=lf
 
@@ -236,6 +267,9 @@ Makefile      text eol=lf
 # ============================================================
 # Any file listed below is treated as binary by Git. Line
 # ending conversion, diff, and merge are disabled for them.
+#
+# v1.4.0: `web/app-debug.apk` is added explicitly at the
+# bottom of this file (see the dedicated section).
 # ============================================================
 *.png         binary
 *.jpg         binary
@@ -291,8 +325,11 @@ proxy/run/.bootstrap_cache binary
 # Improves `git diff` output for common file types.
 #
 # 🔧 v1.2.0 FIX: `proxy/dnscrypt-proxy.version` is NOT listed
-# here with `-diff`. A single-line text file must be diffable
-# so that version bumps are visible in `git log -p`.
+#    here with `-diff`. A single-line text file must be diffable
+#    so that version bumps are visible in `git log -p`.
+#
+# 🔧 v1.4.0 note: `proxy/app-apk.version` is also NOT listed
+#    here with `-diff`, for the same reason.
 # ============================================================
 *.md          diff=markdown
 *.go          diff=golang
@@ -312,11 +349,8 @@ checksums.txt -diff
 #   • web/sw.js        → JavaScript
 #   • .github/**       → not counted at all
 #
-# docs/adr/*.md is automatically covered by `docs/**` and
-# `*.md`. No explicit rule needed.
-#
-# v1.2.0 note: docs/BACKUP.md, docs/EMERGENCY.md, and
-# docs/UPGRADE.md are covered by `docs/**` automatically.
+# v1.4.0 note: `scripts/fetch_app_apk.sh` is covered by `*.sh`
+# automatically (counted as Shell). No explicit rule needed.
 # ============================================================
 docs/**       linguist-documentation
 *.md          linguist-documentation
@@ -356,36 +390,51 @@ proxy/run/.bootstrap_cache merge=binary
 #
 # VERSION:
 #   Single-line file. Two concurrent version bumps are rare,
-#   but `union` prevents a conflict if they happen (the
-#   result is a two-line VERSION, which a human resolves).
+#   but `union` prevents a conflict if they happen.
 #
 # ⚠️ Deliberately NOT union-merged:
 #   • SECURITY.md — Audit Corrections are ordered.
 #   • docs/SECURITY.md — same reason.
 #   • docs/adr/README.md — ADR index is ordered by number.
 #   • docs/BRANCHING.md — structured sections.
-#   • docs/BACKUP.md — v1.2.0, numbered sections (§1–§13).
-#   • docs/EMERGENCY.md — v1.2.0, numbered scenarios (§1–§12).
-#   • docs/UPGRADE.md — v1.2.0, versioned sections (§3.0, §3.1).
+#   • docs/BACKUP.md — numbered sections (§1–§13).
+#   • docs/EMERGENCY.md — numbered scenarios (§1–§12).
+#   • docs/UPGRADE.md — versioned sections (§3.0, §3.1).
 # ============================================================
-CHANGELOG.md  -diff merge=union
+CHANGELOG.md  merge=union
 
 VERSION       merge=union
+
+# ============================================================
+# Companion Android app APK (v1.4.0)
+# ============================================================
+# web/app-debug.apk is a binary Android package (ZIP format).
+# It is staged by release.yml before packaging and copied into
+# the module ZIP. It MUST NOT be treated as text by Git.
+#
+# Rules:
+#   • binary          — no line-ending conversion, no text diff
+#   • merge=binary    — Git falls back to "ours" on conflict,
+#                       which is correct for a binary file
+#
+# The APK is normally staged at build time (release.yml), and
+# .gitignore prevents it from being committed accidentally.
+# ============================================================
+web/app-debug.apk  binary
+web/app-debug.apk  merge=binary
 
 # ============================================================
 # Export-ignore (not included in git archive)
 # ============================================================
 # Files listed below are excluded from `git archive` and from
-# the release tarballs generated by GitHub (which uses
-# `git archive` under the hood).
+# the release tarballs generated by GitHub.
 #
 # ⚠️ Do NOT export-ignore anything under proxy/ or web/ —
 #    those directories ship with the module.
 #
 # The release pipeline uses scripts/package_module.sh, which
 # reads from the working tree (not from `git archive`), so
-# this list only affects the GitHub-generated source tarball
-# (the "Source code (zip)" link on the Releases page).
+# this list only affects the GitHub-generated source tarball.
 #
 # Data preservation (v1.2.0):
 #   The runtime backup directory
@@ -393,10 +442,13 @@ VERSION       merge=union
 #   repository. It never appears in `git archive` and does not
 #   need an export-ignore rule.
 #
-#   The runtime file proxy/dnscrypt-proxy.version is INCLUDED
-#   intentionally — it is the Single Source of Truth for the
-#   DNS engine version and is needed by scripts that consume
-#   the tarball.
+# v1.4.0 note:
+#   • `scripts/` is export-ignored → covers
+#     `scripts/fetch_app_apk.sh` automatically.
+#   • `proxy/app-apk.version` is NOT export-ignored → it is
+#     needed by scripts that consume the source tarball.
+#   • `web/app-debug.apk` is NOT export-ignored → it is
+#     staged at build time (never present in a fresh checkout).
 # ============================================================
 .github/       export-ignore
 .gitignore     export-ignore

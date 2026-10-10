@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – watchdog.sh
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -129,7 +131,7 @@
 #     block above for the full server-side contract.
 #
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES, ROUND 2 (this revision)
+# v1.2.0 — POST-AUDIT FIXES, ROUND 2 (kept)
 # ============================================================
 # A second independent audit of this file identified the
 # following issues. All are fixed in-place; no version bump.
@@ -211,19 +213,71 @@
 #     9  — Automation + rotation    — service.sh
 #     10 — Observability            — status.sh --diagnose
 #
-
 # ============================================================
-# v1.4.0 \u2014 Companion Android app integration
+# v1.3.0 — No changes to the watchdog
 # ============================================================
-#   \U0001f4f1 WD-V14-01 \u2014 No behavior change. The watchdog
+#   The v1.3.0 release fixes a boot-time DNS auto-start issue
+#   in service.sh (see service.sh section [19]). The watchdog
+#   itself was NOT modified in v1.3.0.
+#
+#   The watchdog's existing backoff behavior (30s → 600s) is
+#   intentionally preserved for crash recovery during normal
+#   runtime — it is only the boot path that now takes the
+#   direct route through service.sh.
+#
+#   No code change was needed here. This block is documented
+#   for traceability.
+#
+#   ⚠️ Note on rotation parity: the v1.3.0 release also
+#   rewrote the rotation logic in functions.sh (ROT-MANIFEST
+#   + ROT-MTIME + ROT-PROTECT) and changed snapshot detection
+#   in main.go (SNAP-MANIFEST). The watchdog's snapshot
+#   counter (section [5b]) is a READ-ONLY diagnostic and used
+#   the v1.2.0 name-pattern detection. That discrepancy was
+#   corrected in v1.4.0 — see WD-V14-03 below.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 WD-V14-01 — No behavior change. The watchdog
 #     monitors the DNS engine and WebUI. The companion APK is
 #     a static asset; it has no process and does not need
 #     watchdog supervision.
 #
-#   \U0001f4f1 WD-V14-02 \u2014 Version bump v1.3.0 \u2192 v1.4.0.
-#     Documentation only.
+#   📱 WD-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     Documentation only. The runtime banner (section [5c]) now
+#     reports "v1.4.0". No behavior changes to the monitoring
+#     loop, the backoff strategy, or the token authentication.
 #
-# ============================================================
+#   📚 WD-V14-03 — Documentation-sync correction for the
+#     snapshot counter (section [5b]). The counter previously
+#     matched directories by name pattern
+#     (`^[0-9]{8}-[0-9]{6}-...`) — the v1.2.0 detection rule.
+#     Since v1.3.0, snapshots are detected by the presence of
+#     a `.manifest.json` file (SNAP-MANIFEST), both in
+#     main.go:buildBackupInfo and in functions.sh:rotate_
+#     backups. The watchdog counter was not updated at the
+#     time — it silently under-counted custom-named snapshots
+#     (e.g. `pre-v130-manual-...`) and over-counted name-
+#     matching directories that lacked a manifest.
+#
+#     Fix: the counter now requires BOTH a name match AND a
+#     `.manifest.json` file, matching the canonical SNAP-
+#     MANIFEST rule. This is the minimal change that restores
+#     parity with main.go without duplicating the full
+#     rotation logic (the watchdog is read-only with respect
+#     to the backup directory; it does not rotate, prune, or
+#     create snapshots).
+#
+#     The `_txn_count` and `_orphan_count` counters are
+#     UNCHANGED — those directories are still detected by name
+#     (`txn-*`, `orphan-txn-*`), matching the canonical rule.
+#
+#     No other code changed. This is a documentation +
+#     diagnostic-parity correction; the runtime monitoring
+#     loop is untouched.
+#
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` for all internal variables. The
@@ -310,6 +364,7 @@ WATCHDOG_TOKEN_FILE="$RUN_DIR/.watchdog_token"
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
+# shellcheck disable=SC2034
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
 # Fallback if run/ is not writable
@@ -377,7 +432,8 @@ log_msg() {
         local _size
         _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
         if [ -n "$_size" ] && [ "$_size" -gt 52428800 ]; then
-            local _emg="${LOG_FILE}.emergency.$(date +%s)"
+            local _emg
+            _emg="${LOG_FILE}.emergency.$(date +%s)"
             mv -f "$LOG_FILE" "$_emg" 2>/dev/null
             : > "$LOG_FILE"
         fi
@@ -452,6 +508,19 @@ fi
 #
 # ⚠️ READ-ONLY: This block inspects the backup directory but
 #    does NOT create, modify, or delete any files.
+#
+# WD-V14-03 (v1.4.0): the snapshot counter now requires BOTH
+# a name match (`^[0-9]{8}-[0-9]{6}-`) AND a `.manifest.json`
+# file, matching the canonical SNAP-MANIFEST detection rule
+# introduced in v1.3.0 (main.go:buildBackupInfo, functions.sh:
+# rotate_backups). Before this correction, the counter used
+# only the name pattern — the v1.2.0 rule — and therefore
+# under-counted custom-named snapshots and over-counted
+# name-matching directories without a manifest.
+#
+# The `_txn_count` and `_orphan_count` counters are unchanged:
+# `txn-*` and `orphan-txn-*` are still detected by name,
+# matching the canonical rule.
 # ============================================================
 
 # --- Read pending notification (if any) ---
@@ -466,18 +535,37 @@ if [ -f "$LAST_STABLE_FILE" ]; then
     _last_stable=$(cat "$LAST_STABLE_FILE" 2>/dev/null | tr -d '\r\n ')
 fi
 
-# --- Count available snapshots ---
+# --- Count available snapshots (WD-V14-03) ---
+# A directory is counted as a snapshot iff:
+#   (a) its name matches `^[0-9]{8}-[0-9]{6}-`, AND
+#   (b) it contains a `.manifest.json` file.
+# This matches SNAP-MANIFEST in main.go / functions.sh.
 _snap_count=0
 if [ -d "$PERSISTENT_BACKUP" ]; then
-    _snap_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        wc -l | tr -d ' ')
+    _snap_count=$(
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        count=0
+        for _sd in */; do
+            _sd="${_sd%/}"
+            [ -d "$_sd" ] || continue
+            # (a) name pattern
+            case "$_sd" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            if ! echo "$_sd" | grep -qE '^[0-9]{8}-[0-9]{6}-'; then
+                continue
+            fi
+            # (b) manifest presence
+            [ -f "$_sd/.manifest.json" ] || continue
+            count=$((count + 1))
+        done
+        printf '%s' "$count"
+    )
     [ -z "$_snap_count" ] && _snap_count=0
 fi
 
 # --- Count in-flight transactions (txn-*) ---
+# Unchanged — name-based detection is the canonical rule.
 _txn_count=0
 if [ -d "$PERSISTENT_BACKUP" ]; then
     _txn_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -487,6 +575,7 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
 fi
 
 # --- Count orphan transactions (orphan-txn-*) ---
+# Unchanged — name-based detection is the canonical rule.
 _orphan_count=0
 if [ -d "$PERSISTENT_BACKUP" ]; then
     _orphan_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -509,7 +598,7 @@ fi
 # ============================================================
 log_msg "============================================"
 log_msg "Watchdog started (PID: $$)"
-log_msg "   Version: v1.3.0 (Global Edition)"
+log_msg "   Version: v1.4.0 (Global Edition)"
 log_msg "─── Config ───"
 log_msg "   MODDIR:     $MODDIR"
 log_msg "   PORT:       $PORT"
@@ -1055,6 +1144,7 @@ watchdog_api_call() {
                     --header="$auth_header" "$url" \
                     2>&1) || exit_code=$?
             else
+                # shellcheck disable=SC2034
                 output=$(env -i PATH="$SAFE_PATH" HOME=/data/local/tmp \
                     http_proxy= https_proxy= HTTP_PROXY= HTTPS_PROXY= \
                     no_proxy= NO_PROXY= \

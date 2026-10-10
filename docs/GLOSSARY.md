@@ -4,12 +4,48 @@
 > in DNSCrypt Smart Filter.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
+> **Identifier inventory in this file (10 total)**:
+>   • HARD-GLO-01 (`Last updated` correction — v1.4.0)
+>   • HARD-GLO-02 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-GLO-03 (§5 Persistent Backup rotation description
+>     corrected — v1.4.0)
+>   • HARD-GLO-04 (§5 BAK-1 + runtime_info.backups extended with
+>     v1.3.0 SNAP-*/ROT-* semantics — v1.4.0)
+>   • HARD-GLO-05 (New §5 entries: SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT — v1.4.0)
+>   • HARD-GLO-06 (§11 Fixes Index extended with v1.3.0 rotation
+>     refinements — v1.4.0)
+>   • HARD-GLO-07 (§11 10 Defensive Layers table — Layer 9
+>     updated — v1.4.0)
+>   • HARD-GLO-08 (§5 Rotation Guardian badge reference added —
+>     v1.4.0)
+>   • HARD-GLO-09 (§12 References extended with §4.13 and
+>     §10.3.5 — v1.4.0)
+>   • HARD-GLO-10 (header + footer `Last updated` sync —
+>     v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections
+>   • [docs/API.md](API.md) — HTTP API reference
+>   • [docs/DNS_BINARIES.md](DNS_BINARIES.md) — DNS binaries (Level 4)
+>   • [docs/FAQ.md](FAQ.md) — FAQ (Q131–Q140 for v1.3.0, Q141–Q150
+>     for v1.4.0)
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
 >   • **Companion Android app integration** — new terms added:
 >       - Companion Android App
 >       - `app-apk.version`
@@ -19,6 +55,7 @@
 >       - CodeQL Path-Injection Fix
 >       - `removeModule` hardening
 >       - `filepath.Base()` sanitization
+>       - `sanitizeLogFileName`
 >   • **iOS PWA logic removal** — new term added:
 >       - iOS PWA Logic Removal
 >   • **v1.3.0 additions** (previously undocumented in this
@@ -26,10 +63,12 @@
 >       - PWA Install Button
 >       - Live Status LED
 >       - DNS Auto-Start After Boot
+>       - **Server-side rotation refinements (SNAP-MANIFEST,
+>         SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT)**
 >   • §11 (Fixes Index) — added the v1.3.0 features section and
 >     the v1.4.0 integration section.
 >   • §12 (References) — updated `CHANGELOG.md` reference to
->     `§[v1.4.0]`.
+>     `§[v1.4.0]` and added §4.13 / §10.3.5.
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
@@ -37,6 +76,41 @@
 >     `localStorage['dnscrypt-lang']` and is never transmitted to
 >     the server. Documentation remains English-only by project
 >     convention.
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side additions**:
+>       - PWA install button added (dynamic, browser-aware;
+>         later **replaced in v1.4.0** by a direct
+>         `<a download>` link).
+>       - Live status LED added on the Today counter.
+>   • **Boot-path correctness fix**: DNS engine now starts
+>     automatically after boot (via a direct API call from
+>     `service.sh` §[19]).
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Three
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets: the `.last_stable`
+>         recovery pointer and the newest install snapshot.
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
 
 > **v1.2.0 changes (historical)**:
 >   • Version bumped from v1.1.0 to v1.2.0.
@@ -62,6 +136,40 @@
 >   • 🔧 **Reason string** — §5 "`createAutoBackup`" previously
 >     listed `pre-append-denylist` for the `appendDenylist` call
 >     site. The actual reason string is `pre-denylist-save`.
+
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-GLO-01 + HARD-GLO-10** — `Last updated`
+>     corrected in both the header metadata block and the
+>     trailing footer. Both now read `2026-10-08`, matching
+>     every other file in the v1.4.0 module.
+>   • 🔧 **HARD-GLO-02** — The v1.3.0 block in the header
+>     previously listed only the client-side changes and the
+>     boot-path fix, but **omitted** the server-side rotation
+>     refinements (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+>     ROT-MTIME, ROT-PROTECT) that touched 8 files in v1.3.0.
+>   • 🔧 **HARD-GLO-03** — §5 "Persistent Backup" described the
+>     rotation as "sorted by directory name". This was the
+>     v1.2.0 behavior and was **reversed in v1.3.0** in favour
+>     of mtime sort. The entry now reads "sorted by mtime
+>     descending (v1.3.0+)".
+>   • 🟡 **HARD-GLO-04** — §5 "`runtime_info.backups`" and §5
+>     "BAK-1" extended with the v1.3.0 SNAP-MANIFEST /
+>     SNAP-MTIME semantics for `available` and
+>     `last_backup_name`.
+>   • 🟢 **HARD-GLO-05** — Added five new §5 entries:
+>     `SNAP-MANIFEST`, `SNAP-MTIME`, `ROT-MANIFEST`,
+>     `ROT-MTIME`, `ROT-PROTECT`.
+>   • 🟡 **HARD-GLO-06** — §11 (Fixes Index) extended with the
+>     v1.3.0 rotation refinements under the v1.3.0 section.
+>   • 🟡 **HARD-GLO-07** — §11 "10 Defensive Layers" table —
+>     Layer 9 note updated to mention v1.3.0 mtime sort +
+>     protected targets.
+>   • 🟢 **HARD-GLO-08** — §5 "Data Guardian" badge entry —
+>     added a cross-reference to the new "Rotation Guardian"
+>     badge (v1.3.0).
+>   • 🟢 **HARD-GLO-09** — §12 References extended with
+>     `docs/ARCHITECTURE.md §4.13` and
+>     `docs/COMPATIBILITY.md §10.3.5`.
 
 ---
 
@@ -697,7 +805,8 @@ backoff.
 **v1.2.0**: Sends `X-Watchdog-Token` header to
 `/api/ensure_running_service`. Reads the token from
 `$RUN_DIR/.watchdog_token` on every call (no cache). Read-only with
-respect to the backup directory.
+respect to the backup directory. Uses SNAP-MANIFEST detection for its
+§[5b] snapshot counter (WD-V14-03).
 
 **v1.3.0**: The Watchdog is complemented by a direct
 `service.sh` API call after boot (see §5 "DNS Auto-Start After
@@ -737,8 +846,9 @@ recovery during normal runtime.
 correctness fixes. The registry remains at #33.
 
 **v1.3.0 does NOT add audit corrections.** The PWA install button,
-live status LED, and DNS auto-start-after-boot are functional
-features, not security fixes.
+live status LED, DNS auto-start-after-boot, and the rotation
+refinements (SNAP-*/ROT-*) are functional changes, not security
+fixes.
 
 **v1.4.0 does NOT add audit corrections.** The CodeQL
 path-injection fix in `removeModule` closes two static-analysis
@@ -1103,7 +1213,7 @@ light profiles or starves the heavy ones.
 
 ### 🆕 DNS Version vs Module Version (v1.1.0)
 
-**Two independent versions** coexist in the project:
+**Three independent versions** coexist in the project:
 
 | Version | Source file | v1.4.0 value |
 |---|---|:---:|
@@ -1136,11 +1246,22 @@ snapshotted to `/sdcard/dnscrypt-webui-backup/`.
 - ✅ Survives factory reset of `/data`.
 - ✅ Visible from any file manager + over USB (MTP).
 
-**Rotation**: Keep the 21 newest snapshots, sorted by directory name.
+**Rotation**:
+- **v1.2.0**: Keep the 21 newest snapshots, sorted by **directory
+  name**.
+- **v1.3.0+**: Keep the 21 newest snapshots, sorted by **mtime
+  descending** (`SNAP-MTIME` / `ROT-MTIME`), with two additional
+  protected targets — the `.last_stable` recovery pointer and the
+  newest install snapshot (`ROT-PROTECT`). See §5 "SNAP-MANIFEST",
+  "SNAP-MTIME", "ROT-MANIFEST", "ROT-MTIME", "ROT-PROTECT".
 
-**v1.3.0/v1.4.0**: No change to the backup layer.
+**Snapshot detection**:
+- **v1.2.0**: Name pattern (`^[0-9]{8}-[0-9]{6}-`).
+- **v1.3.0+**: Presence of a `.manifest.json` file
+  (`SNAP-MANIFEST` / `ROT-MANIFEST`). See §5 "SNAP-MANIFEST".
 
-**Reference**: `docs/BACKUP.md` §1.3, §3.
+**Reference**: `docs/BACKUP.md` §1.3, §3; `docs/ARCHITECTURE.md`
+§4.13.2.
 
 ---
 
@@ -1218,7 +1339,13 @@ verification passes.
 (`main.go`, `service.sh`, `action.sh`). Only install-time
 snapshots update `.last_stable`.
 
-**Reference**: `docs/BACKUP.md` §5.2.
+**v1.3.0+ — ROT-PROTECT**: `rotate_backups` **always preserves** the
+`.last_stable` target even when it falls outside the 21-newest
+window. This prevents recovery mode from being silently broken by
+rotation.
+
+**Reference**: `docs/BACKUP.md` §5.2; `docs/ARCHITECTURE.md`
+§4.13.2.
 
 ---
 
@@ -1371,6 +1498,18 @@ state.
 }
 ```
 
+**Field semantics**:
+
+| Field | v1.2.0 | v1.3.0+ |
+|---|---|---|
+| `available` | Count of snapshot dirs (excluding `current/`, `txn-*`, `orphan-txn-*`) | Count of dirs containing a `.manifest.json` file (SNAP-MANIFEST) |
+| `in_flight_txn` | Count of `txn-*` dirs | Unchanged |
+| `orphan_txn` | Count of `orphan-txn-*` dirs | Unchanged |
+| `last_backup` | mtime of the newest snapshot | Unchanged |
+| `last_backup_name` | Newest by **lexicographic directory name** | Newest by **mtime** descending (SNAP-MTIME) |
+| `last_stable` | Content of `.last_stable` | Unchanged |
+| `path` | `$PERSISTENT_BACKUP` | Unchanged |
+
 **Purpose**: Observability + System Info panel display + API
 verification.
 
@@ -1378,7 +1517,8 @@ verification.
 fields (`status`, `last_backup_age_seconds`) that are not part of
 the API surface.
 
-**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1;
+`docs/ARCHITECTURE.md` §4.13.1.
 
 ---
 
@@ -1426,7 +1566,9 @@ the recorded reason is `pre-denylist-save`.
 - **Delegated** to `functions.sh:backup_user_files` via
   `runShellWithTimeout`.
 - **Rotation**: after success, `rotate_backups 21` is invoked in
-  the same shell call.
+  the same shell call. With v1.3.0+ `ROT-PROTECT`, this call
+  preserves `.last_stable` and the newest install snapshot even
+  if they fall outside the 21-newest window.
 
 **Reference**: `docs/ARCHITECTURE.md` §4.10.2; `docs/BACKUP.md` §4.3.
 
@@ -1504,6 +1646,11 @@ with per-file SHA256 hashes.
 
 **Advisory**: Missing or invalid manifests do not block a restore.
 
+**v1.3.0+**: The **presence** of `.manifest.json` is used as the
+snapshot detection rule (`SNAP-MANIFEST` / `ROT-MANIFEST`). Any
+snapshot dir must therefore contain a manifest to be visible to
+the API and to rotation. See §5 "SNAP-MANIFEST".
+
 **Reference**: `docs/BACKUP.md` §5.1.
 
 ---
@@ -1543,6 +1690,28 @@ devices, root solutions, and upgrade scenarios.
 
 ---
 
+### 🆕 Rotation Guardian (v1.3.0)
+
+**Contributor badge** for verifying the v1.3.0 rotation
+refinements (`SNAP-MANIFEST`, `SNAP-MTIME`, `ROT-MANIFEST`,
+`ROT-MTIME`, `ROT-PROTECT`) on a real device.
+
+**Acceptance criteria** (see `docs/HALL_OF_FAME.md` for the full
+list):
+- ✅ Test snapshot detection by `.manifest.json` presence on a real
+  device.
+- ✅ Verify that rotation sorts by mtime, not by directory name.
+- ✅ Verify that `.last_stable` and the newest install snapshot are
+  never pruned by rotation.
+- ✅ Report any mismatch with concrete evidence (logs + reproduction
+  steps).
+
+**Verification procedure**: `docs/COMPATIBILITY.md` §10.3.5.
+
+**Reference**: `docs/HALL_OF_FAME.md`; `docs/CONTRIBUTING.md` §12.2.
+
+---
+
 ### 🆕 Root-Solution Detection (v1.2.0)
 
 **Layer 5** of the 10 defensive layers. Detects the active root
@@ -1567,13 +1736,13 @@ data-preservation release:
 
 | ID | Change | Reference |
 |:-:|---|---|
-| **BAK-1** | `runtime_info.backups` returns 7 fields | §5 "`runtime_info.backups`" |
-| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | §5 "`createAutoBackup`", "`backupMu`" |
+| **BAK-1** | `runtime_info.backups` returns 7 fields. **v1.3.0+**: `available` and `last_backup_name` are now computed by SNAP-MANIFEST + SNAP-MTIME | §5 "`runtime_info.backups`" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation (`.last_stable` and newest install preserved by v1.3.0+ ROT-PROTECT) | §5 "`createAutoBackup`", "`backupMu`" |
 | **BAK-3** | `cleanupOldTransactions` | §5 "`cleanupOldTransactions`" |
 | **BAK-4** | `checkPendingNotifications` | §5 "`checkPendingNotifications`" |
 
 **Reference**: `docs/SECURITY.md` §5.31; `docs/ARCHITECTURE.md`
-§4.10.
+§4.10, §4.13.
 
 ---
 
@@ -1674,6 +1843,113 @@ intact for crash recovery during normal runtime.
 
 **Reference**: `CHANGELOG.md` §[v1.3.0]; `proxy/service.sh`
 §[19].
+
+---
+
+### 🆕 SNAP-MANIFEST (v1.3.0)
+
+**Snapshot-detection rule** introduced in v1.3.0.
+
+**Definition**: A directory in `$PERSISTENT_BACKUP` is treated as a
+snapshot **iff** it contains a `.manifest.json` file (and is not
+named `current`, `txn-*`, or `orphan-txn-*`).
+
+**Implemented in**:
+- `main.go:buildBackupInfo()` (SNAP-MANIFEST).
+- `functions.sh:rotate_backups()` (ROT-MANIFEST).
+- `service.sh` (`_inline_rotate_backups`).
+- `watchdog.sh` (§[5b] snapshot counter, WD-V14-03).
+- `status.sh` (`_list_snapshots`).
+- `customize.sh` (`rotate_backups`).
+- `action.sh` (`_inline_list_snapshots` +
+  `_inline_rotate_backups`).
+- `uninstall.sh` (§[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+
+**Effect**: Custom-named snapshots (e.g. `pre-v130-manual-...`)
+are now visible to the API and to rotation. Previously they were
+silently skipped.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 SNAP-MTIME (v1.3.0)
+
+**Sort-key rule** introduced in v1.3.0 for the
+`last_backup_name` field of `runtime_info.backups`.
+
+**Definition**: The "newest" snapshot is selected by **mtime**
+(descending), not by lexicographic directory name.
+
+**Rationale**: Robust against clock drift and manual renames.
+Aligns the API with the shell-side `status.sh --json` object.
+
+**Reverses**: The v1.2.0 BUG-3 decision, which had aligned
+`buildBackupInfo` with lexicographic sorting.
+
+**Implemented in**:
+- `main.go:buildBackupInfo()`.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1; `CHANGELOG.md`
+§[v1.3.0] → Reversed Decisions.
+
+---
+
+### 🆕 ROT-MANIFEST (v1.3.0)
+
+**Rotation detection rule** introduced in v1.3.0.
+
+**Definition**: In `functions.sh:rotate_backups()` (and its
+mirrored implementations), a directory is a rotation candidate
+**iff** it contains a `.manifest.json` file.
+
+**Equivalent to**: SNAP-MANIFEST, but applied during rotation
+rather than during API enumeration.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 ROT-MTIME (v1.3.0)
+
+**Rotation sort-key rule** introduced in v1.3.0.
+
+**Definition**: Rotation candidates are ordered by **mtime**
+(numeric, descending — `sort -rn -k1,1`), not by lexicographic
+directory name.
+
+**Equivalent to**: SNAP-MTIME, but applied during rotation rather
+than during API enumeration.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 ROT-PROTECT (v1.3.0)
+
+**Rotation protection rule** introduced in v1.3.0.
+
+**Definition**: `rotate_backups` preserves two additional targets
+on top of the 21-newest window:
+
+- The `.last_stable` target (recovery pointer).
+- The newest install snapshot (name matching `-v<digit>`).
+
+**Rationale**: Without these protections, the 21-newest window
+could silently evict the exact snapshot that recovery mode or
+rollback depends on.
+
+**Implemented in**:
+- `functions.sh:rotate_backups()` (canonical).
+- `service.sh` (`_inline_rotate_backups`).
+- `action.sh` (`_inline_rotate_backups`).
+- `customize.sh` (`rotate_backups`).
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
 
 ---
 
@@ -2332,20 +2608,20 @@ feat(app): integrate companion Android app as optional asset
 
 ### 🧪 `upgrade-test.yml` (v1.2.0+)
 
-**GitHub Actions workflow** that runs a **42-scenario matrix** (3
-root solutions × 2 source versions × 7 scenarios).
+**GitHub Actions workflow** that runs a **42-scenario matrix** across
+9 tested layers (Layer 10 is not exercised by this workflow).
 
-**Trigger**: manual (`workflow_dispatch`) + weekly schedule.
+**Trigger**: manual (`workflow_dispatch`) **only**.
 
 **Purpose**: Validate the 10 data-preservation layers across the
 combinations that matter most.
 
-**Runs in**: ~10 minutes.
-
-**Not part of the release pipeline** — it is a QA tool.
+**v1.4.0 note (UPG-V14-04)**: L9-02 and L9-03 now write a
+`.manifest.json` into each synthetic snapshot directory, so the
+v1.3.0 SNAP-MANIFEST detection rule can see them.
 
 **Reference**: `docs/CONTRIBUTING.md` §8.10; `docs/DEVELOPMENT.md`
-§7.4.
+§7.4; `docs/DNS_BINARIES.md` §8.1.
 
 ---
 
@@ -2775,6 +3051,12 @@ fields describing the backup layer's state.
 **Fields**: `available`, `in_flight_txn`, `orphan_txn`,
 `last_backup`, `last_backup_name`, `last_stable`, `path`.
 
+**v1.3.0+ semantics** (see §5 SNAP-MANIFEST and SNAP-MTIME):
+- `available` counts a directory only if it contains a
+  `.manifest.json` file.
+- `last_backup_name` is chosen by mtime sort, not lexicographic
+  name.
+
 **Why this is a security-adjacent addition**: A non-zero
 `in_flight_txn` or `orphan_txn` signals a degraded backup layer that
 may need manual inspection. Exposing these fields allows scripts and
@@ -2782,7 +3064,8 @@ users to detect this condition early.
 
 **⚠️ v1.2.0 — BAK-1 (not an audit correction).**
 
-**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1;
+`docs/ARCHITECTURE.md` §4.13.1.
 
 ---
 
@@ -3014,6 +3297,8 @@ of future regression risk.
 | **CodeQL** | CodeQL | GitHub's static-analysis engine |
 | **LED** | Light-Emitting Diode | Used metaphorically for the status indicator |
 | **WebView** | WebView | Android's embedded browser component (used by the companion app) |
+| **SNAP** | Snapshot detection | Snapshot-detection rule family (SNAP-MANIFEST, SNAP-MTIME) |
+| **ROT** | Rotation | Rotation-rule family (ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) |
 
 ---
 
@@ -3089,8 +3374,8 @@ of future regression risk.
 
 | ID | Change | Reference |
 |:-:|---|---|
-| **BAK-1** | 7-field `runtime_info.backups` | `runtime_info.backups` (§5) + §9 "7-field Backups Schema" |
-| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | `createAutoBackup`, `backupMu` (§5) + §6 `backupMu` |
+| **BAK-1** | 7-field `runtime_info.backups` (with v1.3.0 SNAP-MANIFEST + SNAP-MTIME semantics) | `runtime_info.backups` (§5) + §9 "7-field Backups Schema" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation (with v1.3.0 ROT-PROTECT) | `createAutoBackup`, `backupMu` (§5) + §6 `backupMu` |
 | **BAK-3** | `cleanupOldTransactions` | `cleanupOldTransactions` (§5) |
 | **BAK-4** | `checkPendingNotifications` | `checkPendingNotifications` (§5) |
 
@@ -3113,7 +3398,7 @@ of future regression risk.
 | 6 | SELinux Preservation | `copy_with_context` (§5) |
 | 7 | Recovery Mode | `Recovery Mode Trigger` (§5) |
 | 8 | Config Migrations | (see `docs/BACKUP.md` §11) |
-| 9 | Automation + Rotation | (see `docs/BACKUP.md` §6) |
+| 9 | Automation + Rotation (**v1.3.0+**: mtime sort + protected targets) | (see `docs/BACKUP.md` §6; `docs/ARCHITECTURE.md` §4.13.2) |
 | 10 | Observability | `runtime_info.backups` (§5) |
 
 ### 🆕 v1.3.0 — Feature Release (Not an Audit Correction)
@@ -3125,6 +3410,12 @@ of future regression risk.
 | PWA Install Button | `PWA Install Button` (§5) |
 | Live Status LED | `Live Status LED` (§5) |
 | DNS Auto-Start After Boot | `DNS Auto-Start After Boot` (§5) |
+| **SNAP-MANIFEST** | `SNAP-MANIFEST` (§5) |
+| **SNAP-MTIME** | `SNAP-MTIME` (§5) |
+| **ROT-MANIFEST** | `ROT-MANIFEST` (§5) |
+| **ROT-MTIME** | `ROT-MTIME` (§5) |
+| **ROT-PROTECT** | `ROT-PROTECT` (§5) |
+| **Rotation Guardian** badge | `Rotation Guardian` (§5) |
 
 **The Audit Corrections Registry remains at #33.**
 
@@ -3157,14 +3448,19 @@ of future regression risk.
 >
 > | Prefix | Owning file | Range | Purpose |
 > |---|---|---|---|
-> | `HARD-CS-*` | `proxy/customize.sh` | 01..10 | Installer hardening (10 defensive layers) |
+> | `HARD-CS-*` | `proxy/customize.sh` | 01..19 | Installer hardening (10 defensive layers + v1.3.0/v1.4.0 sync) |
 > | `HARD-FSH-*` | `proxy/functions.sh` | 01..11 | Backup helpers + `get_watchdog_token` (FSH-11) |
-> | `HARD-BK-*` | `docs/BACKUP.md` | 01..19 (with gaps) | Backup system reference hardening (see `docs/BACKUP.md` header for the exact list) |
+> | `HARD-BK-*` | `docs/BACKUP.md` | 01..19 (with gaps) | Backup system reference hardening |
 > | `HARD-COMPAT-*` | `docs/COMPATIBILITY.md` | 01..07 | Device compatibility hardening |
 > | `HARD-MK-*` | `Makefile` | 01..09 | Build-target hardening |
 > | `HARD-PM-*` | `scripts/package_module.sh` | 01..10 | Module packaging hardening |
 > | `BLD-*` | `proxy/build.sh` | 1..8 | Cross-compilation hardening |
-> | `ACT-*` | `proxy/action.sh` | 1..N | Magisk Action button hardening (e.g. ACT-5) |
+> | `ACT-*` | `proxy/action.sh` | 1..N | Magisk Action button hardening |
+> | `HARD-BRN-*` | `docs/BRANCHING.md` | 01..05 | v1.4.0 documentation-sync corrections |
+> | `HARD-CON-*` | `docs/CONTRIBUTING.md` | 01..07 | v1.4.0 documentation-sync corrections |
+> | `HARD-DEV-*` | `docs/DEVELOPMENT.md` | 01..11 | v1.4.0 documentation-sync corrections |
+> | `HARD-FAQ-*` | `docs/FAQ.md` | 01..08 | v1.4.0 documentation-sync corrections |
+> | `HARD-GLO-*` | `docs/GLOSSARY.md` (this file) | 01..10 | v1.4.0 documentation-sync corrections |
 >
 > **Why these are file-scoped, not project-wide**:
 >
@@ -3173,7 +3469,7 @@ of future regression risk.
 >   context after a copy"). It is not a project-level decision that
 >   would justify an ADR.
 > - Renumbering a `HARD-*` identifier in one file has no effect on
->   any other file. The family prefix (`CS`, `FSH`, `BK`, ...)
+>   any other file. The family prefix (`CS`, `FSH`, `BRN`, ...)
 >   already encodes the owning file, so central numbering would add
 >   coordination cost without any benefit.
 > - If a `HARD-*` rule ever becomes a project-wide concern, it is
@@ -3189,9 +3485,10 @@ of future regression risk.
 > - The **v1.2.0 runtime additions** (BAK-1..BAK-4, FIX-1, FIX-2,
 >   WD-TOKEN) are also listed in `docs/SECURITY.md` §17.2 — they
 >   are deliberately **not** audit correction numbers.
-> - The **v1.3.0 features** and **v1.4.0 integration** are
->   documented in `CHANGELOG.md` §[v1.3.0] and §[v1.4.0] — they
->   are not audit corrections either.
+> - The **v1.3.0 features** (including SNAP-*/ROT-* rotation
+>   refinements) and **v1.4.0 integration** are documented in
+>   `CHANGELOG.md` §[v1.3.0] and §[v1.4.0] — they are not audit
+>   corrections either.
 > - The **10 defensive layers** correspond to the `HARD-CS-*` and
 >   `HARD-FSH-*` families. See `docs/BACKUP.md` §1.3 for the layer
 >   → file mapping.
@@ -3233,19 +3530,19 @@ The last audit correction is **#33** (v1.0.0). See
 
 | Document | Purpose |
 |---|---|
-| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
+| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10, **§4.13 — v1.3.0 rotation refinements**) |
 | [docs/SECURITY.md](SECURITY.md) | Security + Audit Corrections (§5.31, §5.32) |
 | [docs/API.md](API.md) | HTTP API Reference (§6.1.7) |
 | [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting |
-| [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix |
+| [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix (**§10.3.5 — on-device SNAP-*/ROT-* verification**) |
 | [docs/DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries management (Level 4) |
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
 | [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1, §3.2) |
-| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0+)** |
+| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 rotation)** |
 | [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0+)** |
-| [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q121–Q130) |
+| [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q131–Q140 for v1.3.0, Q141–Q150 for v1.4.0) |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
 
 ---
@@ -3261,7 +3558,7 @@ Found a missing term? Or an unclear definition?
 
 ---
 
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-08*
 *Version: v1.4.0*
 *Author: gasciljh*
 

@@ -3,9 +3,11 @@
 Comprehensive architecture document explaining how the system works internally.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+---
 
 > **v1.2.0 changes**:
 >   • Version bumped from v1.1.0 to v1.2.0.
@@ -29,49 +31,19 @@ Comprehensive architecture document explaining how the system works internally.
 >     **snapshot-and-reapply** strategy used in `customize.sh` —
 >     section `[8a]` snapshots the restored files to
 >     `$MODPATH/.recovery_snapshot/`, and a new section `[9b2]`
->     re-applies them **after** the `unzip` in `[9]`. This is
->     deliberately different from a "filter the unzip argument
->     list" approach. The rationale is documented inline in
->     §3.10.
->   • **Corrected in this revision**: §4.10.2 (BAK-2) now
->     documents the **actual reason string** for
->     `appendDenylist` — `"pre-denylist-save"` (via
->     `saveDenylist`) — instead of the previously incorrect
->     `"pre-append-denylist"`. `appendDenylist` delegates to
->     `saveDenylist`, which is where the pre-critical backup is
->     triggered.
->   • **§4.10.1** (`runtime_info.backups` schema) documents
->     **7 fields** (not 5):
->       `available`, `in_flight_txn`, `orphan_txn`,
->       `last_backup`, `last_backup_name`, `last_stable`,
->       `path`. This aligns `main.go`'s JSON schema with the
->     one produced by `status.sh --json` **on these 7 common
->     fields**; `status.sh --json` additionally exposes
->     `status` and `last_backup_age_seconds` (see §4.10.6).
->   • **§6.5 (Service Worker update flow)** documents the
->     banner fix in both `index.html` **and** `dashboard.html`.
+>     re-applies them **after** the `unzip` in `[9]`.
 >   • **§8 (File Layout)** now reflects the actual repository
->     layout:
->       - Total tracked files: **87** (not 86).
->       - `.github/` contains **12 files** (not 13): the
->         four root files, one PR template directory, three
->         issue templates, and **four** workflow files
->         (`ci.yml`, `codeql.yml`, `release.yml`,
->         `upgrade-test.yml`).
+>     layout.
 >   • **§4.3 (Concurrency Model)** updated with `backupMu` and
 >     `watchdogTokMu`.
->   • **§4.4 (SSE Implementation)** — removed the misleading
->     `withCredentials` note from the client example.
 >   • **§4.5 (Security Features)** updated with v1.2.0 items
 >     (including the watchdog token; see §4.5.1).
->   • **§5.4–§5.6 (Shell Scripts)** updated with backup
->     helpers, the uninstall policy, and the watchdog token.
->   • **§7 (State Management)** updated with v1.2.0 runtime
->     state, including `.watchdog_token`.
->   • **§9 (Watchdog & Recovery)** — the Watchdog does
->     **not** participate in any of the 10 defensive layers.
->     It is explicitly read-only with respect to the backup
->     directory.
+>   • **§5.4–§5.6 (Shell Scripts)** updated with backup helpers,
+>     the uninstall policy, and the watchdog token.
+>   • **§7 (State Management)** updated with v1.2.0 runtime state,
+>     including `.watchdog_token`.
+>   • **§9 (Watchdog & Recovery)** — the Watchdog does **not**
+>     participate in any of the 10 defensive layers.
 >   • **§10 (Performance)** updated with backup storage metrics
 >     and watchdog-token lookup cost.
 >   • **§11 (Trade-offs)** extended with §11.25–§11.30.
@@ -85,20 +57,74 @@ Comprehensive architecture document explaining how the system works internally.
 >   • No structural changes — v1.2.0 is a data-preservation
 >     release, not a re-architecture.
 
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side features** (documented in §6, §6.4):
+>       - Smart dynamic PWA install button (`web/index.html`
+>         section [13c]). The button adapts to the browser:
+>         Chromium → `beforeinstallprompt` dialog; iOS Safari →
+>         step-by-step instructions; unsupported → friendly modal
+>         with alternatives. Language-aware (EN + AR).
+>       - Live status LED on the Today counter (pure CSS + JS,
+>         aligned with `.status-dot` and `updateStatsDisplay()`).
+>   • **Boot-path correctness fix** (`service.sh`):
+>       - DNS auto-start after boot via direct API call. Root
+>         cause: `watchdog.sh` waits a fixed 30 s before its first
+>         API call, leaving DNS unavailable for minutes after boot
+>         while the WebUI is still binding its port.
+>       - Fix: `service.sh` performs a bounded wait for the WebUI
+>         to become ready (up to 60 s, checking the watchdog token
+>         file + the WebUI TCP port) and then calls
+>         `POST /api/ensure_running_service` itself, with the
+>         `X-Watchdog-Token` header (v1.2.0).
+>   • **Server-side refinements** (this section was previously
+>     undocumented — see §4.13 below):
+>       - `proxy/main.go` — `buildBackupInfo()` now:
+>           • Detects snapshots by **`.manifest.json` presence**,
+>             not by name pattern. Custom-named snapshots
+>             (e.g. `pre-v130-manual-...`) are now visible to the
+>             API and to rotation.
+>           • Sorts `last_backup_name` by **mtime**, not by
+>             lexicographic directory name. This is robust against
+>             clock drift and custom snapshot names, and aligns
+>             `runtime_info.backups` with the shell-side
+>             `status.sh --json` object.
+>       - `proxy/functions.sh` — `rotate_backups()`:
+>           • Rewritten to a **manifest-based** detection:
+>             any directory containing `.manifest.json` (excluding
+>             `current/`, `txn-*`, `orphan-txn-*`) is a candidate
+>             for rotation.
+>           • Sorts by **mtime descending** (`sort -rn -k1,1`),
+>             not by directory name.
+>           • Preserves two additional targets on top of the
+>             21-newest window:
+>               - The `.last_stable` target (recovery pointer).
+>               - The newest install snapshot (name matches
+>                 `-v<digit>`).
+>   • **Correction to v1.2.0 BUG-3**: In v1.2.0, `buildBackupInfo`
+>     was changed to sort by directory name (BUG-3). That decision
+>     was **reversed in v1.3.0** in favour of mtime sorting, for
+>     the reasons listed above. The v1.2.0 note in §4.10.1 is
+>     superseded by §4.13.1.
+>   • No breaking API changes. `runtime_info.backups` keeps the
+>     same 7 fields.
+
 > **v1.4.0 changes**:
 >   • Companion Android app integrated — `web/app-debug.apk` is now
->     bundled into the module ZIP (optional). Fetched by
->     `scripts/fetch_app_apk.sh`, served at `GET /app-debug.apk`
->     (mime: `application/vnd.android.package-archive`, Cache-Control:
+>     bundled into the module ZIP as an OPTIONAL build artifact.
+>     Fetched by `scripts/fetch_app_apk.sh`, served at
+>     `GET /app-debug.apk` (mime:
+>     `application/vnd.android.package-archive`, Cache-Control:
 >     `public, max-age=3600, immutable`).
 >   • `removeModule` hardened against CodeQL `go/path-injection` —
->     `filepath.Base()` sanitization + `filepath.Join(MODULES_DIR, name)`.
->   • iOS PWA logic removed (Android-only project).
->   • **v1.3.0** (previously undocumented in this file):
->     PWA install button now uses `<a download>` (was `onclick`),
->     live status LED added to Today counter, DNS auto-start
->     after boot via direct API call in `service.sh`.
->   • Total tracked files: 87 → 90.
+>     `filepath.Base()` sanitization +
+>     `filepath.Join(MODULES_DIR, name)`.
+>   • iOS PWA logic removed from `web/index.html` (Android-only
+>     project). `apple-touch-icon.png` is **retained** — it is used
+>     by Android launchers as an icon fallback and by the
+>     `manifest.json` icons array. It is not "iOS-only".
+>   • **File count**: 89 tracked files + 1 build artifact
+>     (`web/app-debug.apk`, gitignored — see `.gitignore` §[20]).
 
 ---
 
@@ -174,6 +200,10 @@ Turn an Android device into a **filtered, encrypted DNS server** without a VPN, 
 | **v1.2.0 — Bilingual WebUI** | English default + Arabic toggle, client-side only |
 | **v1.2.0 — Atomic `current/`** | `current/` updated via `.current.tmp.$$` + `.current.old.$$` + `mv` |
 | **v1.2.0 — Unique Snapshot Names** | `<ts>-<version>-<pid>` / `<ts>-manual-<pid>` / `<ts>-auto-<pid>` |
+| **v1.3.0 — Manifest-Based Snapshot Detection** | A directory is a snapshot iff it contains `.manifest.json` |
+| **v1.3.0 — mtime Sort for Rotation & `last_backup_name`** | Robust against clock drift and custom snapshot names |
+| **v1.3.0 — Protected Snapshots** | `.last_stable` target and newest install are never pruned |
+| **v1.3.0 — Boot-Path DNS Auto-Start** | `service.sh` performs a bounded wait + direct API call |
 | **v1.4.0 — CodeQL Path-Injection Hardening** | `removeModule` uses `filepath.Base()` + `filepath.Join(MODULES_DIR, name)` |
 | **v1.4.0 — Optional Companion APK** | `web/app-debug.apk` served at `/app-debug.apk`; missing file is not an error |
 
@@ -227,7 +257,7 @@ Companion app version is determined by `proxy/app-apk.version` — see `scripts/
 │  │  │  getSystemShell() fallback                             │   │  │
 │  │  │  get_profile_memory_hint()  (v1.1.0)                   │   │  │
 │  │  │  auto_backup_if_needed()    (v1.2.0)                   │   │  │
-│  │  │  rotate_backups()           (v1.2.0)                   │   │  │
+│  │  │  rotate_backups()           (v1.2.0, rewritten v1.3.0) │   │  │
 │  │  │  copy_with_context()        (v1.2.0)                   │   │  │
 │  │  │  backup_user_files()        (v1.2.0)                   │   │  │
 │  │  │  restore_user_files()       (v1.2.0)                   │   │  │
@@ -268,10 +298,10 @@ Companion app version is determined by `proxy/app-apk.version` — see `scripts/
 
 | Component | Language | Responsibilities |
 |---|---|---|
-| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON, dynamic memory limit, **auto-backup triggers (v1.2.0)**, **rotation after pre-critical backup (v1.2.0)**, **transaction cleanup (v1.2.0)**, **`backups` runtime_info field (v1.2.0)**, **watchdog token generation (v1.2.0)**, **`/app-debug.apk` route (v1.4.0)**, **CodeQL path-injection hardening in `removeModule` (v1.4.0)** |
+| **main.go** | Go | HTTP API, SSE, auth, blocklist management, Prometheus → JSON, dynamic memory limit, auto-backup triggers (v1.2.0), rotation after pre-critical backup (v1.2.0), transaction cleanup (v1.2.0), `backups` runtime_info field (v1.2.0), watchdog token generation (v1.2.0), **manifest-based snapshot detection + mtime sort (v1.3.0)**, `/app-debug.apk` route (v1.4.0), CodeQL path-injection hardening in `removeModule` (v1.4.0) |
 | **dnscrypt-proxy** | Go (upstream) | The actual DNS engine |
 | **Companion Android app** | Kotlin (separate repo) | Native WebView wrapper (`web/app-debug.apk`, optional, v1.4.0) |
-| **Shell scripts** | sh | Install, launch, watchdog, firewall, memory hint, **backup/restore (v1.2.0)**, **rotation (v1.2.0)**, **recovery mode (v1.2.0)**, **SELinux context preservation (v1.2.0)**, **watchdog token reader (v1.2.0)** |
+| **Shell scripts** | sh | Install, launch, watchdog, firewall, memory hint, backup/restore (v1.2.0), **rotation rewrite — mtime + protections (v1.3.0)**, recovery mode (v1.2.0), SELinux context preservation (v1.2.0), watchdog token reader (v1.2.0) |
 | **META-INF bootstrap** | sh | Magisk/KernelSU entry point — loads `util_functions.sh` and calls `install_module` (which runs `customize.sh`) |
 | **index.html** | HTML+JS | Main interface (bilingual: EN default + AR toggle) |
 | **dashboard.html** | HTML+JS | Monitoring dashboard (bilingual: EN default + AR toggle) |
@@ -330,7 +360,9 @@ main.go
 │      │      → write .manifest.json (SHA256)
 │      │
 │      ├──► functions.sh:rotate_backups 21
-│      │      → keep 21 newest snapshots by directory name
+│      │      → v1.3.0: manifest-based detection
+│      │      → v1.3.0: mtime sort, descending
+│      │      → v1.3.0: preserves .last_stable + newest install
 │      │
 │      └──► (best-effort: failure logs a warning but
 │             does NOT block the update)
@@ -368,6 +400,12 @@ backups on the same source directory. After a successful
 backup, `rotate_backups 21` is invoked **in the same shell
 call** to prevent unbounded accumulation. A failed backup logs
 a warning but never blocks the operation.
+
+**v1.3.0 note**: `rotate_backups` now detects snapshots by the
+presence of `.manifest.json` and sorts them by **mtime**
+descending. This makes it robust against clock drift and
+custom snapshot names (e.g. `pre-v130-manual-...`). See §4.13
+for full details.
 
 ### 3.3 Service Restart
 
@@ -505,6 +543,10 @@ scripts/fetch_app_apk.sh
 continues without the companion app. The APK is **optional**:
 `proxy/main.go` returns 404 for `/app-debug.apk` when the file is
 absent, and `customize.sh` extracts it only if present.
+
+**Build artifact**: `web/app-debug.apk` is **not tracked by git**
+(see `.gitignore` §[20]). It lives in the working tree only after
+`fetch_app_apk.sh` has run. Local developer builds can omit it.
 
 ### 3.6 Login Flow (v1.0.0 — Fix NEW-1)
 
@@ -701,7 +743,7 @@ Result: `BLOCKLIST` is always consistent (no race conditions).
 | Shell scripts only **read** the hint, never set the limit | `get_profile_memory_hint()` |
 | `runtime_info` exposes the effective limit for observability | `buildRuntimeInfo()` |
 
-### 3.10 Backup & Restore Flow (v1.2.0)
+### 3.10 Backup & Restore Flow (v1.2.0, extended in v1.3.0)
 
 **Design philosophy**: *"Search for user data everywhere —
 do not guess whether this is an upgrade."*
@@ -794,6 +836,18 @@ do not guess whether this is an upgrade."*
         └────────────────────────────────────────────────────┘
 ```
 
+**Layer 9 (rotation) — v1.3.0 update**:
+
+The rotation logic was rewritten in v1.3.0 for robustness:
+
+| Aspect | v1.2.0 behaviour | v1.3.0 behaviour |
+|---|---|---|
+| Snapshot detection | Directory name pattern `<YYYYMMDD>-...` | Presence of `.manifest.json` |
+| Sort key | Lexicographic directory name | **mtime** (numeric, descending) |
+| Protected targets | 21 newest by directory name | 21 newest by mtime + `.last_stable` + newest install |
+| Custom-named snapshots | Ignored (not matched by regex) | Recognized (via manifest) |
+| Clock drift | Sensitive (relies on name sort) | Robust (mtime-based) |
+
 **Recovery-mode interaction (v1.2.0 implementation)**:
 
 `customize.sh` uses a **snapshot-and-reapply** strategy when a
@@ -816,27 +870,9 @@ restored files were silently lost.
 
 **The v1.2.0 fix**:
 Rather than excluding the two files from the `unzip` argument
-list (which would require knowing exactly what the ZIP
-contains), `[8a]` now also saves a copy of each restored file
-to `$MODPATH/.recovery_snapshot/`. Section `[9b2]` then
-re-applies these files after the extraction.
-
-**Why this approach is preferred over filtering the unzip
-argument list**:
-- It does **not** depend on knowing what the ZIP contains.
-  If a future release adds or removes files under `proxy/`,
-  the fix keeps working.
-- It keeps the extraction logic of `[9]` untouched, so the
-  normal-install path is byte-for-byte identical to the
-  pre-recovery behavior.
-- The snapshot dir is `$MODPATH/.recovery_snapshot/` (dot-
-  prefixed, cleaned up in `[9b2]`) so it never appears in
-  the final module layout.
-
-**CSH-5 behavior**: If re-application is partial (i.e. fewer
-files were re-applied than were snapshotted), the snapshot
-directory is **preserved** at `$MODPATH/.recovery_snapshot/`
-so the user can recover the remaining files manually.
+list, `[8a]` now also saves a copy of each restored file to
+`$MODPATH/.recovery_snapshot/`. Section `[9b2]` then re-applies
+these files after the extraction.
 
 **Idempotency**: the entire install is idempotent.
 
@@ -861,11 +897,13 @@ so the user can recover the remaining files manually.
 | `[30] - [33]` | runtime_info, healthz/readyz, API, Login |
 | `[34]` | serveStaticAssets (whitelist) |
 | `[35]` | metricsProxyHandler |
-| `[36b]` | **Auto-backup + rotation + notifications (v1.2.0)** |
-| `[36c]` | **Transaction cleanup at startup (v1.2.0)** |
+| `[36b]` | Auto-backup + rotation + notifications (v1.2.0) |
+| `[36c]` | Transaction cleanup at startup (v1.2.0) |
 | `[37]` | main() |
 
-**Size**: ~2,400 lines (v1.2.0).
+**Size**: ~2,450–2,500 lines (v1.4.0). The v1.3.0 and v1.4.0
+releases added approximately 50–80 lines on top of the v1.2.0
+baseline (~2,400 lines).
 
 ### 4.2 API Endpoints
 
@@ -913,9 +951,9 @@ via `http.NotFound` — the route is always registered.
 | `portCacheMap` | `sync.Mutex` | Per-port cache (Fix #11) |
 | `systemShell` | `sync.Once` | Platform detection (Fix #2) |
 | `memLimitMu` | `sync.Mutex` | Memory limit state (v1.1.0 — MEM-1) |
-| **`backupMu`** | **`sync.Mutex`** | **Serializes auto-backup calls (v1.2.0 — BAK-2)** |
-| **`watchdogTokMu`** | **`sync.RWMutex`** | **Watchdog token cache (v1.2.0 — WD-TOKEN)** |
-| **`lastUpdateMu`** | **`sync.Mutex`** | **`last_update` TTL cache (v1.2.0 — BUG-H fix)** |
+| `backupMu` | `sync.Mutex` | Serializes auto-backup calls (v1.2.0 — BAK-2) |
+| `watchdogTokMu` | `sync.RWMutex` | Watchdog token cache (v1.2.0 — WD-TOKEN) |
+| `lastUpdateMu` | `sync.Mutex` | `last_update` TTL cache (v1.2.0 — BUG-H fix) |
 
 **`backupMu` rationale**: two rapid user actions could trigger
 two `createAutoBackup` calls that operate on the same source
@@ -1025,16 +1063,17 @@ const sse = new EventSource('/events');
 - `readConfPort` range check (1-65535)
 - Auth cache 60 s (I/O reduction) — **empty results never cached** (BUG-C fix)
 - `rebuildMu` mutex (RACE-1: BLOCKLIST consistency)
-- **v1.1.0 — MEM-1**: Dynamic per-profile memory limit
-- **v1.1.0 — MEM-3**: `MONITORING_UI_PORT` constant
-- **v1.2.0 — BAK-1**: `runtime_info.backups` exposes 7 fields
-- **v1.2.0 — BAK-2**: Pre-critical backup + rotation before destructive operations
-- **v1.2.0 — BAK-3**: `cleanupOldTransactions()` preserves ROLLBACK/START
-- **v1.2.0 — BAK-4**: `checkPendingNotifications()` reads and clears
-- **v1.2.0 — Language toggle**: client-side only, no server state
-- **v1.2.0 — Watchdog token**: closes the CSRF hole on `ensure_running_service` (see §4.5.1)
-- **v1.2.0 — BUG-A..L fixes**: See the "Post-audit corrections" table below.
-- **v1.4.0 — CodeQL `go/path-injection` fix in `removeModule`**: `filepath.Base()` + `filepath.Join(MODULES_DIR, name)`.
+- v1.1.0 — MEM-1: Dynamic per-profile memory limit
+- v1.1.0 — MEM-3: `MONITORING_UI_PORT` constant
+- v1.2.0 — BAK-1: `runtime_info.backups` exposes 7 fields
+- v1.2.0 — BAK-2: Pre-critical backup + rotation before destructive operations
+- v1.2.0 — BAK-3: `cleanupOldTransactions()` preserves ROLLBACK/START
+- v1.2.0 — BAK-4: `checkPendingNotifications()` reads and clears
+- v1.2.0 — Language toggle: client-side only, no server state
+- v1.2.0 — Watchdog token: closes the CSRF hole on `ensure_running_service` (see §4.5.1)
+- v1.2.0 — BUG-A..L fixes: See the "Post-audit corrections" table below.
+- v1.4.0 — CodeQL `go/path-injection` fix in `removeModule`: `filepath.Base()` + `filepath.Join(MODULES_DIR, name)`.
+- **v1.4.0 — Public static asset**: `/app-debug.apk` requires no auth (documented in §4.12.2). No secrets are present in the APK; the file is versioned by URL and served with an immutable `Cache-Control` header.
 
 #### 4.5.1 Watchdog Token (v1.2.0)
 
@@ -1157,7 +1196,17 @@ detailed implementations in §4.8.
 | WD-TOKEN | Watchdog token (closes CSRF hole) | §4.5.1 |
 | BUG-A..L | Post-audit corrections | §4.11 |
 
-#### 4.6.4 v1.4.0 — Backend Additions
+#### 4.6.4 v1.3.0 — Backend Additions
+
+| ID | Topic | Reference |
+|---|---|---|
+| SNAP-MANIFEST | `buildBackupInfo` — manifest-based detection | §4.13.1 |
+| SNAP-MTIME | `buildBackupInfo` — mtime sort for `last_backup_name` | §4.13.1 |
+| ROT-MANIFEST | `rotate_backups` — manifest-based detection | §4.13.2 |
+| ROT-MTIME | `rotate_backups` — mtime sort | §4.13.2 |
+| ROT-PROTECT | `rotate_backups` — preserve `.last_stable` + newest install | §4.13.2 |
+
+#### 4.6.5 v1.4.0 — Backend Additions
 
 | ID | Topic | Reference |
 |---|---|---|
@@ -1166,7 +1215,7 @@ detailed implementations in §4.8.
 | CQ-FIX | CodeQL `go/path-injection` fix in `removeModule` | §4.12.3 |
 | IOS-REMOVE | iOS PWA logic removed from `web/index.html` (Android-only) | §6.8 |
 
-#### 4.6.5 Post-Audit Corrections (v1.2.0)
+#### 4.6.6 Post-Audit Corrections (v1.2.0)
 
 A pre-release audit identified the following issues, all
 corrected in-place within v1.2.0:
@@ -1185,6 +1234,12 @@ corrected in-place within v1.2.0:
 | BUG-J | `isPidAlive` matches exact command names (no substring) |
 | BUG-K | `runShellWithTimeout` log distinguishes timeout from exit non-zero |
 | BUG-L | Watchdog token file written atomically |
+
+**Note on BUG-3 (superseded)**: In v1.2.0, `buildBackupInfo` was
+changed to sort by directory name (BUG-3), aligning it with the
+`rotate_backups` behaviour at that time. This decision was
+**reversed in v1.3.0** — both `buildBackupInfo` and
+`rotate_backups` now use mtime sorting for robustness. See §4.13.
 
 ### 4.7 Post-Release Fixes
 
@@ -1274,8 +1329,8 @@ func isRunDirUsable() bool {
 ### 4.8 v1.0.0 Backend Fixes (Details)
 
 This section retains the code-level details of the v1.0.0 fixes
-that were fundamental to the security model. The v1.1.0 and
-v1.2.0 additions are covered in §4.9 and §4.10.
+that were fundamental to the security model. The v1.1.0, v1.2.0,
+v1.3.0 and v1.4.0 additions are covered in §4.9 through §4.13.
 
 #### 4.8.1 Fix A — `STATUS_FILE` semantics
 
@@ -1524,8 +1579,7 @@ two new sections (`[36b]` and `[36c]`) plus an extension to
 return a JSON object with 7 fields.
 
 **Fields**:
-- `available` — number of snapshots (excludes `current/`,
-  `txn-*`, `orphan-txn-*`).
+- `available` — number of snapshots.
 - `in_flight_txn` — number of `txn-*` directories.
 - `orphan_txn` — number of `orphan-txn-*` directories.
 - `last_backup` — human-readable mtime of the newest snapshot.
@@ -1547,9 +1601,16 @@ return a JSON object with 7 fields.
 }
 ```
 
-**Ordering**: `last_backup_name` is chosen by lexicographic
-sort of directory names (chronological for the
-`<YYYYMMDD>-<HHMMSS>-...` naming convention).
+**Snapshot detection & ordering** (superseded by §4.13.1 in
+v1.3.0):
+
+- **v1.2.0**: `available` excluded `current/`, `txn-*`, and
+  `orphan-txn-*`; the remaining directories were counted.
+  `last_backup_name` was chosen by **lexicographic sort** of
+  directory names.
+- **v1.3.0** (current): a directory is a snapshot **iff** it
+  contains `.manifest.json`. `last_backup_name` is chosen by
+  **mtime sort** (descending). See §4.13.1.
 
 **Consumed by**:
 - The WebUI System Info panel (`index.html`).
@@ -1573,12 +1634,6 @@ to `saveDenylist`):
 | `saveCustomRulesCombined()` | `"pre-custom-rules-save"` |
 | `appendDenylist(content)` | *(no own reason — calls `saveDenylist`, which uses `"pre-denylist-save"`)* |
 
-**Corrected in this revision**: The `appendDenylist` entry
-previously listed `"pre-append-denylist"` — that string does
-**not** exist in the code. `appendDenylist` delegates to
-`saveDenylist`, so the recorded reason is
-`"pre-denylist-save"`.
-
 **Semantics**:
 - **Best-effort**: a failed backup logs a warning and returns.
   The user action proceeds.
@@ -1591,8 +1646,7 @@ previously listed `"pre-append-denylist"` — that string does
 - **Timeout**: `AUTO_BACKUP_TIMEOUT = 15 s`.
 - **Unique target directory**: main.go generates
   `<ts>-manual-<pid>-<rand4>` and passes it to
-  `backup_user_files` as the second argument. This avoids
-  same-second collisions with `action.sh --backup`.
+  `backup_user_files` as the second argument.
 
 **Non-goals**:
 - Does not trigger in recovery mode.
@@ -1664,7 +1718,7 @@ as optional.
 
 ### 4.11 v1.2.0 Post-Audit Corrections
 
-See §4.6.4 for the summary table. Each correction is
+See §4.6.6 for the summary table. Each correction is
 documented inline in `main.go`'s header.
 
 ### 4.12 v1.4.0 Backend Additions
@@ -1719,6 +1773,12 @@ func serveFile(w http.ResponseWriter, r *http.Request, path, contentType string)
 - If absent → `http.NotFound` (404). This is deliberate: the APK
   is optional and the WebUI install button points at it directly
   (via `<a download>`). A missing file is not a server error.
+
+**Git tracking**: `web/app-debug.apk` is **not tracked by git**
+(see `.gitignore` §[20]). It is a build artifact produced by
+`scripts/fetch_app_apk.sh` and staged by `release.yml` before
+packaging. Local developer builds may omit it — the route still
+works and simply returns 404.
 
 #### 4.12.2 APK-2 — `/app-debug.apk` route
 
@@ -1805,6 +1865,115 @@ func removeModule(modulePath string) map[string]interface{} {
 input. Only malformed inputs (empty basename, `.`, `..`,
 `/`-only) now short-circuit before any file operation.
 
+### 4.13 v1.3.0 Backend Additions
+
+v1.3.0 was released as a feature release (PWA install button +
+live status LED + boot-path DNS auto-start). However, it also
+contained **server-side refinements** that were previously
+undocumented in the release notes and in the file headers of
+`main.go` and `functions.sh`. This section documents them
+retroactively so that the ARCHITECTURE document matches the
+actual code.
+
+#### 4.13.1 SNAP-MANIFEST + SNAP-MTIME — `buildBackupInfo()` (v1.3.0)
+
+`buildBackupInfo` in `proxy/main.go` changed in two ways:
+
+**1. Snapshot detection** — manifest-based, not name-pattern-based:
+
+```go
+// v1.3.0: detect snapshots by manifest presence, not by
+// name pattern. This makes custom-named snapshots
+// (e.g. "pre-v130-manual-...") visible to rotation and
+// to the API.
+manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
+if _, err := os.Stat(manifestPath); err != nil {
+    continue
+}
+```
+
+Before v1.3.0, a snapshot was recognized only if its directory
+name matched the `<YYYYMMDD>-<HHMMSS>-...` pattern. Custom names
+were silently skipped, and `available` undercounted. The new
+check accepts any directory that contains a `.manifest.json`.
+
+**2. Sort key for `last_backup_name`** — mtime, not lexicographic:
+
+```go
+// v1.3.0: sort by mtime, not by name.
+sort.Slice(snapshots, func(i, j int) bool {
+    fi, errI := snapshots[i].Info()
+    fj, errJ := snapshots[j].Info()
+    if errI != nil || errJ != nil {
+        return snapshots[i].Name() < snapshots[j].Name()
+    }
+    return fi.ModTime().Before(fj.ModTime())
+})
+```
+
+Before v1.3.0, the "newest" snapshot was the one whose
+**directory name** sorted last in lexicographic order. This
+relied on the timestamp prefix being stable (no clock drift,
+no manual rename). The new check sorts by **mtime** (filesystem
+timestamp), which is robust against both.
+
+**Consistency impact**: this reverses the v1.2.0 BUG-3 decision
+(see §4.6.6). The change was made to align `buildBackupInfo`
+with the shell-side `status.sh --json` behaviour (mtime-based)
+and to make the API robust against custom snapshot names.
+
+#### 4.13.2 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT — `rotate_backups()` (v1.3.0)
+
+`rotate_backups` in `proxy/functions.sh` was rewritten in v1.3.0:
+
+**1. Snapshot detection** — manifest-based:
+
+```sh
+for _d in */; do
+    _d="${_d%/}"
+    [ -d "$_d" ] || continue
+    case "$_d" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    [ -f "$_d/.manifest.json" ] || continue
+    _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+        || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+        || _mt=0
+    case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+    printf '%s %s\n' "$_mt" "$_d"
+done | sort -rn -k1,1
+```
+
+**2. Sort key** — mtime, descending (`sort -rn -k1,1`).
+
+**3. Protected targets** — two additional snapshots are never
+pruned, on top of the 21-newest window:
+
+```sh
+# Preserve .last_stable target
+if [ "$_name" = "$_protected" ]; then
+    log_fn "  🛡️ Preserved (last_stable): $_name"
+    continue
+fi
+# Preserve newest install snapshot (name contains -v<digit>)
+if [ "$_name" = "$_newest_install" ]; then
+    log_fn "  🛡️ Preserved (newest install): $_name"
+    continue
+fi
+```
+
+**Why**: `.last_stable` is the recovery pointer used by the
+installer. Pruning it would break recovery mode. The newest
+install snapshot is the one referenced in `.upgrade_history`;
+pruning it would break rollback.
+
+**Consistency impact**: the v1.2.0 doc comment in
+`functions.sh:rotate_backups` ("sorted by DIRECTORY NAME ...
+does not depend on mtimes") was left in place during the rewrite.
+That comment is now **misleading** and is corrected by the
+present document: the v1.3.0 implementation sorts by mtime and
+preserves the two targets listed above.
+
 ---
 
 ## 5. Shell Scripts
@@ -1814,13 +1983,13 @@ input. Only malformed inputs (empty basename, `.`, `..`,
 | Script | Role | Trigger |
 |---|---|---|
 | `customize.sh` | Install (+ backup/restore + 10 layers) | Magisk install |
-| `service.sh` | Start services + periodic auto-backup | boot_completed |
+| `service.sh` | Start services + periodic auto-backup + boot-path DNS auto-start (v1.3.0) | boot_completed |
 | `post-fs-data.sh` | Emergency cleanup | early boot |
 | `watchdog.sh` | Monitoring (services only) + token auth | standalone |
 | `action.sh` | Open WebUI + `--backup` + `--diagnose` | Magisk Action |
 | `status.sh` | Display status + `--diagnose` + `--json` | manual |
 | `uninstall.sh` | Cleanup + orphan txn preservation | Magisk remove |
-| `functions.sh` | Shared library (incl. backup helpers + watchdog token reader) | sourced |
+| `functions.sh` | Shared library (incl. backup helpers + watchdog token reader + rotation) | sourced |
 | `build.sh` | Cross-compile | manual / CI |
 | `META-INF/com/google/android/update-binary` | Root manager entry point | Magisk install |
 
@@ -1849,8 +2018,11 @@ service.sh
   ├── cleanupOldTransactions()          ← v1.2.0
   ├── read .pending_notification        ← v1.2.0
   ├── auto_backup_if_needed(24 h)       ← v1.2.0
-  ├── rotate_backups(21)                ← v1.2.0
+  ├── rotate_backups(21)                ← v1.2.0 / mtime+protect v1.3.0
   ├── start WebUI
+  ├── v1.3.0: bounded wait for WebUI ready (up to 60 s)
+  ├── v1.3.0: direct POST /api/ensure_running_service
+  │           with X-Watchdog-Token header
   └── start Watchdog (standalone, with token auth)
 ```
 
@@ -1889,6 +2061,15 @@ watchdog.sh (real PID)
 - If neither is available, the request goes without auth and
   the server returns 401 — the watchdog backs off correctly.
 
+**v1.3.0 note**: `service.sh` no longer depends solely on the
+watchdog for boot-path DNS auto-start. It performs a bounded
+wait for the WebUI to be ready (checking the watchdog token file
+and the WebUI TCP port, up to 60 s) and then issues the same
+`POST /api/ensure_running_service` call itself. This closes a
+boot race that could leave DNS unavailable for several minutes
+while the watchdog's 30 s initial backoff expired and the WebUI
+was still binding its port.
+
 ### 5.4 Backup Helpers in `functions.sh`
 
 `functions.sh` exposes runtime helpers:
@@ -1901,29 +2082,24 @@ watchdog.sh (real PID)
 | `verify_backup_integrity` | SHA256 + size + emptiness check |
 | `backup_user_files` | Snapshot the 5 user config files |
 | `restore_user_files` | Restore with SELinux + verification |
-| `rotate_backups` | Prune to `keep_count` (default 21) |
+| `rotate_backups` | Prune to `keep_count` (default 21); mtime sort + `.last_stable` / newest-install protection (v1.3.0) |
 | `get_last_backup_time` | Return the epoch mtime of `.last_auto_backup` |
 | `auto_backup_if_needed` | Trigger a backup if older than 24 h |
 | `cleanup_old_transactions` | Remove leftover `COMMIT`'d `txn-*` dirs |
 | `copy_with_context` | Copy a single file with SELinux + chmod 0600 |
-| **`get_watchdog_token`** | **Read `$RUN_DIR/.watchdog_token` (v1.2.0 — FSH-11)** |
-
-The same helpers exist inline in `customize.sh` (install-time)
-and in `action.sh`, `service.sh`, `status.sh`, and `watchdog.sh`
-(fallbacks).
+| `get_watchdog_token` | Read `$RUN_DIR/.watchdog_token` (v1.2.0 — FSH-11) |
 
 **FSH-10 (v1.2.0)**: `backup_user_files` and
 `auto_backup_if_needed` append `-$$` (caller PID) to their
-default target directory names. This mirrors the same fix in
-`customize.sh` (BUG-CS-C) and in `main.go` (BUG-E), and
-prevents two backups started in the same wall-clock second from
-writing into the same directory.
+default target directory names.
 
 **FSH-11 (v1.2.0)**: A new `get_watchdog_token` helper reads
 the token written by `customize.sh` §[19b] or by `main.go`.
-It is used by `watchdog.sh` (which implements an inline
-equivalent for self-containment) and by any future script that
-needs to authenticate to `ensure_running_service`.
+
+**v1.3.0 (rotation rewrite)**: `rotate_backups` was rewritten
+to detect snapshots by `.manifest.json` presence, sort by
+mtime, and preserve `.last_stable` plus the newest install.
+See §4.13.2.
 
 ### 5.5 What Shell Scripts Do NOT Do
 
@@ -2005,19 +2181,20 @@ The token is generated once and persists across restarts:
 | `manifest.json` | PWA manifest (`lang="en"`, `dir="ltr"`) | ~4 KB |
 | `sw.js` | Service Worker (language-neutral) | ~22 KB |
 | `offline.html` | Offline page (EN default + AR toggle) | ~18 KB |
-| `app-debug.apk` | Companion Android app (optional, v1.4.0) | ~3 MB |
+| `app-debug.apk` | Companion Android app (optional, v1.4.0) — **build artifact, gitignored** | ~3 MB |
 | `icon-192.svg` | Small icon | ~1.5 KB |
 | `icon-512.svg` | Maskable icon | ~1.7 KB |
 | `icon-192.png` | PWA icon | ~14 KB |
 | `icon-512.png` | PWA icon | ~78 KB |
-| `apple-touch-icon.png` | iOS | ~18 KB |
+| `apple-touch-icon.png` | Launcher icon fallback (Android + legacy Safari); also referenced by `manifest.json` icons array | ~18 KB |
 | `favicon-32x32.png` | favicon | ~1.4 KB |
 | `favicon-16x16.png` | favicon | ~553 B |
 | `favicon.ico` | favicon | ~4.7 KB |
 
-**v1.4.0 note**: `app-debug.apk` is optional and is only present
-when the release pipeline staged it (see §3.5b). Its absence does
-not affect `index.html`, `dashboard.html`, or the Service Worker.
+**v1.4.0 note**: `app-debug.apk` is optional, is **not tracked
+by git** (see `.gitignore` §[20]), and is only present when the
+release pipeline staged it (see §3.5b). Its absence does not
+affect `index.html`, `dashboard.html`, or the Service Worker.
 `main.go` returns 404 for `/app-debug.apk` when the file is
 missing.
 
@@ -2050,11 +2227,31 @@ missing.
 `runtime_info.backups`. The Service Worker **never** caches the
 backup state — the user always sees the current state.
 
-**v1.4.0 note**: The Service Worker does **not** cache
-`/app-debug.apk`. The install button is a direct `<a download>`
-link, so the browser handles the download outside the SW cache.
-This is deliberate: the APK is ~3 MB and caching it would
-consume the runtime cache budget for no benefit.
+**v1.4.0 note — actual behaviour of `/app-debug.apk`**:
+
+The Service Worker **does not precache** `/app-debug.apk` (the
+path is absent from `PRECACHE_ASSETS`). However, the path is
+**not in the bypass list** either, which means it falls through
+to the **Stale-While-Revalidate** strategy for non-navigation
+GET requests:
+
+- **First download**: a normal network fetch (no cache entry
+  exists yet).
+- **Subsequent downloads**: may be served from
+  `RUNTIME_CACHE` (SWR).
+- **Long-lived browser cache**: `main.go` sets
+  `Cache-Control: public, max-age=3600, immutable` for `.apk`
+  paths — this is the primary cache layer.
+
+The Service Worker therefore **does not protect** the APK
+download from SWR caching, but the practical impact is minimal:
+
+- The APK is small (~3 MB) and downloaded at most once per user.
+- The `immutable` header means the file never changes for a
+  given URL — cache staleness is not a concern.
+- The URL is versioned (`/app-debug.apk` maps to a specific
+  release's `app-debug.apk`), so a newer release invalidates
+  the entry via `CACHE_VERSION` bump.
 
 **Language-neutral**: The SW caches the HTML once (with both
 `translations` objects inline). The language toggle operates
@@ -2088,7 +2285,8 @@ purely on the DOM; no additional cache entries are created.
 - **Maskable icon**: PNG (for Android)
 - **SameSite=Lax**: works from shortcuts easily
 - **Favicons**: PNG + ICO for all browsers
-- **iOS Support**: `apple-touch-icon.png`
+- **Launcher icon fallback**: `apple-touch-icon.png` — used by
+  Android launchers and by legacy Safari (not iOS-only; see §6.8)
 - **Dynamic Ports**: links updated from `runtime_info`
 - **LAN Support**: `window.location.hostname` instead of `127.0.0.1`
 - **v1.1.0**: System Info panel shows `profile_key` + `memory_limit_mb`
@@ -2096,6 +2294,9 @@ purely on the DOM; no additional cache entries are created.
 - **v1.2.0**: Bilingual WebUI (EN default + AR toggle). The
   `manifest.json` `lang` field defaults to `en` and `dir` to
   `ltr`. The toggle updates both at runtime.
+- **v1.3.0**: Smart dynamic PWA install button (`index.html`
+  section [13c]), language-aware (EN + AR). Live status LED on
+  the Today counter.
 - **v1.4.0**: Install button is `<a download href="/app-debug.apk">`.
   Removed the `onclick` handler and the `initPWABeforeInstallPrompt()`
   call. iOS-specific logic removed from `isBrowserSupported()`,
@@ -2142,12 +2343,8 @@ banner reappeared on every page reload. Infinite loop.
 - Reload on the `controllerchange` event.
 - Guard double-clicks with a `pendingReload` flag.
 
-**Scope**: the fix now applies to **both** `index.html` **and**
-`dashboard.html`. In v1.1.0, only `index.html` shipped the fix;
-`dashboard.html` had the JS handlers but no
-`<div id="swUpdateBanner">` block, so the banner could never be
-shown. In v1.2.0, `dashboard.html` gained the same HTML block
-and the same CSS rules as `index.html`, making the fix complete.
+**Scope**: the fix applies to **both** `index.html` **and**
+`dashboard.html`.
 
 ### 6.6 Dual-Origin Limitation
 
@@ -2227,9 +2424,18 @@ now fall through to the unified "unsupported" message that lists
 supported alternatives (Chrome / Edge / Brave) with Play Store
 links. No browser-specific branching remains.
 
-**`apple-touch-icon.png` is retained** — it is used by Android
-launchers as an icon fallback and by the `manifest.json` icons
-array. It is not "iOS-only".
+**`apple-touch-icon.png` is retained** — it is **not**
+iOS-only. It is used by:
+
+- Android launchers as an icon fallback when the PWA is
+  installed.
+- The `manifest.json` `icons` array (as a `180×180` entry).
+- Legacy Safari bookmarks (a residual, harmless compatibility
+  case).
+
+Removing it would break the launcher-icon fallback on some
+Android builds. It is kept deliberately. See §6.1 and §6.4 for
+the updated naming.
 
 ---
 
@@ -2254,14 +2460,14 @@ array. It is not "iOS-only".
 | `rebuildMu` | memory | lost on restart | `rebuildBlocklist` |
 | `currentMemLimit` | memory | recomputed at startup | `applyMemoryLimit` (v1.1.0) |
 | `currentProfile` | memory | recomputed at startup | `applyMemoryLimit` (v1.1.0) |
-| **`backupMu`** | **memory** | **lost on restart** | **`createAutoBackup` (v1.2.0)** |
-| **`watchdogTok`** | **memory** | **lost on restart (regenerated)** | **`getWatchdogToken` (v1.2.0)** |
-| **`$PERSISTENT_BACKUP`** | **`/sdcard/...`** | **✓ (survives uninstall)** | **`customize.sh`, `service.sh`, `main.go` (v1.2.0)** |
-| **`.last_stable`** | **file** | **✓** | **`customize.sh` (v1.2.0)** |
-| **`.upgrade_history.json`** | **file** | **✓** | **`customize.sh` (v1.2.0)** |
-| **`.last_auto_backup`** | **file (marker)** | **✓ (mtime)** | **`auto_backup_if_needed` (v1.2.0)** |
-| **`.pending_notification`** | **file (transient)** | **✓** | **`customize.sh` writes; `main.go` deletes (v1.2.0)** |
-| **`.watchdog_token`** | **file** | **✓** | **`customize.sh` or `main.go` (v1.2.0)** |
+| `backupMu` | memory | lost on restart | `createAutoBackup` (v1.2.0) |
+| `watchdogTok` | memory | lost on restart (regenerated) | `getWatchdogToken` (v1.2.0) |
+| `$PERSISTENT_BACKUP` | `/sdcard/...` | ✓ (survives uninstall) | `customize.sh`, `service.sh`, `main.go` (v1.2.0) |
+| `.last_stable` | file | ✓ | `customize.sh` (v1.2.0) |
+| `.upgrade_history.json` | file | ✓ | `customize.sh` (v1.2.0) |
+| `.last_auto_backup` | file (marker) | ✓ (mtime) | `auto_backup_if_needed` (v1.2.0) |
+| `.pending_notification` | file (transient) | ✓ | `customize.sh` writes; `main.go` deletes (v1.2.0) |
+| `.watchdog_token` | file | ✓ | `customize.sh` or `main.go` (v1.2.0) |
 
 ### 7.2 Client-side State
 
@@ -2273,8 +2479,8 @@ array. It is not "iOS-only".
 | Server hashes | memory | page lifetime |
 | `currentStatus` | memory | page lifetime |
 | `PORTS` | memory | page lifetime (updated from runtime_info) |
-| **Language preference** | **`localStorage['dnscrypt-lang']`** | **persistent** |
-| **Current language (runtime)** | **memory (`currentLang`)** | **page lifetime** |
+| Language preference | `localStorage['dnscrypt-lang']` | persistent |
+| Current language (runtime) | memory (`currentLang`) | page lifetime |
 
 **v1.2.0 note**: The `dnscrypt-lang` localStorage key **is
 actively used** to persist the user's choice between English
@@ -2460,15 +2666,13 @@ Client                          Server
 /data/adb/dnscrypt-recovery        # external recovery trigger (optional, v1.2.0)
 ```
 
-### 8.2 Repository Layout (90 files)
+### 8.2 Repository Layout (89 tracked + 1 build artifact)
 
-> **Total tracked files**: **90** across 9 top-level directories.
->
-> **Note**: The file count is 90, matching the count in
-> `README.md`. The `.github/` directory contains 12 files:
-> 4 root files, 1 PR template (inside `PULL_REQUEST_TEMPLATE/`),
-> 3 issue templates, and 4 workflow files
-> (`ci.yml`, `codeql.yml`, `release.yml`, `upgrade-test.yml`).
+> **Tracked files**: **89** across 9 top-level directories.
+> **Build artifact**: **1** — `web/app-debug.apk` (produced by
+> `scripts/fetch_app_apk.sh`, staged by `release.yml`, ignored
+> by `.gitignore` §[20]).
+> **Total in working tree** (after a release build): **90**.
 
 ```text
 dnscrypt-proxy-webui/
@@ -2530,33 +2734,33 @@ dnscrypt-proxy-webui/
 │   ├── dnscrypt-proxy.toml        # DNSCrypt engine config
 │   ├── dnscrypt-proxy.version     # DNS engine version (2.1.18)
 │   ├── app-apk.version            # Companion app version (1.0.0, v1.4.0)
-│   ├── functions.sh               # shared shell library (incl. backup helpers)
+│   ├── functions.sh               # shared shell library (backup helpers + rotation)
 │   ├── go.mod                     # Go module definition
 │   ├── main.go                    # HTTP server (Go 1.22)
 │   ├── post-fs-data.sh            # early boot cleanup
-│   ├── service.sh                 # boot service + periodic auto-backup
+│   ├── service.sh                 # boot service + periodic auto-backup + boot-path DNS auto-start
 │   ├── status.sh                  # status display (+ --diagnose/--json)
 │   ├── uninstall.sh               # cleanup + orphan txn preservation
 │   ├── watchdog.sh                # standalone watchdog process (token auth)
 │   └── webui.conf                 # WebUI/Dashboard config
 │
-├── web/ (14, bilingual: EN default + AR toggle)
+├── web/ (13 tracked + 1 build artifact, bilingual: EN default + AR toggle)
 │   ├── index.html                 # main UI
 │   ├── dashboard.html             # monitoring dashboard
 │   ├── manifest.json              # PWA manifest (lang=en, dir=ltr defaults)
 │   ├── sw.js                      # service worker
 │   ├── offline.html               # offline fallback
-│   ├── app-debug.apk              # companion APK, optional (v1.4.0)
 │   ├── icon-192.svg               # small icon (SVG)
 │   ├── icon-512.svg               # maskable icon (SVG)
 │   ├── icon-192.png               # small icon (PNG)
 │   ├── icon-512.png               # maskable icon (PNG)
-│   ├── apple-touch-icon.png       # iOS icon
+│   ├── apple-touch-icon.png       # launcher icon fallback (Android + legacy Safari)
 │   ├── favicon-32x32.png          # modern favicon
 │   ├── favicon-16x16.png          # legacy favicon
-│   └── favicon.ico                # IE + bookmarks
+│   ├── favicon.ico                # IE + bookmarks
+│   └── [app-debug.apk]            # ← build artifact, gitignored (`.gitignore` §[20])
 │
-└── docs/ (18)
+└── docs/ (18 + 7 in adr/ = 25)
     ├── API.md
     ├── ARCHITECTURE.md            # this file
     ├── BACKUP.md                  # v1.2.0
@@ -2592,16 +2796,19 @@ dnscrypt-proxy-webui/
 | Root | 14 | Version + config + governance + hidden configs |
 | `.github/` | 12 | CI (incl. `upgrade-test.yml`) + templates + policies |
 | `.devcontainer/` | 2 | Dev environment |
-| **`META-INF/`** | **2** | **Magisk bootstrap (update-binary + updater-script)** |
+| `META-INF/` | 2 | Magisk bootstrap (update-binary + updater-script) |
 | `scripts/` | 6 | Build + release tooling (incl. `fetch_app_apk.sh`) |
 | `proxy/` | 15 | Go backend + shell scripts + configs (incl. `app-apk.version`) |
-| `web/` | 14 | HTML + PWA + SVG/PNG/ICO icons + optional APK |
+| `web/` (tracked) | 13 | HTML + PWA + SVG/PNG/ICO icons |
+| `web/` (build artifact) | 1 | `app-debug.apk` — gitignored |
 | `docs/` | 18 | Documentation guides |
 | `docs/adr/` | 7 | Architecture Decision Records |
-| **Total** | **90** | Tracked in the repository |
+| **Tracked total** | **89** | **Committed to the repository** |
+| **Working-tree total** | **90** | **Including the APK build artifact** |
 
 **Cross-check**: `README.md` §Project Structure states the same
-total (90). The two files now agree.
+numbers (89 tracked + 1 build artifact = 90 in the working tree).
+The two files agree.
 
 ### 8.4 META-INF Bootstrap
 
@@ -2615,24 +2822,17 @@ files:
 | `updater-script` | Single line: `#MAGISK`. Tells Magisk this is a Magisk module ZIP. Without it, Magisk treats the ZIP as a recovery-flashable update. |
 
 **Non-responsibility**: `update-binary` contains **no** DNSCrypt
-logic. All installer logic lives in `proxy/customize.sh`. This
-separation is standard practice for Magisk modules:
-
-- `META-INF/*` — bootstrap provided by the module format.
-- `customize.sh` — project-specific installation.
+logic. All installer logic lives in `proxy/customize.sh`.
 
 **Failure mode**: If `update-binary` fails (e.g. Magisk < 20.4),
 the installer aborts with a clear message and never reaches
 `customize.sh`. No partial state is created.
 
 **v1.2.0 note**: The META-INF files are unchanged from v1.0.0.
-The 10 data-preservation layers introduced in v1.2.0 are not
-visible to `update-binary` — they live entirely in
-`customize.sh` and the other shell scripts.
 
 **v1.4.0 note**: The companion APK (`web/app-debug.apk`) is
-extracted by `customize.sh` §[9] via the `unzip 'web/*'` glob,
-which crosses path separators. `update-binary` is unchanged.
+extracted by `customize.sh` §[9] via the `unzip 'web/*'` glob.
+`update-binary` is unchanged.
 
 ### 8.5 Runtime Files (System)
 
@@ -2740,7 +2940,29 @@ Watchdog → POST ensure_running
         → retry on next iteration
 ```
 
-**Scenario 5 (v1.2.0): Recovering from a corrupted config**
+**Scenario 5: Boot-path DNS auto-start (v1.3.0)**
+
+```text
+Boot → service.sh → start WebUI
+  │
+  ├── v1.3.0: bounded wait (up to 60 s):
+  │     • check watchdog token file exists
+  │     • check WebUI TCP port is open
+  │
+  ├── v1.3.0: direct POST /api/ensure_running_service
+  │     with X-Watchdog-Token header
+  │
+  └── start Watchdog (standalone)
+```
+
+This closes a race in the pre-v1.3.0 boot path: the watchdog's
+first API call fires 30 s after boot, but the WebUI may not have
+finished binding its port by then, and the watchdog's backoff
+(30 s → 60 s → 120 s → ...) could leave DNS unavailable for
+minutes. `service.sh` now short-circuits that path by waiting
+for the WebUI and issuing the call itself.
+
+**Scenario 6 (v1.2.0): Recovering from a corrupted config**
 
 Recovery mode is **not** handled by the Watchdog. It is handled
 by `customize.sh` at install time. See §3.10 and
@@ -2780,6 +3002,12 @@ engine stays down until a manual restart.
 │    (BUG-CS-B atomic update).                                 │
 │  • Snapshot directory names are unique per second            │
 │    (PID suffix, BUG-CS-C / BUG-E / FSH-10 / ACT-5).          │
+│  • Snapshot detection is manifest-based (v1.3.0): a          │
+│    directory without .manifest.json is never counted.        │
+│  • Rotation preserves .last_stable and newest install        │
+│    (v1.3.0 — see §4.13.2).                                   │
+│  • Boot-path DNS auto-start no longer depends on the         │
+│    watchdog's backoff schedule (v1.3.0 — see §9.3).          │
 │  • `/app-debug.apk` never returns 5xx (v1.4.0): missing      │
 │    file → 404; existing file → 200 + immutable cache.        │
 │                                                              │
@@ -2791,6 +3019,8 @@ engine stays down until a manual restart.
 │  • main.go: createAutoBackup best-effort + rotation          │
 │  • main.go: cleanupOldTransactions preserves START           │
 │  • main.go: watchdog token verified in constant time         │
+│  • main.go: buildBackupInfo manifest-based + mtime sort      │
+│    (v1.3.0)                                                  │
 │  • main.go: serveFile per-extension Cache-Control (v1.4.0)   │
 │  • main.go: removeModule hardened against path-injection     │
 │    via filepath.Base + filepath.Join(MODULES_DIR, name)      │
@@ -2799,6 +3029,9 @@ engine stays down until a manual restart.
 │  • customize.sh: [19b] pre-generates the watchdog token      │
 │  • customize.sh: atomic current/ via tmp+mv                  │
 │  • service.sh: STATUS_FILE = OFF only on disable             │
+│  • service.sh: bounded wait + direct ensure_running (v1.3.0) │
+│  • functions.sh: rotate_backups mtime sort + protections     │
+│    (v1.3.0)                                                  │
 │  • watchdog.sh: read-only w.r.t. backups                     │
 │  • watchdog.sh: sends X-Watchdog-Token header                │
 └──────────────────────────────────────────────────────────────┘
@@ -2853,13 +3086,14 @@ engine stays down until a manual restart.
 | `getMonitoringAuth` (cached) | ~50 ns |
 | `applyMemoryLimit` (v1.1.0) | ~10 ns |
 | `rebuildBlocklist` (with rebuildMu) | same values |
-| **`createAutoBackup` (delegated) (v1.2.0)** | **~100–300 ms wall, negligible CPU** |
-| **`buildBackupInfo` (v1.2.0)** | **~1–3 ms with ≤ 21 snapshots** |
-| **`cleanupOldTransactions` (v1.2.0)** | **~1 ms per `COMMIT`'d txn, runs once** |
-| **`checkPendingNotifications` (v1.2.0)** | **<100 µs, runs once** |
-| **`verifyWatchdogToken` (v1.2.0)** | **<5 µs (one file read + constant-time compare)** |
-| **`removeModule` (v1.4.0)** | **~50 µs for `filepath.Base` + `filepath.Join` (was ~30 µs for `Clean` + prefix check)** |
-| **`serveFile` (v1.4.0)** | **<1 µs (one `strings.HasSuffix`)** |
+| `createAutoBackup` (delegated) (v1.2.0) | ~100–300 ms wall, negligible CPU |
+| `buildBackupInfo` (v1.2.0 / v1.3.0) | ~1–3 ms with ≤ 21 snapshots (one extra `os.Stat` per candidate dir for the manifest check) |
+| `cleanupOldTransactions` (v1.2.0) | ~1 ms per `COMMIT`'d txn, runs once |
+| `checkPendingNotifications` (v1.2.0) | <100 µs, runs once |
+| `verifyWatchdogToken` (v1.2.0) | <5 µs (one file read + constant-time compare) |
+| `rotate_backups` (v1.3.0) | +1 `stat` per candidate dir; O(n log n) sort on ≤ ~30 entries |
+| `removeModule` (v1.4.0) | ~50 µs for `filepath.Base` + `filepath.Join` (was ~30 µs for `Clean` + prefix check) |
+| `serveFile` (v1.4.0) | <1 µs (one `strings.HasSuffix`) |
 
 ### 10.3 Disk I/O
 
@@ -2871,11 +3105,11 @@ engine stays down until a manual restart.
 | Session GC | 30 min interval |
 | `isRunDirUsable` | cache 30 s |
 | `getMonitoringAuth` | cache 60 s |
-| **`createAutoBackup` (v1.2.0)** | **reads 5 files + writes 5 files + SHA256 per file + rotation ls + rm -rf** |
-| **`buildBackupInfo` (v1.2.0)** | **`ReadDir` + `Info()` + `ReadFile(.last_stable)`** |
-| **`rotate_backups` (v1.2.0)** | **`rm -rf` on old snapshots — at most ~21 dirs** |
-| **`getWatchdogToken` (v1.2.0)** | **1 file read (no cache) per API call** |
-| **`/app-debug.apk` (v1.4.0)** | **1 `os.Stat` (via `serveFile`); no read when 404** |
+| `createAutoBackup` (v1.2.0) | reads 5 files + writes 5 files + SHA256 per file + rotation ls + rm -rf |
+| `buildBackupInfo` (v1.2.0 / v1.3.0) | `ReadDir` + per-dir `os.Stat(.manifest.json)` + `Info()` + `ReadFile(.last_stable)` |
+| `rotate_backups` (v1.2.0 / v1.3.0) | `rm -rf` on old snapshots — at most ~21 dirs; v1.3.0 adds per-dir `stat` |
+| `getWatchdogToken` (v1.2.0) | 1 file read (no cache) per API call |
+| `/app-debug.apk` (v1.4.0) | 1 `os.Stat` (via `serveFile`); no read when 404 |
 
 ### 10.4 Network
 
@@ -2905,7 +3139,7 @@ engine stays down until a manual restart.
 - Before: `getMonitoringAuth` took ~5–10 ms (file I/O).
 - After: cache hit → ~0.05 ms.
 
-### 10.6 Backup Storage (v1.2.0)
+### 10.6 Backup Storage (v1.2.0, rotation updated v1.3.0)
 
 | Metric | Value |
 |---|---|
@@ -2913,7 +3147,8 @@ engine stays down until a manual restart.
 | Total with rotation (21 snapshots) | ~2 MB max |
 | Backup duration | < 5 s wall |
 | Restore duration | < 3 s |
-| Rotation policy | Keep 21 newest by directory name |
+| Rotation policy (v1.3.0) | Keep 21 newest by **mtime**, plus the `.last_stable` target and the newest install snapshot (both protected from pruning) |
+| Snapshot detection (v1.3.0) | Presence of `.manifest.json` (any directory name) |
 | Pre-critical backup frequency | On every destructive write |
 | Periodic backup interval | 24 h (service.sh) |
 
@@ -2939,6 +3174,7 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 | Module ZIP impact | +~3 MB (optional) |
 | Runtime memory impact | 0 MB — served as a static file |
 | Cache-Control | `public, max-age=3600, immutable` |
+| Git tracking | ❌ Not tracked (`.gitignore` §[20]) |
 
 **Absent-APK cost**: one `os.Stat` per request (typically 0
 requests — the WebUI install button is only clicked by users
@@ -2958,7 +3194,7 @@ who want the companion app).
 | JSON | Hard | Easy | **Go** |
 | File ops | Good | Better | **Go** |
 | Process mgmt | ✓ | Possible | **Shell** |
-| **Backup pipeline** | **✓** | Possible | **Shell** (v1.2.0) |
+| Backup pipeline | ✓ | Possible | **Shell** (v1.2.0) |
 
 ### 11.2 Streaming vs Load-All
 
@@ -3048,16 +3284,6 @@ non-empty results** (BUG-C fix).
 
 **Decision**: dynamic, per-profile soft limit.
 
-**Chosen limits (MB)**:
-
-| Profile | Limit | Reason |
-|---|---:|---|
-| light | 80 | 1 GB devices |
-| normal | 100 | 2 GB devices |
-| pro | 120 | 3 GB devices |
-| proplus | 160 | 4 GB devices |
-| ultimate | 220 | 6 GB+ devices |
-
 ### 11.23 v1.1.0 — Extended shellQuote vs Minimal Set
 
 **Decision**: extend `shellQuote()` to also cover `{`, `}`, `\n`, `\t`.
@@ -3079,7 +3305,7 @@ non-empty results** (BUG-C fix).
 | Read `VERSION` from the module folder | also fails when the folder was renamed |
 | Only look in `/sdcard/dnscrypt-webui-backup/` | fails on first upgrade from v1.1.0 (no backup yet) |
 | Only look in the current `$MODPATH` | fails after APatch deletes the module folder |
-| **Multi-source candidate list (7 / 9)** | ✅ robust to renames, reinstalls, root-solution differences |
+| Multi-source candidate list (7 / 9) | ✅ robust to renames, reinstalls, root-solution differences |
 
 ### 11.26 v1.2.0 — Persistent Backup vs tmp Backup
 
@@ -3092,104 +3318,95 @@ non-empty results** (BUG-C fix).
 | Keep `/data/local/tmp/` (v1.1.0 behavior) | cleared on reboot; lost before the user can use it |
 | `/data/adb/modules/dnscrypt-proxy-webui/` | deleted on uninstall |
 | Cloud / external storage | violates Zero-Telemetry + Localhost-Only |
-| **`/sdcard/`** | ✅ survives reboot, uninstall, and `/data` reset |
+| `/sdcard/` | ✅ survives reboot, uninstall, and `/data` reset |
 
 ### 11.27 v1.2.0 — Transactional Install vs Best-Effort Restore
 
 **Decision**: transactional install with rollback + preserved
 `orphan-txn-*` directories.
 
-### 11.28 v1.2.0 — Bilingual WebUI (EN default + AR toggle) vs English-only
+### 11.28 v1.2.0 — Bilingual WebUI (EN default + AR toggle)
 
 **Decision**: ship the WebUI with **English as the default
 language** and an **in-page toggle to switch to Arabic**.
-
-**Rejected alternatives**:
-
-| Alternative | Problem |
-|---|---|
-| English-only WebUI | Removes first-class access for Arabic-speaking users |
-| Arabic-only WebUI | Removes the canonical default |
-| Always render both languages | Doubles the DOM size; slower first paint |
-| Server-side language detection | Adds server state; violates Localhost-First |
-| **Client-side toggle with `localStorage`** | ✅ no server state; instant switch; zero API impact |
 
 ### 11.29 v1.2.0 — Watchdog Token vs Localhost Bypass
 
 **Decision**: replace the localhost bypass on
 `/api/ensure_running_service` with a token.
 
-**Rejected alternatives**:
-
-| Alternative | Problem |
-|---|---|
-| Keep the localhost bypass | CSRF exploitable from any page in a browser on the device |
-| Require full user credentials for the watchdog | The user may not have set them; and the rate limiter would lock the watchdog out |
-| Bind the watchdog endpoint to a different port | More moving parts; no clear security benefit over a token |
-| **Token file (0600) + `X-Watchdog-Token`** | ✅ constant-time; localhost-scoped; not rate-limited |
-
 ### 11.30 v1.2.0 — Unique Snapshot Names vs `<ts>-<version>`
 
 **Decision**: append `-<pid>` (and, for pre-critical backups, a
 short random suffix) to snapshot directory names.
 
-**Reason**: `date +%Y%m%d-%H%M%S` has second precision. Without
-a PID suffix, two concurrent backups started in the same second
-would write to the same directory. The added suffix:
+### 11.31 v1.3.0 — Manifest-Based Snapshot Detection vs Name Pattern
 
-- Is compatible with the rotation regex
-  `^[0-9]{8}-[0-9]{6}-` (still matches).
-- Is compatible with `buildBackupInfo`'s lexicographic sort.
-- Is compatible with `.last_stable` (stores the full name).
+**Decision**: a directory is a snapshot **iff** it contains
+`.manifest.json`.
 
-Applied consistently in:
+**Rejected alternatives**:
 
-- `customize.sh` (BUG-CS-C)
-- `main.go:createAutoBackup` (BUG-E)
-- `functions.sh:backup_user_files` (FSH-10)
-- `functions.sh:auto_backup_if_needed` (FSH-10)
-- `action.sh:_inline_backup_now` (ACT-5)
+| Alternative | Problem |
+|---|---|
+| Match name pattern `<YYYYMMDD>-<HHMMSS>-...` | Silently skips custom-named snapshots (e.g. `pre-v130-manual-...`) |
+| Require both name and manifest | Redundant; the manifest is the source of truth |
+| Trust `.upgrade_history.json` | The history file may be missing or stale; the manifest is per-snapshot |
+| **Manifest presence only** | ✅ Robust to renames; single source of truth |
 
-### 11.31 v1.4.0 — Companion APK: Bundled vs Fetched-at-Install
+### 11.32 v1.3.0 — mtime Sort vs Name Sort
+
+**Decision**: sort snapshots by **mtime** (descending) for
+both `buildBackupInfo.last_backup_name` and `rotate_backups`.
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Lexicographic directory name (v1.2.0 BUG-3) | Breaks on clock drift or manual rename; not robust |
+| Combine name + mtime | Ambiguous ordering; harder to test |
+| File ID (inode) | Not portable; not stable across filesystems |
+| **mtime (numeric)** | ✅ Robust, monotonic, portable |
+
+### 11.33 v1.3.0 — Protected Rotation Targets
+
+**Decision**: `rotate_backups` always preserves two additional
+targets on top of the 21-newest window:
+
+- The `.last_stable` target (used by recovery mode).
+- The newest install snapshot (name matches `-v<digit>`; used
+  by rollback and by `.upgrade_history`).
+
+**Reason**: Without these protections, the 21-newest window can
+evict the exact snapshot the recovery path needs, silently
+breaking recovery mode and rollback.
+
+### 11.34 v1.3.0 — Boot-Path DNS Auto-Start vs Watchdog Reliance
+
+**Decision**: `service.sh` performs a bounded wait for the
+WebUI to be ready (up to 60 s) and then issues a direct
+`POST /api/ensure_running_service` with the watchdog token,
+instead of relying on the watchdog's first backoff tick (30 s).
+
+**Rejected alternatives**:
+
+| Alternative | Problem |
+|---|---|
+| Shorten watchdog's initial backoff | Affects steady-state behaviour; risks flapping |
+| Have the watchdog skip the first backoff tick | Same problem |
+| Let the user wait for the first successful watchdog tick | UX regression (minutes without DNS) |
+| **Direct call from `service.sh` after a bounded wait** | ✅ Fast, deterministic, reuses the watchdog token |
+
+### 11.35 v1.4.0 — Companion APK: Bundled vs Fetched-at-Install
 
 **Decision**: bundle the APK **inside the module ZIP** (optional
 asset) rather than fetching it on the device.
 
-**Rejected alternatives**:
-
-| Alternative | Problem |
-|---|---|
-| Fetch the APK at install time on the device | Requires internet + trust in the on-device download; breaks offline installs |
-| Ship the APK as a separate GitHub Release asset only | Users must know to look for it; two downloads |
-| Link to the companion app's GitHub Release page | Cross-origin, unversioned, no integrity check |
-| **Bundle inside the module ZIP (optional)** | ✅ single download; SHA256 verified at build time; absent file is not an error |
-
-**Trade-offs accepted**:
-
-- The module ZIP grows by ~3 MB.
-- Local developer builds can omit the APK entirely (build still succeeds).
-- The WebUI install button may return 404 if a local build omitted the APK — this is documented behavior (`<a download>` → browser "file not found").
-
-### 11.32 v1.4.0 — CodeQL Fix: `filepath.Base` vs `strings.HasPrefix`
+### 11.36 v1.4.0 — CodeQL Fix: `filepath.Base` vs `strings.HasPrefix`
 
 **Decision**: use `filepath.Base()` + `filepath.Join(MODULES_DIR, name)`
 as the sanitizer, and keep the `strings.HasPrefix` check as
 defence-in-depth (not as the sanitizer).
-
-**Rejected alternatives**:
-
-| Alternative | Problem |
-|---|---|
-| Keep the `strings.HasPrefix` check only | CodeQL `go/path-injection` treats the caller-provided path as taint reaching `os.RemoveAll` — two alerts remain open |
-| Use `filepath.Clean()` only | Removes trailing separators but does **not** remove `..`; CodeQL does not recognize it as a sanitizer for path injection |
-| Reject any path containing `..` | CodeQL does not model "reject-if-contains" as a sanitizer either |
-| Change the endpoint to accept a module *name* instead of a path | Backward-incompatible API change; existing WebUI sends `path=` |
-| **`filepath.Base()` + trusted base directory** | ✅ CodeQL-recognized; behavior unchanged for legitimate inputs; the caller still sends `path=` |
-
-**Behaviour preserved**: For any legitimate module path (a
-directory directly under `/data/adb/modules/`), the function
-behaves identically to v1.3.0. Only malformed inputs (empty
-basename, `.`, `..`, `/`-only) now short-circuit earlier.
 
 ---
 
@@ -3288,8 +3505,8 @@ Replaced by: `rebuildBlocklist()` in `main.go`.
 | reloadService fails | log warning, no rollback |
 | hash conflict (409) | client retries after reload |
 | concurrent conflict (RACE-1) | `rebuildMu` serializes |
-| **pre-critical backup fails (v1.2.0)** | **logged as warning; write proceeds** |
-| **rotation fails (v1.2.0)** | **logged as warning; write proceeds** |
+| pre-critical backup fails (v1.2.0) | logged as warning; write proceeds |
+| rotation fails (v1.2.0 / v1.3.0) | logged as warning; write proceeds |
 
 ### 12.7 Notes for Contributors
 
@@ -3322,16 +3539,11 @@ When called **with** `content`, the endpoint:
 **Historical note**: In earlier drafts of v1.2.0, the endpoint
 took no arguments and re-saved the current denylist unchanged,
 producing a "no-op" that still consumed a pre-critical backup.
-That behavior has been removed. Callers that relied on it (if
-any) must now send a `content` parameter.
+That behavior has been removed.
 
 **Consumer note for the WebUI**: The current WebUI does not yet
-send a `content` parameter. Callers should either:
-- Provide `content` via the API, or
-- Use `POST /api/save_denylist` with the full new content.
-
-The WebUI-side update to use `append_denylist` with content is
-planned for **v1.5.0**.
+send a `content` parameter. The WebUI-side update to use
+`append_denylist` with content is planned for **v1.5.0**.
 
 ---
 
@@ -3471,14 +3683,14 @@ Before Level 4, the project suffered from:
 
 | Problem | Impact |
 |---|---|
-| **Embedded URLs** | GitHub format change → silent failure |
-| **Duplicated version** | potential drift |
-| **`i386` vs `x86`** | different names → conflict |
-| **No SHA256** | no integrity check |
-| **No cache** | fresh download per build |
-| **No fallback** | GitHub failure → build failure |
-| **Slow CI** | ~30 s per release |
-| **No retry** | transient failure → workflow failure |
+| Embedded URLs | GitHub format change → silent failure |
+| Duplicated version | potential drift |
+| `i386` vs `x86` | different names → conflict |
+| No SHA256 | no integrity check |
+| No cache | fresh download per build |
+| No fallback | GitHub failure → build failure |
+| Slow CI | ~30 s per release |
+| No retry | transient failure → workflow failure |
 
 ### 14.2 Principles
 
@@ -3570,16 +3782,11 @@ Before Level 4, the project suffered from:
 
 ### 14.9 Version Update
 
-**Before:**
+**Before**: edit 5 files manually.
+
+**After**: edit one file.
 
 ```bash
-# edit 5 files manually
-```
-
-**After:**
-
-```bash
-# edit one file
 echo "2.1.19" > proxy/dnscrypt-proxy.version
 ```
 
@@ -3599,7 +3806,7 @@ echo "2.1.19" > proxy/dnscrypt-proxy.version
 |---|---|
 | Inline code | duplication |
 | Shared shell library | complexity |
-| **standalone script** | ✅ clear, easy to test |
+| standalone script | ✅ clear, easy to test |
 
 #### Why 5 sources?
 
@@ -3608,7 +3815,7 @@ echo "2.1.19" > proxy/dnscrypt-proxy.version
 | GitHub API only | fails on rate limit |
 | GitHub Releases only | fails on format change |
 | Cache only | fails on first build |
-| **5 sequential sources** | ✅ 99.9% reliability |
+| 5 sequential sources | ✅ 99.9% reliability |
 
 ### 14.11 Notes for Contributors
 
@@ -3637,11 +3844,12 @@ binaries. The two are independent:
 | Output | `dist/` (in module ZIP) | `dist/DNS-Proxy-v<ver>.apk` |
 | Required? | ✅ Always | ❌ Optional |
 | Consumer | `customize.sh` → `proxy/` | `customize.sh` → `web/` |
+| Git tracking | ❌ ignored | ❌ ignored (`.gitignore` §[20]) |
 
-**Shared design**: 5 fallback sources? No — the companion APK
-uses **2 sources** (direct tag URL + `latest` pointer). This is
-deliberate: the companion app has a simpler release process and
-only one asset name (`app-debug.apk`).
+**Shared design**: the companion APK uses **2 sources** (direct
+tag URL + `latest` pointer). This is deliberate: the companion
+app has a simpler release process and only one asset name
+(`app-debug.apk`).
 
 ---
 
@@ -3788,7 +3996,7 @@ result[name] += val  // 100 + 50 = 150
 | Parse time | N/A (fail) | ~50 µs (10 metrics) |
 | End-to-end | N/A (fail) | ~5–15 ms |
 
-### 16.7 v1.1.0 + v1.2.0 — Exposing Profile, Memory, and Backups
+### 16.7 v1.1.0 + v1.2.0 + v1.3.0 — Exposing Profile, Memory, and Backups
 
 `runtime_info` carries fields that the Dashboard and WebUI
 surface in the System Info panel.
@@ -3818,11 +4026,18 @@ surface in the System Info panel.
 }
 ```
 
+**v1.3.0 change**: the `available` count and the
+`last_backup_name` value are computed differently — snapshots
+are detected by `.manifest.json` presence, and
+`last_backup_name` is chosen by mtime sort (see §4.13.1). The
+7-field schema itself is unchanged.
+
 **v1.4.0 fields**:
 
-The `/app-debug.apk` route is a **static asset**, not a field in
-`runtime_info`. Its availability is implicit: the WebUI install
-button points at `/app-debug.apk` and the browser handles 404.
+The `/app-debug.apk` route is a **static asset**, not a field
+in `runtime_info`. Its availability is implicit: the WebUI
+install button points at `/app-debug.apk` and the browser
+handles 404.
 
 **Where these come from**:
 
@@ -3830,11 +4045,11 @@ button points at `/app-debug.apk` and the browser handles 404.
 |---|---|---|
 | `profile_key` | `readSelectedProfile()` (file read) | string |
 | `memory_limit_mb` | `memoryLimitForProfile(currentProfile) / (1024*1024)` | int |
-| `available` | `len(snapshots)` | int |
+| `available` | count of dirs containing `.manifest.json` (v1.3.0) | int |
 | `in_flight_txn` | count of `txn-*` directories | int |
 | `orphan_txn` | count of `orphan-txn-*` directories | int |
 | `last_backup` | mtime of the newest snapshot | string \| null |
-| `last_backup_name` | name of the newest snapshot | string \| null |
+| `last_backup_name` | name of the newest snapshot (by mtime) | string \| null |
 | `last_stable` | content of `.last_stable` | string \| null |
 | `path` | `$PERSISTENT_BACKUP` | string |
 
@@ -3847,7 +4062,8 @@ button points at `/app-debug.apk` and the browser handles 404.
 - **Consistency** — the `backups` object shares its 7 fields
   with `status.sh --json`.
 - **No extra cost** — every field is a simple operation on
-  data already in memory (or one `ReadDir` + one `ReadFile`).
+  data already in memory (or one `ReadDir` + one `os.Stat` per
+  candidate directory + one `ReadFile`).
 
 **Shell equivalent**:
 
@@ -3861,98 +4077,113 @@ button points at `/app-debug.apk` and the browser handles 404.
 
 | # | Description | Section |
 |:-:|---|---|
-| **A** | STATUS_FILE semantics | §4.8.1 |
-| **B** | metricsProxyHandler /metrics | §4.8.2 |
-| **C** | IPv6 client IP | §4.8.3 |
-| **D** | Port Collision Guard | §4.8.4 |
-| **E** | Section-restricted TOML | §4.8.5 |
-| **G** | Exact key matching | §4.7.1 |
-| **H** | recordLoginAttempt | §4.7.2 |
-| **I** | isRunDirUsable cache | §4.7.3 |
-| **J** | isPortOpen native Go | §4.7.4 |
-| **K** | Asset Serving Fix | §4.7.5 |
-| **M** | Metrics JSON conversion | §4.8.6 |
-| **N** | getSystemShell fallback | §4.8.7 |
-| **O** | Basic Auth rate limiting | §4.8.8 |
-| **P** | Section header with comment | §4.8.9 |
-| **Q** | Per-port cache | §4.8.10 |
-| **R** | Exact endpoint matching | §4.8.11 |
-| **S** | Login POST-only | §4.8.12 |
-| **T** | readConfPort range check | §4.8.13 |
-| **U** | /readyz localhost-only | §4.8.14 |
-| **V** | shellQuote injection protection | §4.8.15 |
-| **W** | Auth cache (60 s) | §4.8.16 |
-| **X** | rebuildMu mutex (RACE-1) | §4.8.17 |
-| **Y** | runtime_info ports (PORT-2) | §4.8.18 |
-| **Z** | Preserve Settings on Upgrade | §4.8.19 |
-| **MEM-1** | Dynamic memory limit per profile | §4.9.1 |
-| **MEM-2** | Extended shellQuote charset | §4.9.2 |
-| **MEM-3** | MONITORING_UI_PORT in metrics handler | §4.9.3 |
-| **BAK-1** | `buildBackupInfo()` — 7-field schema | §4.10.1 |
-| **BAK-2** | `createAutoBackup(reason string)` + rotation | §4.10.2 |
-| **BAK-3** | `cleanupOldTransactions()` | §4.10.3 |
-| **BAK-4** | `checkPendingNotifications()` | §4.10.4 |
-| **WD-TOKEN** | Watchdog token (closes CSRF hole) | §4.5.1, §5.7 |
-| **FSH-10** | PID suffix in default backup directory names | §5.4 |
-| **FSH-11** | `get_watchdog_token()` helper | §5.4, §5.7 |
-| **ACT-5** | PID suffix in `_inline_backup_now` | §5.4 |
-| **BUG-A..L** | Post-audit corrections in `main.go` | §4.6.5, §4.11 |
-| **APK-1** | `APK_FILE` constant + serveStaticAssets + serveFile | §4.12.1 |
-| **APK-2** | `/app-debug.apk` route | §4.12.2 |
-| **CQ-FIX** | CodeQL path-injection fix in `removeModule` | §4.12.3 |
-| **IOS-REMOVE** | iOS PWA logic removed from `web/index.html` | §6.8 |
+| A | STATUS_FILE semantics | §4.8.1 |
+| B | metricsProxyHandler /metrics | §4.8.2 |
+| C | IPv6 client IP | §4.8.3 |
+| D | Port Collision Guard | §4.8.4 |
+| E | Section-restricted TOML | §4.8.5 |
+| G | Exact key matching | §4.7.1 |
+| H | recordLoginAttempt | §4.7.2 |
+| I | isRunDirUsable cache | §4.7.3 |
+| J | isPortOpen native Go | §4.7.4 |
+| K | Asset Serving Fix | §4.7.5 |
+| M | Metrics JSON conversion | §4.8.6 |
+| N | getSystemShell fallback | §4.8.7 |
+| O | Basic Auth rate limiting | §4.8.8 |
+| P | Section header with comment | §4.8.9 |
+| Q | Per-port cache | §4.8.10 |
+| R | Exact endpoint matching | §4.8.11 |
+| S | Login POST-only | §4.8.12 |
+| T | readConfPort range check | §4.8.13 |
+| U | /readyz localhost-only | §4.8.14 |
+| V | shellQuote injection protection | §4.8.15 |
+| W | Auth cache (60 s) | §4.8.16 |
+| X | rebuildMu mutex (RACE-1) | §4.8.17 |
+| Y | runtime_info ports (PORT-2) | §4.8.18 |
+| Z | Preserve Settings on Upgrade | §4.8.19 |
+| MEM-1 | Dynamic memory limit per profile | §4.9.1 |
+| MEM-2 | Extended shellQuote charset | §4.9.2 |
+| MEM-3 | MONITORING_UI_PORT in metrics handler | §4.9.3 |
+| BAK-1 | `buildBackupInfo()` — 7-field schema | §4.10.1 |
+| BAK-2 | `createAutoBackup(reason string)` + rotation | §4.10.2 |
+| BAK-3 | `cleanupOldTransactions()` | §4.10.3 |
+| BAK-4 | `checkPendingNotifications()` | §4.10.4 |
+| WD-TOKEN | Watchdog token (closes CSRF hole) | §4.5.1, §5.7 |
+| FSH-10 | PID suffix in default backup directory names | §5.4 |
+| FSH-11 | `get_watchdog_token()` helper | §5.4, §5.7 |
+| ACT-5 | PID suffix in `_inline_backup_now` | §5.4 |
+| BUG-A..L | Post-audit corrections in `main.go` | §4.6.6, §4.11 |
+| SNAP-MANIFEST | Snapshot detection by `.manifest.json` presence (v1.3.0) | §4.13.1 |
+| SNAP-MTIME | `last_backup_name` sorted by mtime (v1.3.0) | §4.13.1 |
+| ROT-MANIFEST | `rotate_backups` manifest-based detection (v1.3.0) | §4.13.2 |
+| ROT-MTIME | `rotate_backups` mtime sort (v1.3.0) | §4.13.2 |
+| ROT-PROTECT | `rotate_backups` preserves `.last_stable` + newest install (v1.3.0) | §4.13.2 |
+| APK-1 | `APK_FILE` constant + serveStaticAssets + serveFile | §4.12.1 |
+| APK-2 | `/app-debug.apk` route | §4.12.2 |
+| CQ-FIX | CodeQL path-injection fix in `removeModule` | §4.12.3 |
+| IOS-REMOVE | iOS PWA logic removed from `web/index.html` | §6.8 |
 
 ### Official Fix Numbers
 
 | # | Description | Reference |
 |:-:|---|---|
-| **Fix #1** | Dashboard JSON Conversion | §4.8.6 |
-| **Fix #2** | Shell fallback (getSystemShell) | §4.8.7 |
-| **Fix #3** | Preserve Settings on Upgrade | §4.8.19 |
-| **Fix #4** | `.gitignore` negation | (outside ARCHITECTURE) |
-| **Fix #5** | Pre-commit hooks fixed | (outside ARCHITECTURE) |
-| **Fix #6** | Asset Serving Fix | §4.7.5 (K) |
-| **Fix #7** | CodeQL config drift | (outside ARCHITECTURE) |
-| **Fix #8** | Basic Auth Rate Limiting | §4.8.8 |
-| **Fix #9** | `fuser` PID parsing | (outside ARCHITECTURE) |
-| **Fix #10** | Section header with comment | §4.8.9 |
-| **Fix #11** | Per-port cache | §4.8.10 |
-| **Fix #12** | Exact endpoint matching | §4.8.11 |
-| **NEW-1** | Login POST-only (CSRF) | §4.8.12 |
-| **NEW-2** | hasEndpoint usage | (merged in Fix #12) |
-| **NEW-3** | readConfPort range check | §4.8.13 |
-| **NEW-4** | /readyz localhost-only | §4.8.14 |
-| **NEW-5** | shellQuote injection protection | §4.8.15 |
-| **NEW-6** | Auth cache (60 s) | §4.8.16 |
-| **RACE-1** | rebuildMu mutex | §4.8.17 |
-| **PORT-2** | runtime_info ports | §4.8.18 |
-| **MEM-1** | Dynamic memory limit per profile | §4.9.1 |
-| **MEM-2** | Extended shellQuote charset | §4.9.2 |
-| **MEM-3** | MONITORING_UI_PORT in metrics handler | §4.9.3 |
-| **BAK-1** | buildBackupInfo 7-field schema | §4.10.1 |
-| **BAK-2** | createAutoBackup + rotation | §4.10.2 |
-| **BAK-3** | cleanupOldTransactions | §4.10.3 |
-| **BAK-4** | checkPendingNotifications | §4.10.4 |
-| **WD-TOKEN** | Watchdog token | §4.5.1, §5.7 |
-| **FSH-10** | PID suffix in backup names | §5.4 |
-| **FSH-11** | get_watchdog_token | §5.4, §5.7 |
-| **ACT-5** | PID suffix in inline backup | §5.4 |
-| **BUG-A..L** | main.go post-audit corrections | §4.6.5, §4.11 |
-| **APK-1** | APK_FILE constant + serveStaticAssets | §4.12.1 |
-| **APK-2** | /app-debug.apk route | §4.12.2 |
-| **CQ-FIX** | CodeQL path-injection fix | §4.12.3 |
-| **IOS-REMOVE** | iOS PWA logic removal | §6.8 |
+| Fix #1 | Dashboard JSON Conversion | §4.8.6 |
+| Fix #2 | Shell fallback (getSystemShell) | §4.8.7 |
+| Fix #3 | Preserve Settings on Upgrade | §4.8.19 |
+| Fix #4 | `.gitignore` negation | (outside ARCHITECTURE) |
+| Fix #5 | Pre-commit hooks fixed | (outside ARCHITECTURE) |
+| Fix #6 | Asset Serving Fix | §4.7.5 (K) |
+| Fix #7 | CodeQL config drift | (outside ARCHITECTURE) |
+| Fix #8 | Basic Auth Rate Limiting | §4.8.8 |
+| Fix #9 | `fuser` PID parsing | (outside ARCHITECTURE) |
+| Fix #10 | Section header with comment | §4.8.9 |
+| Fix #11 | Per-port cache | §4.8.10 |
+| Fix #12 | Exact endpoint matching | §4.8.11 |
+| NEW-1 | Login POST-only (CSRF) | §4.8.12 |
+| NEW-2 | hasEndpoint usage | (merged in Fix #12) |
+| NEW-3 | readConfPort range check | §4.8.13 |
+| NEW-4 | /readyz localhost-only | §4.8.14 |
+| NEW-5 | shellQuote injection protection | §4.8.15 |
+| NEW-6 | Auth cache (60 s) | §4.8.16 |
+| RACE-1 | rebuildMu mutex | §4.8.17 |
+| PORT-2 | runtime_info ports | §4.8.18 |
+| MEM-1 | Dynamic memory limit per profile | §4.9.1 |
+| MEM-2 | Extended shellQuote charset | §4.9.2 |
+| MEM-3 | MONITORING_UI_PORT in metrics handler | §4.9.3 |
+| BAK-1 | buildBackupInfo 7-field schema | §4.10.1 |
+| BAK-2 | createAutoBackup + rotation | §4.10.2 |
+| BAK-3 | cleanupOldTransactions | §4.10.3 |
+| BAK-4 | checkPendingNotifications | §4.10.4 |
+| WD-TOKEN | Watchdog token | §4.5.1, §5.7 |
+| FSH-10 | PID suffix in backup names | §5.4 |
+| FSH-11 | get_watchdog_token | §5.4, §5.7 |
+| ACT-5 | PID suffix in inline backup | §5.4 |
+| BUG-A..L | main.go post-audit corrections | §4.6.6, §4.11 |
+| SNAP-MANIFEST | Snapshot detection via manifest | §4.13.1 |
+| SNAP-MTIME | mtime sort for last_backup_name | §4.13.1 |
+| ROT-MANIFEST | Manifest-based rotation | §4.13.2 |
+| ROT-MTIME | mtime-sorted rotation | §4.13.2 |
+| ROT-PROTECT | Protected rotation targets | §4.13.2 |
+| APK-1 | APK_FILE constant + serveStaticAssets | §4.12.1 |
+| APK-2 | /app-debug.apk route | §4.12.2 |
+| CQ-FIX | CodeQL path-injection fix | §4.12.3 |
+| IOS-REMOVE | iOS PWA logic removal | §6.8 |
 
 > **v1.4.0 note**: APK-1, APK-2, CQ-FIX, and IOS-REMOVE are the
 > v1.4.0 additions. They are not audit corrections — they are
 > integration work (companion APK) and correctness fixes
 > (CodeQL path-injection, iOS removal).
 >
+> **v1.3.0 note**: SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+> ROT-MTIME, and ROT-PROTECT are the v1.3.0 server-side
+> refinements. They were previously undocumented in the release
+> notes and in the file headers of `main.go` / `functions.sh`;
+> they are documented here retroactively.
+>
 > **v1.2.0 note**: BAK-1..BAK-4, MEM-1..MEM-3, WD-TOKEN,
 > FSH-10, FSH-11, and ACT-5 are not audit corrections — they
 > close edge cases and security holes rather than fix known
 > exploitable vulnerabilities in earlier v1.2.0 drafts.
-> See `docs/SECURITY.md` §17.1 and §5.31 for the distinction.
 
 ---
 
@@ -3979,6 +4210,6 @@ button points at `/app-debug.apk` and the browser handles 404.
 
 ---
 
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Version**: v1.4.0
 **Author**: gasciljh

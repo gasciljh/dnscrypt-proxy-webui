@@ -4,11 +4,73 @@
 > shape the project.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-02
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
+> **Identifier inventory in this file (8 total)**:
+>   • HARD-ADRIDX-01 (v1.4.0 changes block — companion app context)
+>   • HARD-ADRIDX-02 (§3.3 extended with v1.3.0 + v1.4.0 examples)
+>   • HARD-ADRIDX-03 (§6.5 — Index Statistics annotated with v1.3.0 + v1.4.0)
+>   • HARD-ADRIDX-04 (§6.6 — ADRs by Release Cycle extended)
+>   • HARD-ADRIDX-05 (§9.3 — Runtime vs ADR table extended)
+>   • HARD-ADRIDX-06 (§9.4 — Summary table + client-side / optional-asset rows)
+>   • HARD-ADRIDX-07 (§10.4 renamed and extended to cover v1.1.0–v1.4.0)
+>   • HARD-ADRIDX-08 (Header / footer version consistency fixed)
+
+> **Cross-references**:
+>   • [ADR-0001](0001-two-branch-model.md) — two-branch model
+>   • [ADR-0002](0002-automated-releases.md) — automated releases
+>   • [ADR-0003](0003-post-release-sync.md) — post-release sync
+>   • [ADR-0004](0004-unified-pr-template.md) — superseded
+>   • [ADR-0005](0005-release-specific-pr-template.md) — active
+>   • [ADR-0006](0006-rename-hotfix-to-release-patch.md) — active
+>   • [../ARCHITECTURE.md §4.13](../ARCHITECTURE.md) — v1.3.0 server-side refinements
+>   • [../ARCHITECTURE.md §4.1, §11.37](../ARCHITECTURE.md) — MAIN-01 (v1.4.0)
+>   • [../SECURITY.md §5.31–§5.35](../SECURITY.md) — data-preservation + hardening
+>   • [../BACKUP.md](../BACKUP.md) — backup system reference
+>   • [../../CHANGELOG.md](../../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date (2026-10-08).
+>   • §3.3 (Examples from this project) extended with the
+>     v1.4.0 companion-app integration as an example of a
+>     contribution that does **not** need an ADR.
+>   • §6.5 (Index Statistics) annotated with the v1.3.0 and
+>     v1.4.0 release cycles (both: no new ADRs).
+>   • §6.6 (ADRs by Release Cycle) extended with the v1.3.0 and
+>     v1.4.0 cycles.
+>   • §9.3 (Runtime Improvements vs ADRs) extended with the
+>     v1.3.0 client-side features and the v1.4.0 companion-app
+>     integration.
+>   • §10.4 renamed and extended — now covers the v1.1.0,
+>     v1.2.0, v1.3.0, and v1.4.0 cycles.
+>   • **No new ADRs were added in v1.4.0.** The registry remains
+>     at **6 ADRs** (5 accepted + 1 superseded). The v1.4.0
+>     release is an integration release, not a re-architecture.
+>   • **Header/footer version consistency fixed** — the v1.3.0
+>     release left the header at `v1.4.0` but the footer at
+>     `v1.3.0`; both are now `v1.4.0`.
+
+> **v1.3.0 changes** (kept as history):
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • `Last updated` reflects the v1.3.0 release date.
+>   • §6.5 (Index Statistics) annotated with the v1.3.0 release
+>     cycle (no new ADRs).
+>   • §6.6 (ADRs by Release Cycle) extended with the v1.3.0 cycle.
+>   • §9.3 (Runtime Improvements vs ADRs) extended with the
+>     v1.3.0 client-side features (PWA install button, live
+>     status LED, DNS auto-start fix).
+>   • **No new ADRs were added in v1.3.0.** The registry remained
+>     at **6 ADRs** (5 accepted + 1 superseded). The v1.3.0
+>     release is a feature release, not a re-architecture.
+>   • **Footer correction**: the v1.3.0 release updated the header
+>     `Version` field to `v1.4.0` but left the footer at
+>     `v1.3.0`. This inconsistency is fixed in the v1.4.0
+>     revision — both fields now read `v1.4.0`.
+
+> **v1.2.0 changes** (kept as history):
 >   • Version bumped from v1.1.0 to v1.2.0.
 >   • `Last updated` reflects the v1.2.0 release date.
 >   • §3.3 (Examples from this project) extended with the
@@ -33,7 +95,7 @@
 >     This is a client-side-only feature and does **not** warrant
 >     an ADR — it does not change the API or the architecture.
 
-> **v1.2.0 (Global Edition) — Corrections in this revision**:
+> **v1.2.0 (Global Edition) — Corrections in this revision** (kept as history):
 >   • 🔧 **FIX-1 description** — §3.3 and §9.3 previously described
 >     FIX-1 as a "recovery-mode reorder". The actual implementation
 >     in `customize.sh` uses a **snapshot-and-reapply** strategy
@@ -53,6 +115,7 @@
 > - Version upgrade guide → [`../UPGRADE.md`](../UPGRADE.md)
 > - Backup system reference → [`../BACKUP.md`](../BACKUP.md)
 > - Emergency recovery → [`../EMERGENCY.md`](../EMERGENCY.md)
+> - Installation guide → [`../INSTALL.md`](../INSTALL.md) §8.6 (companion app)
 
 ---
 
@@ -98,7 +161,7 @@ Kubernetes, Rust, React, and dozens of other major projects.
 
 **In this project**: ADRs are used for both **process** decisions
 (e.g. the two-branch model) and **architectural** decisions. See
-§3.3 for examples across v1.0.0, v1.1.0, and v1.2.0.
+§3.3 for examples across v1.0.0 through v1.4.0.
 
 ---
 
@@ -132,6 +195,25 @@ object, and the watchdog token. Each of these is a
 **data-preservation mechanism** — not an architectural change. The
 rationale lives in `docs/BACKUP.md` and `docs/SECURITY.md` §5.31.
 No new ADRs were needed.
+
+**v1.3.0 example**: The Feature Release added the PWA install
+button, live status LED, DNS auto-start fix, and **server-side
+rotation refinements** (SNAP-MANIFEST + SNAP-MTIME in
+`main.go:buildBackupInfo()`, ROT-MANIFEST + ROT-MTIME +
+ROT-PROTECT in `functions.sh:rotate_backups()`). The client-side
+features have no architectural impact; the rotation refinements
+tune detection and sort keys inside an existing subsystem. No new
+ADRs were needed.
+
+**v1.4.0 example**: The Integration Release added the companion
+Android app (optional asset), the CodeQL `go/path-injection` fix
+in `removeModule`, iOS PWA removal, and the **MAIN-01** fix
+(`LOG_LEVEL` loaded immediately after `initPaths()` in
+`main.go`). None of these changes the architecture: the APK is a
+static asset served by an existing HTTP route, the CodeQL fix is
+a correctness hardening, the iOS removal is a client-side
+cleanup, and MAIN-01 is a startup-order fix. No new ADRs were
+needed.
 
 ### 2.2 What they are NOT
 
@@ -172,6 +254,16 @@ ADRs are specifically about **decisions** — the "why" behind the
 - ❌ The change is a **defensive hardening** that adds new layers
   to an existing subsystem (e.g. BAK-1..BAK-4, WD-TOKEN —
   see §3.3).
+- ❌ The change is a **client-side feature** (e.g. the v1.3.0
+  PWA install button, live status LED — see §3.3).
+- ❌ The change is a **server-side behavioral refinement** that
+  tunes detection / sort keys inside an existing subsystem (e.g.
+  SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME +
+  ROT-PROTECT — see §3.3).
+- ❌ The change is an **integration of an optional asset** (e.g.
+  the v1.4.0 companion Android app — see §3.3).
+- ❌ The change is a **startup-order fix** (e.g. MAIN-01 —
+  see §3.3).
 
 ### 3.3 Examples from this project
 
@@ -202,6 +294,16 @@ ADRs are specifically about **decisions** — the "why" behind the
 | **WD-TOKEN — Watchdog token (v1.2.0)** | **Defensive hardening** | **❌** |
 | **Bilingual WebUI (EN + AR, v1.2.0)** | **Client-side feature** | **❌** |
 | **10 defensive layers (v1.2.0)** | **Extends existing backup subsystem** | **❌** |
+| **PWA install button — smart dynamic (v1.3.0)** | **Client-side feature** | **❌** |
+| **Live status LED (v1.3.0)** | **Client-side feature** | **❌** |
+| **DNS auto-start fix in `service.sh` (v1.3.0)** | **Shell-side fix** | **❌** |
+| **SNAP-MANIFEST + SNAP-MTIME in `main.go:buildBackupInfo()` (v1.3.0)** | **Behavior refinement** | **❌** |
+| **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in `functions.sh:rotate_backups()` (v1.3.0)** | **Behavior refinement** | **❌** |
+| **Companion Android app (v1.4.0)** | **Optional asset integration** | **❌** |
+| **CodeQL `go/path-injection` fix in `removeModule` (v1.4.0)** | **Correctness hardening** | **❌** |
+| **iOS PWA logic removal (v1.4.0)** | **Client-side cleanup** | **❌** |
+| **`/app-debug.apk` static route (v1.4.0)** | **Additive API surface** | **❌** |
+| **MAIN-01 — `LOG_LEVEL` load-order fix (v1.4.0)** | **Startup-order fix** | **❌** |
 
 **Why MEM-1/2/3 do not need ADRs**:
 
@@ -253,6 +355,84 @@ ADRs are specifically about **decisions** — the "why" behind the
 - Its rationale is fully captured in `docs/ARCHITECTURE.md` §6.7
   and `docs/API.md` §10.8.
 
+**Why the v1.3.0 client-side features do not need ADRs**:
+
+- The **PWA install button** is a small change inside
+  `web/index.html` — it uses the browser's existing
+  `beforeinstallprompt` API. No new module, no new endpoint.
+- The **live status LED** is a DOM manipulation inside
+  `index.html` — it reads the current status from the existing SSE
+  stream.
+- The **DNS auto-start fix** changes *when* an existing endpoint
+  is called (at boot instead of waiting for the Watchdog), not
+  *what* the endpoint does.
+- Their rationale is fully captured in `docs/ARCHITECTURE.md` §6.4
+  and `docs/API.md` §6.1.7.
+
+**Why the v1.3.0 rotation refinements do not need ADRs**:
+
+- **SNAP-MANIFEST + SNAP-MTIME** change the *detection* rule
+  (`buildBackupInfo` now checks for `.manifest.json` presence)
+  and the *sort key* (mtime instead of lexicographic name) inside
+  an existing subsystem. The `runtime_info.backups` object keeps
+  the same 7-field schema.
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** apply the same
+  detection / sort changes to the shell-side rotation, plus two
+  protected targets (`.last_stable` + newest install) on top of
+  the 21-newest window.
+- Neither changes the architecture: backups remain
+  filesystem-based, rotation remains count-based (21 snapshots).
+- Their rationale is fully captured in `docs/ARCHITECTURE.md`
+  §4.13 (authoritative), `docs/API.md` §6.1.7, and
+  `docs/COMPATIBILITY.md` §10.3.5.
+
+**Why the v1.4.0 companion app does not need an ADR**:
+
+- The companion app is an **optional asset** — a static file
+  (`web/app-debug.apk`) served by an existing HTTP server on a
+  new public route (`GET /app-debug.apk`). The route has no
+  auth and returns 404 when the file is absent.
+- The pipeline change is **additive** — two new best-effort steps
+  (Fetch APK + Stage APK) that do not fail the release if they
+  fail.
+- The WebUI install button is a **direct `<a download>` link**
+  with no JavaScript logic.
+- No new architectural patterns are introduced: the WebUI
+  continues to be a static-asset server with `main.go` as the
+  only backend.
+- The rationale is fully captured in `docs/ARCHITECTURE.md`
+  §4.12, `docs/API.md` §6.1.15, and `docs/RELEASE_PROCESS.md`
+  §8.4.
+
+**Why the v1.4.0 CodeQL fix does not need an ADR**:
+
+- It is a **correctness hardening** — the sanitizer changes from
+  a prefix check + `filepath.Clean` to `filepath.Base` + a
+  trusted base dir.
+- The endpoint's contract (request shape, response shape) is
+  **unchanged**.
+- No new dependencies, no new patterns.
+- Its rationale is fully captured in `docs/SECURITY.md` §5.34
+  and `docs/ARCHITECTURE.md` §4.12.3.
+
+**Why the v1.4.0 iOS removal does not need an ADR**:
+
+- It **removes dead code** (iOS branches never executed on any
+  supported platform).
+- It does not change the architecture — only the browser-API
+  surface of a client-side file.
+- Its rationale is fully captured in `docs/SECURITY.md` §5.35.1
+  and `docs/ARCHITECTURE.md` §6.8.
+
+**Why MAIN-01 does not need an ADR**:
+
+- It is a **startup-order fix** — `currentLogLevel = loadLogLevel()`
+  is now called immediately after `initPaths()` in `main()`.
+- It does not change the architecture — only the *order* of two
+  existing calls.
+- Its rationale is fully captured in `docs/ARCHITECTURE.md` §4.1
+  and §11.37, and `docs/API.md` §11 v1.4.0.
+
 **When would a memory-related change need an ADR?** If we ever:
 
 - Replace `debug.SetMemoryLimit` with a **custom memory manager**.
@@ -267,6 +447,17 @@ Those would qualify as architectural decisions.
   backend** (e.g. WebDAV, S3).
 - Introduce a **database** for snapshot metadata.
 - Move the backup layer to a **separate daemon**.
+
+Those would qualify as architectural decisions.
+
+**When would a companion-app-related change need an ADR?** If we
+ever:
+
+- Bundle the companion app as a **required** (not optional) asset.
+- Make the WebUI install button **dependent** on the companion
+  app for core functionality.
+- Add a **bidirectional** IPC channel between the module and the
+  companion app (e.g. a local socket, a shared database).
 
 Those would qualify as architectural decisions.
 
@@ -290,6 +481,22 @@ Is it a correctness fix?  ──yes──▶ SECURITY.md + CHANGELOG.md
        no
        ▼
 Is it a defensive hardening of an existing subsystem?  ──yes──▶ SECURITY.md + CHANGELOG.md
+       │
+       no
+       ▼
+Is it a client-side feature?  ──yes──▶ ARCHITECTURE.md + CHANGELOG.md
+       │
+       no
+       ▼
+Is it a server-side behavioral refinement?  ──yes──▶ ARCHITECTURE.md + API.md + CHANGELOG.md
+       │
+       no
+       ▼
+Is it an optional-asset integration?  ──yes──▶ API.md + ARCHITECTURE.md + CHANGELOG.md
+       │
+       no
+       ▼
+Is it a startup-order fix?  ──yes──▶ ARCHITECTURE.md + API.md + CHANGELOG.md
        │
        no
        ▼
@@ -435,6 +642,8 @@ docs/adr/
 | **Added in v1.0.0 cycle** | **6** |
 | **Added in v1.1.0 cycle** | **0** |
 | **Added in v1.2.0 cycle** | **0** |
+| **Added in v1.3.0 cycle** | **0** |
+| **Added in v1.4.0 cycle** | **0** |
 
 **Note**: v1.1.0 did not add any new ADRs. The three runtime
 improvements (MEM-1 / MEM-2 / MEM-3) are documented in
@@ -446,6 +655,22 @@ data-preservation additions (BAK-1..BAK-4), correctness fixes
 the 10 defensive layers are documented in `docs/SECURITY.md`
 §5.31–§5.33, `docs/BACKUP.md`, and `docs/ARCHITECTURE.md` §3.10 /
 §4.10 — but do **not** warrant ADRs (see §3.3).
+
+**Note**: v1.3.0 did not add any new ADRs. The client-side
+features (PWA install button, live status LED, DNS auto-start fix)
+and the server-side rotation refinements (SNAP-MANIFEST +
+SNAP-MTIME + ROT-MANIFEST + ROT-MTIME + ROT-PROTECT) are
+documented in `docs/ARCHITECTURE.md` §6.4 / §4.13,
+`docs/API.md` §6.1.7, and `docs/COMPATIBILITY.md` §10.3.5 — but
+do **not** warrant ADRs (see §3.3).
+
+**Note**: v1.4.0 did not add any new ADRs. The companion Android
+app integration, the CodeQL `go/path-injection` fix, the iOS PWA
+removal, the new `/app-debug.apk` route, and MAIN-01 (`LOG_LEVEL`
+load-order fix) are documented in `docs/ARCHITECTURE.md` §4.1 /
+§4.12 / §6.8 / §11.37, `docs/API.md` §6.1.15, and
+`docs/SECURITY.md` §5.34–§5.35 — but do **not** warrant ADRs
+(see §3.3).
 
 ### 6.6 ADRs by Release Cycle
 
@@ -464,9 +689,15 @@ v1.1.0 cycle (2026-09-26):
 v1.2.0 cycle (2026-09-29):
   └── (no new ADRs — data-preservation release)
 
-v1.3.0 cycle (planned):
-  └── (to be determined — likely a memory-related ADR if the
-       architecture changes; otherwise none)
+v1.3.0 cycle (2026-10-02):
+  └── (no new ADRs — feature release with server-side rotation refinements)
+
+v1.4.0 cycle (2026-10-06):
+  └── (no new ADRs — integration release)
+
+v1.5.0 cycle (planned):
+  └── (to be determined — likely a memory-related or backup-related
+       ADR if the architecture changes; otherwise none)
 ```
 
 ---
@@ -587,6 +818,10 @@ Before submitting an ADR, verify:
 - ❌ **ADR for a runtime improvement** — see §3.3.
 - ❌ **ADR for a correctness fix** — see §3.3.
 - ❌ **ADR for a defensive hardening** — see §3.3.
+- ❌ **ADR for a client-side feature** — see §3.3.
+- ❌ **ADR for a server-side behavioral refinement** — see §3.3.
+- ❌ **ADR for an optional-asset integration** — see §3.3.
+- ❌ **ADR for a startup-order fix** — see §3.3.
 
 ---
 
@@ -624,8 +859,8 @@ only the ADR is needed. The CHANGELOG may reference it as a
 
 ### 9.3 Runtime Improvements vs ADRs
 
-Not every change that "feels important" needs an ADR. The v1.1.0
-and v1.2.0 releases are good examples:
+Not every change that "feels important" needs an ADR. The
+v1.1.0 → v1.4.0 releases are good examples:
 
 **v1.1.0 cycle**:
 
@@ -650,6 +885,26 @@ and v1.2.0 releases are good examples:
 | **Bilingual WebUI** (EN + AR) | ❌ | `docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8 + `CHANGELOG.md` |
 | **10 defensive layers** | ❌ | `docs/BACKUP.md` §1.3 + `docs/ARCHITECTURE.md` §3.10 + `CHANGELOG.md` |
 
+**v1.3.0 cycle**:
+
+| Change | ADR? | Where documented |
+|---|:---:|---|
+| **PWA install button** — smart dynamic | ❌ | `docs/ARCHITECTURE.md` §6.4 + `CHANGELOG.md` |
+| **Live status LED** on Today counter | ❌ | `docs/ARCHITECTURE.md` §6.1 + `CHANGELOG.md` |
+| **DNS auto-start fix** (`service.sh`) | ❌ | `docs/ARCHITECTURE.md` §5.2 + `CHANGELOG.md` |
+| **SNAP-MANIFEST + SNAP-MTIME** (`main.go:buildBackupInfo()`) | ❌ | `docs/ARCHITECTURE.md` §4.13 + `docs/API.md` §6.1.7 + `CHANGELOG.md` |
+| **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** (`functions.sh:rotate_backups()`) | ❌ | `docs/ARCHITECTURE.md` §4.13 + `docs/BACKUP.md` §6.5 + `CHANGELOG.md` |
+
+**v1.4.0 cycle**:
+
+| Change | ADR? | Where documented |
+|---|:---:|---|
+| **Companion Android app** (optional asset) | ❌ | `docs/ARCHITECTURE.md` §4.12 + `docs/INSTALL.md` §8.6 + `CHANGELOG.md` |
+| **CodeQL `go/path-injection` fix** in `removeModule` | ❌ | `docs/SECURITY.md` §5.34 + `docs/API.md` §6.2.10 + `CHANGELOG.md` |
+| **iOS PWA logic removal** | ❌ | `docs/SECURITY.md` §5.35.1 + `docs/ARCHITECTURE.md` §6.8 + `CHANGELOG.md` |
+| **`/app-debug.apk` static route** | ❌ | `docs/API.md` §6.1.15 + `CHANGELOG.md` |
+| **MAIN-01** — `LOG_LEVEL` load-order fix | ❌ | `docs/ARCHITECTURE.md` §4.1 + §11.37 + `docs/API.md` §11 + `CHANGELOG.md` |
+
 **Rule of thumb**:
 
 - If the change **modifies** an existing decision's **value** →
@@ -658,6 +913,10 @@ and v1.2.0 releases are good examples:
 - If the change **reverses** the decision → new superseding ADR.
 - If the change **extends** an existing subsystem without altering
   its boundaries → no ADR.
+- If the change is a **client-side feature** → no ADR.
+- If the change is a **server-side behavioral refinement** → no ADR.
+- If the change is an **optional-asset integration** → no ADR.
+- If the change is a **startup-order fix** → no ADR.
 
 **Why MEM-1 does not need an ADR**:
 
@@ -683,6 +942,42 @@ and v1.2.0 releases are good examples:
   file-backed secrets.
 - The rationale is fully captured in `docs/SECURITY.md` §5.33.
 
+**Why the v1.3.0 PWA button does not need an ADR**:
+
+- It is a **client-side** feature — no API change, no new module.
+- The button uses the browser's `beforeinstallprompt` API, which
+  is standard.
+- The rationale is fully captured in `docs/ARCHITECTURE.md` §6.4.
+
+**Why the v1.3.0 rotation refinements do not need an ADR**:
+
+- The backup subsystem already exists; the refinements change
+  **detection** (manifest-based) and **sort key** (mtime) inside
+  it.
+- The `runtime_info.backups` schema is unchanged (7 fields).
+- The rationale is fully captured in `docs/ARCHITECTURE.md`
+  §4.13 and `docs/COMPATIBILITY.md` §10.3.5.
+
+**Why the v1.4.0 companion app does not need an ADR**:
+
+- The companion app is an **optional asset** — a static file
+  served on a new public route.
+- No new architectural patterns: the WebUI continues to be a
+  static-asset server with `main.go` as the only backend.
+- The pipeline additions (Fetch APK + Stage APK) are best-effort
+  and do not fail the release.
+- The rationale is fully captured in `docs/ARCHITECTURE.md`
+  §4.12 and `docs/API.md` §6.1.15.
+
+**Why MAIN-01 does not need an ADR**:
+
+- It is a **startup-order fix** — `loadLogLevel()` is moved
+  earlier in `main()`.
+- No architectural change: the same function, the same file, the
+  same call site.
+- The rationale is fully captured in `docs/ARCHITECTURE.md` §4.1
+  and §11.37.
+
 **When it *would* need an ADR**:
 
 - Replacing `debug.SetMemoryLimit` with a custom memory manager.
@@ -691,23 +986,30 @@ and v1.2.0 releases are good examples:
 - Replacing the filesystem-based backup with a remote storage
   backend.
 - Moving the backup layer to a separate daemon.
+- Making the companion app **required** (not optional).
+- Adding a **bidirectional IPC** channel between the module and
+  the companion app.
 
 Those would be architectural changes.
 
 ### 9.4 Summary Table
 
-| Change type | ADR | SECURITY.md | CHANGELOG.md | ROADMAP.md | BACKUP.md |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Architectural decision | ✅ | — | ✅ | — | — |
-| Process decision | ✅ | — | ✅ | — | — |
-| Runtime improvement | ❌ | ✅ | ✅ | — | — |
-| **Correctness fix** | ❌ | ✅ | ✅ | — | — |
-| **Defensive hardening** | ❌ | ✅ | ✅ | — | — |
-| **Data-preservation addition** | ❌ | ✅ | ✅ | — | ✅ |
-| Audit Correction | ❌ | ✅ | ✅ | — | — |
-| Bug fix | ❌ | — | ✅ | — | — |
-| New feature (planned) | — | — | — | ✅ | — |
-| New feature (delivered) | — | — | ✅ | ✅ | — |
+| Change type | ADR | SECURITY.md | CHANGELOG.md | ROADMAP.md | BACKUP.md | ARCHITECTURE.md | API.md |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Architectural decision | ✅ | — | ✅ | — | — | ✅ | — |
+| Process decision | ✅ | — | ✅ | — | — | — | — |
+| Runtime improvement | ❌ | ✅ | ✅ | — | — | — | — |
+| **Correctness fix** | ❌ | ✅ | ✅ | — | — | — | — |
+| **Defensive hardening** | ❌ | ✅ | ✅ | — | — | — | — |
+| **Data-preservation addition** | ❌ | ✅ | ✅ | — | ✅ | — | — |
+| **Client-side feature** | ❌ | — | ✅ | — | — | ✅ | — |
+| **Server-side behavioral refinement** | ❌ | — | ✅ | — | ✅ | ✅ | ✅ |
+| **Optional-asset integration** | ❌ | — | ✅ | — | — | ✅ | ✅ |
+| **Startup-order fix** | ❌ | — | ✅ | — | — | ✅ | ✅ |
+| Audit Correction | ❌ | ✅ | ✅ | — | — | — | — |
+| Bug fix | ❌ | — | ✅ | — | — | — | — |
+| New feature (planned) | — | — | — | ✅ | — | — | — |
+| New feature (delivered) | — | — | ✅ | ✅ | — | — | — |
 
 **Legend**:
 
@@ -717,6 +1019,14 @@ Those would be architectural changes.
   explicit one (e.g. WD-TOKEN).
 - **Data-preservation addition** — extends an existing subsystem
   (e.g. BAK-1..BAK-4, 10 defensive layers).
+- **Client-side feature** — a UX change with no server-side impact
+  (e.g. v1.3.0 PWA button, live status LED).
+- **Server-side behavioral refinement** — tunes detection / sort
+  keys inside an existing subsystem (e.g. SNAP-*/ROT-*).
+- **Optional-asset integration** — an additive integration of an
+  optional asset (e.g. v1.4.0 companion Android app).
+- **Startup-order fix** — reorders existing calls in `main()`
+  without changing behavior (e.g. MAIN-01).
 
 ---
 
@@ -727,17 +1037,21 @@ Those would be architectural changes.
 | File | Purpose |
 |---|---|
 | [`../BRANCHING.md`](../BRANCHING.md) | Git branching strategy |
-| [`../RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) | Release process |
+| [`../RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) | Release process (§8.4, §8.5) |
 | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) | Contribution guide |
 | [`../DEVELOPMENT.md`](../DEVELOPMENT.md) | Developer guide |
-| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | System architecture (§3.10, §4.10) |
-| [`../SECURITY.md`](../SECURITY.md) | Security policy (§5.31, §5.32, §5.33) |
+| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | System architecture (§3.10, §4.10, §4.12, §4.13, §6.8) |
+| [`../SECURITY.md`](../SECURITY.md) | Security policy (§5.31–§5.35) |
 | [`../ROADMAP.md`](../ROADMAP.md) | Future plans |
-| [`../UPGRADE.md`](../UPGRADE.md) | Version upgrade guide |
-| [`../BACKUP.md`](../BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [`../EMERGENCY.md`](../EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
-| [`../API.md`](../API.md) | HTTP API reference (§6.1.7) |
-| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
+| [`../UPGRADE.md`](../UPGRADE.md) | Version upgrade guide (§3.1–§3.4) |
+| [`../BACKUP.md`](../BACKUP.md) | Backup system reference (v1.2.0 + v1.3.0 semantics) |
+| [`../EMERGENCY.md`](../EMERGENCY.md) | Emergency recovery (v1.2.0) |
+| [`../INSTALL.md`](../INSTALL.md) | Installation guide (§8.6 companion app) |
+| [`../API.md`](../API.md) | HTTP API reference (§6.1.7, §6.1.15, §2.8, §11) |
+| [`../COMPATIBILITY.md`](../COMPATIBILITY.md) | Compatibility matrix (§10.3.5 SNAP-*/ROT-* verification) |
+| [`../GLOSSARY.md`](../GLOSSARY.md) | Glossary (SNAP-*/ROT-* terms) |
+| [`../HALL_OF_FAME.md`](../HALL_OF_FAME.md) | Contributors recognition |
+| [`../../CHANGELOG.md`](../../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
 
 ### 10.2 External References
 
@@ -761,15 +1075,16 @@ The six ADRs added in the v1.0.0 cycle:
 | 0005 | v1.0.0 | Release-specific PR template |
 | 0006 | v1.0.0 | Rename hotfix.sh → release-patch.sh |
 
-### 10.4 v1.1.0 and v1.2.0 Cycle References
+### 10.4 v1.1.0 – v1.4.0 Cycle References
 
-**No new ADRs were added in either cycle.**
+**No new ADRs were added in the v1.1.0, v1.2.0, v1.3.0, or v1.4.0
+cycles.**
 
 **v1.1.0 cycle (2026-09-26)** — Polish release:
 
 - Runtime improvements (MEM-1/2/3) — see `docs/SECURITY.md` §5.30.
 - Critical fix (`offline.html` CSP) — see `CHANGELOG.md`.
-- Documentation updates — see `docs/UPGRADE.md` §3.0.
+- Documentation updates — see `docs/UPGRADE.md` §3.1.
 
 None of these warranted an ADR (see §3.3 and §9.3).
 
@@ -786,19 +1101,54 @@ None of these warranted an ADR (see §3.3 and §9.3).
 
 None of these warranted an ADR (see §3.3 and §9.3).
 
-**Why**: A data-preservation release that hardens an existing
-subsystem (backup) and tunes existing mechanisms (correctness
-fixes, defensive hardening) is **not** an architectural change.
-Its rationale belongs in the data-preservation reference
-(`docs/BACKUP.md`) and the security registry
+**v1.3.0 cycle (2026-10-02)** — Feature Release:
+
+- PWA install button — see `docs/ARCHITECTURE.md` §6.4.
+- Live status LED — see `docs/ARCHITECTURE.md` §6.1.
+- DNS auto-start fix — see `docs/ARCHITECTURE.md` §5.2.
+- **SNAP-MANIFEST + SNAP-MTIME** (`main.go:buildBackupInfo()`) —
+  see `docs/ARCHITECTURE.md` §4.13.1 and `docs/API.md` §6.1.7.
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT**
+  (`functions.sh:rotate_backups()`) — see
+  `docs/ARCHITECTURE.md` §4.13.2 and `docs/BACKUP.md` §6.5.
+
+None of these warranted an ADR (see §3.3 and §9.3).
+
+**v1.4.0 cycle (2026-10-06)** — Integration Release:
+
+- Companion Android app (optional asset) — see
+  `docs/ARCHITECTURE.md` §4.12 and `docs/INSTALL.md` §8.6.
+- CodeQL `go/path-injection` fix in `removeModule` — see
+  `docs/SECURITY.md` §5.34 and `docs/API.md` §6.2.10.
+- iOS PWA logic removal — see `docs/SECURITY.md` §5.35.1 and
+  `docs/ARCHITECTURE.md` §6.8.
+- `/app-debug.apk` static route — see `docs/API.md` §6.1.15.
+- **MAIN-01** — `LOG_LEVEL` load-order fix — see
+  `docs/ARCHITECTURE.md` §4.1 and §11.37, and `docs/API.md` §11.
+- 8 release artifacts (2 optional) — see
+  `docs/RELEASE_PROCESS.md` §7.3.
+
+None of these warranted an ADR (see §3.3 and §9.3).
+
+**Why**: A polish release (v1.1.0) that tunes existing values, a
+data-preservation release (v1.2.0) that hardens an existing
+subsystem, a feature release (v1.3.0) that adds client-side
+surfaces and tunes rotation semantics inside an existing
+subsystem, and an integration release (v1.4.0) that bundles an
+optional asset and applies a startup-order fix — none of these
+are **architectural changes**. Their rationale belongs in the
+subsystem-specific references (`docs/BACKUP.md`,
+`docs/ARCHITECTURE.md`) and the security registry
 (`docs/SECURITY.md`), not the ADR log.
 
-The next ADR (likely #0007) would be expected in **v1.3.x** if a
+The next ADR (likely #0007) would be expected in **v1.5.x** if a
 proposed change alters the architecture (e.g. a new remote storage
-backend, or a switch to cgroups-based memory limits).
+backend, a switch to cgroups-based memory limits, a bidirectional
+IPC channel between the module and the companion app, or a
+unification of the WebUI + Dashboard onto a single port).
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
 *Author: gasciljh*

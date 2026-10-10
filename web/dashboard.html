@@ -2,6 +2,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
      Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -17,8 +18,40 @@
        • Runtime info (dynamic ports + profile + memory + backups)
        • Diagnostic file viewer
        • Service Worker update banner
+       • Read-only view — no controls, no install button
+         (the companion APK install button is a WebUI-only
+         feature — see web/index.html)
 
-     v1.3.0 fixes (original):
+     v1.4.0 — Companion Android app integration:
+       • The Dashboard does not host an install button of its own.
+         The companion APK is a WebUI feature (see web/index.html);
+         the Dashboard simply displays the same DNS metrics as
+         before.
+       • No behavior change to the metrics pipeline, the runtime
+         info panel, or the SSE stream.
+       • The `<title>` and `<footerText>` were updated from v1.3.0
+         to v1.4.0 (they had been left behind in the v1.3.0 → v1.4.0
+         release).
+
+     v1.4.0 — frontend audit clarifications (kept):
+       • DASH-A1 — the Features list no longer claims a
+         "shared WebUI install button". The Dashboard does
+         not host an install button at all — that is a
+         WebUI-only feature (see `web/index.html`). The
+         Dashboard displays live DNS metrics, runtime info,
+         and diagnostic files only.
+       • DASH-A2 — `setNetworkDownUI()` no longer references
+         an undefined `statusArea` element (a legacy
+         copy-paste artifact from `index.html`). The function
+         now only updates the SSE diagnostic label, which is
+         the Dashboard's sole connection-health indicator.
+       • DASH-A3 — documented that `/app-debug.apk` is
+         bypassed by the Service Worker (see `web/sw.js`
+         `shouldBypass()` rule 9). The Dashboard never
+         references the APK path, so this is a
+         documentation-only note.
+
+     v1.3.0 fixes (kept, original):
        • Service Worker update banner markup + CSS + JS added.
        • Fixed SW reload loop: [Reload] now sends SKIP_WAITING to
          swRegistration.waiting (the NEW worker), and reloads on
@@ -28,138 +61,33 @@
        • Language toggle restored (EN ↔ AR), preference persisted
          in localStorage under 'dnscrypt-lang'.
 
-     ============================================================
-     v1.3.0 — POST-AUDIT FIXES (this file, still v1.3.0)
-     ============================================================
-     A pre-release audit of this file identified the following
-     issues. All of them are addressed in-place; no version bump.
-
-       🔧 DASH-1 — `formatBytes()` did not handle the GB range
-         and fell back to showing large MB values. Added a GB
-         branch.
-
-       🔧 DASH-2 — The service worker update checker was
-         missing entirely from this file. `index.html` sets up
-         a periodic `postMessage({type:'CHECK_UPDATE'})` (every
-         1 h). The dashboard now installs the same interval.
-
-       🔧 DASH-3 — `controllerchange` and `stopPolling()` did
-         not clear the new `swUpdateCheckInterval`. Added
-         explicit cleanup in both places.
-
-       🔧 DASH-4 — In `loadRuntimeInfo()`, the fallback for a
-         missing `backups.path` was the raw literal `'unknown'`
-         rather than the translated `t('riBackupNotInit')`.
-         Replaced by the translation key.
-
-       🛡️ DASH-5 — `bindSWUpdateButtons()` now installs a
-         3-second fallback that reloads the page if
-         `controllerchange` never fires (e.g. misbehaving or
-         terminated SW). Parity with IDX-11 in index.html.
-         Without this, `pendingReload` could stay true forever
-         and the [Reload] button would become a no-op.
-
-       🛡️ DASH-6 — `toggleLanguage()` now rebuilds the Runtime
-         Info card immediately, without requiring an extra
-         HTTP request. The card's labels (Version, Commit,
-         Backups, In-flight Txn, Orphan Txn, ...) switch
-         language along with the rest of the page. Parity with
-         the equivalent behavior in index.html's
-         `toggleLanguage()`.
-
-         Implementation: the runtime-info rendering logic has
-         been extracted into a dedicated `renderRuntimeInfo()`
-         helper, and the raw API response is cached in
-         `lastRuntimeData`. The language toggle calls
-         `renderRuntimeInfo(lastRuntimeData)` directly.
-
-       🛡️ DASH-7 — `formatBytes()` now returns "0 B" for
-         negative input, instead of the nonsensical
-         "<negative> B". Parity with IDX-13 in index.html.
-
-       🛡️ DASH-8 — `showSWUpdateBanner()` is now idempotent:
-         a redundant call with the banner already visible is a
-         no-op, avoiding needless style writes when both the
-         `updatefound` event and a periodic check fire close
-         together.
-
-       🛡️ DASH-9 — `initSSE()` now carries an explicit comment
-         on the `lastStatus` variable, documenting that it is
-         scoped per SSE connection (reset on each reconnect)
-         and intentionally NOT a global. Clarifies behavior
-         for a future reader.
-
-     ============================================================
-     v1.3.0 (Global Edition) — Additional hardening, second pass
-     ============================================================
-     A second review pass (cross-verified against index.html)
-     identified the following issues. All of them are addressed
-     in-place; no version bump.
-
-       🛡️ DASH-10 — `xhrRequest()` with retries, exponential
-         backoff, and explicit handling of HTTP 405 / 409 / 413
-         has been adopted from index.html. The previous
-         `xhrGet`/`xhrPost` pair did not retry on transient
-         network errors and did not distinguish these status
-         codes from generic failures.
-
-         New helpers:
-           • `getTimeoutForUrl(method, url)` — chooses a
-             per-endpoint timeout (310 s for update_profile,
-             60 s for service toggle/restart, 15 s default).
-           • `xhrRequest(method, url, data, cb, retries, delay)`.
-           • `xhrGet` / `xhrPost` are now thin wrappers around
-             `xhrRequest`.
-
-       🛡️ DASH-11 — `setNetworkDownUI(isDown)` has been added.
-         When the periodic metrics fetch fails repeatedly, the
-         status area border turns amber and the status text
-         shows "Server unreachable". When the fetch recovers,
-         the border is restored. Parity with index.html's
-         `setNetworkDownUI()`.
-
-       🛡️ DASH-12 — `showConfirmModal()` now supports
-         `options.primaryText` + `options.primaryCallback`.
-         A custom "primary" button can be inserted before the
-         standard Cancel/Confirm pair. Parity with the
-         index.html modal extension; used by
-         `handleSessionExpired()`.
-
-       🛡️ DASH-13 — `handleSessionExpired()` has been added.
-         It resets the backoff counters (`verifyBackoff`,
-         `sseBackoff`), tears down intervals/SSE, and shows a
-         modal with a `primaryText` = "Re-login" button.
-         Parity with index.html's `handleSessionExpired()`.
-
-       🛡️ DASH-14 — The `dashboardLink` fallback timeout: if
-         `loadRuntimeInfo()` fails or the runtime info never
-         arrives, the `loading` class is removed after 8 s so
-         the Dashboard link does not stay disabled forever.
-         Before this, a failed runtime_info fetch could leave
-         the link in a permanent `loading` state.
-
-       🛡️ DASH-15 — `stopPolling()` now clears the
-         `runtimeInfoRefreshTimeout` and the
-         `dashboardLinkFallbackTimer`, in addition to the
-         intervals already cleared (DASH-3).
-
-       🛡️ DASH-16 — The `<meta http-equiv="Cache-Control">` in
-         `<head>` has been complemented with
-         `<meta http-equiv="Pragma" content="no-cache">` and
-         `<meta http-equiv="Expires" content="0">` for legacy
-         proxy compatibility. The CSP / Cache-Control response
-         headers are still set by main.go, so this is a
-         belt-and-braces measure only.
-
-       🛡️ DASH-17 — `bindSWUpdateButtons()` and the SW
-         registration flow now use `installed`/`activated` SW
-         state checks consistently. When `reg.waiting` exists
-         AND `navigator.serviceWorker.controller` is present,
-         the banner is shown even if `updatefound` never fires
-         (e.g. the SW was already installed on a previous
-         visit). This closes a corner case where a returning
-         user could not see the update banner.
-
+     v1.3.0 — POST-AUDIT FIXES (kept):
+       • DASH-1 — formatBytes() handles GB range.
+       • DASH-2 — periodic postMessage({type:'CHECK_UPDATE'})
+         (every 1 h, parity with index.html).
+       • DASH-3 — controllerchange + stopPolling clear
+         swUpdateCheckInterval.
+       • DASH-4 — backups.path fallback uses the translated key.
+       • DASH-5 — 3-second fallback reload (parity with IDX-11).
+       • DASH-6 — toggleLanguage() re-renders Runtime Info
+         (renderRuntimeInfo helper, lastRuntimeData cache).
+       • DASH-7 — formatBytes() negative input returns "0 B".
+       • DASH-8 — showSWUpdateBanner() idempotent.
+       • DASH-9 — lastStatus scoped per SSE connection.
+       • DASH-10 — xhrRequest() with retries + per-endpoint
+         timeouts (parity with index.html).
+       • DASH-11 — setNetworkDownUI() + periodic failure counter.
+       • DASH-12 — showConfirmModal() supports primaryText /
+         primaryCallback.
+       • DASH-13 — handleSessionExpired() resets backoffs and
+         tears down intervals/SSE.
+       • DASH-14 — dashboardLink fallback timer (8 s).
+       • DASH-15 — stopPolling() clears runtimeInfoRefreshTimeout
+         + dashboardLinkFallbackTimer.
+       • DASH-16 — Pragma + Expires meta added.
+       • DASH-17 — installed/activated SW state checks; banner
+         shown for returning visitors even when 'updatefound'
+         does not fire.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -175,12 +103,8 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Dashboard v1.3.0</title>
+    <title>DNSCrypt Dashboard v1.4.0</title>
 
-    <!-- IDX-4 parity: apply lang/dir from localStorage BEFORE the
-         first paint, matching index.html. Without this, an
-         Arabic-preferring user sees a flash of LTR layout for
-         ~100 ms before boot() corrects it. -->
     <script>
       (function(){
         try {
@@ -444,7 +368,7 @@
         </div>
 
         <div class="footer">
-            <span id="footerText">DNSCrypt Proxy Dashboard – v1.3.0 Zero-Footprint</span>
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.4.0 Zero-Footprint</span>
             · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
         </div>
     </div>
@@ -646,9 +570,6 @@
         var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
         var pendingConfirmCallback = null;
 
-        // DASH-6 fix: cache the most recent runtime_info response so
-        // the Runtime Info card can be re-rendered on language
-        // switch WITHOUT a second HTTP request.
         var lastRuntimeData = null;
 
         var sseBackoff = 5000, sseMaxBackoff = 60000;
@@ -661,24 +582,16 @@
         var swRegistration = null;
         var pendingReload = false;
         var controllerChangeHandlerInstalled = false;
-        // DASH-2 fix: periodic SW update check. Matches the
-        // interval used by index.html (1 hour).
         var swUpdateCheckInterval = null;
 
-        // DASH-14 fix: fallback timer for the Dashboard link
-        // "loading" class. Prevents the link from staying
-        // permanently disabled if runtime_info fails.
         var dashboardLinkFallbackTimer = null;
-
-        // DASH-15 fix: cleanup timer for scheduled runtime_info
-        // refresh.
         var runtimeInfoRefreshTimeout = null;
 
         var $ = function(id) { return document.getElementById(id); };
         function t(key) { return translations[currentLang][key] || key; }
 
         // ============================================================
-        // [1b] Dashboard URL builder (respects custom ports)
+        // [1b] WebUI URL builder (respects custom ports)
         // ============================================================
         function getWebUIUrl() {
             var hostname = window.location.hostname || '127.0.0.1';
@@ -765,11 +678,6 @@
             var map = { 'healthy':t('healthy'), 'stale':t('stale'), 'idle':t('idle'), 'ok':t('ok') };
             return map[String(status).toLowerCase()] || status;
         }
-        // DASH-1 fix: extended formatBytes to handle GB range.
-        // Large rotated logs, or the 50 MB emergency rotation in
-        // functions.sh, would otherwise display as "2048.0 MB".
-        //
-        // DASH-7 fix: guard against negative input by returning "0 B".
         function formatBytes(bytes) {
             if (!bytes || bytes < 0) return '0 B';
             if (bytes < 1024) return bytes + ' B';
@@ -799,10 +707,6 @@
         // ============================================================
         // [5] Modal
         // ============================================================
-        // DASH-12 fix: supports an optional custom primary button
-        // via options.primaryText + options.primaryCallback.
-        // Parity with the index.html modal extension, used by
-        // handleSessionExpired().
         function showConfirmModal(message, callback, options) {
             options = options || {};
             $('modalMessage').textContent = message;
@@ -835,13 +739,6 @@
 
         // ============================================================
         // [6] XHR with retries — parity with index.html
-        // ============================================================
-        // DASH-10 fix: adopt the retry-aware xhrRequest pattern
-        // from index.html. Adds:
-        //   • Retries on transient network errors / timeouts.
-        //   • Per-endpoint timeouts via getTimeoutForUrl.
-        //   • Explicit handling of HTTP 405 / 409 / 413.
-        //   • Session-expiry detection on HTTP 401.
         // ============================================================
         function getTimeoutForUrl(method, url) {
             if (method === 'POST' && url.indexOf('update_profile') !== -1) {
@@ -956,18 +853,7 @@
         }
 
         // ============================================================
-        // [8] Runtime Info — pure rendering helper (DASH-6 refactor)
-        // ============================================================
-        // DASH-6 fix: rendering is now extracted into its own
-        // function so that toggleLanguage() can re-render the card
-        // with the current language without issuing a second HTTP
-        // request. All side effects that are IDEMPOTENT (PORTS
-        // update, footer update, project link) also live here — so
-        // a re-render on language switch keeps the UI consistent.
-        //
-        // `data` is the raw /api/runtime_info response.
-        // `lastRuntimeData` (a module-level variable) caches the
-        // most recent response.
+        // [8] Runtime Info — pure rendering helper
         // ============================================================
         function renderRuntimeInfo(data) {
             var content = $('runtimeInfoContent');
@@ -1004,12 +890,6 @@
 
             var bk = data.backups || {};
             var bkCount = Number(bk.available) || 0;
-            // DASH-4 fix: fall back to the translated
-            // "not initialized" string instead of the raw
-            // literal 'unknown', for consistency with the
-            // other backup fallbacks and for correct display
-            // in Arabic. main.go always sets `path`, but the
-            // fallback should still be localized.
             var bkPath = bk.path || t('riBackupNotInit');
             var bkLast = bk.last_backup_name || bk.last_backup || null;
             var bkLastStable = bk.last_stable || null;
@@ -1109,8 +989,6 @@
                     content.innerHTML = '<div class="ri-error">' + t('riError') + '</div>';
                     return;
                 }
-                // DASH-6 fix: cache the response so the language
-                // toggle can re-render without another HTTP call.
                 lastRuntimeData = data;
                 renderRuntimeInfo(data);
             });
@@ -1300,23 +1178,27 @@
         }
 
         // ============================================================
-        // [11] Diagnostics + network-down UI
+        // [11] Diagnostics + network-down UI (DASH-A2 fix)
         // ============================================================
-        // DASH-11 fix: add setNetworkDownUI() — parity with
-        // index.html. When periodic fetches fail repeatedly, the
-        // status border turns amber and the text changes.
+        // v1.4.0 (DASH-A2): this function previously referenced an
+        // undefined `statusArea` element (a legacy copy-paste
+        // artifact from index.html). The Dashboard has no
+        // `statusArea` — its sole connection-health indicator is
+        // the SSE diagnostic label. The reference has been removed;
+        // the function now only updates the SSE label text.
+        //
+        // Note: `setNetworkDownUI(true)` sets the SSE label to the
+        // `networkDown` string. Any subsequent call to
+        // `updateDiagnostics()` will overwrite it with the real
+        // SSE state — this is intentional: `updateDiagnostics()`
+        // is the single source of truth for the SSE label.
+        // ============================================================
         function setNetworkDownUI(isDown) {
-            var area = $('statusArea');
             var txt = $('diagSse');
-            if (!area && !txt) return;
-            // In the dashboard, the equivalent of index.html's
-            // statusArea is the diagnostics bar. We turn the SSE
-            // indicator into a network warning when isDown.
+            if (!txt) return;
             if (isDown) {
-                if (txt) {
-                    txt.textContent = t('networkDown');
-                    txt.style.color = 'var(--warning)';
-                }
+                txt.textContent = t('networkDown');
+                txt.style.color = 'var(--warning)';
             }
         }
 
@@ -1391,10 +1273,6 @@
             updateDiagnostics();
             if (dataCache) renderDashboard(dataCache);
             if (logFilesData) renderLogFiles();
-            // DASH-6 fix: re-render the Runtime Info card immediately
-            // using the cached response. No second HTTP request is
-            // issued, and the card's labels switch language along
-            // with the rest of the page.
             if (lastRuntimeData) renderRuntimeInfo(lastRuntimeData);
         }
         function toggleIdleResolvers() {
@@ -1448,11 +1326,6 @@
                  + '<div class="stat"><span class="stat-label">' + t('cacheConfiguredSize') + '</span><span class="stat-value">' + formatNumber(cache.configured_size) + '</span></div>'
                  + '<div class="stat"><span class="stat-label">' + t('cacheEntries') + '</span><span class="stat-value">' + formatNumber(cache.entries) + ' / ' + formatNumber(cache.capacity) + '</span></div>'
                  + '<div class="stat"><span class="stat-label">' + t('cacheTTL') + '</span><span class="stat-value">' + (cache.min_ttl||0) + 's – ' + (cache.max_ttl||0) + 's</span></div></div></div>';
-
-            // The .dashboard-grid wrapper is closed after "cache" on
-            // purpose: only overview + cache share the two-column
-            // row on screens ≥ 768 px. All remaining cards take
-            // full width below.
 
             var queryTypesRows = (data.query_types||[]).map(function(q) {
                 return '<tr><td>' + escapeHtml(q.type) + '</td><td>' + formatNumber(q.count) + '</td></tr>';
@@ -1545,13 +1418,7 @@
             if (sse) { sse.close(); sse = null; }
             if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
             if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-            // DASH-3 fix: clear the periodic SW update check
-            // interval when polling stops (session expired or
-            // beforeunload). Matches IDX-7 in index.html.
             if (swUpdateCheckInterval) { clearInterval(swUpdateCheckInterval); swUpdateCheckInterval = null; }
-            // DASH-15 fix: also clear the pending runtime-info
-            // refresh timeout and the dashboard-link fallback
-            // timer.
             if (runtimeInfoRefreshTimeout) { clearTimeout(runtimeInfoRefreshTimeout); runtimeInfoRefreshTimeout = null; }
             if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
             sseConnected = false;
@@ -1617,9 +1484,6 @@
             }
             failureCount++;
             updateDiagnostics();
-            // DASH-11 fix: reflect network trouble in the
-            // diagnostics bar after repeated failures. Parity with
-            // index.html's setNetworkDownUI.
             if (failureCount >= 3) setNetworkDownUI(true);
             if (dataCache && silent) return;
             $('dashboardContent').innerHTML = '<div class="error">' + t('error') + '</div>';
@@ -1643,16 +1507,9 @@
                 sse.onopen = function() {
                     sseConnected = true;
                     sseBackoff = 5000;
-                    // DASH-11 fix: on a successful SSE connection,
-                    // restore the diagnostics bar color.
                     setNetworkDownUI(false);
                     updateDiagnostics();
                 };
-                // DASH-9: lastStatus is scoped per SSE connection,
-                // NOT global. It is reset to null on every
-                // reconnect, so the first "status" event after a
-                // reconnect never triggers a spurious refetch of
-                // the dashboard data.
                 var lastStatus = null;
                 sse.addEventListener('status', function(e) {
                     var incoming = e.data;
@@ -1694,12 +1551,6 @@
         // ============================================================
         // [17] Service Worker update handlers
         // ============================================================
-        // DASH-8 fix: showSWUpdateBanner is now idempotent — a
-        // redundant call with the banner already visible is a
-        // no-op. Avoids needless style writes when both the
-        // `updatefound` event and the periodic CHECK_UPDATE ping
-        // fire close together.
-        // ============================================================
         function showSWUpdateBanner() {
             if (pendingReload) return;
             var banner = $('swUpdateBanner');
@@ -1722,8 +1573,6 @@
             navigator.serviceWorker.addEventListener('controllerchange', function() {
                 if (!pendingReload) return;
                 pendingReload = false;
-                // DASH-3 fix: clear the periodic SW update check
-                // before reloading. Matches IDX-7 in index.html.
                 if (swUpdateCheckInterval) {
                     clearInterval(swUpdateCheckInterval);
                     swUpdateCheckInterval = null;
@@ -1746,11 +1595,6 @@
                 }
             });
 
-            // DASH-2 fix: install the same periodic SW update
-            // check that index.html already has. Without this, a
-            // user who keeps the dashboard tab open would not be
-            // notified of an update until the browser happened to
-            // fire 'updatefound' on its own schedule.
             if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
             swUpdateCheckInterval = setInterval(function() {
                 if (navigator.serviceWorker.controller) {
@@ -1758,9 +1602,6 @@
                 }
             }, 3600000);
 
-            // Also do a first check shortly after boot, so a user
-            // who reloads the page right after an update sees the
-            // banner quickly. 5 s matches index.html's value.
             setTimeout(function() {
                 if (navigator.serviceWorker.controller) {
                     navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
@@ -1799,12 +1640,6 @@
                         return;
                     }
 
-                    // DASH-5 fix: fallback reload if
-                    // 'controllerchange' does not fire within 3
-                    // seconds (e.g. misbehaving or terminated SW).
-                    // Without this, pendingReload could stay true
-                    // forever and the [Reload] button would become
-                    // a no-op. Parity with IDX-11 in index.html.
                     setTimeout(function() {
                         if (pendingReload) {
                             pendingReload = false;
@@ -1826,17 +1661,10 @@
         // ============================================================
         // [18] Session expired
         // ============================================================
-        // DASH-13 fix: parity with index.html's
-        // handleSessionExpired. Resets backoff counters, tears
-        // down intervals/SSE, shows a modal with a primary
-        // "Re-login" action.
-        // ============================================================
         function handleSessionExpired() {
             if (sessionExpired) return;
             sessionExpired = true;
 
-            // Reset backoff states so the next session starts
-            // from a fast polling interval.
             sseBackoff = 5000;
 
             if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
@@ -1848,8 +1676,6 @@
                 title: t('sessionExpiredTitle'),
                 primaryText: t('sessionRelogin'),
                 primaryCallback: function() {
-                    // Redirect to the WebUI login page — the
-                    // dashboard has no login form of its own.
                     window.location.href = getWebUIUrl();
                 }
             });
@@ -1914,14 +1740,23 @@
             bindEvents();
             bindSWUpdateButtons();
 
-            // DASH-14 fix: install a fallback timer that removes
-            // the `loading` class from the Dashboard link if the
-            // runtime_info request never resolves or fails. This
-            // prevents the link from staying disabled forever.
-            var dashLink = $('ndAction');
-            if (dashLink) {
+            // v1.4.0 (DASH-A3): the Dashboard never references the
+            // companion APK path (`/app-debug.apk`). That is a
+            // WebUI-only feature (see `web/index.html`). The
+            // Service Worker bypass rule 9 (`web/sw.js`
+            // `shouldBypass()`) applies regardless — the APK path
+            // is bypassed for both origins.
+            //
+            // The fallback timer below is defensive: it clears the
+            // `loading` class from the "Open WebUI" link if it was
+            // ever set. In practice, `updateBackToHomeLinks()`
+            // already finalises the link before this timer fires,
+            // so the callback is a no-op today.
+            var ndAction = $('ndAction');
+            if (ndAction) {
                 dashboardLinkFallbackTimer = setTimeout(function() {
-                    if (dashLink) dashLink.classList.remove('loading');
+                    if (ndAction) ndAction.classList.remove('loading');
+                    dashboardLinkFallbackTimer = null;
                 }, 8000);
             }
 
@@ -1931,11 +1766,6 @@
                 navigator.serviceWorker.register('/sw.js').then(function(reg) {
                     swRegistration = reg;
 
-                    // DASH-17 fix: show banner if a waiting worker
-                    // already exists (returning visitor). This
-                    // covers the case where 'updatefound' does not
-                    // fire because the SW was already registered
-                    // in a previous session.
                     if (reg.waiting && navigator.serviceWorker.controller) {
                         showSWUpdateBanner();
                     }

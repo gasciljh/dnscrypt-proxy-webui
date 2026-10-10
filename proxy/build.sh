@@ -2,6 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – build.sh
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -77,118 +78,67 @@
 # ============================================================
 # v1.2.0 (Global Edition) — POST-AUDIT FIXES (this file)
 # ============================================================
-# A pre-release audit identified the following issues in this
-# script. All of them are addressed in-place; no version bump.
-# The build pipeline is functionally identical to v1.1.0; the
-# fixes below are strictly correctness, robustness, and
-# portability improvements.
-#
 #   🔧 BLD-1 — Several helper functions used a `local_*`
-#     prefix on variables that are NOT local (they are at
-#     script scope). The prefix was misleading, suggesting
-#     shell `local` semantics that do not apply. All such
-#     variables have been renamed (e.g. `local_checksum_tool`
-#     → `CHECKSUM_TOOL`, `local_files_to_zip` →
-#     `FILES_TO_ZIP`, `local_size` → `SIZE_DISPLAY`,
-#     `local_type` → `TYPE_DISPLAY`). No behavioural change.
+#     prefix on variables that are NOT local. Renamed.
 #
-#   🔧 BLD-2 — `EXPECTED_ARCH_COUNT` was hardcoded to 4 while
-#     `ALL_ARCHS` was a separate string. Adding a 5th
-#     architecture would have required editing two places,
-#     and forgetting one would produce a misleading "success
-#     count less than expected" warning. The count is now
-#     derived from `ALL_ARCHS` via word-splitting, keeping a
-#     single source of truth. A `--single` build still
-#     overrides the count to 1.
+#   🔧 BLD-2 — `EXPECTED_ARCH_COUNT` is now derived from
+#     `ALL_ARCHS` via word-splitting.
 #
 #   🔧 BLD-3 — The `timeout 300` wrapper around `go build`
-#     assumed the GNU coreutils `timeout(1)` is available. On
-#     macOS (without coreutils) and on some minimal Termux
-#     installs, it is not. A `command -v timeout` check now
-#     falls back to running `go build` without a timeout,
-#     with a warning logged. On the CI and Termux
-#     environments the timeout still applies.
+#     now checks for `timeout(1)` availability and falls back
+#     to running `go build` without a timeout.
 #
-#   🔧 BLD-4 — When `SOURCE_DATE_EPOCH=0` (git unavailable),
-#     `checksums.txt` printed `1970-01-01 00:00:00 UTC` as
-#     the build date. That is technically correct but
-#     confusing for a human reader. The header now prints
-#     `unknown (SOURCE_DATE_EPOCH=0)` in that case while
-#     keeping the machine-readable `# Reproducible:`
-#     comment unchanged.
+#   🔧 BLD-4 — When `SOURCE_DATE_EPOCH=0`, `checksums.txt` now
+#     prints `unknown (SOURCE_DATE_EPOCH=0)`.
 #
-#   🔧 BLD-5 — `--enable-upx` was accepted, then checked,
-#     then disabled if `upx` was missing. The order was
-#     slightly confusing (the option appeared to be honoured
-#     before being rejected). The check now happens as part
-#     of argument parsing, and the user is told immediately
-#     if the tool is not installed.
+#   🔧 BLD-5 — `--enable-upx` is now validated at argument
+#     parsing time.
 #
-#   🔧 BLD-6 — Some `$(...)` command substitutions were
-#     accidentally followed by a backtick-style capture in
-#     comments and messages; this file is now uniformly
-#     `$()`-based, matching the rest of the codebase. No
-#     behavioural change.
+#   🔧 BLD-6 — `$(...)`-based command substitutions uniform.
 #
-#   🔧 BLD-7 — `VERSION_NO_V` was computed inline at the
-#     point of use. It is now computed once at the top
-#     (right after `SCRIPT_VERSION`) so that any future
-#     consumer can reference it without re-deriving. No
-#     behavioural change.
+#   🔧 BLD-7 — `VERSION_NO_V` computed once at the top.
 #
-#   🔧 BLD-8 — When `go.mod` was missing and `go mod init`
-#     failed, the script continued silently (the failure was
-#     suppressed by `|| true`). The `go build` step would
-#     then fail with a less informative error. A clear
-#     diagnostic message is now printed if `go mod init`
-#     fails AND `go.mod` still does not exist afterwards.
+#   🔧 BLD-8 — `go mod init` failure now produces a clear
+#     diagnostic message.
+#
 # ============================================================
-# BuildVersion ↔ VERSION — how it works
+# v1.3.0 — No changes to the build pipeline
 # ============================================================
-# The `BuildVersion` variable in main.go is injected at build
-# time via the -X linker flag. Its value comes from the VERSION
-# file (single source of truth), NOT from a hardcoded string
-# in this script or in main.go.
+#   📌 The v1.3.0 release did not touch this file.
 #
-# Flow:
-#   1. read_version() reads VERSION (e.g. "v1.2.0").
-#   2. SCRIPT_VERSION is set to that value.
-#   3. LDFLAGS includes: -X main.BuildVersion=${SCRIPT_VERSION}
-#   4. At runtime, main.go reports BuildVersion via the
-#      /api?action=runtime_info endpoint.
+#   The v1.3.0 release is primarily a feature release:
+#     • PWA install button (client-side, web/index.html)
+#     • Live status LED (client-side, web/index.html)
+#     • DNS auto-start fix (shell-side, proxy/service.sh)
 #
-# Other build-time variables injected the same way:
-#   • main.BuildCommit   — short git hash (+ -dirty if applicable)
-#   • main.BuildTime     — SOURCE_DATE_EPOCH (for reproducibility)
-#   • main.ProjectURL    — canonical repository URL
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
 #
-# ⚠️ Do NOT hardcode the version anywhere in this script. The
-#    value must always come from the VERSION file. This is what
-#    makes scripts/release.sh able to bump the version in ONE
-#    place and have it propagate automatically to the binary.
-# ============================================================
-# Relation to other scripts in the repository
-# ============================================================
-# This script is one of four build-related scripts. Their
-# responsibilities are deliberately separated:
+#   Why this file was NOT modified:
+#     • The build pipeline cross-compiles proxy/main.go for
+#       4 Android architectures with reproducible flags
+#       (-trimpath, -buildid=, SOURCE_DATE_EPOCH). It does
+#       NOT inspect the internal semantics of the compiled
+#       code.
+#     • The v1.3.0 server-side changes (SNAP-*, ROT-*) are
+#       pure source-level refinements in Go and shell files.
+#       They compile and package with the SAME flags as
+#       v1.2.0 — no new build tags, no new linker flags, no
+#       new runtime dependencies, no new toolchain
+#       requirements.
+#     • The 4-architecture matrix, the NDK detection, the
+#       LDFLAGS injection (BuildVersion/BuildCommit/BuildTime/
+#       ProjectURL), and the reproducible-build guarantees are
+#       all unchanged.
 #
-#   ┌───────────────────────────┬────────────────────────┐
-#   │ Script                         │ Responsibility             │
-#   ├───────────────────────────┼────────────────────────┤
-#   │ scripts/release.sh             │ Bump VERSION + tag         │
-#   │ scripts/package_module.sh      │ Create the Magisk ZIP      │
-#   │ scripts/fetch_dns_binaries.sh  │ Download dnscrypt-proxy    │
-#   │ proxy/build.sh (this file)     │ Cross-compile WebUI        │
-#   └───────────────────────────┴────────────────────────┘
+#   Therefore the entire build pipeline is byte-for-byte
+#   identical between v1.2.0 and v1.3.0. See CHANGELOG.md
+#   [v1.3.0] and docs/ARCHITECTURE.md §4.13 for the full delta.
 #
-# This script does NOT:
-#   • Download dnscrypt-proxy (that is fetch_dns_binaries.sh)
-#   • Create the Magisk ZIP (that is package_module.sh)
-#   • Modify VERSION, module.prop, or update.json
-#     (that is release.sh)
-#
-# It ONLY produces the 4 WebUI binaries in proxy/build/.
-# The other scripts consume those binaries.
 # ============================================================
 # v1.4.0 — Companion Android app integration
 # ============================================================
@@ -203,7 +153,60 @@
 #     reproducible build flags, and LDFLAGS injection are all
 #     unchanged.
 #
+#   📱 BLD-V14-03 — The CodeQL `go/path-injection` fix in
+#     `main.go::removeModule` compiles cleanly with the same
+#     flags. No new build dependency, no new linker flag.
+#
+#   📱 BLD-V14-04 — MAIN-01 (the `LOG_LEVEL` load-order fix
+#     in `main.go`) is a source-level change only. It does
+#     NOT alter the build pipeline, the LDFLAGS, or the
+#     reproducible-build guarantees.
+#
 # ============================================================
+# BuildVersion ↔ VERSION — how it works
+# ============================================================
+# The `BuildVersion` variable in main.go is injected at build
+# time via the -X linker flag. Its value comes from the VERSION
+# file (single source of truth).
+#
+# ⚠️ Do NOT hardcode the version anywhere in this script.
+# ============================================================
+# Relation to other scripts in the repository
+# ============================================================
+# This script is one of six build/release-related scripts:
+#
+#   ┌───────────────────────────┬────────────────────────┐
+#   │ Script                         │ Responsibility             │
+#   ├───────────────────────────┼────────────────────────┤
+#   │ scripts/release.sh             │ Bump VERSION + tag         │
+#   │ scripts/release-patch.sh       │ PATCH-only (hotfix)        │
+#   │ scripts/package_module.sh      │ Create the Magisk ZIP      │
+#   │ scripts/fetch_dns_binaries.sh  │ Download dnscrypt-proxy    │
+#   │ scripts/fetch_app_apk.sh       │ Fetch companion app APK    │
+#   │ scripts/generate-icons.sh      │ Generate PNG/ICO from SVG  │
+#   │ proxy/build.sh (this file)     │ Cross-compile WebUI        │
+#   └───────────────────────────┴────────────────────────┘
+#
+# ============================================================
+# Cross-references:
+# ============================================================
+#   • VERSION                        — Single Source of Truth
+#                                       for BuildVersion
+#   • proxy/main.go                  — consumer of BuildVersion
+#   • proxy/go.mod                   — Go module definition
+#   • scripts/release.sh             — bumps VERSION + tag
+#   • scripts/release-patch.sh       — PATCH-only automation
+#   • scripts/package_module.sh      — packages the ZIP
+#   • scripts/fetch_dns_binaries.sh  — DNS engine binaries
+#   • scripts/fetch_app_apk.sh       — companion APK (v1.4.0)
+#   • scripts/generate-icons.sh      — icon generation pipeline
+#   • .github/workflows/ci.yml       — 4-arch build matrix
+#   • .github/workflows/release.yml  — release pipeline
+#   • docs/ARCHITECTURE.md §4.13     — v1.3.0 server-side
+#                                       refinements
+#   • docs/DNS_BINARIES.md           — DNS binaries (Level 4)
+#   • CHANGELOG.md                   — version history
+#                                       (v1.0.0 → v1.4.0)
 # ============================================================
 # UPX + PIE warning
 # ============================================================
@@ -212,15 +215,8 @@
 # verify PIE-ness, so a UPX-compressed binary will NOT run on
 # Android 5+.
 #
-# If --enable-upx is passed AND the `upx` binary is installed,
-# the script applies `upx --best --lzma` to the output. The
-# final PIE verification step will report non-PIE for the
-# affected binaries.
-#
 # ⚠️ Recommendation: do NOT use --enable-upx for release
-#    builds. It is provided for size-constrained test scenarios
-#    only.
-#
+#    builds.
 # ============================================================
 # Examples:
 #   ./build.sh --clean --parallel
@@ -244,16 +240,14 @@ VERSION_FILE="${REPO_ROOT}/VERSION"
 if [ -t 1 ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
     BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'
-    DIM='\033[2m'; MAGENTA='\033[0;35m'; NC='\033[0m'
+    DIM='\033[2m'; NC='\033[0m'
 else
-    RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; BOLD=''; DIM=''; MAGENTA=''; NC=''
+    RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 # ------------------------------------------------------------
 # [3] Configuration
 # ------------------------------------------------------------
-# BUILD_DIR lives under proxy/ (matches release.yml/ci.yml).
-# Can be overridden with --output-dir or BUILD_DIR env var.
 BUILD_DIR="${BUILD_DIR:-${SCRIPT_DIR}/build}"
 
 OUTPUT_PREFIX="dnscrypt-webui"
@@ -268,8 +262,7 @@ ALL_ARCHS="arm64 arm amd64 386"
 KEEP_LOGS=0
 
 # BLD-2: derive the expected count from the single source of
-# truth instead of hard-coding it. A --single build overrides
-# this value to 1 further below.
+# truth instead of hard-coding it.
 EXPECTED_ARCH_COUNT=0
 for _a in $ALL_ARCHS; do
     EXPECTED_ARCH_COUNT=$((EXPECTED_ARCH_COUNT + 1))
@@ -283,13 +276,6 @@ PROJECT_URL="${PROJECT_URL:-https://github.com/gasciljh/dnscrypt-proxy-webui}"
 
 # ------------------------------------------------------------
 # [4] Read VERSION
-# ------------------------------------------------------------
-# VERSION is the single source of truth for the module version.
-# The value read here is injected into main.go via the
-# -X main.BuildVersion linker flag (see [19] for LDFLAGS).
-#
-# Format expected: v<MAJOR>.<MINOR>.<PATCH>[-<prerelease>]
-# Example: "v1.2.0"
 # ------------------------------------------------------------
 read_version() {
     if [ ! -f "$VERSION_FILE" ]; then
@@ -310,25 +296,16 @@ read_version() {
 
 SCRIPT_VERSION=$(read_version)
 
-# BLD-7: VERSION_NO_V is computed once, right after
-# SCRIPT_VERSION, so that any future consumer can reference it
-# without re-deriving.
+# BLD-7: VERSION_NO_V is computed once.
 VERSION_NO_V="${SCRIPT_VERSION#v}"
 
 # ------------------------------------------------------------
 # [5] Reproducible build vars
 # ------------------------------------------------------------
-# SOURCE_DATE_EPOCH is used by the Go toolchain and by `touch`
-# to produce deterministic timestamps. It is extracted from the
-# last git commit so that:
-#   same commit → same build output → same SHA-256
-#
-# If git is not available (e.g. building from a tarball), the
-# value falls back to 0.
-# ------------------------------------------------------------
 if command -v git >/dev/null 2>&1 && \
    git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-    export SOURCE_DATE_EPOCH=$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || echo "0")
+    SOURCE_DATE_EPOCH=$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || echo "0")
+    export SOURCE_DATE_EPOCH
     BUILD_COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
     GIT_DIRTY=""
     if ! git -C "$REPO_ROOT" diff-index --quiet HEAD -- 2>/dev/null; then
@@ -360,10 +337,6 @@ detect_environment() {
 
 # ------------------------------------------------------------
 # [7] NDK detection
-# ------------------------------------------------------------
-# Tries several common environment variables and paths, in
-# order of preference. A path is accepted only if it contains
-# both /toolchains/llvm AND a usable prebuilt/bin directory.
 # ------------------------------------------------------------
 detect_ndk() {
     local var val
@@ -504,8 +477,11 @@ Notes:
 
 References:
   scripts/release.sh            Bump VERSION + tag
+  scripts/release-patch.sh      PATCH-only automation
   scripts/package_module.sh     Create the Magisk ZIP
   scripts/fetch_dns_binaries.sh Download dnscrypt-proxy
+  scripts/fetch_app_apk.sh      Fetch companion app APK (v1.4.0)
+  scripts/generate-icons.sh     Generate PNG/ICO from SVG
   proxy/main.go                 Consumer of BuildVersion
 EOF
     exit 0
@@ -627,9 +603,9 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# Make BUILD_DIR absolute (if relative, resolve against current PWD)
+# Make BUILD_DIR absolute
 case "$BUILD_DIR" in
-    /*) ;;  # absolute
+    /*) ;;
     *) BUILD_DIR="$(cd "$(dirname "$BUILD_DIR")" 2>/dev/null && pwd)/$(basename "$BUILD_DIR")" ;;
 esac
 
@@ -639,8 +615,7 @@ if [ "$DO_PARALLEL" = "1" ] && [ -n "$SINGLE_ARCH" ]; then
     DO_PARALLEL=0
 fi
 
-# BLD-5: verify UPX is installed at argument-parsing time so the
-# user is told immediately rather than after the build starts.
+# BLD-5: verify UPX is installed at argument-parsing time.
 if [ "$USE_UPX" = "1" ]; then
     if ! command -v upx >/dev/null 2>&1; then
         echo -e "${YELLOW}⚠️  --enable-upx requested but 'upx' not found — disabling UPX${NC}" >&2
@@ -648,8 +623,7 @@ if [ "$USE_UPX" = "1" ]; then
     fi
 fi
 
-# BLD-3: check whether `timeout` is available. If not, the
-# build runs without a hard time limit and logs a warning.
+# BLD-3: check whether `timeout` is available.
 if command -v timeout >/dev/null 2>&1; then
     HAS_TIMEOUT=1
 else
@@ -707,10 +681,7 @@ cd "$SCRIPT_DIR"
 
 if [ ! -f "go.mod" ]; then
     echo -e "${DIM}→ go mod init dnscrypt-webui${NC}"
-    # BLD-8: don't silently swallow the failure. If go.mod still
-    # does not exist after the init attempt, the subsequent
-    # `go build` will fail with a confusing error; we print a
-    # clear diagnostic here instead.
+    # BLD-8: don't silently swallow the failure.
     if ! go mod init dnscrypt-webui >/dev/null 2>&1; then
         if [ ! -f "go.mod" ]; then
             echo -e "${RED}❌ 'go mod init' failed and go.mod is still missing${NC}" >&2
@@ -727,25 +698,6 @@ fi
 
 # ------------------------------------------------------------
 # [19] Full LDFLAGS
-# ------------------------------------------------------------
-# BuildVersion is injected into main.go via -X. main.go reads it
-# at startup and exposes it via /api?action=runtime_info. The
-# value comes from VERSION (single source of truth), not hardcoded.
-#
-# For v1.2.0:
-#   • VERSION contains "v1.2.0" → -X main.BuildVersion=v1.2.0
-#   • The v1.2.0 data-preservation features (customize.sh,
-#     functions.sh, service.sh, status.sh, uninstall.sh,
-#     watchdog.sh) do NOT affect this step. Only the Go source
-#     (main.go) is compiled here.
-#
-# Other injected variables:
-#   • BuildCommit  → short git hash (+ -dirty suffix if applicable)
-#   • BuildTime    → SOURCE_DATE_EPOCH (for reproducible builds)
-#   • ProjectURL   → canonical repository URL
-#
-# -buildid= removes the random build ID that Go would otherwise
-# generate, ensuring byte-identical output for the same inputs.
 # ------------------------------------------------------------
 LDFLAGS="${LDFLAGS_BASE}"
 LDFLAGS="${LDFLAGS} -X main.BuildVersion=${SCRIPT_VERSION}"
@@ -783,9 +735,6 @@ fi
 
 # ------------------------------------------------------------
 # [21] UPX + PIE warning
-# ------------------------------------------------------------
-# BLD-5: the USE_UPX flag was already validated during argument
-# parsing. This section only prints the reminder.
 # ------------------------------------------------------------
 if [ "$USE_UPX" = "1" ]; then
     echo -e "${YELLOW}⚠️  UPX enabled — may break PIE${NC}"
@@ -852,16 +801,14 @@ build_arch() {
     [ -n "$GOARM_VAL" ] && BUILD_ENV+=("GOARM=$GOARM_VAL")
     [ -n "$CC_PATH" ] && BUILD_ENV+=("CC=$CC_PATH")
 
-    # BLD-3: use `timeout` when available; otherwise run the
-    # build without a hard time limit. On CI/Termux the timeout
-    # is present; on macOS without coreutils it may not be.
+    # BLD-3: use `timeout` when available.
     local build_ok=0
     if [ "$HAS_TIMEOUT" = "1" ]; then
         if timeout 300 env "${BUILD_ENV[@]}" go build \
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
             -buildmode "$BUILDMODE" \
-            $GOFLAGS \
+            "$GOFLAGS" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
             build_ok=1
@@ -871,7 +818,7 @@ build_arch() {
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
             -buildmode "$BUILDMODE" \
-            $GOFLAGS \
+            "$GOFLAGS" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
             build_ok=1
@@ -990,8 +937,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
 
     CHECKSUM_FILE="$BUILD_DIR/checksums.txt"
 
-    # BLD-4: when SOURCE_DATE_EPOCH=0 (git unavailable), print a
-    # human-friendly "unknown" instead of 1970-01-01.
+    # BLD-4: when SOURCE_DATE_EPOCH=0, print "unknown".
     if [ "$SOURCE_DATE_EPOCH" -gt 0 ] 2>/dev/null; then
         BUILD_DATE_HUMAN=$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u +'%Y-%m-%d %H:%M:%S UTC')
     else
@@ -1017,7 +963,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     fi
 
     if [ -n "$CHECKSUM_TOOL" ]; then
-        for f in ${OUTPUT_PREFIX}-*; do
+        for f in "${OUTPUT_PREFIX}"-*; do
             [ -f "$f" ] || continue
             case "$f" in
                 *.log|*.log.*) continue ;;
@@ -1074,7 +1020,7 @@ if [ "$DO_PACKAGE" = "1" ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         FILES_TO_ZIP=""
         cd "$BUILD_DIR"
-        for f in ${OUTPUT_PREFIX}-* checksums.txt; do
+        for f in "${OUTPUT_PREFIX}"-* checksums.txt; do
             [ -f "$f" ] || continue
             case "$f" in
                 *.log|*.log.*) continue ;;

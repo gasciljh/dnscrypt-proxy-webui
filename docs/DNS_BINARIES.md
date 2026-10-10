@@ -4,13 +4,44 @@
 > `dnscrypt-proxy` binaries in DNSCrypt Smart Filter.
 
 **Version**: v1.4.0
-**Last updated**: 2026-10-06
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
+> **Identifier inventory in this file (6 total)**:
+>   • HARD-DNS-01 (`Last updated` correction — v1.4.0)
+>   • HARD-DNS-02 (§8.1 `upgrade-test.yml` trigger corrected —
+>     `workflow_dispatch` only, not "Manual + weekly" — v1.4.0)
+>   • HARD-DNS-03 (header + middle + footer `Last updated`
+>     synchronized — v1.4.0)
+>   • HARD-DNS-04 (§8.7 v1.2.0 workflow additions — expanded —
+>     v1.4.0)
+>   • HARD-DNS-05 (v1.3.0 block retained and confirmed correct —
+>     v1.4.0)
+>   • HARD-DNS-06 (v1.4.0 companion APK orthogonality note
+>     retained — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md](ARCHITECTURE.md) — DNS Binaries
+>     Management (§14)
+>   • [docs/API.md](API.md) — API reference
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections
+>   • [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
+>   • [docs/GLOSSARY.md](GLOSSARY.md) — Glossary
+>   • [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility
+>     matrix
+>   • [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide
+>   • [docs/BACKUP.md](BACKUP.md) — Backup system reference (v1.2.0)
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — Emergency recovery (v1.2.0)
+>   • [docs/ROADMAP.md](ROADMAP.md) — Project plan
+>   • [CHANGELOG.md](../CHANGELOG.md) — Version history
+>   • [dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) —
+>     Companion Android app repository (v1.4.0)
+
 > **v1.4.0 changes**:
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • `Last updated` reflects the v1.4.0 release date.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
 >   • **No change to the DNS-binaries pipeline.** The DNS version
 >     (`proxy/dnscrypt-proxy.version`) stays at `2.1.18`.
 >   • **Companion Android app integration** — the module ZIP may
@@ -20,13 +51,12 @@
 >     the distinction.
 >   • §12.3 (Project Documentation) extended with the companion
 >     app repository.
->   • §13.6 (Version History) extended with a v1.3.0 and a
->     v1.4.0 row.
+>   • §13.5 (Version History) extended with a v1.4.0 row.
 >   • **Encoding correction (this revision)**: every mojibake
 >     sequence (e.g. `вҖ”` instead of `—`, `вҶ’` instead of `→`)
 >     has been replaced with proper UTF-8.
 
-> **v1.3.0 changes** (previously undocumented in this file):
+> **v1.3.0 changes**:
 >   • Version bumped from v1.2.0 to v1.3.0.
 >   • **No change to the DNS-binaries pipeline.** The DNS version
 >     stayed at `2.1.18`.
@@ -35,6 +65,15 @@
 >       - Live status LED on the Today counter (WebUI)
 >       - DNS auto-start after boot (`service.sh` §[19])
 >     None of these touch the fetch / cache / verify pipeline.
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory
+>     (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+>     ROT-PROTECT). Those refinements touched `main.go`,
+>     `functions.sh`, and 6 other shell scripts. **They do NOT
+>     affect the DNS-binaries pipeline** — that pipeline is
+>     independent of the backup layer and does not read the
+>     snapshot directory.
 
 > **v1.2.0 changes** (kept for reference):
 >   • Version bumped from v1.1.0 to v1.2.0.
@@ -62,6 +101,29 @@
 >       - [`docs/EMERGENCY.md`](EMERGENCY.md)
 >       - [`docs/UPGRADE.md`](UPGRADE.md)
 >   • §13.5 (Version History) extended with a v1.2.0 row.
+
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-DNS-01 + HARD-DNS-03** — `Last updated` corrected
+>     in all three locations (the header metadata block, the
+>     `**Last updated**` line inside the intro blockquote, and
+>     the trailing `*Last updated:*` line). All three now read
+>     `2026-10-08`, matching every other file in the v1.4.0
+>     module.
+>   • 🔧 **HARD-DNS-02** — §8.1 (Related Workflows): the
+>     `upgrade-test.yml` row incorrectly described the trigger
+>     frequency as "Manual + weekly". The actual workflow is
+>     **`workflow_dispatch` only** (manual), as documented in
+>     its own header. The row now reads "Manual
+>     (`workflow_dispatch`)".
+>   • 🟡 **HARD-DNS-04** — §8.7 (v1.2.0 Workflow Additions)
+>     expanded with the v1.3.0 rotation refinements and the
+>     v1.4.0 companion APK additions, and a cross-reference to
+>     §8.8.
+>   • 🟢 **HARD-DNS-05** — v1.3.0 block confirmed correct and
+>     retained (no change needed beyond adding a note about the
+>     rotation refinements being orthogonal).
+>   • 🟢 **HARD-DNS-06** — v1.4.0 companion APK orthogonality
+>     note retained.
 
 ---
 
@@ -94,17 +156,19 @@
 - Availability: 4 architectures (arm64, arm, i386, x86_64)
 - Current version: **2.1.18**
 
-**Two versions coexist in the project** — do not confuse them:
+**Three versions coexist in the project** — do not confuse them:
 
 | Version | Source file | Value in v1.4.0 |
 |---|---|:---:|
 | **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
 | **Module version** (this project) | `VERSION` | `v1.4.0` |
+| **Companion app version** (v1.4.0) | `proxy/app-apk.version` | `1.0.0` |
 
 - The **DNS version** changes only when upstream ships a new release.
 - The **module version** changes with each project release.
-- The two are **independent**. A module release (e.g. `v1.4.0`) does
-  not necessarily change the DNS version.
+- The **companion app version** changes only when the companion
+  repository publishes a new APK.
+- All three are **independent**.
 
 **v1.2.0 / v1.3.0 / v1.4.0 reaffirmation**: None of these releases
 bumped the DNS version. The DNS version stays at `2.1.18`, identical
@@ -145,8 +209,10 @@ to v1.1.0.
   `customize.sh`, `functions.sh`, `service.sh`, `status.sh`,
   `uninstall.sh`, and `main.go`.
 - The **v1.3.0** additions (PWA install button, live status LED,
-  DNS auto-start after boot) live in `web/index.html` and
-  `proxy/service.sh`.
+  DNS auto-start after boot, **rotation refinements
+  SNAP-*/ROT-***) live in `web/index.html`, `proxy/service.sh`,
+  `proxy/main.go`, and the shell scripts that mirror the rotation
+  semantics.
 - The **v1.4.0** additions (companion APK integration, CodeQL fix,
   iOS PWA removal) live in `web/app-debug.apk` (asset),
   `scripts/fetch_app_apk.sh`, and `proxy/main.go`.
@@ -193,8 +259,9 @@ remains valid across the entire v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0
 ```
 
 **v1.2.0 / v1.3.0 / v1.4.0 note**: No new consumer was added in any
-of these cycles. The 10 defensive layers, the PWA install button,
-and the companion APK integration do **not** read this file.
+of these cycles. The 10 defensive layers, the rotation refinements
+(SNAP-*/ROT-*), the PWA install button, and the companion APK
+integration do **not** read this file.
 
 ### 2.3 Upgrade Scenario
 
@@ -264,12 +331,14 @@ cat VERSION                          # v1.3.0
 cat proxy/dnscrypt-proxy.version     # 2.1.18  ← unchanged
 ```
 
-**Why?** The v1.3.0 release was a **client-side + boot-flow**
-release:
+**Why?** The v1.3.0 release was a **client-side + boot-flow +
+rotation-refinement** release:
 
 - PWA install button (WebUI).
 - Live status LED (WebUI).
 - DNS auto-start after boot (`service.sh` §[19]).
+- Rotation refinements (SNAP-*/ROT-*) — **orthogonal to DNS
+  binaries**.
 - **No changes to the encrypted DNS engine or its binaries.**
 
 ### 2.7 v1.4.0 Example — DNS Version Stays the Same
@@ -533,7 +602,7 @@ $ ./scripts/fetch_dns_binaries.sh --arch arm64 --verbose
 | **CI cache** | Depends on `dns_version` | Workflow | Reuse between runs |
 
 ⚠️ **Note**: GitHub Actions cache is evicted after 7 days of non-use.
-Because the workflow runs weekly, it will not be evicted.
+Because the workflow runs on every push and PR, it will not be evicted.
 
 **v1.2.0 / v1.3.0 / v1.4.0 note**: No change to the cache TTL policy.
 The DNS version did not change, so the cache key continues to match
@@ -563,8 +632,9 @@ across all v1.x releases.
 └─────────────────────────────────┘
 ```
 
-**v1.2.0 note**: This SHA256 verification is **distinct** from the
-v1.2.0 backup integrity verification (Layer 3):
+**v1.2.0 + v1.3.0 + v1.4.0 note**: This SHA256 verification is
+**distinct** from the v1.2.0 backup integrity verification (Layer 3)
+and from the v1.4.0 companion APK verification:
 
 | Verification | Target | File |
 |---|---|---|
@@ -749,11 +819,12 @@ Permanent errors (version missing) fail after 3 attempts (as they should).
 
 ### 8.1 Related Workflows
 
-| Workflow | Role | Frequency | v1.4.0 |
+| Workflow | Role | Trigger | v1.4.0 |
 |---|---|---|---|
-| **`release.yml`** | Uses cache or fetches | On tag | + companion APK fetch/stage |
-| **`ci.yml`** | Verifies presence only | Every push/PR | + APK metadata check |
-| **`upgrade-test.yml`** | 42-scenario data-preservation matrix | Manual + weekly | Unchanged |
+| **`release.yml`** | Uses cache or fetches | On tag push `v*` (or manual re-publish) | + companion APK fetch/stage |
+| **`ci.yml`** | Verifies presence + metadata | Every push/PR to `main` or `develop` | + APK metadata check |
+| **`upgrade-test.yml`** | 42-scenario data-preservation matrix | **Manual (`workflow_dispatch`) only** | Unchanged |
+| **`codeql.yml`** | SAST — Go security analysis | Push/PR + weekly schedule | Unchanged |
 
 **v1.4.0 clarification**: The v1.4.0 release adds two new steps to
 `release.yml` — `Fetch companion Android app APK` and
@@ -761,12 +832,20 @@ Permanent errors (version missing) fail after 3 attempts (as they should).
 pipeline. The `fetch_dns_binaries.sh` and `package_module.sh`
 scripts are the same as in v1.3.0 for DNS purposes.
 
+**v1.4.0 correction (HARD-DNS-02)**: The `upgrade-test.yml` trigger
+is **`workflow_dispatch` only** (manual). Earlier revisions of this
+document incorrectly described it as "Manual + weekly". The actual
+workflow has no `schedule:` trigger — see the workflow's own header
+for the rationale (the 42-scenario matrix is expensive and the
+failures it originally detected were unrelated to the
+data-preservation layers).
+
 ### 8.2 Cache Flow
 
 ```text
 ┌────────────────────────────────────────────────────────┐
 │  release.yml                                           │
-│  (on push tag)                                         │
+│  (on tag push)                                         │
 │                                                        │
 │  1. Read DNS version                                   │
 │  2. Restore from cache                                 │
@@ -829,10 +908,12 @@ intentional and correct — the DNS version did not change.
 
 **Free tier**: 2000 minutes/month → ~1.3% only.
 
-### 8.7 v1.2.0 Workflow Additions — Impact on DNS Binaries
+### 8.7 v1.2.0 + v1.3.0 + v1.4.0 Workflow Additions — Impact on DNS Binaries
 
-The v1.2.0 release added two CI features that **did not** affect the
-DNS-binaries pipeline:
+The v1.2.0, v1.3.0, and v1.4.0 releases added CI features that
+**did not** affect the DNS-binaries pipeline:
+
+**v1.2.0 additions**:
 
 **1. `backup-smoke-test` job** (in `ci.yml`):
 - Validates the 10 defensive layers.
@@ -842,6 +923,26 @@ DNS-binaries pipeline:
 - 42-scenario matrix.
 - Uses pre-built binaries from the CI cache.
 - **Does NOT re-fetch the DNS binaries.**
+
+**v1.3.0 additions**:
+
+No CI configuration change was required for v1.3.0. The
+`backup-smoke-test` job verifies **function presence** (via grep),
+not internal semantics, so the rotation refinements
+(SNAP-MANIFEST + SNAP-MTIME in `main.go`; ROT-MANIFEST + ROT-MTIME
++ ROT-PROTECT in `functions.sh`; the mirrored implementations in 5
+shell scripts) passed the smoke test unchanged. The
+**`upgrade-test.yml`** matrix was updated separately (L9-02 / L9-03
+now write `.manifest.json` files into the synthetic snapshots) — this
+is documented in the workflow's own header, not here.
+
+**v1.4.0 additions** (see also §8.8):
+
+Two new steps in `release.yml` and one new step in `ci.yml`, all
+related to the companion APK. None touch the DNS-binaries cache.
+
+**Conclusion**: All v1.2.0 / v1.3.0 / v1.4.0 CI additions are
+**orthogonal** to the DNS-binaries pipeline.
 
 ### 8.8 v1.4.0 Workflow Additions — Impact on DNS Binaries
 
@@ -861,10 +962,6 @@ The v1.4.0 release added **two new steps** to `release.yml` and
 **3. `Verify companion app metadata`** (ci.yml):
 - Validates `proxy/app-apk.version` format.
 - **Does NOT touch the DNS-binaries cache.**
-
-**Conclusion**: The v1.4.0 workflow additions are **orthogonal** to
-the DNS-binaries pipeline. The two pipelines share the release
-workflow file but operate on different artifacts.
 
 **Comparison table**:
 
@@ -1104,7 +1201,7 @@ This table is the authoritative distinction.
 | First stable | v1.0.0 | 2.1.18 | — | 33 audit corrections |
 | Polish | v1.1.0 | 2.1.18 | — | MEM-1/2/3 |
 | Data preservation | v1.2.0 | 2.1.18 | — | 10 layers + BAK-1..4 + FIX-1/2 |
-| PWA + boot fix | v1.3.0 | 2.1.18 | — | PWA button + LED + DNS auto-start |
+| PWA + boot fix | v1.3.0 | 2.1.18 | — | PWA button + LED + DNS auto-start + rotation refinements |
 | **Companion app** | **v1.4.0** | **2.1.18** | **1.0.0** | **Companion APK + CodeQL + iOS removal** |
 | Next minor (planned) | v1.5.0 | 2.1.18 (expected) | 1.0.0 (expected) | No DNS change expected |
 
@@ -1273,6 +1370,26 @@ backup directory share the same path?"
 - The backup directory is on the **Android device**.
 - They never overlap.
 
+### 11.11 Scenario: v1.3.0 rotation refinements — no DNS impact
+
+**Symptom** (potential confusion): "Does the v1.3.0 rotation
+refinement (SNAP-*/ROT-*) affect DNS binaries?"
+
+**Answer**: **No.** The rotation refinements touched 8 files
+(`main.go`, `functions.sh`, `service.sh`, `watchdog.sh`,
+`status.sh`, `customize.sh`, `action.sh`, `uninstall.sh`) but
+**none** of them feed the DNS-binaries pipeline. The pipelines are
+independent:
+
+- DNS binaries: `fetch_dns_binaries.sh` → `dns-binaries/` cache →
+  `proxy/dnscrypt-proxy-<arch>` in the module ZIP.
+- Rotation semantics: `main.go:buildBackupInfo` + 7 shell scripts
+  → the persistent backup directory at
+  `/sdcard/dnscrypt-webui-backup/`.
+
+See `docs/ARCHITECTURE.md` §4.13.2 for the rotation reference and
+§14 for the DNS-binaries reference.
+
 ---
 
 ## 12. References
@@ -1289,7 +1406,7 @@ backup directory share the same path?"
 | `.github/workflows/release.yml` | Uses cache + stages APK |
 | `.github/workflows/ci.yml` | Verifies metadata |
 | `.github/workflows/upgrade-test.yml` | v1.2.0 42-scenario matrix |
-| `docs/ARCHITECTURE.md` | Architectural section |
+| `docs/ARCHITECTURE.md` | Architectural section (§14 — DNS Binaries; §4.13 — rotation refinements) |
 | `docs/SECURITY.md` | Audit Corrections |
 | `docs/UPGRADE.md` | Version upgrade guide |
 | `docs/BACKUP.md` | Backup system reference (v1.2.0) |
@@ -1309,7 +1426,7 @@ backup directory share the same path?"
 
 ### 12.3 Project Documentation
 
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — DNS Binaries Management
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — DNS Binaries Management (§14) + v1.3.0 rotation refinements (§4.13)
 - [docs/API.md](API.md) — API reference
 - [docs/SECURITY.md](SECURITY.md) — Audit Corrections
 - [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
@@ -1370,8 +1487,9 @@ backup directory share the same path?"
 > **10.** **(v1.2.0)** Do not confuse the DNS-binaries cache with
 > the persistent backup directory.
 >
-> **11.** **(v1.3.0)** The PWA install button and the DNS auto-start
-> fix do **not** affect the DNS-binaries pipeline.
+> **11.** **(v1.3.0)** The PWA install button, the DNS auto-start
+> fix, and the rotation refinements (SNAP-*/ROT-*) do **not**
+> affect the DNS-binaries pipeline.
 >
 > **12.** **(v1.4.0)** Do not confuse the DNS-binaries fetcher
 > (`fetch_dns_binaries.sh`) with the companion APK fetcher
@@ -1405,7 +1523,7 @@ backup directory share the same path?"
 | v1.0.0 | 2.1.18 | — | First stable release — Level 4 established |
 | v1.1.0 | 2.1.18 | — | Polish release — DNS version unchanged |
 | v1.2.0 | 2.1.18 | — | Data preservation release — DNS version unchanged |
-| v1.3.0 | 2.1.18 | — | PWA + boot fix — DNS version unchanged |
+| v1.3.0 | 2.1.18 | — | PWA + boot fix + rotation refinements — DNS version unchanged |
 | **v1.4.0** | **2.1.18** | **1.0.0** | **Companion app — DNS version unchanged** |
 
 **None of the v1.1.0 / v1.2.0 / v1.3.0 / v1.4.0 releases affected
@@ -1444,7 +1562,7 @@ make check-app-version
 
 ---
 
-*Last updated: 2026-10-06*
+*Last updated: 2026-10-08*
 *Version: v1.4.0*
 *Author: gasciljh*
 

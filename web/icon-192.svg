@@ -2,6 +2,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter - PWA Icon (192x192)
      Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -25,7 +26,7 @@
          icon-512.svg (see that file for details).
 
      ============================================================
-     Icon source pipeline (v1.2.0)
+     Icon source pipeline
      ============================================================
      This SVG is the SOURCE for icon-192.png only. It is NOT the
      source for the 512x512 PNG or the favicons.
@@ -41,7 +42,7 @@
        * favicon.ico          (from favicon-16 and favicon-32)
 
      ============================================================
-     Design decisions (v1.2.0 documentation)
+     Design decisions
      ============================================================
      1. Rounded corners (rx=42, ~22% of the canvas):
           Chosen for a modern app-icon look on Android launchers
@@ -67,7 +68,39 @@
           (the mask would only crop the rounded corners).
 
      ============================================================
-     v1.2.0 note:
+     v1.4.0 changes:
+     ============================================================
+       * Version bumped from v1.3.0 to v1.4.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.3.0 and to v1.2.0 before it.
+       * The v1.4.0 release ships a companion Android app
+         (web/app-debug.apk, optional), served by main.go at
+         GET /app-debug.apk. This icon is unaffected by that
+         integration - the PWA continues to use this SVG for
+         its own branding.
+       * Cross-reference to scripts/generate-icons.sh remains
+         authoritative: this SVG produces icon-192.png only.
+       * No new SVG files were introduced in v1.4.0. The
+         icon-maskable.svg file remains deferred (see
+         icon-512.svg for the v1.5.0 plan).
+       * All messages and comments are English-only (global
+         edition). No Arabic strings exist in this file.
+
+     ============================================================
+     v1.3.0 changes (historical):
+     ============================================================
+       * Version bumped from v1.2.0 to v1.3.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.2.0.
+       * The v1.3.0 release added a PWA install button and a
+         live status LED to web/index.html. Neither change
+         affected this icon file.
+
+     ============================================================
+     v1.2.0 note (historical):
+     ============================================================
        * Version bumped from v1.1.0 to v1.2.0 to match the
          module release.
        * No design changes were made - the SVG path data is

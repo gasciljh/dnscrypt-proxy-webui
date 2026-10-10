@@ -1,6 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – Release Workflow
 # Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -36,8 +37,8 @@
 #   update.json is updated LOCALLY by scripts/release.sh in
 #   the same commit that bumps VERSION and module.prop. As of
 #   v1.2.0, release.sh writes three fields together:
-#     • version     (e.g. "v1.2.0")
-#     • versionCode (e.g. 1020000)
+#     • version     (e.g. "v1.4.0")
+#     • versionCode (e.g. 1040000)
 #     • zipUrl      (built from the tag pattern below)
 #
 #   The zipUrl written by release.sh uses the SAME template that
@@ -49,28 +50,33 @@
 #   the commit and the release are guaranteed to be consistent.
 #
 # ============================================================
-# Pipeline steps (13):
+# Pipeline steps (16):
 # ============================================================
-#   ┌────┬──────────────────────────┬──────────┐
-#   │ #  │ Step                          │ Duration   │
-#   ├────┼──────────────────────────┼──────────┤
-#   │  1 │ Checkout (fetch-depth: 0)     │ ~5 s       │
-#   │  2 │ Setup Go 1.22                 │ ~10 s      │
-#   │  3 │ Setup Android NDK r26b        │ ~30 s      │
-#   │  4 │ Determine + validate version  │ ~2 s       │
-#   │  5 │ Install packaging tools       │ ~15 s      │
-#   │  6 │ Build WebUI binaries (4 arch) │ ~60 s      │
-#   │  7 │ Verify binaries (ELF + PIE)   │ ~5 s       │
-#   │  8 │ Package Magisk module         │ ~30 s      │
-#   │  9 │ Upload artifacts (backup)     │ ~20 s      │
-#   │ 10 │ Create GitHub Release         │ ~10 s      │
-#   │ 11 │ Sync main → develop           │ ~15 s      │
-#   └────┴──────────────────────────┴──────────┘
+#   ┌────┬─────────────────────────────────┬──────────┐
+#   │ #  │ Step                                │ Duration     │
+#   ├────┼─────────────────────────────────┼──────────┤
+#   │  1 │ Checkout (fetch-depth: 0)           │ ~5 s         │
+#   │  2 │ Setup Go 1.22                       │ ~10 s        │
+#   │  3 │ Setup Android NDK r26b              │ ~30 s        │
+#   │  4 │ Determine + validate version        │ ~2 s         │
+#   │  5 │ Verify tag exists (dispatch only)   │ ~2 s         │
+#   │  6 │ Install packaging tools             │ ~15 s        │
+#   │  7 │ Fetch companion app APK (v1.4.0)    │ ~10 s        │
+#   │  8 │ Build WebUI binaries (4 arch)       │ ~60 s        │
+#   │  9 │ Verify binaries (ELF + PIE)         │ ~5 s         │
+#   │ 10 │ Stage APK for module ZIP (v1.4.0)   │ ~2 s         │
+#   │ 11 │ Package Magisk module               │ ~30 s        │
+#   │ 12 │ List final artifacts                │ ~2 s         │
+#   │ 13 │ Upload artifacts (backup)           │ ~20 s        │
+#   │ 14 │ Extract CHANGELOG section           │ ~2 s         │
+#   │ 15 │ Create GitHub Release               │ ~10 s        │
+#   │ 16 │ Sync main → develop                 │ ~15 s        │
+#   └────┴─────────────────────────────────┴──────────┘
 #
 #   Total: ~3–5 minutes (excluding runner setup).
 #
 # ============================================================
-# Release artifacts (6 files attached to the GitHub Release):
+# Release artifacts (8 files attached to the GitHub Release):
 # ============================================================
 #   • dnscrypt-webui-<ver>-module.zip         (~12 MB)
 #   • dnscrypt-webui-<ver>-module.zip.sha256  (~100 B)
@@ -78,6 +84,13 @@
 #   • dnscrypt-webui-arm                      (~7 MB)
 #   • dnscrypt-webui-amd64                    (~7.5 MB)
 #   • dnscrypt-webui-386                      (~7 MB)
+#   • DNS-Proxy-v<app-ver>.apk                (~3 MB, v1.4.0)
+#   • DNS-Proxy-v<app-ver>.apk.sha256         (~100 B, v1.4.0)
+#
+#   The two APK files are OPTIONAL. When the companion APK cannot
+#   be fetched (network failure, missing app-apk.version), the
+#   release proceeds without them. All other 6 files are ALWAYS
+#   attached.
 #
 #   Also uploaded as a workflow artifact (backup, 30-day retention).
 #
@@ -100,7 +113,7 @@
 #     already exist. Use scripts/release.sh to create one.
 #
 # ============================================================
-# Sync main → develop (step 11):
+# Sync main → develop (step 16):
 # ============================================================
 #   After the release is published, this workflow syncs main
 #   into develop. See docs/adr/0003-post-release-sync.md.
@@ -195,6 +208,31 @@
 #     trigger paths, not just the tag-push path.
 #
 # ============================================================
+# v1.3.0 — No changes to the release pipeline
+# ============================================================
+#   The v1.3.0 release is primarily a feature release (PWA
+#   install button, live status LED, DNS auto-start after
+#   boot). All three changes are client-side or shell-side:
+#     • PWA install button  → web/index.html (client-side)
+#     • Live status LED     → web/index.html (client-side)
+#     • DNS auto-start fix  → proxy/service.sh (shell)
+#
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#
+#   This workflow (release.yml) was NOT modified in v1.3.0.
+#   It builds and packages the module ZIP but does NOT inspect
+#   the snapshot-detection or rotation logic in the shipped
+#   scripts. Its artifact list, build matrix, and sync step
+#   are all unchanged from v1.2.0.
+#
+#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13.
+# ============================================================
 # v1.4.0 — Companion Android app integration
 # ============================================================
 #   📱 REL-18 — New step "Fetch companion Android app APK".
@@ -212,6 +250,19 @@
 #   📱 REL-20 — Release assets now include:
 #     • dist/DNS-Proxy-v*.apk
 #     • dist/DNS-Proxy-v*.apk.sha256
+#
+#     The list above has been updated from 6 to 8 files to
+#     reflect this. The two APK entries are conditional: they
+#     are attached only when the APK was successfully fetched.
+#
+#   📱 REL-21 — The "Pipeline steps" table above has been
+#     corrected from 13 to 16. The count now reflects the
+#     actual number of steps in the `release` job, including:
+#       • Step 5  — Verify tag exists (HARD-REL-12)
+#       • Step 7  — Fetch companion APK (REL-18)
+#       • Step 10 — Stage APK for module ZIP (REL-19)
+#       • Step 12 — List final artifacts
+#       • Step 14 — Extract CHANGELOG section (HARD-REL-14)
 # ============================================================
 
 name: Release
