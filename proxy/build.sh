@@ -706,7 +706,7 @@ LDFLAGS="${LDFLAGS} -X main.BuildTime=${SOURCE_DATE_EPOCH}"
 LDFLAGS="${LDFLAGS} -X main.ProjectURL=${PROJECT_URL}"
 LDFLAGS="${LDFLAGS} -buildid="
 
-GOFLAGS="-buildvcs=false -trimpath -mod=readonly"
+GOFLAGS=(-buildvcs=false -trimpath -mod=readonly)
 
 # ------------------------------------------------------------
 # [20] NDK detection
@@ -808,7 +808,7 @@ build_arch() {
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
             -buildmode "$BUILDMODE" \
-            "$GOFLAGS" \
+            "${GOFLAGS[@]}" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
             build_ok=1
@@ -818,7 +818,7 @@ build_arch() {
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
             -buildmode "$BUILDMODE" \
-            "$GOFLAGS" \
+            "${GOFLAGS[@]}" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
             build_ok=1
