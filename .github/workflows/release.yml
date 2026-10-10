@@ -577,16 +577,30 @@ jobs:
           git checkout -B develop origin/develop
           echo "::endgroup::"
 
-          echo "::group::Attempt merge main into develop"
+          echo "::group::Sync develop with main (linear)"
+          # Strategy:
+          #   1. Try fast-forward (no-op after sync)
+          #   2. Otherwise, rebase develop onto main (linear history)
+          #   3. Skip empty commits that arise from squash-merges
           if git merge origin/main --no-edit --ff-only 2>/dev/null; then
-            echo "::notice::Fast-forward merge succeeded"
+            echo "::notice::Fast-forward succeeded"
           else
-            echo "::warning::Fast-forward not possible — trying regular merge"
-            if ! git merge origin/main --no-edit -m "chore: sync develop with main after ${V} release"; then
-              echo "::warning::Merge conflict detected — manual resolution required"
-              echo "::warning::develop will NOT be synced automatically"
-              git merge --abort || true
-              exit 0
+            echo "::notice::Fast-forward not possible — rebasing develop onto main"
+            if ! git rebase origin/main; then
+              # After a squash-merge, develop's individual commits may
+              # become empty during rebase. Skip them until rebase ends
+              # or a real conflict is detected.
+              echo "::warning::Rebase issues — attempting to skip empty commits"
+              while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+                if ! git rebase --skip 2>/dev/null; then
+                  echo "::warning::Real conflict — aborting sync"
+                  git rebase --abort || true
+                  exit 0
+                fi
+              done
+              echo "::notice::Rebase completed (empty commits skipped)"
+            else
+              echo "::notice::Rebase succeeded"
             fi
           fi
           echo "::endgroup::"
