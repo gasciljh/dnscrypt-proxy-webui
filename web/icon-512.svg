@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
      DNSCrypt Smart Filter - PWA Icon (512x512)
-     Version: v1.3.0 (Global Edition)
+     Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -34,14 +35,19 @@
      ============================================================
      * This SVG: declared as "purpose": "any".
      * icon-512.png (derived from this SVG): declared as
-       "purpose": "any, maskable".
+       "purpose": "any" in one entry and "purpose": "maskable"
+       in a second entry.
 
-     The same PNG serves both purposes because the underlying
-     shape fits both. See the "Maskable-safe zone" analysis below
-     for the trade-off.
+     The same PNG serves both purposes via two distinct entries
+     in the manifest's icons array (see manifest.json icons[2]
+     for "any" and icons[4] for "maskable"). This is spec-
+     compliant: the PWA spec requires a SEPARATE entry per
+     purpose, not a comma-separated value in a single entry.
+     See the "Maskable-safe zone" analysis below for the
+     trade-off.
 
      ============================================================
-     Maskable-safe zone - honest assessment (v1.2.0)
+     Maskable-safe zone - honest assessment
      ============================================================
      Per the W3C Web App Manifest spec, the maskable safe zone
      is a circle of radius 40% of the canvas:
@@ -64,10 +70,12 @@
          launchers at 45%+), the top of the shield may be
          clipped by a few pixels.
 
-     A future release may ship a dedicated icon-maskable.svg
-     with a wider safe-zone margin (~10% inset). Until then,
-     the manifest accepts this trade-off rather than shipping a
-     shrunk, visually-weaker icon.
+     Deferred to v1.5.0: a dedicated icon-maskable.svg with a
+     wider safe-zone margin (~10% inset). The plan is tracked in
+     docs/ROADMAP.md §5.1 and in the [Unreleased] section of
+     CHANGELOG.md. Historical note: this item was previously
+     listed as a v1.3.0 goal in an earlier revision, then as a
+     v1.4.0 goal; it was not shipped in either release.
 
      Rationale for the trade-off:
        * The shield is the visual identity of the icon.
@@ -77,7 +85,7 @@
          launchers, which is the pragmatic choice.
 
      ============================================================
-     Design decisions (v1.2.0 documentation)
+     Design decisions
      ============================================================
      1. Full-bleed background (rect fills 0,0 to 512,512):
           No rounded corners. This is deliberate for the
@@ -127,7 +135,41 @@
        maskable-safe-zone analysis above.
 
      ============================================================
-     v1.2.0 note:
+     v1.4.0 changes:
+     ============================================================
+       * Version bumped from v1.3.0 to v1.4.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.3.0 and to v1.2.0 before it.
+       * The v1.4.0 release ships a companion Android app
+         (web/app-debug.apk, optional), served by main.go at
+         GET /app-debug.apk. This icon is unaffected by that
+         integration - the PWA continues to use this SVG for
+         its own branding.
+       * Cross-reference to scripts/generate-icons.sh remains
+         authoritative: this SVG produces four files
+         (icon-512.png, apple-touch-icon.png, favicon-32x32.png,
+         favicon-16x16.png).
+       * No new SVG files were introduced in v1.4.0.
+       * The maskable-safe-zone analysis and the deferred
+         icon-maskable.svg plan (now v1.5.0) are unchanged.
+       * All messages and comments are English-only (global
+         edition). No Arabic strings exist in this file.
+
+     ============================================================
+     v1.3.0 changes (historical):
+     ============================================================
+       * Version bumped from v1.2.0 to v1.3.0 to match the
+         module release.
+       * No design changes were made - the SVG path data is
+         IDENTICAL to v1.2.0.
+       * The v1.3.0 release added a PWA install button and a
+         live status LED to web/index.html. Neither change
+         affected this icon file.
+
+     ============================================================
+     v1.2.0 note (historical):
+     ============================================================
        * Version bumped from v1.1.0 to v1.2.0 to match the
          module release.
        * No design changes were made - the SVG path data is

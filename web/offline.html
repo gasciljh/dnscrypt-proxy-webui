@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Offline Page
-     Version: v1.3.0 (Global Edition)
+     Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -12,84 +13,75 @@
      first (this file), then falls back to an inline English-
      only page if the cache lookup fails.
 
-     v1.2.0 → v1.3.0 — POST-AUDIT FIXES
-     ============================================================
-     A pre-release audit of this file identified the following
-     issues. All of them are addressed in-place.
+     v1.4.0 — Companion Android app integration:
+       • No behavior change. The offline page does not mention
+         or link to the companion APK; it is unaffected by the
+         v1.4.0 integration release.
+       • The `pageTitle` translation keys (EN + AR) were updated
+         from v1.3.0 to v1.4.0 (they had been left behind in
+         the v1.3.0 → v1.4.0 release).
 
-       🔧 OFF-1 — The <html> tag shipped with static
-         lang="en" dir="ltr", matching index.html and
-         dashboard.html before their IDX-4 fix. For users whose
-         preference is Arabic (stored in localStorage under
-         'dnscrypt-lang'), the page painted LTR for the first
-         ~100 ms before applyLanguage() corrected it. A small
-         inline script in <head> now sets the correct lang/dir
-         BEFORE the first paint.
+     v1.4.0 — frontend audit clarifications (this revision):
+       • OFF-5 — the `navigator.onLine` limitation is now
+         **actually** documented in `renderDiagnostics()`. The
+         v1.2.0 → v1.3.0 header claimed this fix but the code
+         contained no such documentation. The claim has been
+         honoured in this revision.
 
-       🔧 OFF-2 — In toggleLanguage(), the diagnostics box was
-         refreshed by calling handleDiagnose() twice in a row.
-         Because handleDiagnose() is a TOGGLE (if the box is
-         visible, it hides it; otherwise it renders and shows
-         it), the double call was a net no-op: the first call
-         hid the box, the second call re-rendered and re-showed
-         it. The intent was to RE-RENDER the diagnostic labels
-         with the new language, not to toggle. The rendering
-         logic has been extracted into a new function
-         `renderDiagnostics()` which is now called directly
-         from toggleLanguage(). handleDiagnose() keeps its
-         toggle behavior for the button.
+       • OFF-6 — `boot()` no longer calls
+         `updateStatus(navigator.onLine)`. The offline page is
+         only shown when the LOCAL server is unreachable, so
+         `navigator.onLine === true` (browser has network) must
+         NOT be interpreted as "server up". The previous
+         behaviour displayed a green "Connected" pill on a page
+         that exists precisely because the server is DOWN.
+         Boot now calls `updateStatus(false)`, which correctly
+         shows "Reconnecting...".
 
-       🔧 OFF-3 — updateStatus(false) did not reset the visual
-         state of the connectivity status box. If the box had
-         been switched to the green "online" appearance and the
-         user then went offline, the dot stayed green and the
-         border stayed green while the text reverted to the
-         warning text — a confusing mixed state. The function
-         now resets the box style, dot color, and dot animation
-         in both directions.
+       • OFF-7 — the `online` event listener now triggers
+         `handleRetry()` instead of the misleading
+         `updateStatus(true)`. The `offline` event continues to
+         call `updateStatus(false)`.
 
-       🔧 OFF-4 (critical for LAN users) — All three actionable
-         links on this page hard-coded 127.0.0.1:
-           • #portsWebuiLink   → http://127.0.0.1:9090/
-           • #portsDashLink    → http://127.0.0.1:9091/
-           • #openDashBtn      → http://127.0.0.1:9091/
-         When the user accesses the WebUI over the LAN (for
-         example http://192.168.1.5:9090/), clicking any of
-         these links navigated to 127.0.0.1 on the CLIENT
-         device — which is the user's own phone or laptop, not
-         the Android device running the module. The links are
-         now built at runtime from window.location.hostname,
-         matching the pattern used by index.html's
-         getDashboardUrl(). The port numbers remain the
-         default 9090/9091 (this page cannot read webui.conf;
-         see the ports-note), but the HOSTNAME now reflects
-         however the user actually reached the page.
+       • OFF-8 — favicon links + `Pragma`/`Expires` meta tags
+         added for parity with `index.html` and
+         `dashboard.html`. The SW already precaches the three
+         favicon files; this revision finally references them
+         from the offline page.
 
-       🔧 OFF-5 — updateStatus() uses navigator.onLine as its
-         "is the server reachable?" signal. navigator.onLine
-         only reflects the CLIENT's network interface state,
-         not the server's availability. A user can be "online"
-         (Wi-Fi connected) while the module is stopped, or
-         vice versa. The behavior is unchanged (it is the best
-         signal available to a static page), but the comment
-         has been expanded to make this limitation explicit so
-         that a future reader does not mistake it for a
-         reliable health check.
+       • OFF-9 — the language toggle's `aria-label` is now
+         i18n-driven (`langToggleAriaLabel`), matching the
+         visible label's language. The previous static
+         `aria-label="Toggle language"` (English-only) has
+         been removed.
+
+     v1.2.0 → v1.3.0 — POST-AUDIT FIXES (kept, historical):
+       • OFF-1 — lang/dir set before first paint.
+       • OFF-2 — renderDiagnostics() extracted from
+         handleDiagnose() (was a double-call no-op).
+       • OFF-3 — updateStatus(false) resets box appearance.
+       • OFF-4 — links built from window.location.hostname
+         (was hardcoded 127.0.0.1).
+       • OFF-5 — navigator.onLine limitation documented.
+         (⚠️ Claimed in v1.3.0 but not implemented in code —
+             actually delivered by OFF-5 in v1.4.0 above.)
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta name="theme-color" content="#0d1117">
     <meta name="robots" content="noindex, nofollow">
-    <title>Offline — DNSCrypt Smart Filter v1.3.0</title>
+    <title>Offline — DNSCrypt Smart Filter v1.4.0</title>
 
-    <!-- OFF-1 fix: apply lang/dir from localStorage BEFORE the
-         first paint, matching IDX-4 in index.html and
-         dashboard.html. Without this, an Arabic-preferring
-         user sees a flash of LTR layout for ~100 ms before
-         applyLanguage() corrects it. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+
     <script>
       (function(){
         try {
@@ -250,14 +242,6 @@
             white-space: nowrap;
         }
 
-        /* ============================================================
-         * Scrollable code inside info-box list items
-         * ------------------------------------------------------------
-         * Long commands (e.g. the su -c "...action.sh --restart")
-         * stay on one line and can be scrolled horizontally
-         * instead of being clipped at the card edge.
-         * Mirrors the pattern used by #riRawJson in index.html.
-         * ============================================================ */
         .info-box li code {
             display: inline-block;
             max-width: 100%;
@@ -642,10 +626,6 @@
                 <span id="portsWebuiLabel">WebUI</span>
             </span>
             <span class="port-value">
-                <!-- OFF-4 fix: href is set at runtime from
-                     window.location.hostname; the static value
-                     here is a placeholder and will be replaced
-                     during boot(). -->
                 <a href="#" id="portsWebuiLink">http://127.0.0.1:9090/</a>
             </span>
         </div>
@@ -655,7 +635,6 @@
                 <span id="portsDashLabel">Dashboard</span>
             </span>
             <span class="port-value">
-                <!-- OFF-4 fix: href is set at runtime -->
                 <a href="#" id="portsDashLink">http://127.0.0.1:9091/</a>
             </span>
         </div>
@@ -724,9 +703,6 @@
             <span id="retryText">Retry</span>
         </button>
 
-        <!-- OFF-4 fix: href is set at runtime from
-             window.location.hostname. The static value is a
-             placeholder. -->
         <a
             class="btn btn-success"
             id="openDashBtn"
@@ -766,7 +742,7 @@
         <div>
             <span aria-hidden="true">🛡️</span>
             DNSCrypt Smart Filter
-            <span class="version" id="versionBadge">v1.3.0</span>
+            <span class="version" id="versionBadge">v1.4.0</span>
         </div>
         <div style="margin-top: 6px;">
             <a
@@ -787,12 +763,12 @@
 
     var translations = {
         en: {
-            pageTitle: 'Offline — DNSCrypt Smart Filter v1.3.0',
+            pageTitle: 'Offline — DNSCrypt Smart Filter v1.4.0',
             langToggle: '🇸🇦 العربية',
+            langToggleAriaLabel: 'Toggle language to Arabic',
             title: 'Offline',
             subtitle: 'Cannot reach DNSCrypt WebUI server.<br>Make sure the service is running on port <code>9090</code>.',
             statusText: 'Reconnecting...',
-            statusOnline: 'Connected',
             safeTitle: 'Your data is safe',
             safeMsg1: 'This page is shown because the local WebUI server is not responding. It does <strong>not</strong> mean your settings were lost.',
             safeMsg2: 'Since v1.2.0, all 5 user config files are preserved on <code>/sdcard/dnscrypt-webui-backup/</code> and are restored automatically if you reinstall the module.',
@@ -822,12 +798,12 @@
             projectText: 'Project on GitHub'
         },
         ar: {
-            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.3.0',
+            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.4.0',
             langToggle: '🇬🇧 English',
+            langToggleAriaLabel: 'تبديل اللغة إلى الإنجليزية',
             title: 'غير متصل',
             subtitle: 'لا يمكن الوصول إلى خادم DNSCrypt WebUI.<br>تأكد من أن الخدمة تعمل على المنفذ <code>9090</code>.',
             statusText: 'جاري إعادة الاتصال...',
-            statusOnline: 'متصل',
             safeTitle: 'بياناتك بأمان',
             safeMsg1: 'هذه الصفحة تظهر لأن خادم WebUI المحلي لا يستجيب. هذا <strong>لا</strong> يعني أن إعداداتك قد فُقدت.',
             safeMsg2: 'منذ v1.2.0، تُحفظ جميع ملفات الإعداد الخمسة على <code>/sdcard/dnscrypt-webui-backup/</code> وتُستعاد تلقائيًا عند إعادة تثبيت الموديول.',
@@ -875,15 +851,6 @@
             .replace(/'/g, '&#39;');
     }
 
-    // ============================================================
-    // OFF-4 fix: build the WebUI / Dashboard URLs from the host
-    // the page was actually served from. Falls back to 127.0.0.1
-    // if window.location.hostname is somehow empty.
-    //
-    // Ports remain the DEFAULTS (9090/9091). This page cannot
-    // read webui.conf — the offline state means the API is
-    // unreachable. The ports-note in the UI tells the user this.
-    // ============================================================
     function hostForUrl() {
         var hostname = window.location.hostname || '127.0.0.1';
         if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
@@ -963,9 +930,15 @@
         setText('diagTitle', t.diagTitle);
         setText('projectText', t.projectText);
 
-        // OFF-4 fix: re-apply the runtime URLs after a language
-        // change. The URLs are language-independent, but this
-        // keeps the invariant "URLs are always set" in one place.
+        // OFF-9 (v1.4.0): keep the aria-label in sync with the
+        // visible label's language. Previously the aria-label
+        // was a static English string ("Toggle language"), which
+        // mismatched the Arabic visible text for AR users.
+        var langBtn = $('langToggle');
+        if (langBtn && t.langToggleAriaLabel) {
+            langBtn.setAttribute('aria-label', t.langToggleAriaLabel);
+        }
+
         applyRuntimeUrls();
 
         try {
@@ -977,11 +950,6 @@
         currentLang = (currentLang === 'ar') ? 'en' : 'ar';
         applyLanguage(currentLang);
 
-        // OFF-2 fix: re-render the diagnostic labels in the new
-        // language IF the box is visible. The previous code
-        // called handleDiagnose() TWICE, which was a no-op (the
-        // function is a toggle). Now we call a dedicated
-        // renderDiagnostics() that never touches visibility.
         var box = $('diagnosticsBox');
         if (box && box.style.display === 'block') {
             renderDiagnostics();
@@ -1020,22 +988,30 @@
         xhr.send();
     }
 
-    // ============================================================
-    // updateStatus — reflects the CLIENT's network state only.
+    // ------------------------------------------------------------
+    // updateStatus(isOnline)
+    // ------------------------------------------------------------
+    // Sets the connectivity-status pill's appearance.
     //
-    // OFF-5 note: navigator.onLine is NOT a health check for the
-    // module. It only tells us whether the browser has a network
-    // interface up. A user can be "online" (Wi-Fi connected)
-    // while the module is stopped, and the reverse is possible
-    // in edge cases. This is the best signal available to a
-    // static cached page; do not treat it as a server-reachable
-    // signal.
+    // OFF-6 (v1.4.0): the two call sites in this file always pass
+    // `false`. The `true` branch is retained for future use (e.g.
+    // a "server back up, reloading..." transient state), but it is
+    // not reachable from the current boot flow.
     //
-    // OFF-3 fix: both directions now reset the box appearance
-    // (background, border, dot color, dot animation) so that a
-    // transition from green → warning does not leave a green
-    // dot behind.
-    // ============================================================
+    // Why `true` is never passed on boot:
+    //   The offline page only exists because the local server was
+    //   unreachable. `navigator.onLine === true` means the BROWSER
+    //   has network — it says nothing about whether 127.0.0.1:9090
+    //   is answering. Showing a green "Connected" pill on this
+    //   page would be misleading. Boot therefore always starts in
+    //   the "Reconnecting..." state, and only a successful
+    //   /healthz probe (see handleRetry()) upgrades the UI — at
+    //   which point the page reloads, so updateStatus(true) is
+    //   never actually needed.
+    //
+    // See also: OFF-5 (navigator.onLine limitation) in
+    // renderDiagnostics() below.
+    // ------------------------------------------------------------
     function updateStatus(isOnline) {
         var statusEl = $('statusText');
         var statusBox = document.querySelector('.connectivity-status');
@@ -1045,7 +1021,7 @@
         var dot = statusBox.querySelector('.dot');
 
         if (isOnline) {
-            if (statusEl) statusEl.textContent = t.statusOnline;
+            if (statusEl) statusEl.textContent = t.statusText;
             statusBox.style.background = 'rgba(63, 185, 80, 0.1)';
             statusBox.style.borderColor = 'rgba(63, 185, 80, 0.3)';
             statusBox.style.color = 'var(--success)';
@@ -1055,23 +1031,33 @@
             }
         } else {
             if (statusEl) statusEl.textContent = t.statusText;
-            // OFF-3 fix: reset back to the warning appearance.
             statusBox.style.background = 'rgba(210, 153, 34, 0.1)';
             statusBox.style.borderColor = 'rgba(210, 153, 34, 0.3)';
             statusBox.style.color = 'var(--warning)';
             if (dot) {
                 dot.style.background = 'var(--warning)';
-                dot.style.animation = ''; // restore the blink animation
+                dot.style.animation = '';
             }
         }
     }
 
-    // ============================================================
-    // renderDiagnostics — populate the diagnostic fields.
-    // Does NOT change visibility. (OFF-2 fix: extracted from
-    // handleDiagnose so that it can be called from
-    // toggleLanguage without toggling the box.)
-    // ============================================================
+    // ------------------------------------------------------------
+    // renderDiagnostics()
+    // ------------------------------------------------------------
+    // OFF-5 (v1.4.0): the `navigator.onLine` limitation is
+    // documented here — this is the promised v1.3.0 fix, actually
+    // delivered in v1.4.0.
+    //
+    // navigator.onLine reports the BROWSER's view of connectivity
+    // (is there a network interface up?), not the LOCAL server's
+    // reachability. On Android, a device with WiFi enabled will
+    // report navigator.onLine === true even when the local WebUI
+    // server (127.0.0.1:9090) is unreachable — which is precisely
+    // the situation this page exists to handle.
+    //
+    // The value is shown for reference only. It MUST NOT be
+    // interpreted as "server up" (see OFF-6 in updateStatus()).
+    // ------------------------------------------------------------
     function renderDiagnostics() {
         var t = translations[currentLang];
 
@@ -1103,7 +1089,6 @@
         }
     }
 
-    // handleDiagnose — toggle the box; on show, populate it.
     function handleDiagnose() {
         var box = $('diagnosticsBox');
         if (!box) return;
@@ -1157,9 +1142,22 @@
         var diagBtn = $('diagnoseBtn');
         if (diagBtn) diagBtn.addEventListener('click', handleDiagnose);
 
-        updateStatus(navigator.onLine);
+        // OFF-6 (v1.4.0): always start in the "Reconnecting..." state.
+        // The offline page is only shown when the local server is
+        // unreachable, so `navigator.onLine === true` must NOT be
+        // rendered as "Connected" — see updateStatus() for details.
+        updateStatus(false);
 
-        window.addEventListener('online', function() { updateStatus(true); });
+        // OFF-7 (v1.4.0): the 'online' event means the BROWSER
+        // regained network connectivity. It does NOT mean the local
+        // WebUI server is back up. The correct response is to
+        // probe the server (handleRetry()), not to paint a green
+        // "Connected" pill.
+        //
+        // The 'offline' event means the browser lost network
+        // connectivity. The "Reconnecting..." pill is the right
+        // state, so we reset it explicitly.
+        window.addEventListener('online', function() { handleRetry(); });
         window.addEventListener('offline', function() { updateStatus(false); });
 
         startAutoRetry();

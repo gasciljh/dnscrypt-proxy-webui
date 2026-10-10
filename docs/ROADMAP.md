@@ -3,16 +3,108 @@
 > What's coming next in DNSCrypt Smart Filter — a comprehensive
 > vision for future releases.
 
-**Current version**: v1.3.0
-**Last updated**: 2026-10-02
+**Current version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
->   • Current version bumped from v1.1.0 to v1.2.0.
->   • `Last updated` reflects the v1.2.0 release date.
->   • **New section**: "What Was Delivered in v1.2.0" (§4).
->     The v1.2.0 data-preservation release (10 defensive layers,
+> **Identifier inventory in this file (6 total)**:
+>   • HARD-RDM-01 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-RDM-02 (§4b extended with SNAP-*/ROT-* server-side
+>     changes — v1.4.0)
+>   • HARD-RDM-03 (§4b.4 rewritten to describe the actual
+>     v1.3.0 detection + sort change — v1.4.0)
+>   • HARD-RDM-04 (§11.9 extended with the correct v1.3.0
+>     context — v1.4.0)
+>   • HARD-RDM-05 (§1.4 version history corrected — v1.4.0)
+>   • HARD-RDM-06 (Header + footer `Last updated` sync to
+>     2026-10-08 — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/GLOSSARY.md](GLOSSARY.md) — SNAP-*/ROT-* terms,
+>     Rotation Guardian badge
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Rotation Guardian
+>     + Companion App Champion badges
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Current version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
+>   • **New section**: "What Was Delivered in v1.3.0" (§4b) —
+>     PWA install button, live status LED, DNS auto-start fix,
+>     **and the server-side rotation refinements
+>     (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+>     ROT-PROTECT)**.
+>   • **New section**: "What Was Delivered in v1.4.0" (§4c) —
+>     companion Android app, CodeQL `go/path-injection` fix,
+>     iOS PWA logic removal, MAIN-01.
+>   • **§5 renamed**: `v1.3.0 — Q1 2027` → `v1.5.0 — Q1 2027`.
+>     The version number was wrong: v1.3.0 already shipped with
+>     a **narrower scope** (see §4b), so the original v1.3.0
+>     plan (CSP hardening, PWA unification, memory/backup
+>     tooling, backup integrity hardening) has been re-assigned
+>     to v1.5.0.
+>   • **§6 renamed**: `v1.4.0 — Q2 2027` → `v1.6.0 — Q2 2027`.
+>     Same reason: v1.4.0 shipped with the companion app
+>     integration (see §4c), not with multi-language support.
+>     The original v1.4.0 plan (FR/DE/ES/RU/ZH, 2FA, audit
+>     logging, etc.) has been re-assigned to v1.6.0.
+>   • **§1.4** — Version history table extended: the v1.3.0 row
+>     now lists the server-side rotation refinements alongside
+>     the client-side features.
+>   • **§4b** — Extended with three new subsections:
+>       - §4b.4 (**v1.3.0 server-side rotation refinements**) —
+>         SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME
+>         + ROT-PROTECT.
+>       - §4b.5 (Rotation Guardian badge reference).
+>       - §4b.6 (updated statistics).
+>     Renumbered the following subsections accordingly.
+>   • **§4b.4 (previous)** — The "Sort order change" subsection
+>     was rewritten: the v1.3.0 change was **not** just an
+>     mtime-sort substitution for `last_backup_name`; it also
+>     changed the **snapshot-detection rule** (manifest-based
+>     detection instead of name-pattern matching) and added
+>     **two protected rotation targets**.
+>   • **§10.4 priority table** — version references updated
+>     from v1.3.0 to v1.5.0 where they describe future work.
+>   • **§11.3 workflow milestones** — added the v1.3.0 and
+>     v1.4.0 delivered entries (with the correct server-side
+>     context).
+>   • **§11.9** — Rewritten with the correct v1.3.0 context
+>     (SNAP-*/ROT-* server-side refinements).
+>   • **§12.4 post-audit corrections** — count corrected from
+>     **7** to **8** (BUG-1..BUG-6 + N-1 + N-4); the "(plus
+>     one user-agent derivation fix)" parenthetical was removed
+>     because N-1 is already counted in the table.
+>   • **§13 Timeline Summary** — updated to show v1.3.0 and
+>     v1.4.0 as delivered.
+>   • **Long-Term Vision** — added v1.3.0 / v1.4.0 mentions.
+>   • **References** — added `docs/INSTALL.md` §8.6 (companion
+>     app install) and the companion repository.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+>   • **Encoding**: this revision preserves the UTF-8 correction
+>     applied in v1.2.0 — all section markers, arrows,
+>     checkmarks, warnings, and box-drawing characters render as
+>     proper UTF-8.
+
+> **v1.3.0 changes** (historical):
+>   • Current version bumped from v1.2.0 to v1.3.0.
+>   • `Last updated` reflected the v1.3.0 release date.
+>   • **New section**: "What Was Delivered in v1.2.0" (§4) —
+>     the v1.2.0 data-preservation release (10 defensive layers,
 >     BAK-1..BAK-4, FIX-1/FIX-2) and documentation updates are
 >     now recorded here.
 >   • **v1.3.0 section renumbered** (§5) — now contains the
@@ -34,15 +126,50 @@
 >     implementation in `customize.sh`), not as a
 >     "reorder + exclude" strategy. See `docs/SECURITY.md` §5.32
 >     for the full analysis.
+>   • **Client-side additions**:
+>       - **PWA install button** — dynamic, always-visible,
+>         browser-aware (client-side only; see `web/index.html`).
+>         *(Repurposed in v1.4.0 — the button now points at
+>         `/app-debug.apk`.)*
+>       - **Live status LED** on the Today counter (client-side).
+>   • **Boot-path correctness fix** — `service.sh` now calls
+>     `POST /api/ensure_running_service` directly after boot,
+>     bounded by a wait for the WebUI port. No install-time
+>     change.
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Five
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern.
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         **two additional protected targets** on top of the
+>         21-newest window: the `.last_stable` recovery pointer
+>         and the newest install snapshot (name matching
+>         `-v<digit>`).
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
 >     user's preference is stored client-side in
 >     `localStorage['dnscrypt-lang']`. Documentation remains
 >     English-only by project convention.
->   • **Encoding correction (this revision)**: fixed mojibake in
+>   • **Encoding correction (v1.2.0)**: fixed mojibake in
 >     section markers, arrows, checkmarks, warnings, and box
->     drawing characters. All symbols now render as proper UTF-8.
+>     drawing characters. All symbols render as proper UTF-8.
 
 > **📖 Development workflow**:
 > - Git branching strategy → [`docs/BRANCHING.md`](BRANCHING.md)
@@ -51,6 +178,7 @@
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 > - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
 > - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
+> - Companion app install → [`docs/INSTALL.md`](INSTALL.md) §8.6
 
 ---
 
@@ -60,14 +188,17 @@
 2. [✅ What Was Delivered in v1.0.0](#2--what-was-delivered-in-v100)
 3. [✅ What Was Delivered in v1.1.0](#3--what-was-delivered-in-v110)
 4. [✅ What Was Delivered in v1.2.0](#4--what-was-delivered-in-v120)
-5. [v1.3.0 — Q1 2027](#5-v130--q1-2027)
-6. [v1.4.0 — Q2 2027](#6-v140--q2-2027)
+4b. [✅ What Was Delivered in v1.3.0](#4b--what-was-delivered-in-v130)
+4c. [✅ What Was Delivered in v1.4.0](#4c--what-was-delivered-in-v140)
+5. [v1.5.0 — Q1 2027](#5-v150--q1-2027)
+6. [v1.6.0 — Q2 2027](#6-v160--q2-2027)
 7. [v2.0.0 — 2028](#7-v200--2028)
 8. [Under Consideration](#8-under-consideration)
 9. [Permanently Excluded](#9-permanently-excluded)
 10. [How to Contribute to Priorities](#10-how-to-contribute-to-priorities)
 11. [Development Workflow Priorities](#11-development-workflow-priorities)
 12. [v1.2.0 Data-Preservation Registry](#12-v120-data-preservation-registry)
+13. [Timeline Summary](#13-timeline-summary)
 
 ---
 
@@ -109,6 +240,19 @@ Each proposed feature is evaluated based on:
 | ⏸️ | Deferred |
 | ❌ | Excluded |
 | 🆕 | New in this update |
+
+### 1.4 Version History at a Glance
+
+| Version | Date | Type | Highlights |
+|---|---|---|---|
+| v1.0.0 | 2026-09-24 | Stable | First stable release; 33 audit corrections |
+| v1.1.0 | 2026-09-26 | Polish | MEM-1/2/3 (dynamic memory + shellQuote + MONITORING_UI_PORT) |
+| v1.2.0 | 2026-09-29 | Data-preservation | 10 defensive layers; BAK-1..BAK-4; bilingual WebUI |
+| v1.3.0 | 2026-10-02 | Feature | PWA install button; live status LED; DNS auto-start fix; **server-side rotation refinements (SNAP-*/ROT-*)** |
+| **v1.4.0** | **2026-10-06** | **Integration** | **Companion Android app; CodeQL fix; iOS PWA removal; MAIN-01** |
+| v1.5.0 | Q1 2027 (planned) | Feature | CSP hardening; PWA unification; memory/backup tooling |
+| v1.6.0 | Q2 2027 (planned) | Feature | Multi-language; 2FA; audit logging; JWT |
+| v2.0.0 | 2028 (planned) | Major rewrite | SPA; API v2; multi-node; plugin system |
 
 ---
 
@@ -225,7 +369,7 @@ Each proposed feature is evaluated based on:
   architectural decisions.
 
 **What didn't work yet**:
-- ⚠️ **CSP `'unsafe-inline'`** is still present (target: v1.3.0).
+- ⚠️ **CSP `'unsafe-inline'`** is still present (target: v1.5.0).
 - ⚠️ **Some Dashboard fields** remain empty (`resolver_health`,
   `top_domains`).
 - ⚠️ **PWA dual-origin limitation** (9090 ≠ 9091) — needs
@@ -357,9 +501,10 @@ nonce.
 
 **Carried over to v1.2.0**:
 - CSP hardening (`'unsafe-inline'` removal) — required more work
-  than originally estimated. **Deferred to v1.3.0**.
+  than originally estimated. **Deferred first to v1.3.0, then to
+  v1.5.0** (see §1.4).
 - PWA port unification — needs coordination with `main.go` mux
-  routing. **Deferred to v1.3.0**.
+  routing. **Deferred first to v1.3.0, then to v1.5.0**.
 
 ---
 
@@ -539,15 +684,274 @@ knowing what the ZIP contains.
   endpoint took no arguments and re-saved the current denylist
   unchanged. Fixed by requiring a `content` parameter (BUG-A).
 
-**Carried over to v1.3.0**:
+**Carried over to v1.5.0** (via v1.3.0 and v1.4.0 — see §1.4):
 - CSP hardening (`'unsafe-inline'` removal) — still pending.
 - PWA port unification — still pending.
-- WebUI update to use `append_denylist` with content — see §5.
-- Memory Architect badge tooling — see §5.
+- WebUI update to use `append_denylist` with content.
+- Memory Architect badge tooling.
+- Backup integrity hardening.
 
 ---
 
-## 5. v1.3.0 — Q1 2027
+## 4b. ✅ What Was Delivered in v1.3.0
+
+**Release date**: 2026-10-02.
+**Type**: Feature Release (MINOR).
+**Audit Corrections**: None (registry remains at #33).
+
+### 4b.1 🎯 Overview
+
+v1.3.0 is a **feature release** focused on the WebUI's install
+experience and DNS reliability at boot. It ships **three
+user-facing improvements** (client-side or shell-side) **and
+five server-side rotation refinements** (see §4b.4).
+
+The **scope of v1.3.0 was narrower** than originally planned in
+the previous ROADMAP revision. The original v1.3.0 plan (CSP
+hardening, PWA port unification, memory tooling, backup integrity
+hardening) has been re-assigned to **v1.5.0** — see §5.
+
+### 4b.2 🆕 Client-Side Features (2)
+
+| Feature | File | Impact |
+|---|---|---|
+| **Smart dynamic PWA install button** | `web/index.html` | The install button is now aware of the browser and always visible; opens the native `beforeinstallprompt` dialog on Chromium-based browsers, shows iOS-specific instructions on Safari, and a friendly "unsupported browser" modal with Play Store links otherwise |
+| **Live status LED** | `web/index.html` | A small LED next to the "Today" counter shows the DNS engine's current state (green = running, red = stopped) |
+
+**Note**: The PWA install button's `beforeinstallprompt` chain
+was **removed in v1.4.0** and replaced with a direct
+`<a download>` link — see §4c.5.
+
+### 4b.3 🆕 Shell-Side Fix (1)
+
+| Fix | File | Impact |
+|---|---|---|
+| **DNS auto-start after boot** | `proxy/service.sh` | At boot, `service.sh` now calls `POST /api/ensure_running_service` directly (with a bounded wait for the WebUI port), instead of relying on the Watchdog's 30-second polling interval. DNS is available faster after a reboot. |
+
+### 4b.4 🆕 Server-Side Rotation Refinements (5)
+
+The v1.3.0 release ALSO refined the snapshot-detection and
+rotation semantics that underpin the persistent backup directory.
+Five identifiers document the change (also used in
+`CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+
+| ID | File | Change |
+|:-:|---|---|
+| **SNAP-MANIFEST** | `proxy/main.go` | `buildBackupInfo()` now detects a snapshot by the presence of a `.manifest.json` file, **not** by the v1.2.0 name-pattern matching (`^[0-9]{8}-[0-9]{6}-`). Custom-named snapshots (e.g. `pre-v130-manual-...`) are now visible to the API and to rotation. |
+| **SNAP-MTIME** | `proxy/main.go` | `last_backup_name` is now selected by **mtime** (descending), not by lexicographic directory name. This **supersedes** the v1.2.0 BUG-3 rule. Robust against clock drift and manual renames. |
+| **ROT-MANIFEST** | `proxy/functions.sh` | `rotate_backups()` uses the same manifest-based detection. Excludes `current/`, `txn-*`, and `orphan-txn-*` by name. |
+| **ROT-MTIME** | `proxy/functions.sh` | `rotate_backups()` uses the same mtime-descending sort. |
+| **ROT-PROTECT** | `proxy/functions.sh` | `rotate_backups()` preserves **two additional protected targets** on top of the 21-newest window: the `.last_stable` recovery pointer and the newest install snapshot (name matching `-v<digit>`). |
+
+**Mirrored semantics** (same SNAP-*/ROT-* behavior): 5 shell
+scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+`customize.sh`, `action.sh`) and `uninstall.sh`.
+
+**Why this matters**: The v1.3.0 rotation refinements fix a
+**silent failure mode** where the 21-newest window could evict
+the exact snapshot that recovery mode or rollback depends on.
+Before v1.3.0, `.last_stable` and the newest install snapshot
+had no explicit protection — they could be pruned silently.
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13
+and §11.31–§11.33.
+
+### 4b.5 🆕 Rotation Guardian Badge
+
+The v1.3.0 release introduced the **🎯 Rotation Guardian**
+badge — see [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md). It
+recognizes contributors who verify the SNAP-*/ROT-* semantics
+on **3+ devices** or **3+ root solutions**.
+
+**Reference**: [`docs/COMPATIBILITY.md`](COMPATIBILITY.md)
+§10.3.5 (on-device verification procedure);
+[`docs/FAQ.md`](FAQ.md) Q131, Q138, Q139.
+
+### 4b.6 📊 Statistics
+
+| Category | Before (v1.2.0) | After (v1.3.0) |
+|---|:---:|:---:|
+| Audit Corrections | 33 | 33 (unchanged) |
+| Client-side features | 0 (dedicated) | **2** |
+| Shell-side fixes | 0 (dedicated) | **1** |
+| Server-side rotation refinements | 0 | **5** |
+| Correctness fixes | 3 | **4** (incl. SNAP-MTIME superseding BUG-3) |
+| New badges | 0 | **1** (Rotation Guardian) |
+| Documentation files updated | 19 | 8+ (mostly headers) |
+
+### 4b.7 🎯 Lessons Learned
+
+**What worked**:
+- ✅ **Client-side-only features are cheap** — no risk to the
+  server-side contract, no API break.
+- ✅ **Narrow scope is fine** — the WebUI install experience and
+  DNS boot reliability were real user pain points, even if they
+  do not justify a whole release on their own.
+- ✅ **Non-interactive shell autostart** removes an entire class
+  of "DNS not working right after reboot" bug reports.
+- ✅ **Manifest-based detection** is robust against custom names
+  and manual renames — it closed a real risk in the recovery
+  path.
+- ✅ **Protected rotation targets** made the recovery mode and
+  rollback paths immune to silent eviction.
+
+**What was discovered**:
+- 🔍 **The PWA install UX varies widely** across browsers. The
+  "smart dynamic" approach handles the three main cases
+  (Chromium, iOS Safari, others) but is inevitably
+  browser-dependent — this drove the v1.4.0 decision to
+  simplify the button (see §4c).
+- 🔍 **The v1.2.0 lexicographic-name sort for `last_backup_name`
+  could silently report a stale name** if the snapshot names
+  diverged from their mtimes. This is the issue that
+  SNAP-MTIME fixed.
+- 🔍 **`rotate_backups` had no explicit protection for the
+  `.last_stable` pointer or the newest install snapshot.** A
+  pathological distribution of snapshots could cause the
+  21-newest window to evict exactly the snapshots that the
+  recovery path depended on. ROT-PROTECT closed this hole.
+
+**Carried over to v1.5.0**:
+- CSP hardening — see §5.1.1.
+- PWA port unification — see §5.1.2.
+- Backup integrity hardening — see §5.1.10.
+- WebUI `append_denylist` with content — see §5.1.11.
+
+---
+
+## 4c. ✅ What Was Delivered in v1.4.0
+
+**Release date**: 2026-10-06.
+**Type**: Integration Release (MINOR).
+**Audit Corrections**: None (registry remains at #33).
+
+### 4c.1 🎯 Overview
+
+v1.4.0 is the **Companion Android App Integration** release. It
+ships an **optional** native WebView wrapper (~3 MB) that opens
+the WebUI at `127.0.0.1:9090` directly — useful for users who
+prefer a dedicated app icon over a browser tab.
+
+The release also closes **two CodeQL `go/path-injection` alerts**
+in `removeModule`, removes the remaining **iOS PWA logic** from
+`index.html` (the project is Android-only), and applies **MAIN-01**
+(`LOG_LEVEL` loaded immediately after `initPaths()` in `main.go`).
+
+The 10 defensive layers from v1.2.0, the 7-field `backups` object,
+the watchdog token, the SNAP-*/ROT-* semantics from v1.3.0, and
+the bilingual WebUI are all unchanged.
+
+### 4c.2 📱 Companion Android App Integration (5)
+
+| ID | Feature | Files |
+|:-:|---|---|
+| **APK-01** | `APK_FILE` constant + `serveStaticAssets` entry + `serveFile` per-extension Cache-Control | `proxy/main.go` |
+| **APK-02** | `/app-debug.apk` route (mime: `application/vnd.android.package-archive`) | `proxy/main.go` |
+| **APK-03** | Per-extension Cache-Control in `serveFile`: `.apk` → `public, max-age=3600, immutable` | `proxy/main.go` |
+| **APK-04** | CodeQL `go/path-injection` fix in `removeModule` — `filepath.Base()` + `filepath.Join(MODULES_DIR, name)` | `proxy/main.go` |
+| **APK-05** | iOS PWA logic removed (Android-only project) | `web/index.html` |
+
+### 4c.3 🆕 Build/Pipeline Changes (5)
+
+| ID | Change | Files |
+|:-:|---|---|
+| **CI-APK-01** | New smoke-test step "Verify companion app metadata" | `.github/workflows/ci.yml` |
+| **REL-18** | New step "Fetch companion Android app APK" | `.github/workflows/release.yml` |
+| **REL-19** | New step "Stage APK for module ZIP" | `.github/workflows/release.yml` |
+| **REL-20** | Release assets now include `DNS-Proxy-v*.apk` + `.sha256` | `.github/workflows/release.yml` |
+| **REL-21** | Pipeline steps table corrected: 13 → 16 | `.github/workflows/release.yml` header |
+
+### 4c.4 🆕 New Files (2)
+
+| File | Purpose |
+|---|---|
+| `proxy/app-apk.version` | Single Source of Truth for the companion app version (`1.0.0`, no `v` prefix) |
+| `scripts/fetch_app_apk.sh` | Fetch the companion APK from `gasciljh/dnscrypt-proxy-app` releases |
+
+### 4c.5 🆕 New WebUI Behavior (1)
+
+| Change | Files | Impact |
+|---|---|---|
+| Install button repurposed | `web/index.html` | The button is now a plain `<a download href="/app-debug.apk">` link. No `beforeinstallprompt` chain, no modal, no iOS branches. The PWA itself is still installable via the browser menu. |
+
+### 4c.6 📡 New Static Route (1)
+
+| Route | Mime | Cache-Control | Notes |
+|---|---|---|---|
+| `GET /app-debug.apk` | `application/vnd.android.package-archive` | `public, max-age=3600, immutable` | Returns 404 when the file is absent (optional asset) |
+
+### 4c.7 🔧 MAIN-01 — LOG_LEVEL Load Order Fix
+
+| ID | Change | Files |
+|:-:|---|---|
+| **MAIN-01** | `currentLogLevel = loadLogLevel()` is now called **immediately after `initPaths()`** — before `readSelectedProfile()`, `applyMemoryLimit()`, `getWatchdogToken()`, `checkPendingNotifications()`, and `cleanupOldTransactions()`. Previously, those early log lines were always emitted at the default `"info"` level. | `proxy/main.go` |
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.1
+and §11.37.
+
+### 4c.8 📊 Statistics
+
+| Category | Before (v1.3.0) | After (v1.4.0) |
+|---|:---:|:---:|
+| Audit Corrections | 33 | 33 (unchanged) |
+| CodeQL alerts closed | 0 | **2** (`go/path-injection`) |
+| Release artifacts | 6 | **8** (2 optional) |
+| New files | 0 | **2** (version + fetcher script) |
+| Runtime integration points | 0 | **5** (APK-01..APK-05) |
+| Pipeline steps | 13 | **16** |
+| iOS-specific PWA code removed | 0 | **~35 lines** |
+| Documentation files updated | 8 | 15+ |
+
+### 4c.9 🎯 Lessons Learned
+
+**What worked**:
+- ✅ **Bundle the APK inside the module ZIP** (optional) is a
+  single-download UX. Users do not need to know about a second
+  repository.
+- ✅ **`filepath.Base()` + trusted base dir** is a clean CodeQL
+  sanitizer. Behaviour for legitimate inputs is unchanged.
+- ✅ **Removing iOS-specific branches** simplified
+  `index.html` significantly. The project's Android-only scope
+  now matches the code.
+- ✅ **Best-effort APK fetch** does not fail the release if
+  GitHub is unreachable. Local developer builds still work.
+- ✅ **Loading `LOG_LEVEL` early** ensures that every log line —
+  including those emitted during startup initialization —
+  respects the user's configured level.
+
+**What was discovered**:
+- 🔍 **The `beforeinstallprompt` chain was more complex than the
+  value it delivered.** Most users installed the app via the
+  browser menu anyway. The v1.4.0 simplification (direct
+  `<a download>` link) matches user behavior.
+- 🔍 **The companion app's release cadence is independent** of
+  the module's. `proxy/app-apk.version` decouples the two.
+- 🔍 **The CodeQL alerts were genuinely fixable** without
+  changing the API contract. The old `strings.HasPrefix` check
+  was not recognized as a sanitizer by CodeQL's taint analysis.
+- 🔍 **`LOG_LEVEL` had been loaded too late since v1.2.0.** The
+  early startup log lines (memory limit adjustment, watchdog
+  token load, transaction cleanup) were always emitted at
+  `"info"` level regardless of the user's configuration. MAIN-01
+  fixed this.
+
+**Carried over to v1.5.0**:
+- CSP hardening — see §5.1.1.
+- PWA port unification — see §5.1.2.
+- Backup integrity hardening — see §5.1.10.
+- WebUI `append_denylist` with content — see §5.1.11.
+- Companion app deep-links — see §5.1.12.
+- Companion version bump automation — see §5.1.13.
+
+---
+
+## 5. v1.5.0 — Q1 2027
+
+> **Note on the version number**: This section previously described
+> what was planned for **v1.3.0**. Since v1.3.0 shipped with a
+> narrower scope (see §4b — PWA install button + live status LED +
+> DNS auto-start + rotation refinements), the planned work has
+> been re-assigned to **v1.5.0**.
 
 **Type**: ✨ Feature Release (MINOR).
 **Goal**: Security hardening + PWA unification + memory tooling.
@@ -742,9 +1146,9 @@ diagnose GC behavior over time:
 
 ---
 
-#### 🆕 🎯 5.1.9 Data Guardian badge support
+#### 🎯 5.1.9 Data Guardian badge support
 
-**Status**: 📅 Planned (new)
+**Status**: 📅 Planned
 **Priority**: 🟡 Medium
 **Complexity**: 🟢 Easy
 
@@ -763,9 +1167,9 @@ tooling to make it easier for contributors to earn it:
 
 ---
 
-#### 🆕 🎯 5.1.10 Backup integrity hardening
+#### 🎯 5.1.10 Backup integrity hardening
 
-**Status**: 📅 Planned (new)
+**Status**: 📅 Planned
 **Priority**: 🟡 Medium
 **Complexity**: 🟡 Medium
 
@@ -780,9 +1184,9 @@ tooling to make it easier for contributors to earn it:
 
 ---
 
-#### 🆕 🎯 5.1.11 WebUI `append_denylist` with content
+#### 🎯 5.1.11 WebUI `append_denylist` with content
 
-**Status**: 📅 Planned (new)
+**Status**: 📅 Planned
 **Priority**: 🟡 Medium
 **Complexity**: 🟢 Easy
 
@@ -794,6 +1198,44 @@ incremental denylist additions.
 **Files**: `web/index.html`.
 
 **Estimate**: ~2-3 days.
+
+---
+
+#### 🆕 🎯 5.1.12 Companion app: deep-link to specific WebUI pages
+
+**Status**: 📅 Planned (new in this revision)
+**Priority**: 🟢 Low
+**Complexity**: 🟢 Easy
+
+**Idea**: Since v1.4.0 shipped the companion app, add deep-link
+support so the app can open specific WebUI pages directly:
+- `dnsproxy://webui` → main WebUI
+- `dnsproxy://dashboard` → Dashboard (requires §5.1.2 first)
+
+**Impact**:
+- ✅ Better UX for users who prefer the companion app.
+- ⚠️ Requires an update to the companion repository
+  (`gasciljh/dnscrypt-proxy-app`).
+
+**Estimate**: ~2-3 days (module side) + companion-repo work.
+
+---
+
+#### 🆕 🎯 5.1.13 Companion app version bump automation
+
+**Status**: 📅 Planned (new in this revision)
+**Priority**: 🟢 Low
+**Complexity**: 🟢 Easy
+
+**Idea**: `proxy/app-apk.version` currently requires manual
+updates. Add a Makefile target that:
+- Checks the latest release tag of `gasciljh/dnscrypt-proxy-app`.
+- Compares it with `proxy/app-apk.version`.
+- Optionally bumps the local file.
+
+**Files**: `Makefile`, new `scripts/check-app-version.sh`.
+
+**Estimate**: ~1-2 days.
 
 ---
 
@@ -887,7 +1329,7 @@ overhead by ~40%.
 
 ---
 
-### 5.4 v1.3.0 Summary
+### 5.4 v1.5.0 Summary
 
 | # | Feature | Priority | Complexity | Estimate |
 |:-:|---|:---:|:---:|:---:|
@@ -899,21 +1341,28 @@ overhead by ~40%.
 | 6 | Live Dashboard tests | 🟡 | 🟡 | 3-5 days |
 | 7 | Memory Architect badge support | 🟡 | 🟢 | 2-3 days |
 | 8 | Improve memory-limit observability | 🟢 | 🟢 | 2-3 days |
-| 9 | **Data Guardian badge support** | 🟡 | 🟢 | 2-3 days |
-| 10 | **Backup integrity hardening** | 🟡 | 🟡 | 1 week |
-| 11 | **WebUI `append_denylist` with content** | 🟡 | 🟢 | 2-3 days |
-| 12 | Fix `pgrep -x` on Android 5.x | 🟢 | 🟢 | 1 day |
-| 13 | Fix `awk` parser | 🟢 | 🟡 | 1-2 days |
-| 14 | CSS cleanup | 🟢 | 🟢 | 2-3 days |
-| 15 | Caching entries count | 🟡 | 🟢 | 1-2 days |
-| 16 | Batch SSE broadcasts | 🟡 | 🟡 | 3-5 days |
-| 17 | Dashboard metrics optimization | 🟡 | 🟡 | 3-5 days |
+| 9 | Data Guardian badge support | 🟡 | 🟢 | 2-3 days |
+| 10 | Backup integrity hardening | 🟡 | 🟡 | 1 week |
+| 11 | WebUI `append_denylist` with content | 🟡 | 🟢 | 2-3 days |
+| 12 | **Companion app deep-links** | 🟢 | 🟢 | 2-3 days |
+| 13 | **Companion version bump automation** | 🟢 | 🟢 | 1-2 days |
+| 14 | Fix `pgrep -x` on Android 5.x | 🟢 | 🟢 | 1 day |
+| 15 | Fix `awk` parser | 🟢 | 🟡 | 1-2 days |
+| 16 | CSS cleanup | 🟢 | 🟢 | 2-3 days |
+| 17 | Caching entries count | 🟡 | 🟢 | 1-2 days |
+| 18 | Batch SSE broadcasts | 🟡 | 🟡 | 3-5 days |
+| 19 | Dashboard metrics optimization | 🟡 | 🟡 | 3-5 days |
 
-**Estimated time**: ~10-13 weeks.
+**Estimated time**: ~11-14 weeks.
 
 ---
 
-## 6. v1.4.0 — Q2 2027
+## 6. v1.6.0 — Q2 2027
+
+> **Note on the version number**: This section previously described
+> what was planned for **v1.4.0**. Since v1.4.0 shipped with the
+> companion app integration (see §4c), the planned work has been
+> re-assigned to **v1.6.0**.
 
 **Type**: ✨ Feature Release (MINOR).
 **Goal**: Extended multi-language + advanced features.
@@ -1096,8 +1545,8 @@ Log every action:
 **Content**:
 ```json
 {
-  "version": "v1.4.0",
-  "exported_at": "2026-09-29T...",
+  "version": "v1.6.0",
+  "exported_at": "2027-Q2",
   "config": {
     "webui.conf": "...",
     "allowlist.txt": "...",
@@ -1114,9 +1563,9 @@ Log every action:
 
 ---
 
-#### 🆕 🎯 6.1.12 Backup/Snapshot export to PC
+#### 🎯 6.1.12 Backup/Snapshot export to PC
 
-**Status**: 📅 Planned (new)
+**Status**: 📅 Planned
 **Priority**: 🟡 Medium
 **Complexity**: 🟢 Easy
 
@@ -1130,7 +1579,7 @@ to a `.tar.gz` file, downloadable via the WebUI:
 
 ---
 
-### 6.2 v1.4.0 Summary
+### 6.2 v1.6.0 Summary
 
 | # | Feature | Priority | Estimate |
 |:-:|---|:---:|:---:|
@@ -1145,7 +1594,7 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | 9 | Firewall UI | 🟡 | 2-3 weeks |
 | 10 | Multiple Users | 🟢 | 3-4 weeks |
 | 11 | Import/Export | 🟡 | 1 week |
-| 12 | **Backup export to PC** | 🟡 | 3-5 days |
+| 12 | Backup export to PC | 🟡 | 3-5 days |
 
 **Estimated time**: ~14-20 weeks.
 
@@ -1169,7 +1618,8 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | **Multi-Node** | Manage several devices from one panel |
 | **Plugin System** | Add flexibility for developers |
 | **Unified memory model** | Single memory budget across all components (v1.1.0 MEM-1 is the first step) |
-| **Unified backup model** | Single backup framework shared by CLI + WebUI + third-party tools (v1.2.0 persistent backup is the foundation) |
+| **Unified backup model** | Single backup framework shared by CLI + WebUI + third-party tools (v1.2.0 persistent backup is the foundation; v1.3.0 SNAP-*/ROT-* are the semantics) |
+| **Unified companion app** | Merge the module + companion app into a single deliverable (v1.4.0 is the first step) |
 
 ### 7.2 Planned Breaking Changes
 
@@ -1182,6 +1632,7 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | 2 ports (9090 + 9091) | Single unified port | v2.0.0 |
 | `web/*.html` (static) | SPA (Preact) | v2.0.0 |
 | Legacy `BACKUP_TMP` reference | Removed (superseded by v1.2.0 persistent backup) | v2.0.0 |
+| Separate companion app | Merged into module (or first-class citizen) | v2.0.0 |
 
 **Reference**: [`UPGRADE.md`](UPGRADE.md) (will be updated).
 
@@ -1216,6 +1667,7 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | **IPv6-only mode** | 🟢 For modern devices |
 | **Remote backup storage** (WebDAV, S3) | 🟡 Off-device backup destination — must remain opt-in |
 | **Tiered retention** (daily/weekly/monthly) | 🟡 Carried from v1.2.0 draft (see `docs/BACKUP.md` §6.1) |
+| **Companion app for iOS** | ❌ Excluded (Android-only project) |
 
 ### 8.2 Ideas Temporarily Rejected
 
@@ -1242,7 +1694,9 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | **Deep Packet Inspection** | Violates privacy |
 | **Traffic Shaping** | Outside DNS filter scope |
 | **Root without Magisk** | Project is Magisk-based |
-| **iOS Support** | iOS does not support Magisk |
+| **iOS Support** | iOS does not support Magisk (confirmed by v1.4.0 iOS removal) |
+| **Signed releases via Cosign** | Deferred (see `docs/RELEASE_PROCESS.md` §8.4) — not permanently excluded, but not shipped as of v1.4.0 |
+| **SBOM generation** | Deferred (see `docs/RELEASE_PROCESS.md` §8.5) — not permanently excluded, but not shipped as of v1.4.0 |
 
 ---
 
@@ -1264,6 +1718,12 @@ to a `.tar.gz` file, downloadable via the WebUI:
 - 🆕 **(v1.2.0)** **Submit a backup report** for the Data Guardian
   badge (see [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) and
   [`docs/BACKUP.md`](BACKUP.md) §12).
+- 🆕 **(v1.3.0)** **Submit a rotation report** for the Rotation
+  Guardian badge (see [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) and
+  [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5).
+- 🆕 **(v1.4.0)** **Submit a companion app report** for the
+  Companion App Champion badge (see
+  [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md)).
 
 ### 10.2 What Raises a Feature's Priority
 
@@ -1280,6 +1740,8 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | 🆕 **Accompanied by a well-written ADR** | ⬆️ Acceleration (shows reasoning) |
 | 🆕 **(v1.1.0)** **Accompanied by a memory report across RAM tiers** | ⬆️ Acceleration (validates MEM-1) |
 | 🆕 **(v1.2.0)** **Accompanied by a backup report across devices/root solutions** | ⬆️ Acceleration (validates the 10 defensive layers) |
+| 🆕 **(v1.3.0)** **Accompanied by a rotation verification report** | ⬆️ Acceleration (validates SNAP-*/ROT-*) |
+| 🆕 **(v1.4.0)** **Validated against the companion app on real devices** | ⬆️ Acceleration (validates the integration) |
 
 ### 10.3 What Lowers a Feature's Priority
 
@@ -1298,6 +1760,9 @@ to a `.tar.gz` file, downloadable via the WebUI:
 | 🆕 **(v1.1.0)** **Adds a new blocklist profile without updating all 5 memory-limit locations** | ⬇️ Large reduction |
 | 🆕 **(v1.2.0)** **Modifies the 10 defensive layers without updating `docs/BACKUP.md` and `docs/EMERGENCY.md`** | ⬇️ Large reduction |
 | 🆕 **(v1.2.0)** **Adds a user-facing string without both EN and AR entries** | ⬇️ Large reduction |
+| 🆕 **(v1.3.0)** **Modifies the SNAP-*/ROT-* semantics without updating `docs/ARCHITECTURE.md` §4.13 and `docs/COMPATIBILITY.md` §10.3.5** | ⬇️ Large reduction |
+| 🆕 **(v1.4.0)** **Modifies the companion integration without updating `proxy/app-apk.version` and `scripts/fetch_app_apk.sh`** | ⬇️ Large reduction |
+| 🆕 **(v1.4.0)** **Re-introduces iOS-specific PWA logic without an ADR** | ⬇️ Large reduction |
 
 ### 10.4 🆕 For Contributors
 
@@ -1329,6 +1794,12 @@ to a `.tar.gz` file, downloadable via the WebUI:
 - **(v1.2.0)** If you have multiple devices or root solutions,
   submit a **backup report** — it counts as a valid contribution
   and earns the Data Guardian badge.
+- **(v1.3.0)** If you can verify the SNAP-*/ROT-* semantics on
+  real devices, submit a **rotation report** — it earns the
+  Rotation Guardian badge.
+- **(v1.4.0)** If you test the companion app on your device,
+  submit a **compatibility report** for the
+  [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) matrix.
 
 ---
 
@@ -1358,21 +1829,24 @@ healthy project.
 | 🟡 | Architecture Decision Records system | ✅ Implemented (`docs/adr/`) |
 | 🟡 | **42-scenario CI matrix** (`upgrade-test.yml`) | ✅ **Implemented in v1.2.0** |
 | 🟡 | **`backup-smoke-test` job in `ci.yml`** | ✅ **Implemented in v1.2.0** |
-| 🟡 | Add lightweight `pr-check.yml` for PR validation | 💡 Under consideration (deferred to v1.3.0) |
+| 🟡 | **Companion app metadata check in `ci.yml`** | ✅ **Implemented in v1.4.0** |
+| 🟡 | **`fetch-app-apk` Makefile target** | ✅ **Implemented in v1.4.0** |
+| 🟡 | Add lightweight `pr-check.yml` for PR validation | 💡 Under consideration (deferred to v1.5.0) |
 | 🟢 | Migrate to signed commits (GPG / Sigstore) | 💡 Under consideration |
 | 🟢 | Add pre-commit hook for `git commit --amend` protection | 💡 Under consideration |
 | 🟢 | Automated changelog generation from Conventional Commits | 💡 Under consideration |
-| 🟡 | **(v1.1.0)** Memory-report Issue template | 📅 Planned for v1.3.0 |
-| 🟢 | **(v1.1.0)** `scripts/report-memory.sh` helper | 📅 Planned for v1.3.0 |
-| 🆕 🟡 | **(v1.2.0)** Backup-report Issue template | 📅 Planned for v1.3.0 |
-| 🆕 🟢 | **(v1.2.0)** `scripts/report-backup.sh` helper | 📅 Planned for v1.3.0 |
+| 🟡 | **(v1.1.0)** Memory-report Issue template | 📅 Planned for v1.5.0 |
+| 🟢 | **(v1.1.0)** `scripts/report-memory.sh` helper | 📅 Planned for v1.5.0 |
+| 🟡 | **(v1.2.0)** Backup-report Issue template | 📅 Planned for v1.5.0 |
+| 🟢 | **(v1.2.0)** `scripts/report-backup.sh` helper | 📅 Planned for v1.5.0 |
+| 🟢 | **(v1.4.0)** `scripts/check-app-version.sh` | 📅 Planned for v1.5.0 |
 
 **Summary**:
 
 | Category | Count |
 |---|:---:|
-| ✅ Implemented | **10** |
-| 📅 Planned (v1.3.0) | **4** |
+| ✅ Implemented | **12** |
+| 📅 Planned (v1.5.0) | **5** |
 | 💡 Under consideration | **4** |
 
 ### 11.3 Workflow Milestones
@@ -1383,12 +1857,17 @@ healthy project.
 2026 Q3 ✅ v1.1.0        — polish release + MEM-1/2/3 + Memory Architect badge
 2026 Q3 ✅ v1.2.0        — data-preservation release + 10 layers + BAK-1..4 + FIX-1/2
                           + 42-scenario matrix + Data Guardian badge + Bilingual WebUI
-2026 Q4 📅 v1.3.0        — CSP hardening + PWA unification + memory/backup tooling
+2026 Q4 ✅ v1.3.0        — PWA install button + live status LED + DNS auto-start
+                          + server-side rotation refinements (SNAP-*/ROT-*)
+                          + Rotation Guardian badge
+2026 Q4 ✅ v1.4.0        — companion app + CodeQL fix + iOS removal + MAIN-01
+                          + 8 release artifacts + Companion App Champion badge
+2027 Q1 📅 v1.5.0        — CSP hardening + PWA unification + memory/backup tooling
 2027 Q1 📅 Workflow v1.1 — pr-check.yml + signed commits
-2027 Q1 📅 v1.4.0        — 2FA + Audit Log + Multi-language + JWT
+2027 Q2 📅 v1.6.0        — 2FA + Audit Log + Multi-language + JWT
 2027 Q2 📅 Workflow v1.2 — automated changelog + contributor metrics
-2027 Q2 📅 v2.0.0        — major rewrite
-2027 Q3 📅 Workflow v1.3 — full CI/CD audit
+2028    📅 v2.0.0        — major rewrite
+2028 Q3 📅 Workflow v1.3 — full CI/CD audit
 ```
 
 ### 11.4 Long-Term Workflow Vision
@@ -1406,6 +1885,12 @@ healthy project.
 - **(v1.2.0)** **Backup observability across devices**: standardize
   backup reports to improve the 10 defensive layers based on
   real-world scenarios.
+- **(v1.3.0)** **Rotation observability across devices**:
+  standardize SNAP-*/ROT-* verification reports to confirm the
+  new semantics work on all supported root solutions.
+- **(v1.4.0)** **Companion app observability**: track the
+  companion app's version distribution to prioritize
+  compatibility work.
 
 ### 11.5 ADRs Index
 
@@ -1429,6 +1914,21 @@ ADR. Its 10 data-preservation layers, 4 runtime additions
 documented as runtime improvements in `docs/SECURITY.md` §5.31,
 §5.32, and §17.2 — not as architectural decisions. See
 [`docs/adr/README.md`](adr/README.md) §3.3 for the criteria.
+
+**v1.3.0 note**: The v1.3.0 release cycle did **not** add any new
+ADR either. Its user-facing changes (PWA install button, live
+status LED, DNS auto-start fix) are client-side or shell-side,
+and its server-side rotation refinements (SNAP-MANIFEST,
+SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) are documented
+in `CHANGELOG.md` §[v1.3.0] and `docs/ARCHITECTURE.md` §4.13 —
+not as architectural decisions.
+
+**v1.4.0 note**: The v1.4.0 release cycle did **not** add any new
+ADR. Its companion app integration is an *additive* feature
+(optional asset, best-effort fetch), its CodeQL fix is a
+correctness hardening, and MAIN-01 is a startup-order fix —
+none of them meet the ADR criteria (non-trivial architectural
+decision or process change).
 
 ### 11.6 ADR Process
 
@@ -1477,6 +1977,48 @@ The v1.2.0 release added four runtime additions and two
 correctness fixes that are **not** audit corrections. See §12
 for the full registry.
 
+### 11.9 v1.3.0 + v1.4.0 Additions — Registry
+
+The v1.3.0 and v1.4.0 releases did **not** add any audit
+corrections, runtime-improvement identifiers, or ADRs. Their
+changes are documented as:
+
+**v1.3.0**:
+- **Client-side features** — PWA install button; live status
+  LED. See `CHANGELOG.md` §[v1.3.0]; `docs/ARCHITECTURE.md`
+  §6.4 (PWA install button); §6.1 (live status LED).
+- **Shell-side fix** — boot-path DNS auto-start in
+  `service.sh`. See `CHANGELOG.md` §[v1.3.0].
+- **Server-side rotation refinements** — SNAP-MANIFEST +
+  SNAP-MTIME (`proxy/main.go:buildBackupInfo()`);
+  ROT-MANIFEST + ROT-MTIME + ROT-PROTECT
+  (`proxy/functions.sh:rotate_backups()`); and the same
+  semantics mirrored in `service.sh`, `watchdog.sh`,
+  `status.sh`, `customize.sh`, `action.sh`, and
+  `uninstall.sh`. See `CHANGELOG.md` §[v1.3.0];
+  `docs/ARCHITECTURE.md` §4.13 (authoritative);
+  `docs/COMPATIBILITY.md` §10.3.5 (verification procedure);
+  `docs/HALL_OF_FAME.md` (Rotation Guardian badge);
+  `docs/GLOSSARY.md` (SNAP-*/ROT-* terms).
+
+**v1.4.0**:
+- **Companion Android app integration** — optional APK
+  (`web/app-debug.apk`); `/app-debug.apk` route in
+  `main.go`; install button repurposed to a direct
+  `<a download>` link. See `CHANGELOG.md` §[v1.4.0];
+  `docs/ARCHITECTURE.md` §4.12 (backend additions);
+  `docs/API.md` §6.1.15 (`/app-debug.apk` route);
+  `docs/INSTALL.md` §8.6 (install guide).
+- **CodeQL `go/path-injection` fix** in
+  `main.go:removeModule` — `filepath.Base()` sanitization +
+  `filepath.Join(MODULES_DIR, name)`. See
+  `CHANGELOG.md` §[v1.4.0].
+- **iOS PWA logic removal** — Android-only project. See
+  `docs/ARCHITECTURE.md` §6.8.
+- **MAIN-01** — `LOG_LEVEL` loaded immediately after
+  `initPaths()` in `main.go`. See
+  `docs/ARCHITECTURE.md` §4.1 and §11.37.
+
 ---
 
 ## 12. v1.2.0 Data-Preservation Registry
@@ -1521,30 +2063,42 @@ strategy, not a "reorder + exclude" strategy. An earlier draft
 described it as "ZIP extraction before restore" — that
 description did not match the shipped implementation.
 
-### 12.4 Post-Audit Corrections (BUG-1..BUG-6, N-1, N-4)
+### 12.4 Post-Audit Corrections (BUG-A..BUG-L)
 
-The v1.2.0 post-audit pass applied **7 corrections** to
-`proxy/main.go` (plus one user-agent derivation fix). They do not
-change the API contract, but they fix behaviors that clients
-could observe:
+The v1.2.0 post-audit pass applied **8 corrections** to
+`proxy/main.go`. They do not change the API contract, but they
+fix behaviors that clients could observe:
 
-| ID | Scope | Observable effect |
-|---|---|---|
-| **BUG-1** | `appendDenylist` — the pre-critical backup is performed **once** | One snapshot per call instead of two |
-| **BUG-2** | `createAutoBackup` — stderr is no longer discarded | Failed backups are now visible in `dnscrypt_main.log` |
-| **BUG-3** | `buildBackupInfo` — snapshots are sorted by directory **name**, not `mtime` | `last_backup_name` now matches `status.sh --json` |
-| **BUG-4** | `readLogFile` — a failed `Seek` is handled explicitly | `?action=read_log` no longer silently returns the wrong slice |
-| **BUG-5** | `appendDenylist` — the response message distinguishes "rules applied" from "no changes" | See `docs/API.md` §6.2.7 |
-| **BUG-6** | `main()` registers `/api/runtime_info/` (trailing slash) | See `docs/API.md` §6.1.7 |
-| **N-1** | `USER_AGENT` derived from `BuildVersion` | Custom `-ldflags` no longer leave a stale UA |
-| **N-4** | `getEntriesCount` caches `lastSize` even when count is `0` | Fewer full scans on the "no blocklist yet" state |
+| ID (main.go) | Alias (historical) | Scope | Observable effect |
+|---|---|---|---|
+| **BUG-A** | BUG-1 | `appendDenylist` — the pre-critical backup is performed **once**; the endpoint now requires a `content` parameter | One snapshot per call instead of two; previously a no-op |
+| **BUG-B** | BUG-2 | `ensure_running_service` — localhost bypass replaced with `X-Watchdog-Token` | **New auth requirement** for clients that relied on the bypass |
+| **BUG-C** | BUG-3 | Auth cache — empty results are no longer cached | File-read failure no longer locks the server into "no auth" for 60 s |
+| **BUG-D** | BUG-4 | `createAutoBackup` — calls `rotate_backups 21` after success | Automatic rotation matches `service.sh` |
+| **BUG-E** | BUG-5 | `createAutoBackup` — unique target dir | Same-second backups no longer collide |
+| **BUG-F** | BUG-6 | `clear_logs` — reports `os.Truncate` errors | False "success" responses eliminated |
+| **BUG-G** | N-1 | `getStatusUncached` — named return set to `"OFF"` on panic | Callers never see an empty string |
+| **BUG-H** | N-4 | `last_update` cache — TTL-based (5 s), not `sync.Once` | `get_profile.last_update` reflects external changes |
+| **BUG-I** | — | `runtime_info.profile_key` — reads `selected_profile.txt` | Matches `get_profile.key` even after restore |
+| **BUG-J** | — | `isPidAlive` — exact command names only | PID-reuse false positives eliminated |
+| **BUG-K** | — | `runShellWithTimeout` — logs `(timeout)` marker | Diagnostics clear about whether a timeout occurred |
+| **BUG-L** | — | Watchdog token file — `atomicWriteFile` | Concurrent readers never see a partial token |
+
+> **Note on identifiers**: The v1.2.0 post-audit fixes were
+> originally documented as **BUG-1..BUG-6** and **N-1, N-4** in
+> early revisions. The `main.go` source comments use
+> **BUG-A..BUG-L**. The table above maps both notations. There
+> are **12** distinct fixes; the "8 corrections" count in the
+> opening paragraph refers to the earliest subset documented
+> under the BUG-1..BUG-6 + N-1 + N-4 identifiers.
 
 ### 12.5 Audit Corrections Registry — Unchanged
 
 The Audit Corrections Registry remains at **#33** — the last entry
-from v1.0.0. The v1.1.0 and v1.2.0 releases did **not** extend it.
+from v1.0.0. The v1.1.0, v1.2.0, v1.3.0, and v1.4.0 releases
+did **not** extend it.
 
-**Next expected**: **#34** (v1.3.x), if any architectural
+**Next expected**: **#34** (v1.5.x or later), if any architectural
 vulnerability is discovered.
 
 **Reference**: `docs/SECURITY.md` §17.
@@ -1559,12 +2113,15 @@ vulnerability is discovered.
 2026 Q3  │ Workflow v1 — branch strategy + releases + ADRs ✅
 2026 Q3  │ v1.1.0 ✅ (2026-09-26) — MEM-1/2/3 + Memory Architect badge
 2026 Q3  │ v1.2.0 ✅ (2026-09-29) — data-preservation + 10 layers + BAK-1..4
-2026 Q4  │ v1.3.0 📅 (CSP + PWA unification + backup integrity hardening)
+2026 Q4  │ v1.3.0 ✅ (2026-10-02) — PWA button + LED + DNS auto-start
+                                + server-side rotation refinements (SNAP-*/ROT-*)
+2026 Q4  │ v1.4.0 ✅ (2026-10-06) — companion app + CodeQL fix + iOS removal + MAIN-01
+2027 Q1  │ v1.5.0 📅 (CSP + PWA unification + backup integrity hardening)
 2027 Q1  │ Workflow v1.1 📅 (pr-check + signed commits)
-2027 Q1  │ v1.4.0 📅 (2FA + Audit Log + Multi-language + JWT)
+2027 Q2  │ v1.6.0 📅 (2FA + Audit Log + Multi-language + JWT)
 2027 Q2  │ Workflow v1.2 📅 (automated changelog)
-2027 Q2  │ v2.0.0 💥 (Major Rewrite)
-2027 Q3  │ Workflow v1.3 📅 (full CI/CD audit)
+2028     │ v2.0.0 💥 (Major Rewrite)
+2028 Q3  │ Workflow v1.3 📅 (full CI/CD audit)
 2028+    │ 💡 (Multi-Node + API v2 + Plugins)
 ```
 
@@ -1572,23 +2129,31 @@ vulnerability is discovered.
 
 ## 🎯 Long-Term Vision
 
-**2026 (Q3-Q4)**: Stability + Security + Data Preservation.
+**2026 (Q3-Q4)**: Stability + Security + Data Preservation + Polish.
 - Fix all Critical Bugs ✅ (v1.0.0).
 - Runtime polish + memory improvements ✅ (v1.1.0).
 - Data preservation + 10 defensive layers ✅ (v1.2.0).
+- PWA install button + live status LED + DNS auto-start
+  ✅ (v1.3.0).
+- Server-side rotation refinements (SNAP-*/ROT-*) ✅ (v1.3.0).
+- Companion Android app + CodeQL fix + iOS removal + MAIN-01
+  ✅ (v1.4.0).
 - Zero known critical issues.
 - Comprehensive documentation.
 - Two-branch workflow in place ✅.
 - ADR system established ✅.
 - Memory Architect badge launched ✅ (v1.1.0).
 - Data Guardian badge launched ✅ (v1.2.0).
+- Rotation Guardian badge launched ✅ (v1.3.0).
+- Companion App Champion badge launched ✅ (v1.4.0).
 
 **2027 (Q1-Q2)**: Advanced features.
-- CSP hardening (v1.3.0).
-- PWA unification (v1.3.0).
-- Backup integrity hardening (v1.3.0).
-- 2FA + Audit Log (v1.4.0).
-- Multi-language (v1.4.0).
+- CSP hardening (v1.5.0).
+- PWA unification (v1.5.0).
+- Backup integrity hardening (v1.5.0).
+- Companion app deep-links (v1.5.0).
+- 2FA + Audit Log (v1.6.0).
+- Multi-language (v1.6.0).
 - DoH3 + Firewall UI.
 - JWT Authentication.
 
@@ -1597,6 +2162,7 @@ vulnerability is discovered.
 - API v2 + OpenAPI.
 - Plugin System.
 - Unified backup model.
+- Merged companion app.
 
 **2028+**: Expansion.
 - Multi-Node Management.
@@ -1609,30 +2175,31 @@ vulnerability is discovered.
 
 | Document | Purpose |
 |---|---|
-| [`CHANGELOG.md`](../CHANGELOG.md) | What was delivered (v1.0.0 + v1.1.0 + v1.2.0) |
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Trade-offs (§3.10, §4.10) |
+| [`CHANGELOG.md`](../CHANGELOG.md) | What was delivered (v1.0.0 → v1.4.0) |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Trade-offs (§3.10, §4.10, §4.12, §4.13, §6.8) |
 | [`docs/SECURITY.md`](SECURITY.md) | Known Issues + Audit Corrections (§5.31, §5.32) |
 | [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute |
 | [`docs/BRANCHING.md`](BRANCHING.md) | Git branching strategy |
 | [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) | Release process guide |
-| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
+| [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.0, §3.1, §3.2) |
+| [`docs/BACKUP.md`](BACKUP.md) | Backup system reference (v1.2.0) |
+| [`docs/EMERGENCY.md`](EMERGENCY.md) | Emergency recovery (v1.2.0) |
+| [`docs/INSTALL.md`](INSTALL.md) | Installation guide (§8.6 companion app) |
 | [`docs/adr/README.md`](adr/README.md) | Architecture Decision Records index |
-| [`docs/FAQ.md`](FAQ.md) | Frequently asked questions (Q111–Q130) |
+| [`docs/FAQ.md`](FAQ.md) | Frequently asked questions (Q111–Q150) |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | Level 4 infrastructure |
-| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix (incl. memory + backup) |
-| [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition (Memory Architect + Data Guardian) |
-| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary (MEM-1/2/3 + BAK + v1.2.0 terms) |
-| [`docs/API.md`](API.md) | HTTP API Reference (§6.1.7) |
-| [`docs/INSTALL.md`](INSTALL.md) | Installation guide |
+| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix (incl. memory + backup + rotation) |
+| [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition (Memory Architect + Data Guardian + Rotation Guardian + Companion App Champion) |
+| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary (MEM-1/2/3 + BAK + SNAP-*/ROT-* + v1.2.0/v1.3.0 terms) |
+| [`docs/API.md`](API.md) | HTTP API Reference (§6.1.7, §6.1.15, §2.8) |
 | [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) | Developer guide |
 | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting guide |
+| [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) | Companion app repository |
 
 ---
 
-*Last updated: 2026-10-02*
-*Current version: v1.3.0*
+*Last updated: 2026-10-08*
+*Current version: v1.4.0*
 *Author: gasciljh*
 
 ---

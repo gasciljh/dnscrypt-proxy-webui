@@ -2,12 +2,144 @@
 
 > Comprehensive diagnostic guide: from symptoms to solutions.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
+> **Identifier inventory in this file (8 total)**:
+>   • HARD-TRB-01 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-TRB-02 (§4.13 extended with SNAP-*/ROT-* context —
+>     v1.4.0)
+>   • HARD-TRB-03 (§4.14 extended with SNAP-*/ROT-* semantics —
+>     v1.4.0)
+>   • HARD-TRB-04 (NEW §4.16 — rotation semantics issues —
+>     v1.4.0)
+>   • HARD-TRB-05 (NEW §15.17 — rotation diagnostics helper —
+>     v1.4.0)
+>   • HARD-TRB-06 (§16.2 extended with rotation-related fields —
+>     v1.4.0)
+>   • HARD-TRB-07 (§12.8 + §12.9 cross-referenced to
+>     SNAP-*/ROT-* — v1.4.0)
+>   • HARD-TRB-08 (Header + footer `Last updated` sync to
+>     2026-10-08 — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/GLOSSARY.md](GLOSSARY.md) — SNAP-*/ROT-* terms,
+>     Rotation Guardian badge
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Rotation Guardian
+>     + Companion App Champion badges
+>   • [docs/API.md](API.md) — runtime_info + /app-debug.apk
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
+>   • Added §4.15 (Companion APK route issues) — the v1.4.0
+>     `/app-debug.apk` public route.
+>   • **Added §4.16 (Rotation semantics issues — v1.3.0
+>     SNAP-*/ROT-*)** — this section was **missing** from the
+>     previous revision. It covers the v1.3.0 rotation
+>     refinements that were not documented in the troubleshooting
+>     guide.
+>   • Added §5.16 (Companion app install issues) — the v1.4.0
+>     companion Android app.
+>   • Added §12.10 (remove_module returns "Invalid path") — the
+>     v1.4.0 CodeQL `go/path-injection` fix.
+>   • **Added §15.17 (Rotation diagnostics helper — v1.3.0
+>     SNAP-*/ROT-*)** — a one-shot script to verify the rotation
+>     semantics on a real device.
+>   • §1.1 (Diagnostic Tree) — added v1.4.0 and v1.3.0 branches;
+>     added the §4.16 rotation branch.
+>   • §1.2 (Quick Commands) — added companion APK check +
+>     rotation-state check.
+>   • §4.4 — web/ file count corrected from **13** to **14**
+>     (v1.4.0 adds `web/app-debug.apk`).
+>   • **§4.13** — Extended with SNAP-*/ROT-* context (the
+>     snapshot-detection rule changed in v1.3.0).
+>   • **§4.14** — Extended with SNAP-*/ROT-* semantics.
+>   • §3.4 and §3.5 — examples updated from
+>     `dnscrypt-webui-1.2.0-module.zip` to
+>     `dnscrypt-webui-1.4.0-module.zip`.
+>   • **§12.8** — Extended with a note that the rotation
+>     behavior changed in v1.3.0 (SNAP-MANIFEST + ROT-MANIFEST).
+>   • **§12.9** — Extended with a cross-reference to
+>     `docs/ARCHITECTURE.md §4.13` and the Rotation Guardian
+>     badge.
+>   • **§16.2 (Issue template)** — added rotation-state fields
+>     and companion-app fields.
+>   • Footer — `Last updated` bumped; `Version` corrected from
+>     `v1.3.0` to `v1.4.0`.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's preference is stored client-side in
+>     `localStorage['dnscrypt-lang']`. Documentation remains
+>     English-only by project convention.
+>   • **Encoding**: this revision preserves the UTF-8 correction
+>     applied in v1.2.0 — all section markers, arrows,
+>     checkmarks, warnings, and box-drawing characters render as
+>     proper UTF-8.
+
+> **v1.3.0 changes** (historical):
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side additions**:
+>       - **PWA install button** (client-side) — new "smart
+>         dynamic" behavior. No troubleshooting impact beyond
+>         what is covered under §4 (WebUI access).
+>         *(Repurposed in v1.4.0 — see §4.15.)*
+>       - **Live status LED** (client-side) — no troubleshooting
+>         impact.
+>   • **Boot-path correctness fix** (`service.sh`) — the boot
+>     path now calls `POST /api/ensure_running_service` directly.
+>     Covered under §6.9 (Watchdog does not restart).
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Five
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`). Custom-named snapshots are
+>         now visible to the API and to rotation.
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule. Robust against clock
+>         drift and manual renames.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with
+>         the same manifest-based detection, the same mtime
+>         sort, and **two additional protected targets** on top
+>         of the 21-newest window: the `.last_stable` recovery
+>         pointer and the newest install snapshot (name
+>         matching `-v<digit>`).
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
+>   • **`buildBackupInfo` sort order** — changed from name to
+>     mtime. **Covered under §4.14** — but see §4.16 for the
+>     full SNAP-*/ROT-* semantics and the specific failure
+>     modes they fix.
+>   • All `v1.2.0` references in examples that represent "the
+>     current version" were left unchanged in v1.3.0 (they were
+>     used as historical examples, not as "current"). The
+>     v1.4.0 revision updates only the "current version"
+>     references (§3.4, §3.5).
+
+> **v1.2.0 changes** (historical):
 >   • Version bumped from v1.1.0 to v1.2.0.
 >   • Added §4.13 (Backup directory missing) — covers the
 >     v1.2.0 persistent backup directory
@@ -47,7 +179,7 @@
 >     user's preference is stored client-side in
 >     `localStorage['dnscrypt-lang']`. Documentation remains
 >     English-only by project convention.
->   • **Encoding correction (this revision)**: fixed mojibake in
+>   • **Encoding correction (v1.2.0)**: fixed mojibake in
 >     section markers, arrows, checkmarks, warnings, and box
 >     drawing characters. All symbols now render as proper UTF-8.
 
@@ -72,6 +204,9 @@
 > - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 > - API reference → [`docs/API.md`](API.md)
+> - Companion app install → [`docs/INSTALL.md`](INSTALL.md) §8.6
+> - v1.3.0 rotation refinements → [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13
+> - On-device SNAP-*/ROT-* verification → [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5
 
 ---
 
@@ -115,8 +250,10 @@ Problem?
 │   ├── § 4.10 (Invalid port ignored) ← NEW-3
 │   ├── § 4.11 (Broken Dashboard links) ← PORT-2
 │   ├── § 4.12 (Memory limit issues) ← MEM-1 (v1.1.0)
-│   ├── § 4.13 (Backup directory missing) ← v1.2.0
-│   └── § 4.14 (Backup state issues) ← v1.2.0
+│   ├── § 4.13 (Backup directory missing) ← v1.2.0 + SNAP-*/ROT-* (v1.3.0)
+│   ├── § 4.14 (Backup state issues) ← v1.2.0 + SNAP-*/ROT-* (v1.3.0)
+│   ├── § 4.15 (Companion APK route issues) ← v1.4.0
+│   └── § 4.16 (Rotation semantics issues) ← SNAP-*/ROT-* (v1.3.0)
 │
 ├── Cannot log in
 │   └── § 5 (Authentication)
@@ -127,11 +264,12 @@ Problem?
 │   ├── § 5.12 (Basic Auth locked) ← Fix #8
 │   ├── § 5.13 (Credentials change delay) ← NEW-6
 │   ├── § 5.14 (Profile key problems) ← MEM-1 (v1.1.0)
-│   └── § 5.15 (Watchdog token issues) ← v1.2.0
+│   ├── § 5.15 (Watchdog token issues) ← v1.2.0
+│   └── § 5.16 (Companion app install issues) ← v1.4.0
 │
 ├── DNS not working at all
 │   └── § 6 (DNS)
-│   └── § 6.9 (Watchdog does not restart)
+│   ├── § 6.9 (Watchdog does not restart)
 │   └── § 6.10 (GC thrashing symptoms) ← MEM-1 (v1.1.0)
 │
 ├── Some sites are not blocked
@@ -154,12 +292,14 @@ Problem?
 │
 ├── Settings lost after upgrade
 │   └── § 12.7 (Upgrade loses settings) ← Fix #3 (superseded by v1.2.0)
-│   └── § 12.8 (Backup layer fails) ← v1.2.0
-│   └── § 12.9 (Recovery mode correctness) ← FIX-1 (v1.2.0)
+│   └── § 12.8 (Backup layer fails) ← v1.2.0 + SNAP-*/ROT-* (v1.3.0)
+│   └── § 12.9 (Recovery mode correctness) ← FIX-1 (v1.2.0) + SNAP-*/ROT-* (v1.3.0)
+│   └── § 12.10 (remove_module returns "Invalid path") ← v1.4.0
 │
 ├── Backup/orphan issues after uninstall
 │   └── § 13.4 (Orphan-txn preserved) ← v1.2.0
 │   └── § 13.5 (Preserved backup directory) ← v1.2.0
+│   └── § 13.6 (Companion app remains) ← v1.4.0
 │
 ├── Module cannot boot / data corrupted
 │   └── § 14.5 (Recovery mode) ← v1.2.0
@@ -207,8 +347,17 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
 # Backup directory listing (v1.2.0)
 su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 
+# Rotation state (v1.3.0 — SNAP-*/ROT-*)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{available: .backups.available, last_backup_name: .backups.last_backup_name, last_stable: .backups.last_stable}'"
+su -c "ls -la /sdcard/dnscrypt-webui-backup/ | grep -vE 'current|txn-|orphan-txn-'"
+su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+
 # Full diagnostic report (v1.2.0 — Layer 10)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
+
+# Companion APK route (v1.4.0)
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk && echo '✅ APK bundled' || echo '(dev build)'"
 ```
 
 ---
@@ -261,7 +410,20 @@ echo "=== Backup State (v1.2.0) ==="
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ls -la /sdcard/dnscrypt-webui-backup/ 2>&1
 
-# 8. Logs (last 50)
+# 8. Rotation state (v1.3.0 — SNAP-*/ROT-*)
+echo ""
+echo "=== Rotation State (v1.3.0) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | {available, last_backup_name, last_stable, in_flight_txn, orphan_txn}'
+ls -la /sdcard/dnscrypt-webui-backup/ 2>&1 | grep -vE 'current|txn-|orphan-txn-'
+echo "last_stable pointer: $(cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null)"
+
+# 9. Companion APK (v1.4.0)
+echo ""
+echo "=== Companion APK (v1.4.0) ==="
+ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+
+# 10. Logs (last 50)
 echo ""
 echo "=== Logs ==="
 tail -50 /data/local/tmp/dnscrypt_main.log
@@ -283,11 +445,15 @@ tail -50 /data/local/tmp/dnscrypt_main.log
 | Firewall | `iptables -t nat -L DNSCRYPT_OUT -n` |
 | Dashboard | `curl -s http://127.0.0.1:9091/api/metrics` |
 | Runtime Info | `curl -s http://127.0.0.1:9090/api?action=runtime_info` |
-| **Profile (v1.1.0)** | **`curl -s .../runtime_info \| jq -r .profile_key`** |
-| **Memory limit (v1.1.0)** | **`curl -s .../runtime_info \| jq .memory_limit_mb`** |
-| **Backup state (v1.2.0)** | **`curl -s .../runtime_info \| jq .backups`** |
-| **Backup directory (v1.2.0)** | **`ls -la /sdcard/dnscrypt-webui-backup/`** |
-| **Diagnose report (v1.2.0)** | **`sh status.sh --diagnose`** |
+| Profile (v1.1.0) | `curl -s .../runtime_info \| jq -r .profile_key` |
+| Memory limit (v1.1.0) | `curl -s .../runtime_info \| jq .memory_limit_mb` |
+| Backup state (v1.2.0) | `curl -s .../runtime_info \| jq .backups` |
+| Backup directory (v1.2.0) | `ls -la /sdcard/dnscrypt-webui-backup/` |
+| **Rotation state (v1.3.0)** | **`curl -s .../runtime_info \| jq '.backups \| {available, last_backup_name, last_stable}'`** |
+| **`.last_stable` (v1.3.0)** | **`cat /sdcard/dnscrypt-webui-backup/.last_stable`** |
+| Diagnose report (v1.2.0) | `sh status.sh --diagnose` |
+| **Companion APK (v1.4.0)** | **`curl -sI http://127.0.0.1:9090/app-debug.apk \| head -1`** |
+| **Companion app version (v1.4.0)** | **`cat proxy/app-apk.version`** |
 | Logs | `tail -50 dnscrypt_main.log` |
 
 ---
@@ -327,7 +493,7 @@ su -c "which unzip sed tr date grep head cut"
 **Solution**:
 ```bash
 # 1. verify ZIP
-unzip -t /sdcard/dnscrypt-webui-1.2.0-module.zip
+unzip -t /sdcard/dnscrypt-webui-1.4.0-module.zip
 
 # 2. verify space
 df -h /data
@@ -342,7 +508,7 @@ df -h /sdcard
 - Download a fresh ZIP.
 - Verify SHA256:
   ```bash
-  sha256sum -c dnscrypt-webui-1.2.0-module.zip.sha256
+  sha256sum -c dnscrypt-webui-1.4.0-module.zip.sha256
   ```
 
 ### 3.6 "DNS binary missing for <arch>"
@@ -374,8 +540,8 @@ su -c "grep -E 'PORT|DASHBOARD' /data/adb/modules/dnscrypt-proxy-webui/proxy/web
 - During install, `customize.sh` prints:
   ```text
   → Multi-source detection (Layer 1): 5 file(s) found
-  → Transaction begun (Layer 4): txn-20260929-150000-12345
-  → Persistent backup created (Layer 2): 20260929-150000-v1.2.0-12345
+  → Transaction begun (Layer 4): txn-20261008-150000-12345
+  → Persistent backup created (Layer 2): 20261008-150000-v1.4.0-12345
     → SHA256 manifest written (Layer 3)
   ```
 
@@ -390,7 +556,13 @@ su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 # Expected: current/, <ts>-<version>/, .last_stable, ...
 ```
 
-**See**: §4.13 (if missing), §4.14 (state issues).
+**v1.3.0 note**: The snapshot is recognized by the **presence
+of a `.manifest.json` file** (SNAP-MANIFEST), not by a name
+pattern. Any snapshot directory that contains a
+`.manifest.json` file is valid.
+
+**See**: §4.13 (if missing), §4.14 (state issues), §4.16
+(rotation semantics).
 
 ---
 
@@ -450,12 +622,17 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf | grep -E 'PO
 **Solution**:
 ```bash
 su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/"
-# Expected: 13 files (index, dashboard, offline, manifest, sw, 3 SVG, 3 PNG, ICO)
+# Expected: 14 files (index, dashboard, offline, manifest, sw,
+#           3 SVG, 3 PNG, ICO, optional app-debug.apk)
 ```
+
+**v1.4.0 note**: The expected file count is **14** (was 13 in
+v1.3.0). The new entry is `app-debug.apk` (the companion Android
+app). It is OPTIONAL — a developer build may omit it (13 files).
 
 ### 4.5 "404 Not Found" on /icon-192.svg
 
-**Solution**: confirm version `v1.2.0`.
+**Solution**: confirm version `v1.2.0` or newer.
 
 ```bash
 su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
@@ -468,7 +645,7 @@ su -c "curl -I http://127.0.0.1:9090/icon-192.svg"
 - Dashboard at `http://127.0.0.1:9091` opens.
 - But the Metrics tables are empty.
 
-**Solution**: update to `v1.2.0` (or v1.0.0+). `/api/metrics` returns proper JSON.
+**Solution**: update to `v1.2.0` or newer. `/api/metrics` returns proper JSON.
 
 **Verify**:
 ```bash
@@ -530,7 +707,7 @@ su -c "curl -s -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics" | head -5
 
 # After the fix: JSON:
 # {
-#   "generated_at": "2026-09-29T10:30:00Z",
+#   "generated_at": "2026-10-08T10:30:00Z",
 #   "total_queries": 15234,
 #   ...
 # }
@@ -553,7 +730,7 @@ su -c "curl -s -u \"user:pass\" http://127.0.0.1:8080/api/metrics | head -10"
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.2.0` (or v1.0.0+).
+- Update to `v1.4.0` (or v1.0.0+).
 - Now `metricsProxyHandler` contains:
   ```go
   func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
@@ -676,7 +853,7 @@ func readConfPort(key, defaultPort string) string {
 ```
 
 **Solution**:
-- Update to `v1.2.0` (or v1.0.0+).
+- Update to `v1.4.0` (or v1.0.0+).
 - Now `readConfPort`:
   ```go
   func readConfPort(key, defaultPort string) string {
@@ -736,7 +913,7 @@ su -c "sed -i 's/^PORT=.*/PORT=9090/' /data/adb/modules/dnscrypt-proxy-webui/pro
 ```
 
 **Solution**:
-- Update to `v1.2.0` (or v1.0.0+).
+- Update to `v1.4.0` (or v1.0.0+).
 - Now:
   - `runtime_info` returns `webui_port` + `dashboard_port`.
   - The frontend updates the links dynamically.
@@ -804,7 +981,7 @@ to use a lighter profile.
 
 **Solution**:
 
-**For (A)** — Update to `v1.2.0` (the fix was introduced in v1.1.0).
+**For (A)** — Update to `v1.4.0` (the fix was introduced in v1.1.0).
 The limit is now computed per profile:
 
 ```go
@@ -867,10 +1044,10 @@ su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
 
 **Reference**: [SECURITY.md](SECURITY.md) §5.30.1, §14.22; [ARCHITECTURE.md](ARCHITECTURE.md) §3.9, §4.9.1, §11.22.
 
-### 4.13 Backup directory missing (v1.2.0 — Layer 2)
+### 4.13 Backup directory missing (v1.2.0 — Layer 2; refined v1.3.0)
 
 **Symptom**:
-- After upgrading to v1.2.0, the persistent backup directory
+- After upgrading to v1.2.0+, the persistent backup directory
   `/sdcard/dnscrypt-webui-backup/` does not exist.
 - `runtime_info.backups.available` is `0`.
 - `backups.last_backup_name` is `null`.
@@ -883,6 +1060,13 @@ su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
    mounted external storage with restrictive flags.
 3. **Storage full** — if `/sdcard/` has less than ~10 MB free,
    the backup dir cannot be created.
+
+**v1.3.0 note**: The snapshot-detection rule changed in v1.3.0.
+A directory is now recognized as a snapshot **iff it contains a
+`.manifest.json` file** (SNAP-MANIFEST). Custom-named
+directories without a manifest are **not** counted. If you
+manually created a directory and expected it to be counted,
+verify the manifest is present. See §4.16.
 
 **Diagnosis**:
 
@@ -901,6 +1085,19 @@ su -c "df -h /sdcard"
 
 # 4. Check runtime_info
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+
+# 5. v1.3.0 — verify the snapshot detection rule
+for d in /sdcard/dnscrypt-webui-backup/*/; do
+    name=$(basename "$d")
+    case "$name" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    if [ -f "$d/.manifest.json" ]; then
+        echo "  ✅ $name (has manifest)"
+    else
+        echo "  ⚠️  $name (NO manifest — not counted by v1.3.0+)"
+    fi
+done
 ```
 
 **Solutions**:
@@ -927,9 +1124,9 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.avai
 ```
 
 **Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.1;
-[`docs/EMERGENCY.md`](EMERGENCY.md) §4.
+[`docs/EMERGENCY.md`](EMERGENCY.md) §4; §4.16 in this file.
 
-### 4.14 Backup state issues (v1.2.0 — BAK-1)
+### 4.14 Backup state issues (v1.2.0 — BAK-1; refined v1.3.0)
 
 **Symptom (A)** — `runtime_info.backups` returns 5 fields instead
 of 7:
@@ -947,18 +1144,32 @@ on the shared fields.
 **Symptom (C)** — `available` is greater than the actual number
 of snapshot directories on disk.
 
+**Symptom (C2, v1.3.0)** — `available` is **less** than the
+actual number of snapshot directories on disk. This happens when
+some snapshot directories lack a `.manifest.json` file
+(SNAP-MANIFEST rule). See §4.16.
+
 **Symptom (D)** — `last_stable` is `null` even though snapshots
 exist.
 
+**Symptom (E, v1.3.0)** — `last_backup_name` does not match the
+"newest" snapshot when sorted by directory name. This is
+**expected** — v1.3.0 uses **mtime** (SNAP-MTIME) instead of
+lexicographic name order.
+
 **Cause (A)** — Version mismatch between `main.go` and `status.sh`.
-This should not occur on v1.2.0 — both were updated in the same
+This should not occur on v1.2.0+ — both were updated in the same
 release.
 
 **Cause (B)** — Same as (A): version mismatch.
 
 **Cause (C)** — The counter includes `txn-*` or `orphan-txn-*`
-directories. In v1.2.0, `available` should exclude them. If it
+directories. In v1.2.0+, `available` should exclude them. If it
 does not, `main.go` is out of date.
+
+**Cause (C2)** — The snapshot directory does not contain a
+`.manifest.json` file. In v1.3.0+, this directory is **not**
+counted by `available`. See §4.16.
 
 **Cause (D)** — `.last_stable` is updated only by
 **install-time** snapshots (`customize.sh`). Runtime snapshots
@@ -966,17 +1177,20 @@ does not, `main.go` is out of date.
 by design — the pointer must reference a version-tagged snapshot,
 not a runtime one whose `version` field is `"unknown"`.
 
+**Cause (E)** — Expected behavior in v1.3.0+. The sort key is
+mtime (SNAP-MTIME), not name. See §4.16.
+
 **Solution**:
 
 1. Confirm the module version:
 
 ```bash
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → must be version=v1.2.0
+# → must be version=v1.2.0 or newer
 ```
 
 2. If the binary is stale (older than the scripts), reinstall
-   the module from the v1.2.0 ZIP.
+   the module from a v1.2.0+ ZIP.
 
 3. After fixing, restart the WebUI and re-run:
 
@@ -998,7 +1212,310 @@ diff <(su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.ba
 (`status`, `last_backup_age_seconds`) that are **not** part of the
 API surface. See [`docs/API.md`](API.md) §6.1.7.
 
-**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.6.
+**Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.6; §4.16 in this
+file.
+
+### 4.15 Companion APK route issues (v1.4.0)
+
+**Symptom (A)** — The "📲 Install App" button in the WebUI header
+leads to a browser "file not found" page.
+
+**Symptom (B)** — `curl -I http://127.0.0.1:9090/app-debug.apk`
+returns **404 Not Found**.
+
+**Symptom (C)** — The `web/app-debug.apk` file is present, but
+`curl -I` returns 404 anyway.
+
+**Cause (A) and (B)** — The module ZIP is a **developer build**
+that does not bundle the companion APK. This is expected for
+local builds (built with `package_module.sh` without running
+`fetch_app_apk.sh` first). Release ZIPs from GitHub always
+bundle the APK.
+
+**Cause (C)** — The file is present but not served. This can
+happen if:
+- The file has wrong permissions (must be readable by the
+  WebUI process; `0644` is expected).
+- `main.go` is out of date and does not register the
+  `/app-debug.apk` route.
+
+**Diagnosis**:
+
+```bash
+# 1. Check if the APK is bundled
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected (release build): ~3 MB
+# Expected (dev build):     No such file or directory
+
+# 2. Check the HTTP route
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+# Expected (release build):
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+# Expected (dev build):
+#   HTTP/1.1 404 Not Found
+
+# 3. Verify main.go registers the route
+grep -q '"/app-debug.apk"' proxy/main.go && echo "✅ route registered"
+grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+
+# 4. Verify the install button uses the direct link
+grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ direct <a download> link"
+
+# 5. Verify iOS logic is absent
+grep -q 'isIOSDevice' web/index.html && echo "❌ iOS logic still present" || echo "✅ iOS logic removed"
+```
+
+**Solutions**:
+
+- **Cause (A) and (B)** — Re-download the module ZIP from
+  [GitHub Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
+  Release ZIPs always bundle the APK.
+- **Cause (C)** — Verify the module ZIP ships the APK:
+  ```bash
+  unzip -l /sdcard/dnscrypt-webui-1.4.0-module.zip | grep app-debug.apk
+  # Expected: web/app-debug.apk
+  ```
+  If the file is present but not served, reinstall `main.go` by
+  flashing the module again.
+
+**Alternative** — Download the companion app directly from the
+[companion repository releases](https://github.com/gasciljh/dnscrypt-proxy-app/releases).
+
+**Related sections**:
+- §5.16 — Companion app install issues (after download).
+- `docs/API.md` §6.1.15 — `/app-debug.apk` route reference.
+- `docs/INSTALL.md` §8.6 — How to install the companion app.
+
+### 4.16 Rotation semantics issues (v1.3.0 — SNAP-*/ROT-*)
+
+> **This section is new in v1.4.0.** It was missing from the
+> previous revision of the troubleshooting guide. The v1.3.0
+> rotation refinements (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+> ROT-MTIME, ROT-PROTECT) changed the semantics of the persistent
+> backup directory in ways that can surprise users. This section
+> documents the three most common failure modes.
+
+**Background** — What changed in v1.3.0:
+
+| Aspect | v1.2.0 rule | v1.3.0 rule (current) |
+|---|---|---|
+| Snapshot detection | Name pattern `^[0-9]{8}-[0-9]{6}-` | **`.manifest.json` presence** (SNAP-MANIFEST) |
+| Sort key | Lexicographic directory name | **mtime** descending (SNAP-MTIME) |
+| Protected targets | 21-newest window only | 21-newest window **+ `.last_stable` + newest install** (ROT-PROTECT) |
+
+**See also**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13;
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5;
+[`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) (Rotation Guardian
+badge).
+
+---
+
+#### 4.16.1 Symptom — A custom-named snapshot is "invisible"
+
+**Symptom**:
+- You manually created a snapshot directory with a custom name
+  (e.g. `pre-v130-manual-20261008/`) and copied the 5 files into
+  it.
+- But `runtime_info.backups.available` does not count it.
+- And `rotate_backups` never removes it (it lives forever, or
+  never gets touched).
+
+**Cause**: The v1.3.0 SNAP-MANIFEST rule requires the directory
+to contain a `.manifest.json` file to be counted as a snapshot.
+
+**Diagnosis**:
+```bash
+# List candidate directories
+for d in /sdcard/dnscrypt-webui-backup/*/; do
+    name=$(basename "$d")
+    case "$name" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    if [ -f "$d/.manifest.json" ]; then
+        echo "  ✅ $name (has manifest)"
+    else
+        echo "  ⚠️  $name (NO manifest — invisible to v1.3.0+)"
+    fi
+done
+```
+
+**Solutions**:
+
+- **Option 1 — Add the manifest manually** (if you know the
+  SHA256 of the files):
+  ```bash
+  # Compute the manifest in the same shape as write_manifest
+  cat > /sdcard/dnscrypt-webui-backup/pre-v130-manual-20261008/.manifest.json << 'EOF'
+  {
+    "version": "v1.4.0",
+    "timestamp": "20261008-150000",
+    "source": "manual",
+    "root_solution": "unknown",
+    "files_count": 5,
+    "files": []
+  }
+  EOF
+  chmod 0600 /sdcard/dnscrypt-webui-backup/pre-v130-manual-20261008/.manifest.json
+  ```
+
+- **Option 2 — Rename to the standard pattern and copy a
+  manifest from an existing snapshot**:
+  ```bash
+  # Use an existing snapshot's manifest as a template
+  cp /sdcard/dnscrypt-webui-backup/current/.manifest.json \
+     /sdcard/dnscrypt-webui-backup/pre-v130-manual-20261008/.manifest.json
+  ```
+
+- **Option 3 — Let the WebUI re-create it** (recommended):
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+  # Creates a properly-named, manifest-carrying snapshot
+  ```
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.1.
+
+---
+
+#### 4.16.2 Symptom — `last_backup_name` is not the lexicographically last
+
+**Symptom**:
+- You expect `last_backup_name` to be the directory name that
+  sorts last (e.g. `20261008-150000-...` sorts after
+  `20261001-120000-...`).
+- But `last_backup_name` shows a **different** name — a name
+  that may have a higher timestamp but a lower mtime, or a name
+  that sorts earlier but has a newer mtime.
+
+**Cause**: The v1.3.0 SNAP-MTIME rule sorts by **mtime**, not by
+name. This is deliberate — mtime is robust against clock drift
+and manual renames, while name sorting is fragile.
+
+**Diagnosis**:
+```bash
+# Show mtime vs name for each snapshot
+for d in /sdcard/dnscrypt-webui-backup/*/; do
+    name=$(basename "$d")
+    case "$name" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    mtime=$(stat -c %Y "$d" 2>/dev/null)
+    mtime_h=$(date -d "@$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)
+    echo "  $mtime_h  $name"
+done | sort -r
+```
+
+**Is this a bug?**
+- No — intentional v1.3.0 behavior.
+- mtime is the correct sort key for "newest snapshot".
+
+**Solutions**:
+
+- **To make `last_backup_name` match name sort**: ensure the
+  directory's mtime matches its name's timestamp. You can
+  restore the mtime:
+  ```bash
+  # Parse "YYYYMMDD-HHMMSS" from the name and restore mtime
+  d=/sdcard/dnscrypt-webui-backup/20261008-150000-v1.4.0-12345
+  ts=$(basename "$d" | cut -c1-15)
+  epoch=$(date -d "${ts:0:4}-${ts:4:2}-${ts:6:2} ${ts:9:2}:${ts:11:2}:${ts:13:2}" +%s 2>/dev/null)
+  touch -d "@$epoch" "$d"
+  ```
+
+- **In general**: trust the mtime. If you want name-based
+  sorting, this is not the tool for you — see
+  [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §11.32 for the
+  rationale of choosing mtime.
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.1;
+§11.32.
+
+---
+
+#### 4.16.3 Symptom — `.last_stable` target was pruned by rotation
+
+**Symptom**:
+- Before v1.3.0, `.last_stable` could point to a snapshot that
+  rotation then removed — leaving recovery mode broken.
+- After upgrading to v1.3.0+, you observe that `.last_stable`
+  still points to a snapshot **that does not exist on disk**.
+
+**Cause**: This is a **residual symptom from a v1.2.0 state**.
+On the v1.2.0 rotation logic, `.last_stable` was not protected.
+If you upgraded a v1.2.0 install whose `.last_stable` was
+already pointing at a pruned snapshot, the pointer is stale.
+
+**Note**: The v1.3.0 ROT-PROTECT rule prevents **future**
+occurrences. It does not repair an already-stale pointer.
+
+**Diagnosis**:
+```bash
+# Show the pointer
+LAST_STABLE=$(cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null)
+echo "Pointer: $LAST_STABLE"
+
+# Check if the target exists
+if [ -d "/sdcard/dnscrypt-webui-backup/$LAST_STABLE" ]; then
+    echo "✅ Target exists"
+else
+    echo "❌ Target is missing — stale pointer"
+fi
+```
+
+**Solutions**:
+
+- **Point `.last_stable` to an existing snapshot**:
+  ```bash
+  # List snapshots
+  ls -1d /sdcard/dnscrypt-webui-backup/*/ | grep -vE 'current|txn-|orphan-txn-'
+
+  # Pick one and update the pointer
+  NEW_STABLE=20261008-095826-v1.4.0-12345  # ← example
+  echo "$NEW_STABLE" > /sdcard/dnscrypt-webui-backup/.last_stable
+  chmod 0600 /sdcard/dnscrypt-webui-backup/.last_stable
+  ```
+
+- **Or trigger a fresh install snapshot** (which will set the
+  pointer correctly):
+  ```bash
+  # Reinstall the module over the current one
+  # customize.sh will create a fresh snapshot and update .last_stable
+  ```
+
+**Verification (v1.3.0+ ROT-PROTECT works)**:
+
+```bash
+# 1. Confirm the pointer target exists
+LAST_STABLE=$(cat /sdcard/dnscrypt-webui-backup/.last_stable)
+test -d "/sdcard/dnscrypt-webui-backup/$LAST_STABLE" && echo "✅ pointer valid"
+
+# 2. Simulate rotation with many snapshots
+#    (create 30 synthetic snapshots)
+for i in $(seq -w 1 30); do
+    ts="20260901-0000${i}"
+    mkdir -p "/sdcard/dnscrypt-webui-backup/${ts}-v1.4.0-100"
+    echo '{}' > "/sdcard/dnscrypt-webui-backup/${ts}-v1.4.0-100/.manifest.json"
+done
+
+# 3. Trigger rotation
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
+
+# 4. Verify .last_stable target survived
+test -d "/sdcard/dnscrypt-webui-backup/$LAST_STABLE" && echo "✅ ROT-PROTECT works"
+```
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.2;
+§11.33.
+
+---
+
+**Rotation Guardian badge**: If you verified SNAP-*/ROT-*
+semantics on **3+ devices** or **3+ root solutions**, you qualify
+for the 🎯 **Rotation Guardian** badge — see
+[`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) and
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5 for the
+acceptance criteria.
 
 ---
 
@@ -1038,7 +1555,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 
 ### 5.4 Session expires quickly
 
-**Solution**: v1.2.0 relies on `HttpOnly cookie` — session lasts 24h.
+**Solution**: v1.2.0+ relies on `HttpOnly cookie` — session lasts 24h.
 
 ### 5.5 "Session Expired" modal frequently
 
@@ -1072,7 +1589,7 @@ ip := strings.Split(r.RemoteAddr, ":")[0]
 // RemoteAddr = "[::1]:12345" → ip = "["  ← wrong!
 ```
 
-**Solution**: update to `v1.2.0` (or `v1.0.0+`).
+**Solution**: update to `v1.4.0` (or `v1.0.0+`).
 
 **Verify**:
 ```bash
@@ -1088,7 +1605,7 @@ grep -A5 'func getClientIP' proxy/main.go | grep -q 'net.SplitHostPort' && echo 
 **Cause (before v1.0.0)**:
 `getMonitoringAuth` read the first line containing `username=` regardless of the section.
 
-**Solution**: update to `v1.2.0` (or `v1.0.0+`).
+**Solution**: update to `v1.4.0` (or `v1.0.0+`).
 
 **Verify**:
 ```bash
@@ -1323,6 +1840,12 @@ sleep 60
 curl -u "new_user:new_pass" http://127.0.0.1:9090/api?action=status
 # → 200 OK
 ```
+
+**v1.2.0 note (BUG-C fix)**: The cache no longer stores **empty
+results**. If the credentials file is unreadable (SELinux
+denial, mid-upgrade, missing file), the next request re-reads it
+instead of caching "no auth required" for 60 s. This closes a
+full auth bypass on `BIND_ADDR=0.0.0.0`.
 
 **Reference**: [SECURITY.md](SECURITY.md).
 
@@ -1564,6 +2087,98 @@ curl -s -o /dev/null -w "With token: %{http_code}\n" \
 **Reference**: [`docs/SECURITY.md`](SECURITY.md) §5.33;
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.5.1, §5.7.
 
+### 5.16 Companion app install issues (v1.4.0)
+
+**Symptom (A)** — You tap the "Install App" button in the WebUI,
+the browser downloads `DNS-Proxy.apk`, but the Android installer
+**rejects** it.
+
+**Symptom (B)** — You tap the button and the browser does not
+prompt to download — it just navigates to the APK URL and shows
+a "file not found" page (see §4.15).
+
+**Symptom (C)** — The APK installs, but opening it shows a blank
+screen or an error.
+
+**Cause (A)** — The APK is corrupted, or the download was
+interrupted. Or your device's security settings block
+"sideloaded" apps.
+
+**Cause (B)** — The module ZIP does not bundle the APK. This is
+expected for developer builds. See §4.15.
+
+**Cause (C)** — The APK requires the WebUI to be running at
+`127.0.0.1:9090`. If the module is not installed or the WebUI
+is stopped, the companion app has nothing to load. The APK
+itself is a WebView wrapper; it does not include the DNS
+engine.
+
+**Diagnosis**:
+
+```bash
+# 1. Verify the APK is a valid ZIP (APK = ZIP format)
+file /sdcard/Download/DNS-Proxy.apk
+# Expected: Android package (APK), Zip archive data
+
+# 2. Verify the APK is signed
+unzip -l /sdcard/Download/DNS-Proxy.apk | grep -i 'META-INF'
+# Expected: META-INF/CERT.RSA (or similar)
+#           META-INF/MANIFEST.MF
+
+# 3. Verify the source
+# The APK should be fetched from the official repository:
+#   https://github.com/gasciljh/dnscrypt-proxy-app
+# Do NOT install APKs from untrusted sources.
+
+# 4. Verify the version matches proxy/app-apk.version
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version"
+# Expected: 1.0.0 (or the pinned version)
+```
+
+**Solutions**:
+
+- **Cause (A)** — Allow "Install unknown apps" for your browser:
+  1. Open **Settings** → **Apps** → **[Your browser]**.
+  2. Tap **Install unknown apps**.
+  3. Toggle **Allow from this source**.
+  4. Retry the install.
+
+  If the install still fails, the APK may be corrupted:
+  ```bash
+  # Re-download the APK from the release
+  curl -O http://127.0.0.1:9090/app-debug.apk
+  # Or from the companion repo:
+  #   https://github.com/gasciljh/dnscrypt-proxy-app/releases
+  ```
+
+- **Cause (B)** — See §4.15. Use the browser to install the
+  WebUI itself as a PWA instead (WebUI menu → "Install app"), or
+  re-download the module ZIP from GitHub Releases.
+
+- **Cause (C)** — Ensure the module is installed and running:
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+  # Expected: "DNS=UP" and "WebUI=UP"
+  ```
+  If the WebUI is down, start it:
+  ```bash
+  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+  ```
+
+**Security notes**:
+
+- The companion APK is distributed via Android package
+  signatures. **Android verifies the signature at install time**
+  — a tampered APK fails the check.
+- Only install the companion app from the official sources:
+  - `http://127.0.0.1:9090/app-debug.apk` (served by the module), or
+  - `https://github.com/gasciljh/dnscrypt-proxy-app/releases`.
+- Do not install APKs from mirror sites or third-party stores.
+
+**Reference**: [`docs/INSTALL.md`](INSTALL.md) §8.6; §4.15 in
+this file; [`docs/API.md`](API.md) §6.1.15;
+[`docs/SECURITY.md`](SECURITY.md) §5.35.2.
+
 ---
 
 ## 6. DNS Issues
@@ -1676,7 +2291,7 @@ su -c "settings delete global private_dns_mode"
 - On crash: `getStatusUncached` wrote `STATUS_FILE = "OFF"`.
 - Watchdog reads "OFF" → ignores restart.
 
-**Solution**: update to `v1.2.0` (or v1.0.0+).
+**Solution**: update to `v1.2.0` (or `v1.0.0+`).
 
 **Verify after update**:
 ```bash
@@ -1841,7 +2456,7 @@ su -c "tail -100 /data/local/tmp/dnscrypt_main.log"
 
 ### 7.3 "Custom Rules are not applied"
 
-**Solution**: ensure `v1.2.0` (or `v1.0.0+`).
+**Solution**: ensure `v1.2.0+` (or `v1.0.0+`).
 
 ### 7.4 "Allowlist does not exclude the domain"
 
@@ -1918,7 +2533,7 @@ Two functions call `rebuildBlocklist`:
 **How to verify?**
 ```bash
 # 1. static audit
-grep -qE 'rebuildMu[[:space:]]\+sync\.Mutex' proxy/main.go && echo "✅ declared"
+grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ declared"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'rebuildMu.Lock()' && echo "✅ Lock"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock()' && echo "✅ Unlock"
 
@@ -1947,7 +2562,7 @@ grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock
   curl -X POST -b /tmp/cookies.txt \
       http://127.0.0.1:9090/api/append_denylist
   ```
-- Result (v1.2.0):
+- Result (v1.2.0+):
   ```json
   {
     "status": "error",
@@ -1962,7 +2577,7 @@ grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock
   that still consumed a pre-critical backup. That behavior has
   been removed.
 
-**The v1.2.0 contract**:
+**The v1.2.0+ contract**:
 
 `POST /api/append_denylist` **requires** a `content` parameter.
 
@@ -2029,7 +2644,7 @@ curl -X POST -b /tmp/cookies.txt \
 `content` parameter. This means the WebUI itself does not use the
 `append_denylist` endpoint — it uses `save_denylist` for full
 content updates. The WebUI-side update to use `append_denylist`
-is planned for v1.3.0.
+is planned for **v1.5.0** (see `docs/ROADMAP.md` §5.1.11).
 
 **Reference**: [`docs/API.md`](API.md) §6.2.7;
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §12.8.
@@ -2087,7 +2702,7 @@ su -c "nano /data/adb/modules/dnscrypt-proxy-webui/proxy/watchdog.sh"
 - ~5–10 ms per request (on Android).
 - 100 req/s → ~1 MB/s I/O.
 
-**Solution**: update to `v1.2.0` (or `v1.0.0+`).
+**Solution**: update to `v1.2.0+` (or `v1.0.0+`).
 
 Now:
 - Auth cache (60 s TTL).
@@ -2213,7 +2828,7 @@ su -c "> /data/local/tmp/dnscrypt_main.log"
 su -c "grep -E 'MAX_LOG_SIZE|LOG_LEVEL' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 ```
 
-### 10.4 Backup log lines (v1.2.0)
+### 10.4 Backup log lines (v1.2.0; refined v1.3.0)
 
 **What to look for**:
 
@@ -2225,22 +2840,54 @@ su -c "grep -iE 'auto-backup|backup|restore|rotate|orphan|txn-' \
 **Expected log lines** (examples):
 
 ```text
-[2026-09-29T15:00:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
-[2026-09-29T15:00:05Z] 📢 Restored 5 user files from backup
-[2026-09-29T15:00:30Z] 🧹 cleanupOldTransactions: removed 1 COMMIT'd txn
-[2026-09-29T15:30:00Z] 💾 auto-backup (reason=pre-allowlist-save): 5 file(s)
-[2026-09-29T15:30:01Z] 🔄 rotate_backups: kept 21 snapshot(s)
+[2026-10-08T15:00:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+[2026-10-08T15:00:05Z] 📢 Restored 5 user files from backup
+[2026-10-08T15:00:30Z] 🧹 cleanupOldTransactions: removed 1 COMMIT'd txn
+[2026-10-08T15:30:00Z] 💾 auto-backup (reason=pre-allowlist-save): 5 file(s)
+[2026-10-08T15:30:01Z] 🔄 rotate_backups: kept 21 snapshot(s)
 ```
+
+**v1.3.0 note**: The rotation logic now uses **manifest-based
+detection** (SNAP-MANIFEST / ROT-MANIFEST) and **mtime sorting**
+(SNAP-MTIME / ROT-MTIME). If you see rotation log lines that
+mention "kept 21" but the on-disk count is different, check
+§4.16.
 
 **If backups are failing silently**:
 
-- **Before BUG-2 fix**: `createAutoBackup` discarded stderr, so a
+- **Before BUG-D fix**: `createAutoBackup` discarded stderr, so a
   failed shell command left no trace.
-- **After BUG-2 fix (v1.2.0)**: stderr is captured and logged.
+- **After BUG-D fix (v1.2.0)**: stderr is captured and logged.
 - If you see no backup lines at all after a save operation, check:
   ```bash
   su -c "grep -iE 'backup' /data/local/tmp/dnscrypt_main.log | tail -20"
   ```
+
+### 10.5 Companion app route logs (v1.4.0)
+
+**What to look for**:
+
+```bash
+# The /app-debug.apk route is a static asset fetch.
+# It is NOT logged per-request (like icons).
+```
+
+**Verify the route is registered**:
+
+```bash
+grep -q '"/app-debug.apk"' proxy/main.go && echo "✅ route present"
+grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+grep -q 'vnd.android.package-archive' proxy/main.go && echo "✅ MIME type"
+```
+
+**Check for HTTP-level errors**:
+
+```bash
+# Test the route and capture the status code
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+# If 404, the file is absent (expected for dev builds).
+# If 500, that is a bug — check dnscrypt_main.log.
+```
 
 ---
 
@@ -2381,7 +3028,7 @@ If `MODDIR = "/tmp/evil;rm -rf/"`:
 - No practical vector today.
 
 **Solution**:
-- Update to `v1.2.0` (or `v1.0.0+`).
+- Update to `v1.2.0+` (or `v1.0.0+`).
 - v1.0.0 extended `shellQuote` covers 20 shell metacharacters.
 - v1.1.0 extends it further to 24 (`{`, `}`, `\n`, `\t` added).
 - v1.2.0's `copy_with_context` helper uses `shellQuote` for all
@@ -2428,8 +3075,8 @@ su -c "cat /data/local/tmp/dnscrypt_credentials.txt"
 
 ### 12.3 "Settings lost"
 
-**Solution**: 
-- **v1.2.0**: The 10 defensive layers preserve all 5 config files
+**Solution**:
+- **v1.2.0+**: The 10 defensive layers preserve all 5 config files
   automatically. See §12.7.
 - **Before v1.2.0**: keep a manual backup before upgrade.
 
@@ -2484,7 +3131,7 @@ grep -n '/system/bin/sh' proxy/main.go
 **Solution**:
 
 **Option 1 — Update (recommended)**:
-- Update to `v1.2.0` (or `v1.0.0+`).
+- Update to `v1.2.0+` (or `v1.0.0+`).
 - Now `runShell` uses:
   ```go
   func getSystemShell() string {
@@ -2576,7 +3223,7 @@ The v1.2.0 persistent backup at
 `/sdcard/dnscrypt-webui-backup/` survives reboot, uninstall, and
 factory reset of `/data`.
 
-**Verify v1.2.0 is active**:
+**Verify v1.2.0+ is active**:
 
 ```bash
 su -c "grep -q 'CANDIDATE_SOURCES' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
@@ -2607,7 +3254,7 @@ su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 # v1.0.0+:      PORT=9191 (preserved ✅)
 # v1.2.0+:      PORT=9191 (preserved + a snapshot exists)
 
-# 5. v1.2.0: verify a snapshot was created
+# 5. v1.2.0+: verify a snapshot was created
 su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 ```
 
@@ -2629,10 +3276,10 @@ su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #26 +
 [`docs/BACKUP.md`](BACKUP.md) §1.
 
-### 12.8 Backup layer fails after upgrade (v1.2.0)
+### 12.8 Backup layer fails after upgrade (v1.2.0; refined v1.3.0)
 
 **Symptom**:
-- After upgrading to v1.2.0, the log contains:
+- After upgrading to v1.2.0+, the log contains:
   ```text
   ⚠️ auto-backup failed (continuing)
   ⚠️ PERSISTENT_BACKUP not writable
@@ -2644,6 +3291,17 @@ su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 - `/sdcard/` was not mounted when `customize.sh` ran.
 - Or `/sdcard/` was full (< 10 MB free).
 - Or the FUSE mount was slow on this ROM.
+
+**v1.3.0 note**: The rotation logic changed in v1.3.0. The
+snapshot count and the "newest" snapshot name are now computed
+differently:
+- **SNAP-MANIFEST**: a directory is counted iff it contains a
+  `.manifest.json` file.
+- **SNAP-MTIME**: the "newest" snapshot is selected by mtime, not
+  by name.
+
+If you see a different `available` count or `last_backup_name`
+than expected, see §4.16.
 
 **Diagnosis**:
 
@@ -2705,9 +3363,9 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
 ```
 
 **Reference**: [`docs/BACKUP.md`](BACKUP.md) §10.1, §10.2, §10.4;
-§4.13 in this file.
+§4.13 in this file; §4.16 for the v1.3.0 rotation refinements.
 
-### 12.9 Recovery mode correctness (FIX-1 — v1.2.0)
+### 12.9 Recovery mode correctness (FIX-1 — v1.2.0; cross-ref v1.3.0)
 
 **Symptom**:
 - You triggered recovery mode (`touch recovery && reboot`).
@@ -2743,12 +3401,20 @@ snapshot directory is **preserved** at
 `$MODPATH/.recovery_snapshot/` so the user can recover the
 remaining files manually.
 
+**v1.3.0 cross-reference**: The rotation refinements
+(SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+ROT-PROTECT) that were introduced in v1.3.0 strengthen the
+recovery path indirectly — the `.last_stable` target that
+recovery mode relies on is now **protected from rotation**
+(ROT-PROTECT). See [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+§4.13.2, §11.33, and §4.16 in this file.
+
 **Verify you are on the fixed version**:
 
 ```bash
 # 1. Module version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → must be version=v1.2.0
+# → must be version=v1.2.0 or newer
 
 # 2. The snapshot directory constant must be present
 su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' \
@@ -2761,14 +3427,126 @@ su -c "grep -q 'Re-applying recovery snapshot' \
     echo '✅ FIX-1 present (§[9b2] re-apply block)'"
 ```
 
-**If the fix is missing**: reinstall the module from the v1.2.0 ZIP.
+**If the fix is missing**: reinstall the module from a v1.2.0+ ZIP.
 
 **Test procedure** (full):
 
 See §14.5 (Recovery mode).
 
 **Reference**: [`docs/SECURITY.md`](SECURITY.md) §5.32;
-[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §3.10.
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.13;
+[`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) (Rotation Guardian
+badge).
+
+### 12.10 remove_module returns "Invalid path" (v1.4.0 — CodeQL fix)
+
+**Symptom**:
+- You call `POST /api/remove_module` with a path that used to work
+  (in v1.3.0 or earlier), and you get:
+
+  ```json
+  {
+    "status": "error",
+    "message": "Invalid path"
+  }
+  ```
+
+- Or:
+
+  ```json
+  {
+    "status": "error",
+    "message": "Invalid module name"
+  }
+  ```
+
+**Is this a bug?**
+- No — intentional v1.4.0 hardening (CodeQL `go/path-injection`
+  fix). The endpoint's contract is unchanged for valid inputs.
+
+**What changed in v1.4.0**:
+- The caller-provided path is now routed through
+  `filepath.Base()` and the final path is rebuilt from the
+  trusted `MODULES_DIR` constant:
+
+  ```go
+  name := filepath.Base(modulePath)
+  if name == "" || name == "." || name == ".." ||
+      name == string(filepath.Separator) {
+      return map[string]interface{}{
+          "status":  "error",
+          "message": "Invalid module name",
+      }
+  }
+  cleanPath := filepath.Join(MODULES_DIR, name)
+  ```
+
+- Two CodeQL `go/path-injection` alerts were closed.
+
+**When the error appears**:
+
+| Input | Result |
+|---|---|
+| `/data/adb/modules/dnscrypt-old` | ✅ OK (basename is `dnscrypt-old`) |
+| `/data/adb/modules/dnscrypt-old/` | ✅ OK (basename is `dnscrypt-old`) |
+| `/data/adb/modules/..` | ❌ `"Invalid module name"` |
+| `/data/adb/modules/` | ❌ `"Invalid module name"` (basename is `modules`) |
+| `/data/adb/modules/foo/bar` | ❌ `"Invalid path"` (basename is `bar`, prefix check fails) |
+| `/etc/passwd` | ❌ `"Invalid path"` (prefix check fails) |
+
+**Solution**:
+
+**Call the endpoint with the full module path**:
+
+```bash
+# ✅ Correct
+curl -X POST -b /tmp/cookies.txt \
+    -d "path=/data/adb/modules/dnscrypt-old" \
+    http://127.0.0.1:9090/api/remove_module
+
+# Response: {"status": "ok", "message": "Old module removed successfully"}
+```
+
+**Do NOT use**:
+
+```bash
+# ❌ Contains ".."
+-d "path=/data/adb/modules/.."
+
+# ❌ Empty path
+-d "path="
+
+# ❌ Just a name
+-d "path=dnscrypt-old"
+```
+
+**For the WebUI**: The "Old Modules" panel in the WebUI sends the
+full path automatically — no user action needed. If you see the
+error in the WebUI, this means `main.go` and the WebUI are out of
+sync (unlikely in v1.4.0 — both were updated in the same release).
+
+**Diagnosis**:
+
+```bash
+# 1. Verify the module version
+su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+# → must be version=v1.4.0
+
+# 2. Static audit
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ filepath.Base present"
+grep -q 'filepath.Join(MODULES_DIR, name)' proxy/main.go && echo "✅ trusted base dir"
+grep -A20 'func removeModule' proxy/main.go | grep -q 'os.RemoveAll(modulePath)' \
+    && echo "❌ raw path used" || echo "✅ raw path not used"
+
+# 3. Negative test (should return error)
+curl -X POST http://127.0.0.1:9090/api/remove_module \
+    -d "path=/data/adb/modules/.."
+# Expected: {"status":"error","message":"Invalid module name"}
+```
+
+**Reference**: [`docs/SECURITY.md`](SECURITY.md) §5.34;
+[`docs/API.md`](API.md) §6.2.10;
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.12.3.
 
 ---
 
@@ -2833,7 +3611,7 @@ su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 ```bash
 su -c "ls -la /data/local/tmp/dnscrypt_backup_uninstall/"
 # This is a legacy artifact from v1.0.0
-# uninstall.sh v1.2.0 removes it automatically
+# uninstall.sh v1.2.0+ removes it automatically
 # To remove manually:
 su -c "rm -rf /data/local/tmp/dnscrypt_backup_uninstall/"
 ```
@@ -2925,6 +3703,39 @@ su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 
 **Reference**: [`docs/BACKUP.md`](BACKUP.md) §5.6.
 
+### 13.6 Companion app remains after module uninstall (v1.4.0)
+
+**Symptom**:
+- You uninstalled the module.
+- The companion app (`DNS Proxy`) is still in your launcher.
+
+**Is this a bug?**
+- No — intentional. The companion app is **independent** of the
+  module. The module's `uninstall.sh` removes the bundled APK
+  file (`web/app-debug.apk`), but does **not** uninstall the app
+  from Android.
+
+**Why?** The app is a normal Android package; the module has no
+authority over it (that would require being a device
+administrator, which the module is not).
+
+**Solution**:
+
+**Uninstall the app manually**:
+
+1. Long-press the app icon → **Uninstall**.
+2. Or: **Settings** → **Apps** → **DNS Proxy** → **Uninstall**.
+
+**Or via ADB**:
+
+```bash
+adb uninstall com.gasciljh.dnscryptproxy
+# (the exact package name is in the companion repo)
+```
+
+**Reference**: [`docs/INSTALL.md`](INSTALL.md) §8.6;
+[`docs/SECURITY.md`](SECURITY.md) §5.35.2.
+
 ---
 
 ## 14. Emergency Situations
@@ -2949,7 +3760,7 @@ adb shell su -c "rm -rf /data/adb/modules/dnscrypt-proxy-webui"
 adb reboot
 ```
 
-**v1.2.0 alternative**: use recovery mode (§14.5) — it restores
+**v1.2.0+ alternative**: use recovery mode (§14.5) — it restores
 the last known-good config without reinstalling.
 
 ### 14.2 "Wi-Fi does not work at all"
@@ -2983,7 +3794,7 @@ nslookup google.com
 
 **Warning**: `iptables -t nat -F OUTPUT` clears all rules. If you have a VPN, delete the rules individually (§13.2).
 
-### 14.5 Recovery mode (v1.2.0)
+### 14.5 Recovery mode (v1.2.0; cross-ref v1.3.0)
 
 **When to use it**:
 
@@ -2999,6 +3810,11 @@ nslookup google.com
 - [ ] `.last_stable` is set: `su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"`.
 - [ ] You recorded the current profile:
   `su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"`.
+
+**v1.3.0 note**: ROT-PROTECT now ensures the `.last_stable`
+target is **protected from rotation** even if it falls outside
+the 21-newest window. This makes recovery mode significantly more
+reliable on v1.3.0+ than it was on v1.2.0.
 
 **Procedure**:
 
@@ -3153,6 +3969,9 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key,
 
 # Backups object (v1.2.0 — BAK-1, 7 fields)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
+
+# Rotation state (v1.3.0 — SNAP-*/ROT-*)
+su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | {available, last_backup_name, last_stable, in_flight_txn, orphan_txn}'"
 ```
 
 ### 15.6 dnsleaktest
@@ -3173,7 +3992,8 @@ grep -c "$(date +%Y-%m-%d)" /data/local/tmp/dnscrypt-blocked.log
 grep -i error /data/local/tmp/dnscrypt_main.log | tail -10
 grep -i 'watchdog\|ensure_running' /data/local/tmp/dnscrypt_main.log | tail -10
 grep -iE 'metrics|proxy|error' /data/local/tmp/dnscrypt_main.log | tail -10
-grep -iE 'backup|restore|rotate|orphan|txn-' /data/local/tmp/dnscrypt_main.log | tail -20  # v1.2.0
+grep -iE 'backup|restore|rotate|orphan|txn-' /data/local/tmp/dnscrypt_main.log | tail -20  # v1.2.0+
+grep -iE 'apk|companion' /data/local/tmp/dnscrypt_main.log | tail -10  # v1.4.0
 ```
 
 ### 15.9 Status File Check
@@ -3249,6 +4069,37 @@ grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
 
 # WD-TOKEN (v1.2.0)
 grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
+
+# SNAP-MANIFEST (v1.3.0)
+grep -q 'v1.3.0 (SNAP-MANIFEST)' proxy/main.go && echo "✅ SNAP-MANIFEST"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ manifest check"
+
+# SNAP-MTIME (v1.3.0)
+grep -q 'v1.3.0 (SNAP-MTIME)' proxy/main.go && echo "✅ SNAP-MTIME"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime()' && echo "✅ mtime sort"
+
+# ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (v1.3.0)
+grep -q 'v1.3.0' proxy/functions.sh && echo "✅ v1.3.0 in functions.sh"
+grep -q 'sort -rn -k1,1' proxy/functions.sh && echo "✅ ROT-MTIME"
+grep -q '_last_stable' proxy/functions.sh && echo "✅ ROT-PROTECT (last_stable)"
+grep -q '_newest_install' proxy/functions.sh && echo "✅ ROT-PROTECT (newest install)"
+
+# CodeQL fix (v1.4.0)
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ CQ-FIX filepath.Base"
+grep -q 'filepath.Join(MODULES_DIR, name)' proxy/main.go && echo "✅ CQ-FIX trusted base"
+
+# Companion APK route (v1.4.0)
+grep -q '"/app-debug.apk"' proxy/main.go && echo "✅ APK route"
+grep -q 'vnd.android.package-archive' proxy/main.go && echo "✅ APK mime"
+
+# MAIN-01 (v1.4.0)
+grep -q 'MAIN-01' proxy/main.go && echo "✅ MAIN-01 documented"
+
+# iOS PWA removal (v1.4.0)
+grep -q 'isIOSDevice' web/index.html && echo "❌ iOS still present" || echo "✅ iOS removed"
+
+# Direct install link (v1.4.0)
+grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ direct link"
 ```
 
 ### 15.12 RACE-1 + PORT-2 Diagnostics
@@ -3343,7 +4194,7 @@ su -c "sh /data/local/tmp/memory-diagnostics.sh"
 {
   "profile_key": "pro",
   "memory_limit_mb": 120,
-  "version": "v1.2.0"
+  "version": "v1.4.0"
 }
 
 === 2. selected_profile.txt (raw) ===
@@ -3357,8 +4208,8 @@ VmRSS:     18234 kB
  5678 u0_a123      20   0 1.2G  18M  12M S  0.5   0.9  0:12.34 dnscrypt-webui
 
 === 5. GC / memory log lines ===
-2026-09-29 10:00:00 - 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
-2026-09-29 10:05:00 - memory limit adjusted: 80 MB → 120 MB (profile=pro, previous runtime value=120 MB)
+2026-10-08 10:00:00 - 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+2026-10-08 10:05:00 - memory limit adjusted: 80 MB → 120 MB (profile=pro, previous runtime value=120 MB)
 
 === 6. Expected values ===
 light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
@@ -3374,7 +4225,7 @@ light=80, normal=100, pro=120, proplus=160, ultimate=220 (MB)
 | CPU idle | < 5% | > 20% → see §6.10 (GC thrashing) |
 | Log line | reported once at startup | repeated "adjusted" lines → check for rapid profile changes |
 
-### 15.14 Backup Diagnostics Helper (v1.2.0 — new)
+### 15.14 Backup Diagnostics Helper (v1.2.0)
 
 **Purpose**: one-shot script to dump the full backup state for bug
 reports or verification.
@@ -3418,7 +4269,7 @@ chmod +x /data/local/tmp/backup-diagnostics.sh"
 su -c "sh /data/local/tmp/backup-diagnostics.sh"
 ```
 
-**Sample output** (on a healthy v1.2.0 install):
+**Sample output** (on a healthy v1.2.0+ install):
 
 ```
 === 1. Backup state (7-field object) ===
@@ -3426,21 +4277,21 @@ su -c "sh /data/local/tmp/backup-diagnostics.sh"
   "available": 7,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-29 15:30:00",
-  "last_backup_name": "20260929-153000-manual-12345",
-  "last_stable": "20260929-095826-v1.2.0-12345",
+  "last_backup": "2026-10-08 15:30:00",
+  "last_backup_name": "20261008-153000-manual-12345",
+  "last_stable": "20261008-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 
 === 2. Backup directory listing ===
 drwx------  current/
-drwx------  20260929-153000-manual-12345/
-drwx------  20260929-095826-v1.2.0-12345/
+drwx------  20261008-153000-manual-12345/
+drwx------  20261008-095826-v1.4.0-12345/
 -rw-------  .last_stable
 -rw-------  .upgrade_history.json
 
 === 3. .last_stable pointer ===
-20260929-095826-v1.2.0-12345
+20261008-095826-v1.4.0-12345
 
 === 4. In-flight transactions ===
 ls: /sdcard/dnscrypt-webui-backup/txn-*: No such file or directory
@@ -3460,7 +4311,7 @@ ls: /sdcard/dnscrypt-webui-backup/orphan-txn-*: No such file or directory
 | `.last_stable` | matches `last_stable` field | mismatch → version mismatch |
 | Directory listing | `current/` + ≥ 1 snapshot | missing `current/` → see §4.13 |
 
-### 15.15 Recovery Mode Test Helper (v1.2.0 — new)
+### 15.15 Recovery Mode Test Helper (v1.2.0)
 
 **Purpose**: verify the FIX-1 snapshot-and-reapply mechanism on a
 real device without reinstalling the module.
@@ -3560,6 +4411,332 @@ su -c "sh /data/local/tmp/recovery-mode-test.sh"
 **Reference**: §12.9, [`docs/SECURITY.md`](SECURITY.md) §5.32,
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §3.10.
 
+### 15.16 Companion APK Diagnostics Helper (v1.4.0)
+
+**Purpose**: one-shot script to verify the companion APK route for
+bug reports or verification.
+
+```bash
+#!/system/bin/sh
+# companion-apk-diagnostics.sh — v1.4.0
+# Collects:
+#   • Whether the APK is bundled in the module
+#   • HTTP route status (200 vs 404)
+#   • iOS PWA logic removal verification
+#   • Install button URL verification
+
+MODPATH=/data/adb/modules/dnscrypt-proxy-webui
+
+echo "=== 1. APK file presence ==="
+ls -la $MODPATH/web/app-debug.apk 2>&1
+
+echo ""
+echo "=== 2. APK version (from proxy/app-apk.version) ==="
+cat $MODPATH/proxy/app-apk.version 2>&1
+echo ""
+
+echo "=== 3. HTTP route status ==="
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -5
+
+echo ""
+echo "=== 4. iOS PWA logic removal ==="
+if grep -q 'isIOSDevice' $MODPATH/web/index.html 2>/dev/null; then
+    echo "❌ isIOSDevice still present"
+else
+    echo "✅ isIOSDevice removed"
+fi
+
+echo ""
+echo "=== 5. Install button URL ==="
+if grep -q 'href="/app-debug.apk"' $MODPATH/web/index.html 2>/dev/null; then
+    echo "✅ Direct <a download> link present"
+else
+    echo "❌ Direct link not found"
+fi
+
+echo ""
+echo "=== 6. Cache-Control header ==="
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -i 'cache-control'
+
+echo ""
+echo "=== 7. Content-Type header ==="
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -i 'content-type'
+
+echo ""
+echo "=== 8. main.go route registration ==="
+# Note: this checks the source, not the deployed binary.
+# If you are running on the device, the source may not be present.
+if [ -f /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk ]; then
+    echo "✅ APK bundled (release build)"
+else
+    echo "ℹ️  APK not bundled (dev build, expected for local builds)"
+fi
+
+echo ""
+echo "=== 9. Summary ==="
+echo "If the HTTP route returned 200 and the APK is a valid ZIP:"
+echo "  the WebUI install button will work as expected."
+echo "If the route returned 404:"
+echo "  the module is a developer build — see §4.15."
+```
+
+**Usage**:
+
+```bash
+su -c "cat > /data/local/tmp/companion-apk-diagnostics.sh << 'EOF'
+...paste script here...
+EOF
+chmod +x /data/local/tmp/companion-apk-diagnostics.sh"
+
+su -c "sh /data/local/tmp/companion-apk-diagnostics.sh"
+```
+
+**Sample output** (release build, healthy):
+
+```
+=== 1. APK file presence ===
+-rw-r--r-- 1 root root 3145728 2026-10-08 10:00 web/app-debug.apk
+
+=== 2. APK version (from proxy/app-apk.version) ===
+1.0.0
+
+=== 3. HTTP route status ===
+HTTP/1.1 200 OK
+Content-Type: application/vnd.android.package-archive
+Cache-Control: public, max-age=3600, immutable
+Content-Length: 3145728
+
+=== 4. iOS PWA logic removal ===
+✅ isIOSDevice removed
+
+=== 5. Install button URL ===
+✅ Direct <a download> link present
+
+=== 6. Cache-Control header ===
+Cache-Control: public, max-age=3600, immutable
+
+=== 7. Content-Type header ===
+Content-Type: application/vnd.android.package-archive
+
+=== 8. main.go route registration ===
+✅ APK bundled (release build)
+
+=== 9. Summary ===
+If the HTTP route returned 200 and the APK is a valid ZIP:
+  the WebUI install button will work as expected.
+If the route returned 404:
+  the module is a developer build — see §4.15.
+```
+
+**Sample output** (dev build):
+
+```
+=== 1. APK file presence ===
+ls: /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk: No such file or directory
+
+=== 3. HTTP route status ===
+HTTP/1.1 404 Not Found
+Content-Type: text/plain; charset=utf-8
+
+=== 4. iOS PWA logic removal ===
+✅ isIOSDevice removed
+
+=== 5. Install button URL ===
+✅ Direct <a download> link present
+
+=== 8. main.go route registration ===
+ℹ️  APK not bundled (dev build, expected for local builds)
+
+=== 9. Summary ===
+If the HTTP route returned 200 and the APK is a valid ZIP:
+  the WebUI install button will work as expected.
+If the route returned 404:
+  the module is a developer build — see §4.15.
+```
+
+**Interpretation**:
+
+| Field | Release build | Dev build |
+|---|---|---|
+| APK file | present (~3 MB) | absent |
+| HTTP route | 200 + mime type | 404 |
+| iOS logic | removed | removed |
+| Install button | direct link | direct link |
+| Route registration | ✅ | ℹ️ (expected) |
+
+**Reference**: §4.15, §5.16, [`docs/API.md`](API.md) §6.1.15,
+[`docs/SECURITY.md`](SECURITY.md) §5.35.2,
+[`docs/INSTALL.md`](INSTALL.md) §8.6.
+
+### 15.17 Rotation Diagnostics Helper (v1.3.0 — SNAP-*/ROT-*)
+
+> **This helper is new in v1.4.0.** It provides a one-shot script
+> to verify the v1.3.0 rotation semantics (SNAP-MANIFEST,
+> SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) on a real
+> device. Use it as the basis for a **Rotation Guardian** badge
+> report — see [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) and
+> [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5.
+
+**Purpose**: verify the rotation semantics on a real device
+without triggering a full install.
+
+```bash
+#!/system/bin/sh
+# rotation-diagnostics.sh — v1.3.0
+# Collects:
+#   • Snapshot detection (SNAP-MANIFEST)
+#   • Sort key (SNAP-MTIME)
+#   • Rotation protections (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT)
+#
+# Safe to run: it does NOT modify the module or trigger rotation.
+
+MODPATH=/data/adb/modules/dnscrypt-proxy-webui
+PERSISTENT_BACKUP=/sdcard/dnscrypt-webui-backup
+
+echo "=== 1. runtime_info.backups (7 fields) ==="
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
+
+echo ""
+echo "=== 2. Snapshot enumeration (SNAP-MANIFEST rule) ==="
+echo "A snapshot is counted iff it contains a .manifest.json file."
+echo ""
+FOUND=0
+COUNTED=0
+for d in "$PERSISTENT_BACKUP"/*/; do
+    [ -d "$d" ] || continue
+    name=$(basename "$d")
+    case "$name" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    FOUND=$((FOUND + 1))
+    if [ -f "$d/.manifest.json" ]; then
+        COUNTED=$((COUNTED + 1))
+        mtime=$(stat -c %Y "$d" 2>/dev/null)
+        mtime_h=$(date -d "@$mtime" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)
+        printf "  ✅ %-40s (mtime: %s)\n" "$name" "$mtime_h"
+    else
+        printf "  ⚠️  %-40s (NO manifest — not counted by v1.3.0+)\n" "$name"
+    fi
+done
+echo ""
+echo "  Total candidate directories: $FOUND"
+echo "  Counted by SNAP-MANIFEST:    $COUNTED"
+echo "  Reported by runtime_info:    $(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.available')"
+echo ""
+echo "  If 'Counted' != 'Reported', there is a version mismatch:"
+echo "    → see §4.14 (Backup state issues)"
+
+echo ""
+echo "=== 3. Sort key verification (SNAP-MTIME) ==="
+echo "The 'newest' snapshot is chosen by mtime, not by name."
+echo ""
+echo "  Reported last_backup_name:"
+echo "    $(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.last_backup_name')"
+echo ""
+echo "  Newest by mtime (recomputed locally):"
+NEWEST=$(ls -1dt "$PERSISTENT_BACKUP"/*/ 2>/dev/null | \
+    grep -vE '/(current|txn-|orphan-txn-)' | \
+    while IFS= read -r d; do
+        [ -f "$d/.manifest.json" ] && basename "$d"
+    done | head -n1)
+echo "    $NEWEST"
+echo ""
+echo "  If these differ, verify:"
+echo "    • The runtime binary is v1.3.0+ (SNAP-MTIME)"
+echo "    • No filesystem-level mtime drift"
+
+echo ""
+echo "=== 4. Protected targets (ROT-PROTECT) ==="
+echo "Rotation preserves two additional targets on top of the 21-newest window:"
+echo "  • The .last_stable target"
+echo "  • The newest install snapshot (name matches -v<digit>)"
+echo ""
+LAST_STABLE=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null)
+echo "  .last_stable pointer: $LAST_STABLE"
+if [ -n "$LAST_STABLE" ] && [ -d "$PERSISTENT_BACKUP/$LAST_STABLE" ]; then
+    echo "  ✅ Target exists"
+else
+    echo "  ❌ Target missing — the pointer is stale"
+    echo "     see §4.16.3"
+fi
+echo ""
+echo "  Newest install snapshot (name matches -v<digit>):"
+NEWEST_INSTALL=$(ls -1d "$PERSISTENT_BACKUP"/*-v[0-9]*/ 2>/dev/null | head -n1)
+if [ -n "$NEWEST_INSTALL" ]; then
+    echo "    ✅ $(basename "$NEWEST_INSTALL")"
+else
+    echo "    ℹ️  No install snapshot yet (install-time snapshots only)"
+fi
+
+echo ""
+echo "=== 5. Verifying ROT-* markers in functions.sh ==="
+for marker in \
+    'ROT-MANIFEST' \
+    'ROT-MTIME' \
+    'ROT-PROTECT' \
+    'sort -rn -k1,1' \
+    '_last_stable' \
+    '_newest_install'; do
+    if grep -q -- "$marker" "$MODPATH/functions.sh" 2>/dev/null; then
+        echo "  ✅ $marker"
+    else
+        echo "  ⚠️  $marker not found — the module may be pre-v1.3.0"
+    fi
+done
+
+echo ""
+echo "=== 6. Verifying SNAP-* markers in main.go ==="
+# main.go source is not present on the device in a release install.
+# Check the running binary version instead.
+VERSION=$(grep '^version=' "$MODPATH/module.prop" | cut -d= -f2)
+echo "  Module version: $VERSION"
+case "$VERSION" in
+    v1.3.0|v1.3.*|v1.4.0|v1.4.*)
+        echo "  ✅ SNAP-* semantics expected (v1.3.0+)"
+        ;;
+    *)
+        echo "  ⚠️  Pre-v1.3.0 — SNAP-* semantics NOT active"
+        ;;
+esac
+
+echo ""
+echo "=== 7. Report summary ==="
+echo "For a Rotation Guardian report, include:"
+echo "  1. This output."
+echo "  2. The output of: status.sh --diagnose"
+echo "  3. The device model + Android version + root solution."
+echo "  4. The scenarios you verified from COMPATIBILITY.md §10.3.5."
+echo ""
+echo "See docs/HALL_OF_FAME.md (Rotation Guardian badge)."
+```
+
+**Usage**:
+
+```bash
+su -c "cat > /data/local/tmp/rotation-diagnostics.sh << 'EOF'
+...paste script here...
+EOF
+chmod +x /data/local/tmp/rotation-diagnostics.sh"
+
+su -c "sh /data/local/tmp/rotation-diagnostics.sh"
+```
+
+**Interpretation**:
+
+| Check | Healthy v1.3.0+ | Suspicious |
+|---|---|---|
+| SNAP-MANIFEST count == runtime_info.available | ✅ | mismatch → see §4.14 |
+| `last_backup_name` matches local newest-by-mtime | ✅ | mismatch → check binary version |
+| `.last_stable` target exists | ✅ | missing → see §4.16.3 |
+| ROT-* markers present in `functions.sh` | ✅ | missing → pre-v1.3.0 |
+| Module version is `v1.3.0+` | ✅ | older → upgrade |
+
+**Full verification procedure**: [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5.
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13;
+§11.31–§11.33; §4.16 in this file;
+[`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) (Rotation Guardian).
+
 ---
 
 ## 16. When All Else Fails
@@ -3569,7 +4746,7 @@ su -c "sh /data/local/tmp/recovery-mode-test.sh"
 If none of the above worked:
 
 ```bash
-# 1. Full diagnostic (v1.2.0 — Layer 10)
+# 1. Full diagnostic (v1.2.0+ — Layer 10)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" \
     > /sdcard/diagnose.txt 2>&1
 
@@ -3577,15 +4754,23 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" \
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" \
     > /sdcard/diagnose.json 2>&1
 
-# 3. Backup state (v1.2.0)
+# 3. Backup state (v1.2.0+)
 su -c "sh /data/local/tmp/backup-diagnostics.sh" \
     > /sdcard/backup-diagnose.txt 2>&1
 
-# 4. Logs
+# 4. Rotation state (v1.3.0+)
+su -c "sh /data/local/tmp/rotation-diagnostics.sh" \
+    > /sdcard/rotation-diagnose.txt 2>&1
+
+# 5. Companion APK state (v1.4.0)
+su -c "sh /data/local/tmp/companion-apk-diagnostics.sh" \
+    > /sdcard/companion-apk-diagnose.txt 2>&1
+
+# 6. Logs
 su -c "tail -200 /data/local/tmp/dnscrypt_main.log" \
     > /sdcard/logs.txt 2>&1
 
-# 5. Module info
+# 7. Module info
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/module.prop" \
     >> /sdcard/logs.txt 2>&1
 ```
@@ -3608,7 +4793,7 @@ When opening a GitHub Issue, include:
 
 - `diagnose.txt` (from §16.1 step 1)
 - `diagnose.json` (from §16.1 step 2)
-- `logs.txt` (from §16.1 step 4)
+- `logs.txt` (from §16.1 step 6)
 
 **For backup-related issues, also include**:
 
@@ -3621,6 +4806,25 @@ When opening a GitHub Issue, include:
   ```bash
   su -c "ls -la /sdcard/dnscrypt-webui-backup/"
   ```
+
+**For rotation-related issues (v1.3.0 — SNAP-*/ROT-*), also include**:
+
+- `rotation-diagnose.txt` (from §16.1 step 4)
+- The 5-field rotation state:
+  ```bash
+  su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | {available, last_backup_name, last_stable, in_flight_txn, orphan_txn}'"
+  ```
+- The `.last_stable` pointer content:
+  ```bash
+  su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
+  ```
+- The snapshot enumeration (per §15.17 step 2), including which
+  directories contain `.manifest.json` and which do not.
+- The module version:
+  ```bash
+  su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+  ```
+  (Must be `v1.3.0` or newer for SNAP-*/ROT-* to be active.)
 
 **For recovery-mode issues, also include**:
 
@@ -3645,14 +4849,32 @@ When opening a GitHub Issue, include:
   su -c "grep -i 'watchdog' /data/local/tmp/dnscrypt_main.log | tail -20"
   ```
 
+**For companion app issues (v1.4.0), also include**:
+
+- `companion-apk-diagnose.txt` (from §16.1 step 5)
+- The HTTP route status:
+  ```bash
+  su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+  ```
+- The install button markup (from `web/index.html`):
+  ```bash
+  su -c "grep -A2 'id=\"pwaInstallBtn\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html"
+  ```
+- The pinned companion version:
+  ```bash
+  su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version"
+  ```
+
 ### 16.3 Support Links
 
 - **Bug reports**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
 - **Security issues**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new (do **not** open public issues for security)
+- **Companion app**: https://github.com/gasciljh/dnscrypt-proxy-app
+- **Companion app releases**: https://github.com/gasciljh/dnscrypt-proxy-app/releases
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
 *Author: gasciljh*

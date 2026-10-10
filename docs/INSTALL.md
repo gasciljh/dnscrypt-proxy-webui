@@ -2,12 +2,109 @@
 
 > Detailed step-by-step installation guide.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
+> **Identifier inventory in this file (7 total)**:
+>   • HARD-INS-01 (Cosign flow removal — §3.3 rewritten —
+>     v1.4.0)
+>   • HARD-INS-02 (§7.14 Watchdog token verification added —
+>     v1.4.0)
+>   • HARD-INS-03 (§7.15 Companion APK route verification added —
+>     v1.4.0)
+>   • HARD-INS-04 (§8.6 Companion app install section added —
+>     v1.4.0)
+>   • HARD-INS-05 (§12.4b + §12.4c v1.3.0/v1.4.0 key-changes
+>     tables added — v1.4.0)
+>   • HARD-INS-06 (§12.8 Companion APK quick test added — v1.4.0)
+>   • HARD-INS-07 (`Last updated` sync — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/API.md](API.md) — HTTP API (§6.1.7, §6.1.15, §2.8)
+>   • [docs/UPGRADE.md](UPGRADE.md) — upgrade guide
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections
+>   • [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • **Companion Android app integration** — the module ZIP now
+>     ships an OPTIONAL companion app APK (`web/app-debug.apk`),
+>     served by `main.go` at `GET /app-debug.apk`. The WebUI
+>     install button is a plain `<a download>` link pointing at
+>     that route.
+>   • **CodeQL `go/path-injection` fix** in `removeModule` — no
+>     user-visible impact; the endpoint's request/response shapes
+>     are unchanged.
+>   • **iOS PWA logic removed** — Android-only project.
+>   • **`§3.3` (Cosign)** — the section was previously documented
+>     but the release pipeline does NOT sign the artifacts.
+>     Replaced with an explicit "no signature yet" note (see
+>     `release.yml` §Non-goals).
+>   • **`§7.14` (new)** — Verify companion APK route.
+>   • **`§8.6` (new)** — Install the companion Android app.
+>   • **`§9.7` (versionCode table)** — added v1.3.0 + v1.4.0.
+>   • **`§12.4b` + `§12.4c` (new)** — v1.3.0 + v1.4.0 key changes.
+>   • **`§12.8` (new)** — Companion APK quick test.
+>   • All ZIP filename examples updated: `1.2.0` → `1.4.0`.
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side additions**:
+>       - **PWA install button** — dynamic, always-visible,
+>         browser-aware (client-side only; see `web/index.html`).
+>         *(Repurposed in v1.4.0 — see §8.6 and §12.4c.)*
+>       - **Live status LED** on the Today counter (client-side).
+>   • **Boot-path correctness fix** — `service.sh` now calls
+>     `POST /api/ensure_running_service` directly after boot,
+>     bounded by a wait for the WebUI port. No install-time
+>     change.
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Three
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern.
+>         **User-visible effect**: custom-named snapshots
+>         (e.g. `pre-v130-manual-...`) are now visible to the API
+>         and to rotation.
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule. **User-visible effect**:
+>         rotation and `runtime_info.backups.last_backup_name`
+>         are robust against clock drift and manual renames.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         **two additional protected targets** on top of the
+>         21-newest window: the `.last_stable` recovery pointer
+>         and the newest install snapshot (name matching
+>         `-v<digit>`). **User-visible effect**: recovery mode
+>         and rollback can no longer be silently broken by
+>         rotation.
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
+>   • **No install-time change** — the persistent backup
+>     directory, the 5 preserved files, and the install procedure
+>     are unchanged from v1.2.0.
+>   • No structural changes to the installation procedure.
+
+> **v1.2.0 changes** (kept as history):
 >   • Version bumped from v1.1.0 to v1.2.0.
 >   • §4.3 (What Happens During Installation) rewritten for the
 >     10 defensive layers (Layer 1..Layer 10).
@@ -46,7 +143,8 @@
 >     `localStorage['dnscrypt-lang']`. Documentation remains
 >     English-only by project convention.
 
-> **v1.2.0 (Global Edition) — Corrections in this revision**:
+> **v1.2.0 (Global Edition) — Corrections in this revision
+> (historical)**:
 >   • 🔧 **FIX-1 description** — §12.4 previously described FIX-1
 >     as a "recovery-mode reorder" that "excludes 2 files at
 >     risk". The actual implementation in `customize.sh` uses a
@@ -57,6 +155,39 @@
 >   • 🔧 **Backup directory path** — §10.7 previously showed
 >     `rm -rf /sdcrypt-webui-backup`, which is a typo. The
 >     correct path is `/sdcard/dnscrypt-webui-backup`. Corrected.
+
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-INS-01** — §3.3 (Signature / Attestation)
+>     rewritten. An earlier revision of this document described
+>     a Cosign keyless verification flow (`cosign verify-blob`
+>     with a `.sig` and `.pem` pair). **That flow does NOT
+>     exist.** The release workflow
+>     (`.github/workflows/release.yml`) explicitly documents this
+>     in its **Non-goals** section. The section now states this
+>     clearly and lists what CAN be verified today
+>     (SHA-256 only).
+>   • 🔧 **HARD-INS-02** — §7.14 (Watchdog token verification)
+>     added. Documents the v1.2.0 watchdog token file
+>     (`$RUN_DIR/.watchdog_token`, mode 0600) and how to test the
+>     `/api/ensure_running_service` endpoint with a valid or
+>     invalid token.
+>   • 🔧 **HARD-INS-03** — §7.15 (Companion APK route
+>     verification) added. Documents the v1.4.0 `GET
+>     /app-debug.apk` route, its expected response codes, and
+>     how to detect a developer build.
+>   • 🔧 **HARD-INS-04** — §8.6 (Install the Companion Android
+>     App) added. Documents the v1.4.0 optional companion APK:
+>     the WebUI install button, the direct download link, and how
+>     to distinguish a release build from a developer build.
+>   • 🔧 **HARD-INS-05** — §12.4b (Key Changes in v1.3.0) and
+>     §12.4c (Key Changes in v1.4.0) added. They summarize the
+>     user-visible impact of the v1.3.0 rotation refinements and
+>     the v1.4.0 companion app.
+>   • 🔧 **HARD-INS-06** — §12.8 (v1.4.0 Companion APK — Quick
+>     Test) added. A focused test that verifies the APK is
+>     bundled, served, and downloadable.
+>   • 🟢 **HARD-INS-07** — Header and footer `Last updated`
+>     synchronized to `2026-10-08`.
 
 ---
 
@@ -73,7 +204,7 @@
 9. [Updating](#9-updating)
 10. [Uninstalling](#10-uninstalling)
 11. [Quick Reference](#11-quick-reference)
-12. [v1.2.0 Specific Notes](#12-v120-specific-notes)
+12. [v1.4.0 Specific Notes](#12-v140-specific-notes)
 13. [Unified Verification Script](#13-unified-verification-script)
 14. [References](#14-references)
 
@@ -104,12 +235,17 @@
 
 **v1.1.0 note**: On 1 GB devices, prefer the `light` or
 `normal` profile. The `ultimate` profile sets a 220 MB soft
-limit for the WebUI process — see §12.4.
+limit for the WebUI process — see §12.4c.
 
 **v1.2.0 note**: The persistent backup directory requires at
 least **10 MB** free on `/sdcard/`. Each snapshot uses ~30–100 KB;
 the rotation cap (21 snapshots) bounds the total to ~2.5 MB.
 See [`docs/BACKUP.md`](BACKUP.md) §6.4.
+
+**v1.4.0 note**: The companion Android app requires an
+additional ~3 MB in the module ZIP if it is bundled (release
+builds). Local developer builds may omit it without any change
+to the install procedure.
 
 ### 1.3 Does Not Work With
 
@@ -198,51 +334,92 @@ df -h /sdcard
 ### 3.1 From GitHub Releases
 
 ```bash
-# Latest release (v1.2.0)
-wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.2.0-module.zip
+# Latest release (v1.4.0)
+wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.4.0-module.zip
 
 # Or
-curl -L -o dnscrypt-webui-1.2.0-module.zip \
-    https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.2.0-module.zip
+curl -L -o dnscrypt-webui-1.4.0-module.zip \
+    https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.4.0-module.zip
 ```
+
+**v1.4.0 release assets (8 files, 2 of them optional)**:
+
+| Asset | Required? | Notes |
+|---|:---:|---|
+| `dnscrypt-webui-1.4.0-module.zip` | ✅ | The module |
+| `dnscrypt-webui-1.4.0-module.zip.sha256` | ✅ | Integrity file |
+| `dnscrypt-webui-arm64` | ✅ | Standalone WebUI binary |
+| `dnscrypt-webui-arm` | ✅ | Standalone WebUI binary |
+| `dnscrypt-webui-amd64` | ✅ | Standalone WebUI binary |
+| `dnscrypt-webui-386` | ✅ | Standalone WebUI binary |
+| `DNS-Proxy-v1.0.0.apk` | ❌ Optional | Companion app (also bundled in ZIP) |
+| `DNS-Proxy-v1.0.0.apk.sha256` | ❌ Optional | Companion app checksum |
+
+The two APK assets are only present when the release pipeline
+successfully fetched the companion app. The module works
+without them.
 
 ### 3.2 Verify SHA-256
 
 ```bash
-# Download checksum
-curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/module.zip.sha256
+# Download checksum (release asset name matches the ZIP)
+curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.4.0-module.zip.sha256
 
 # Verify
-sha256sum -c module.zip.sha256
-# → dnscrypt-webui-1.2.0-module.zip: OK
+sha256sum -c dnscrypt-webui-1.4.0-module.zip.sha256
+# → dnscrypt-webui-1.4.0-module.zip: OK
 ```
 
-### 3.3 Verify Signature (optional, recommended)
+**If you only have the ZIP** (no `.sha256` file): download both
+files into the same directory, then run:
 
 ```bash
-# Download signature + certificate
-curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.2.0-module.zip.sig
-curl -L -O https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.2.0-module.zip.pem
-
-# Verify (Cosign keyless)
-cosign verify-blob \
-    --signature dnscrypt-webui-1.2.0-module.zip.sig \
-    --certificate dnscrypt-webui-1.2.0-module.zip.pem \
-    --certificate-identity-regexp "https://github.com/gasciljh/dnscrypt-proxy-webui/.*" \
-    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-    dnscrypt-webui-1.2.0-module.zip
+sha256sum -c dnscrypt-webui-1.4.0-module.zip.sha256
 ```
 
-**Expected**:
-```text
-Verified OK
-```
+On macOS, use `shasum -a 256` instead of `sha256sum`.
+
+### 3.3 Signature / Attestation (status)
+
+> ⚠️ **No signature is attached to the release artifacts as of
+> v1.4.0.**
+>
+> An earlier revision of this document described a Cosign
+> keyless verification flow (`cosign verify-blob` with a
+> `.sig` and `.pem` pair). **That flow does NOT exist.** The
+> release workflow (`.github/workflows/release.yml`) explicitly
+> documents this in its **Non-goals** section:
+>
+> ```text
+> • No GPG signing of the tag or the artifacts.
+> • No Cosign signature. `cosign` is not invoked anywhere.
+> • No SBOM.
+> The SHA256 file is the only integrity artifact attached
+> to the release.
+> ```
+>
+> **What you CAN verify today**:
+>
+> 1. **SHA-256** — the `.sha256` release asset (§3.2). This is
+>    the ONLY integrity check published with the release.
+> 2. **Source** — clone the repository and build the ZIP
+>    yourself (see [`docs/DEVELOPMENT.md`](DEVELOPMENT.md)),
+>    then compare the SHA-256 of your build with the release
+>    asset. The build is reproducible when
+>    `SOURCE_DATE_EPOCH` is set to the tag's commit time.
+> 3. **Tag integrity** — the tag is created **annotated** by
+>    `scripts/release.sh` (`git tag -a`), not **signed**
+>    (`git tag -s`). You can inspect the tag on GitHub.
+>
+> **If you need a signed release**, please open an issue to
+> discuss the addition of Sigstore / Cosign. It is on the
+> roadmap for a future release; it is NOT available now.
 
 ### 3.4 Transfer to Device
 
 ```bash
 # Via ADB
-adb push dnscrypt-webui-1.2.0-module.zip /sdcard/Download/
+adb push dnscrypt-webui-1.4.0-module.zip /sdcard/Download/
 
 # Or copy manually
 ```
@@ -256,14 +433,14 @@ adb push dnscrypt-webui-1.2.0-module.zip /sdcard/Download/
 1. Open **Magisk Manager**.
 2. Go to **Modules**.
 3. Press **Install from storage**.
-4. Choose `dnscrypt-webui-1.2.0-module.zip`.
+4. Choose `dnscrypt-webui-1.4.0-module.zip`.
 5. Press **OK** to confirm.
 
 ### 4.2 From TWRP (alternative)
 
 ```bash
 # In TWRP
-adb push dnscrypt-webui-1.2.0-module.zip /sdcard/
+adb push dnscrypt-webui-1.4.0-module.zip /sdcard/
 # Then from TWRP: Install → choose the ZIP
 ```
 
@@ -290,7 +467,10 @@ layers** introduced in v1.2.0:
      `selected_profile.txt`, `allowlist.txt`, `denylist.txt`.
    - Writes `.manifest.json` with per-file SHA256 (Layer 3).
 9. **Extract module files** (`unzip -o`).
-10. Move web files (HTML/JSON/ICO) to `web/`.
+10. Move web files (HTML/JSON/ICO) to `web/`. If the ZIP
+    contains `web/app-debug.apk` (v1.4.0 companion app), it is
+    extracted here as well — the extraction is a normal glob,
+    no special handling.
 11. **Layer 6 — Restore user settings** (via `copy_with_context`):
     - Copies saved files over defaults.
     - Restores SELinux context (`restorecon` / `chcon`).
@@ -317,13 +497,18 @@ layers** introduced in v1.2.0:
 rollback (Layer 4). The `txn-*` directory is preserved as
 `orphan-txn-*` for manual inspection.
 
+**v1.4.0 note**: The companion APK is extracted by step 10
+via the `unzip 'web/*'` glob. It is **optional** — a local
+developer build without the APK installs normally (the WebUI
+install button simply returns 404 if the user clicks it).
+
 ### 4.4 Successful Installation Screen
 
 **Expected in Magisk**:
 ```text
 ╔═════════════════════════════════════╗
 ║  🛡️  DNSCrypt Smart Filter                ║
-║      v1.2.0                               ║
+║      v1.4.0                               ║
 ║      Professional Edition                 ║
 ╚═════════════════════════════════════╝
 
@@ -333,8 +518,8 @@ rollback (Layer 4). The `txn-*` directory is preserved as
   → Firewall rules cleaned (Custom Chain + Legacy)
   ✅ Old instances cleaned
   → Multi-source detection (Layer 1): 5 file(s) found
-  → Transaction begun (Layer 4): txn-20260929-150000-12345
-  → Persistent backup created (Layer 2): 20260929-150000-v1.2.0-12345
+  → Transaction begun (Layer 4): txn-20261008-150000-12345
+  → Persistent backup created (Layer 2): 20261008-150000-v1.4.0-12345
     → SHA256 manifest written (Layer 3)
 - Extracting module files...
   ✅ Files extracted
@@ -358,7 +543,7 @@ rollback (Layer 4). The `txn-*` directory is preserved as
 
 ╔═════════════════════════════════════╗
 ║  ✅ Installation Complete                 ║
-║      v1.2.0                               ║
+║      v1.4.0                               ║
 ╚═════════════════════════════════════╝
 
   📊 Upgrade detected: YES (5 files restored)
@@ -367,25 +552,32 @@ rollback (Layer 4). The `txn-*` directory is preserved as
   📈 Dashboard: http://127.0.0.1:9091
   🔌 Bind: 127.0.0.1
   🧠 Memory limit: ~120 MB (profile: pro)   ← v1.1.0
+  📱 Companion APK: bundled (optional, v1.4.0)
 
   ℹ️  Next steps:
     1. Reboot your device
     2. Open the WebUI and login with the credentials above
     3. Choose a blocklist profile and press Apply
+    4. (Optional) Install the companion app — see §8.6
 ```
 
-⚠️ **Important**: Copy the credentials — you will need them in **Step 8**.
+⚠️ **Important**: Copy the credentials — you will need them in **§8.2**.
 
 **v1.1.0 addition**: The `🧠 Memory limit: ~120 MB (profile: pro)`
 line is computed by `customize.sh` from
 `selected_profile.txt`. It reflects the soft limit that
-`main.go` will apply at startup. See §12.4 for the full table.
+`main.go` will apply at startup. See §12.4c for the full table.
 
 **v1.2.0 addition**: The `💾 Persistent backup:` line confirms that
 Layer 2 created a snapshot in `/sdcard/dnscrypt-webui-backup/`.
 On the first boot after installation, `service.sh` runs
 `auto_backup_if_needed(24 h)` and may create an additional
 `-auto-` snapshot.
+
+**v1.4.0 addition**: The `📱 Companion APK:` line indicates whether
+the ZIP shipped the companion app APK. If the ZIP does not
+contain it (local developer build), the line reads
+`not bundled (dev build)`.
 
 ### 4.5 Possible Warnings During Installation
 
@@ -421,6 +613,13 @@ correctly until you REBOOT your device.
 🛑 You MUST REBOOT NOW to restore DNS.
 ```
 
+**Warning 5 — Companion APK missing (v1.4.0, dev builds only)**:
+```text
+⚠️ Companion APK not bundled — release build required
+```
+Expected for local developer builds; release ZIPs from GitHub
+always include it. See §8.6.
+
 ---
 
 ## 5. Installation via KernelSU
@@ -430,7 +629,7 @@ correctly until you REBOOT your device.
 1. Open **KernelSU Manager**.
 2. Go to **Modules**.
 3. Press **Install**.
-4. Choose `dnscrypt-webui-1.2.0-module.zip`.
+4. Choose `dnscrypt-webui-1.4.0-module.zip`.
 5. Press **Install**.
 
 ### 5.2 Difference from Magisk
@@ -476,7 +675,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
 **Expected**:
 ```text
 ╔════════════════════════════════════════════════╗
-║  🛡️  DNSCrypt Smart Filter v1.2.0                      ║
+║  🛡️  DNSCrypt Smart Filter v1.4.0                      ║
 ║      ✅ ACTIVE                                         ║
 ╚════════════════════════════════════════════════╝
 
@@ -500,10 +699,10 @@ su -c "curl -s http://127.0.0.1:9090/healthz"
 
 # Readiness (localhost-only — Fix NEW-4)
 su -c "curl -s http://127.0.0.1:9090/readyz"
-# → {"blocklist":"ok","config":"ok","run_dir":"ok","status":"ready","version":"v1.2.0"}
+# → {"blocklist":"ok","config":"ok","run_dir":"ok","status":"ready","version":"v1.4.0"}
 ```
 
-⚠️ **Note**: `version` must be `v1.2.0`.
+⚠️ **Note**: `version` must be `v1.4.0`.
 
 ⚠️ **From LAN (after BIND_ADDR=0.0.0.0)**:
 ```bash
@@ -665,7 +864,7 @@ su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key,
 # 4. Confirm the value matches the profile
 # If profile_key is "ultimate", memory_limit_mb must be 220.
 # If profile_key is "light", memory_limit_mb must be 80.
-# See §12.4 for the full table.
+# See §12.4c for the full table.
 
 # 5. Backups object (v1.2.0 — BAK-1) — 7 fields
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
@@ -695,7 +894,7 @@ curl -i -X POST http://127.0.0.1:9090/api/auth/login \
 # Expected: 200 + Set-Cookie
 ```
 
-### 7.12 Verify Backup Layer (v1.2.0 — new)
+### 7.12 Verify Backup Layer (v1.2.0)
 
 ```bash
 # 1. Backup directory exists
@@ -717,7 +916,7 @@ su -c "ls /sdcard/dnscrypt-webui-backup/current/"
 
 # 5. .last_stable pointer
 su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
-# Expected: a snapshot directory name (e.g. 20260929-095826-v1.2.0-12345)
+# Expected: a snapshot directory name (e.g. 20261008-095826-v1.4.0-12345)
 
 # 6. Full diagnostic (Layer 10)
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
@@ -727,7 +926,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 
 **If `available == 0`**: run a manual backup — see §7.13.
 
-### 7.13 Create a Manual Backup (v1.2.0 — new)
+### 7.13 Create a Manual Backup (v1.2.0)
 
 ```bash
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
@@ -748,6 +947,77 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
     7 snapshot(s), latest 0s ago
 ```
 
+### 7.14 Verify Watchdog Token (v1.2.0 — BUG-B)
+
+The `POST /api/ensure_running_service` endpoint requires an
+`X-Watchdog-Token` header when called from a script (rather than
+a user session). Verify that the token file exists and that the
+endpoint accepts it.
+
+```bash
+# 1. Token file exists
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+# Expected: mode 0600, owned by root
+#   -rw------- 1 root root 65 ... .watchdog_token
+
+# 2. Token has 64 hex chars (or 65 with trailing newline)
+su -c "wc -c /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+# Expected: 64 or 65
+
+# 3. Extract and test the token
+TOKEN=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token")
+curl -i -X POST http://127.0.0.1:9090/api/ensure_running_service \
+  -H "X-Watchdog-Token: $TOKEN"
+# Expected: HTTP 200 with {"status":"ON", "action":"..."}
+#         OR HTTP 200 with {"status":"OFF", "action":"skipped"} if user stopped the service
+
+# 4. Negative test: send a wrong token
+curl -i -X POST http://127.0.0.1:9090/api/ensure_running_service \
+  -H "X-Watchdog-Token: deadbeef..."
+# Expected: HTTP 401 Unauthorized
+# {"status":"error","message":"Unauthorized"}
+```
+
+⚠️ **Note**: If the token file is missing, `main.go` regenerates it on
+the next run. This is safe (the file is a runtime secret, not
+user config).
+
+**Related documentation**:
+- [`API.md`](API.md) §2.8 — Watchdog token design.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.5.1 and §5.7 — implementation.
+
+### 7.15 Verify Companion APK Route (v1.4.0)
+
+The companion Android app is served by `main.go` at
+`GET /app-debug.apk`. The route is **public** (no auth) and
+**optional** — it returns HTTP 404 when the file is absent.
+
+```bash
+# 1. Check the route
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+# Expected when bundled (release build):
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+#
+# Expected when absent (dev build):
+#   HTTP/1.1 404 Not Found
+
+# 2. Verify the file is bundled in the module ZIP
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: ~3 MB
+# If this fails: this is a developer build. See §8.6.
+
+# 3. Download it (to confirm it is a valid APK)
+su -c "curl -o /sdcard/DNS-Proxy.apk http://127.0.0.1:9090/app-debug.apk"
+su -c "file /sdcard/DNS-Proxy.apk"
+# Expected: Android package (APK), Zip archive data
+```
+
+⚠️ **Note**: If you installed a developer build (built locally
+without the companion APK), step 1 returns 404 and step 2 fails.
+**This is expected.** The rest of the WebUI works normally.
+
 ---
 
 ## 8. Initial Setup
@@ -759,7 +1029,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
 
 ### 8.2 Login
 
-Use the credentials generated in **Step 4.4**:
+Use the credentials generated in **§4.4**:
 ```text
 👤 Username: admin_xxxxxxxx
 🔑 Password: XXXXXXXXXXXXXXXXXXXXXXXX
@@ -789,7 +1059,7 @@ for the WebUI process. Choose based on your device's RAM:
 | PRO++ | 4 GB | 160 MB |
 | Ultimate | 6 GB+ | 220 MB |
 
-See §12.4 for details.
+See §12.4c for details.
 
 **v1.2.0 note**: A pre-critical backup is created before each
 profile change (BAK-2). See §7.12.
@@ -814,12 +1084,76 @@ tiktok.com
 
 ### 8.5 Install PWA (optional)
 
+**v1.3.0 note**: The "Install PWA" button in the WebUI header
+uses `beforeinstallprompt` when available. If your browser
+supports it, tapping the button opens the native install prompt.
+If not, follow the browser menu path below.
+
 1. Open Chrome on the phone.
 2. Go to `http://127.0.0.1:9090`.
 3. From the **Menu** → **Install app** or **Add to Home screen**.
+   *(Or tap the in-page "Install PWA" button if it appears.)*
 4. A DNSCrypt icon will appear on the Home Screen.
 
-### 8.6 Open the Dashboard (optional)
+**v1.4.0 note**: The WebUI's install button has been
+repurposed (see §8.6) and now points at the companion APK. To
+install the WebUI itself as a PWA, use the browser menu (step 3
+above). If your browser's menu path differs, consult its
+documentation.
+
+### 8.6 Install the Companion Android App (v1.4.0, optional)
+
+The v1.4.0 release adds an optional **native Android app** — a
+small (~3 MB) WebView wrapper that opens the WebUI at
+`127.0.0.1:9090` without requiring a browser tab.
+
+**When to use it**:
+
+- You prefer a dedicated app icon over a browser tab.
+- You want the WebUI to survive browser cache clears.
+- You want a "real" Android app in your launcher.
+
+**How to install it**:
+
+1. In the WebUI header, tap **📲 Install App** (the button next
+   to the version badge).
+   - The button is a direct link: `<a download href="/app-debug.apk">`.
+   - No JavaScript prompt, no modal — the browser downloads the
+     APK file.
+
+2. When the browser finishes downloading, tap the APK file to
+   install it.
+   - You will need to allow **"Install unknown apps"** for the
+     browser (Settings → Apps → \[Browser\] → Install unknown
+     apps → Allow).
+
+3. Confirm the installation. The app will appear in your launcher
+   as **DNS Proxy**.
+
+4. Open the app — it loads `http://127.0.0.1:9090` immediately.
+
+**If the button leads to a "file not found" page**: your
+module ZIP is a **developer build** without the companion APK.
+This is expected for local builds. Use the browser-based WebUI
+(§8.1) instead, or download the APK directly from the
+[companion app repository](https://github.com/gasciljh/dnscrypt-proxy-app/releases).
+
+**Details**:
+
+| Attribute | Value |
+|---|---|
+| Size | ~3 MB |
+| Stack | Kotlin + WebView |
+| Min Android | 5.0 (API 21) |
+| Telemetry | None |
+| Source repository | [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) |
+| Version pin | `proxy/app-apk.version` (`1.0.0`) |
+
+**Uninstall**: remove it like any other Android app (long-press
+the icon → Uninstall, or Settings → Apps → DNS Proxy →
+Uninstall).
+
+### 8.7 Open the Dashboard (optional)
 
 - **From WebUI**: Press **📊 Dashboard** (green badge).
 - **Manually**: Open the browser at `http://127.0.0.1:9091`.
@@ -858,7 +1192,7 @@ Then:
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
-### 8.7 Test DNS
+### 8.8 Test DNS
 
 Open `https://www.dnsleaktest.com` — you should see:
 - ✅ Cloudflare or Quad9 (or your chosen server, not your ISP).
@@ -880,7 +1214,7 @@ Open `https://www.dnsleaktest.com` — you should see:
 
 ```bash
 # 1. Download the new ZIP
-wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.2.0-module.zip
+wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.4.0-module.zip
 
 # 2. Install over the old one (from Magisk directly)
 # 3. Reboot
@@ -888,7 +1222,7 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 
 ### 9.3 What Happens During Update
 
-**v1.2.0** — the 10 defensive layers are applied automatically:
+**v1.2.0+** — the 10 defensive layers are applied automatically:
 
 - **Layer 1** — Multi-source detection finds the 5 user files
   in 7 candidate locations.
@@ -900,7 +1234,8 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 - **Layer 6** — SELinux context preservation.
 - **Layer 7** — Recovery mode (not triggered on a normal update).
 - **Layer 8** — Config migrations.
-- **Layer 9** — Rotation (max 21 snapshots).
+- **Layer 9** — Rotation (max 21 snapshots; **v1.3.0+** uses
+  mtime sort + protected targets — see §12.4b).
 - **Layer 10** — Full observability.
 - **Result**: Your settings are preserved **and** a persistent
   snapshot is created for future recovery.
@@ -921,6 +1256,9 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 - **Preserved after a successful upgrade** — used for future
   recovery.
 - Rotation cap: 21 snapshots (~2.5 MB max).
+- **v1.3.0+**: Rotation preserves the `.last_stable` target and
+  the newest install snapshot even if they fall outside the
+  21-newest window (ROT-PROTECT).
 - If restore fails → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ### 9.4 After Update
@@ -954,6 +1292,17 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
   # → {"available": N, "in_flight_txn": 0, "orphan_txn": 0, ...}
   su -c "ls -la /sdcard/dnscrypt-webui-backup/"
   # → current/, <ts>-<version>/…, .last_stable, …
+  ```
+- **Verify the watchdog token (v1.2.0 — BUG-B)**:
+  ```bash
+  su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
+  # → -rw------- ... (mode 0600)
+  ```
+- **Verify the companion APK route (v1.4.0)**:
+  ```bash
+  su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -1"
+  # → HTTP/1.1 200 OK (release build)
+  # → HTTP/1.1 404 Not Found (dev build; expected)
   ```
 
 ### 9.5 Upgrading from an older version
@@ -1009,6 +1358,11 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
    # .last_stable pointer (set by install-time snapshot)
    su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
    ```
+5. **Verify the v1.4.0 companion route (release builds)**:
+   ```bash
+   su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -1"
+   # → HTTP/1.1 200 OK
+   ```
 
 **No manual action required** — everything is automatic.
 
@@ -1039,7 +1393,7 @@ wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/d
 
 ```bash
 su -c "grep '^versionCode=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: 1020000 (v1.2.0)
+# Expected: 1040000 (v1.4.0)
 ```
 
 **Formula**:
@@ -1055,9 +1409,12 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.0.1 | 1000001 |
 | v1.1.0 | 1010000 |
 | v1.2.0 | 1020000 |
+| v1.3.0 | 1030000 |
+| **v1.4.0** | **1040000** |
+| v1.5.0 (planned) | 1050000 |
 | v2.0.0 | 2000000 |
 
-### 9.8 Verify the Backup Layer After Upgrade (v1.2.0 — new)
+### 9.8 Verify the Backup Layer After Upgrade (v1.2.0)
 
 ```bash
 # 1. Persistent backup directory exists
@@ -1084,6 +1441,25 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" | head -2
 
 **If `available == 0`**: run a manual backup (see §7.13) or reboot
 to let `service.sh` run `auto_backup_if_needed(24 h)`.
+
+### 9.9 Verify the Companion APK After Upgrade (v1.4.0)
+
+```bash
+# 1. APK file present in the module
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: ~3 MB
+
+# 2. HTTP route
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+# Expected:
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+
+# 3. APK version matches app-apk.version (on the build side)
+grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' proxy/app-apk.version
+# Expected: 1.0.0
+```
 
 ---
 
@@ -1136,6 +1512,13 @@ su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 **v1.1.0 behavior (superseded)**: `uninstall.sh` did not create a
 backup, and the module settings were removed permanently. Since
 v1.2.0, the persistent backup **survives** the uninstall.
+
+**v1.4.0 note**: The companion APK
+(`/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk`)
+is removed with the rest of the module directory — it is part
+of the module. The **installed app** (from the user's launcher)
+is NOT touched by `uninstall.sh`; remove it separately via the
+Android app manager if desired.
 
 ### 10.4 Manual Removal (if normal uninstall fails)
 
@@ -1208,7 +1591,7 @@ su -c "iptables -t nat -L DNSCRYPT_OUT -n 2>&1 | grep -c 'No chain'"
 
 If there are orphans → see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
-### 10.7 Preserved Backup Directory After Uninstall (v1.2.0 — new)
+### 10.7 Preserved Backup Directory After Uninstall (v1.2.0)
 
 **What survives**:
 
@@ -1245,7 +1628,7 @@ su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable"
 su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 ```
 
-### 10.8 Trigger Recovery Mode (v1.2.0 — new)
+### 10.8 Trigger Recovery Mode (v1.2.0)
 
 If the module is unbootable or user data is corrupted:
 
@@ -1284,17 +1667,21 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 
 | Step | Time | Note |
 |---|---|---|
-| Download | 30s | ~30 MB |
+| Download | 30s | ~33 MB (with APK, v1.4.0) |
 | Verify (SHA-256) | 5s | — |
-| Verify (Cosign) | 15s | Optional |
 | Install | 15s | Via Magisk |
 | Reboot | 60s | Mandatory |
 | Initial setup | 5 min | With list download |
-| **Total** | **~7 minutes** | — |
+| Companion app | 30s | Optional, v1.4.0 — see §8.6 |
+| **Total** | **~7 minutes** | (or ~7.5 with companion app) |
+
+**Note**: The download size (~33 MB) reflects the v1.4.0
+module ZIP with the companion APK bundled. A developer build
+without the APK is ~30 MB.
 
 ---
 
-## 12. v1.2.0 Specific Notes
+## 12. v1.4.0 Specific Notes
 
 ### 12.1 First-Time Installation
 
@@ -1304,10 +1691,13 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 4. **Dashboard**: Works immediately (JSON metrics).
 5. **Memory limit**: Printed by `customize.sh` during install
    (informational — the effective limit is set by `main.go` at
-   startup). See §12.4.
+   startup). See §12.4c.
 6. **v1.2.0 — Persistent backup**: On the first boot,
    `service.sh` runs `auto_backup_if_needed(24 h)`, creating
    the first snapshot at `/sdcard/dnscrypt-webui-backup/`.
+7. **v1.4.0 — Companion APK**: The WebUI header shows the
+   **📲 Install App** button if the module ZIP bundled the APK.
+   See §8.6.
 
 ### 12.2 On Upgrade
 
@@ -1321,7 +1711,10 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
    by `customize.sh` (Layer 2), and `.last_stable` is updated
    (Layer 10).
 7. **v1.2.0 — Rotation**: The periodic and manual flows keep the
-   21 newest snapshots.
+   21 newest snapshots. **v1.3.0+**: rotation sorts by mtime and
+   preserves `.last_stable` + the newest install snapshot.
+8. **v1.2.0 — Watchdog token**: Regenerated on the next
+   `main.go` startup if missing.
 
 ### 12.3 On Uninstall
 
@@ -1337,6 +1730,9 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
    `.state=START` are renamed to `orphan-txn-*` (see §10.7).
 6. **v1.2.0 — External recovery trigger removed**
    (`/data/adb/dnscrypt-recovery`).
+7. **v1.4.0 — Companion APK removed with the module**. The
+   installed app (from the launcher) is NOT touched — remove it
+   separately via the app manager.
 
 ### 12.4 Key Changes in v1.2.0
 
@@ -1356,6 +1752,7 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 | **BAK-2 — Pre-critical backups** | `createAutoBackup(reason)` called from 5 destructive endpoints; serialized by `backupMu`. |
 | **BAK-3 — `cleanupOldTransactions`** | Removes leftover `COMMIT`'d `txn-*` dirs at startup. |
 | **BAK-4 — `checkPendingNotifications`** | Reads `.pending_notification` at startup. |
+| **BUG-B — Watchdog token** | `POST /api/ensure_running_service` now requires `X-Watchdog-Token` (localhost only). |
 | **FIX-1 — Recovery-mode correctness via snapshot-and-reapply** | `§[8a]` restores the 5 files **and** copies each to `$MODPATH/.recovery_snapshot/`. `§[9]` extracts the ZIP normally (the extraction logic is left untouched, so the normal-install path is byte-for-byte identical). `§[9b2]` re-applies the 5 files from the snapshot. This strategy does not depend on knowing the ZIP's contents. |
 | **FIX-2 — Service Worker update-banner** | Send `SKIP_WAITING` to the correct worker (both `index.html` + `dashboard.html`). |
 | **New CLI — `action.sh --backup`** | Trigger a manual backup (see §7.13). |
@@ -1381,26 +1778,60 @@ runtime does not kill the process — it runs GC more aggressively
 instead. Setting it too low causes CPU waste; too high wastes
 RAM. Hence the per-profile values.
 
+### 12.4b Key Changes in v1.3.0
+
+| Feature | Impact on Installation |
+|---|---|
+| **PWA install button** | Client-side only (`web/index.html`). No install-time change. **Note**: the button was repurposed in v1.4.0 — see §12.4c and §8.5. |
+| **Live status LED** | Client-side only (`web/index.html`). Shows the current DNS engine state next to the Today counter. |
+| **DNS auto-start after boot** | `service.sh` now calls `POST /api/ensure_running_service` directly after the boot wait, instead of relying on the Watchdog's 30 s polling interval. |
+| **SNAP-MANIFEST** | `main.go:buildBackupInfo()` detects a snapshot by `.manifest.json` presence. Custom-named snapshots are now visible to the API and to rotation. No install-time change. |
+| **SNAP-MTIME** | `last_backup_name` is selected by mtime (descending), not lexicographic name. Robust against clock drift and manual renames. No install-time change. |
+| **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** | `functions.sh:rotate_backups()` uses the same detection + sort, and preserves the `.last_stable` target + newest install snapshot on top of the 21-newest window. No install-time change. |
+| **Carried forward from v1.2.0** | All 10 defensive layers, the 7-field `backups` object, the watchdog token, the bilingual WebUI — all still active. |
+
+**No new CLI flags, no new config keys, no new install steps.**
+
+### 12.4c Key Changes in v1.4.0
+
+| Feature | Impact on Installation |
+|---|---|
+| **Companion Android app** (optional) | Module ZIP ships `web/app-debug.apk` when built by the release pipeline. Served by `main.go` at `GET /app-debug.apk` (mime: `application/vnd.android.package-archive`, `Cache-Control: public, max-age=3600, immutable`). Absent in dev builds. See §8.6. |
+| **WebUI install button repurposed** | `web/index.html` now uses a direct `<a download href="/app-debug.apk">` link instead of a `beforeinstallprompt` chain. No JS logic, no modal, no iOS branches. |
+| **iOS PWA logic removed** | Android-only project. This includes `isIOSDevice()`, `pwaStepIos1/2/3`, and the iOS branches in `getBrowserName()` / `isBrowserSupported()` / `getPWAInstallSteps()` / `showPWAInstructionsModal()`. |
+| **CodeQL `go/path-injection` fix** | `removeModule` now sanitizes the caller-provided path via `filepath.Base()` and rebuilds from the trusted `MODULES_DIR` constant. No user-visible change for valid inputs. |
+| **`proxy/app-apk.version`** | New file — Single Source of Truth for the companion app version (`1.0.0`, no `v` prefix). |
+| **`scripts/fetch_app_apk.sh`** | New script — fetches the companion APK from `gasciljh/dnscrypt-proxy-app` releases. Invoked by `release.yml` and by `Makefile` target `fetch-apk`. |
+| **Release assets** | Now 8 files (was 6): the module ZIP + `.sha256`, four WebUI binaries, and the companion APK + `.sha256`. The last two are **optional** — a failed fetch does not fail the release. |
+| **Carried forward from v1.3.0 + v1.2.0** | All 10 defensive layers, the 7-field `backups` object, the watchdog token, the bilingual WebUI — all still active. |
+
+**No new config keys. No new install steps for existing users.**
+The companion app is **purely additive** — existing installs
+continue to work without it.
+
+**Memory limits per profile** (unchanged since v1.1.0): see
+§12.4 (bottom).
+
 ### 12.5 Verify the Version
 
 ```bash
 # Method 1: module.prop
 su -c "grep -E '^(version|versionCode)=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
 # Expected:
-# version=v1.2.0
-# versionCode=1020000
+# version=v1.4.0
+# versionCode=1040000
 
 # Method 2: runtime_info
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | grep version"
-# Expected: contains "version":"v1.2.0"
+# Expected: contains "version":"v1.4.0"
 
 # Method 3: status.sh --check
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
-# Expected: starts with "v1.2.0"
+# Expected: starts with "v1.4.0"
 
 # Method 4: readyz
 su -c "curl -s http://127.0.0.1:9090/readyz | grep version"
-# Expected: contains "version":"v1.2.0"
+# Expected: contains "version":"v1.4.0"
 
 # Method 5: WebUI
 # Open http://127.0.0.1:9090 — it appears in the footer / badge
@@ -1438,6 +1869,25 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" | head -5
 su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ index'"
 su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html && echo '✅ dashboard'"
 su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/offline.html && echo '✅ offline'"
+
+# Watchdog token file present
+su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token && echo '✅ token'"
+```
+
+**Additional v1.4.0 verifications**:
+
+```bash
+# Companion APK bundled
+su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk && echo '✅ APK bundled' || echo '(dev build — no APK)'"
+
+# Companion route responds
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type'"
+
+# iOS PWA logic removed from index.html
+su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '❌ still present' || echo '✅ removed'"
+
+# Install button points at /app-debug.apk
+su -c "grep -q 'href=\"/app-debug.apk\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ direct link'"
 ```
 
 ### 12.6 v1.2.0 Backup — Quick Test
@@ -1500,6 +1950,49 @@ su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>&1"
 
 **Full guide**: [`docs/EMERGENCY.md`](EMERGENCY.md) §9.
 
+### 12.8 v1.4.0 Companion APK — Quick Test
+
+**Pre-flight checklist**:
+
+- [ ] The module ZIP was built by the release pipeline (not local).
+- [ ] `web/app-debug.apk` exists in the module.
+
+**Procedure**:
+
+```bash
+# 1. Confirm the APK is bundled
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# Expected: ~3 MB
+
+# 2. Confirm the HTTP route serves it
+su -c "curl -sI http://127.0.0.1:9090/app-debug.apk | head -3"
+# Expected:
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+
+# 3. Download it via HTTP (proves the route works end-to-end)
+su -c "curl -s -o /sdcard/APK-test.apk http://127.0.0.1:9090/app-debug.apk"
+su -c "ls -la /sdcard/APK-test.apk"
+# Expected: ~3 MB
+
+# 4. Confirm the file is a valid APK (ZIP magic = "PK")
+su -c "head -c 2 /sdcard/APK-test.apk | xxd | grep -q '50 4b' && echo '✅ PK magic'"
+
+# 5. Clean up
+su -c "rm -f /sdcard/APK-test.apk"
+```
+
+**If the APK route returns 404**: your module is a developer
+build. This is expected. Re-download the release ZIP from
+[GitHub Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+to get the bundled APK.
+
+**Alternative**: download the companion app directly from the
+[dnscrypt-proxy-app releases page](https://github.com/gasciljh/dnscrypt-proxy-app/releases).
+
+**Full documentation**: §8.6 above and [`API.md`](API.md) §6.1.15.
+
 ---
 
 ## 13. Unified Verification Script
@@ -1508,11 +2001,11 @@ After installation, run this script for a comprehensive check:
 
 ```bash
 #!/bin/bash
-# verify-install.sh — Comprehensive verification after installation (v1.2.0)
+# verify-install.sh — Comprehensive verification after installation (v1.4.0)
 
 echo "╔════════════════════════════════════╗"
 echo "║  DNSCrypt Verification Script            ║"
-echo "║  v1.2.0                                  ║"
+echo "║  v1.4.0                                  ║"
 echo "╚════════════════════════════════════╝"
 echo ""
 
@@ -1628,6 +2121,26 @@ for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
 done
 echo ""
 
+echo "=== [24] v1.2.0 — Watchdog token (BUG-B) ==="
+su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token && echo '✅ token file present' || echo '⚠️ token file missing (regenerated at next main.go run)'"
+su -c "curl -s -o /dev/null -w 'POST ensure_running (no token) → %{http_code}\n' -X POST http://127.0.0.1:9090/api/ensure_running_service"
+echo "Expected: 401 (without token and without user auth)"
+echo ""
+
+echo "=== [25] v1.4.0 — Companion APK route ==="
+su -c "curl -s -o /dev/null -w 'GET /app-debug.apk → %{http_code}\n' http://127.0.0.1:9090/app-debug.apk"
+echo "Expected: 200 (release build) or 404 (dev build)"
+su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk && echo '✅ APK bundled' || echo '(dev build — no APK)'"
+echo ""
+
+echo "=== [26] v1.4.0 — iOS PWA logic removed ==="
+su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '❌ still present' || echo '✅ removed'"
+echo ""
+
+echo "=== [27] v1.4.0 — Install button direct link ==="
+su -c "grep -q 'href=\"/app-debug.apk\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ direct <a download> link' || echo '❌ not found'"
+echo ""
+
 echo "✅ Verification complete"
 ```
 
@@ -1652,17 +2165,17 @@ su -c "sh /sdcard/verify-install.sh"
 | [README.md](../README.md) | Overview |
 | [FAQ.md](FAQ.md) | Frequently asked questions (Q121–Q130) |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting |
-| [COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix |
+| [COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix (§10.3.5 — SNAP-*/ROT-*) |
 | [SECURITY.md](SECURITY.md) | Security + Audit Corrections (§5.31, §5.32) |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
-| [API.md](API.md) | HTTP API Reference (§6.1.7) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10, §4.12, §4.13, §6.8) |
+| [API.md](API.md) | HTTP API Reference (§6.1.7, §6.1.15, §2.8) |
 | [UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1) |
-| [BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 rotation)** |
 | [EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries management |
-| [GLOSSARY.md](GLOSSARY.md) | Glossary |
+| [GLOSSARY.md](GLOSSARY.md) | Glossary (SNAP-*/ROT-* terms) |
 | [ROADMAP.md](ROADMAP.md) | Future plans |
 | [HALL_OF_FAME.md](HALL_OF_FAME.md) | Contributors recognition |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
@@ -1672,12 +2185,12 @@ su -c "sh /sdcard/verify-install.sh"
 - [Magisk Documentation](https://topjohnwu.github.io/Magisk/)
 - [KernelSU Documentation](https://kernelsu.org/)
 - [APatch](https://github.com/bmax121/APatch)
-- [Cosign (Sigstore)](https://docs.sigstore.dev/cosign/overview/)
 - [dnscrypt-proxy Wiki](https://github.com/DNSCrypt/dnscrypt-proxy/wiki)
 - [HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists)
 - [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [Android FUSE — Storage Access Framework](https://source.android.com/docs/core/storage)
 - [Android SELinux — restorecon](https://source.android.com/docs/security/features/selinux)
+- [Companion Android App](https://github.com/gasciljh/dnscrypt-proxy-app)
 
 ### 14.3 Quick Links
 
@@ -1685,14 +2198,15 @@ su -c "sh /sdcard/verify-install.sh"
 - **Issues**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
 - **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
 - **Security**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
-- **Attestations**: https://github.com/gasciljh/dnscrypt-proxy-webui/attestations
+- **Companion App**: https://github.com/gasciljh/dnscrypt-proxy-app
+- **Companion App Releases**: https://github.com/gasciljh/dnscrypt-proxy-app/releases
 
 ---
 
 <div align="center">
 
-**Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Last updated**: 2026-10-08
+**Version**: v1.4.0
 **Author**: gasciljh
 
 </div>

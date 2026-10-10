@@ -3,14 +3,15 @@
 Complete reference for the persistent user-data backup system
 introduced in v1.2.0.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **Identifier inventory in this file (6 total)**:
+> **Identifier inventory in this file (7 total)**:
 >   • HARD-BK-01, HARD-BK-06, HARD-BK-16,
 >     HARD-BK-17, HARD-BK-18, HARD-BK-19
+>   • HARD-BK-20 (v1.4.0 — v1.3.0 rotation semantics alignment)
 >
 > **NOTE ON IDENTIFIER GAPS**: BK-02 through BK-05, and
 > BK-07 through BK-15 were never assigned in a released
@@ -23,11 +24,89 @@ introduced in v1.2.0.
 > **📖 Related documents**:
 > - Emergency recovery → [`EMERGENCY.md`](EMERGENCY.md)
 > - Upgrade guide → [`UPGRADE.md`](UPGRADE.md) §3.1
-> - Architecture → [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.10
+> - Architecture → [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10, §4.10, §4.13
 > - Security model → [`SECURITY.md`](SECURITY.md) §5.31
-> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0]
+> - Changelog → [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0], §[v1.3.0], §[v1.4.0]
 
-> **v1.2.0 — this is the current release**:
+> **v1.4.0 — this is the current release**:
+>   • **No change to the backup system itself.** The v1.4.0 release
+>     is an integration release focused on the **companion Android
+>     app** and **CodeQL hardening**. The 10 defensive layers, the
+>     persistent backup directory, the `.manifest.json` schema, and
+>     the v1.3.0 rotation semantics (ROT-MANIFEST + ROT-MTIME +
+>     ROT-PROTECT) are byte-for-byte identical to v1.3.0.
+>   • **Companion Android app** (`web/app-debug.apk`) — an OPTIONAL
+>     asset bundled into the module ZIP. It is served at
+>     `GET /app-debug.apk` by `main.go`. This does NOT affect the
+>     backup layer: the APK is not one of the 5 preserved files.
+>   • **CodeQL `go/path-injection` fix in `removeModule`** — internal
+>     hardening of `main.go`. The backup layer is unaffected.
+>   • **iOS PWA logic removed** — Android-only project. No change to
+>     the WebUI, the Service Worker, or the backup directory.
+>   • **All v1.2.0 and v1.3.0 features remain in place.** No breaking
+>     change to the API, the config files, or the shell scripts.
+>   • See [`../CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0] for details.
+
+> **v1.3.0 — server-side snapshot-detection & rotation refinements**:
+>   • **No new user-facing feature.** The v1.3.0 release is
+>     primarily a feature release (PWA install button + live status
+>     LED + DNS auto-start fix). Those changes live in `web/*.html`
+>     and `proxy/service.sh` and do NOT touch the backup system.
+>   • **But the internal semantics of the backup layer changed.**
+>     Three new identifiers describe the change
+>     (used in `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — snapshot *detection* is now
+>         manifest-based. `main.go:buildBackupInfo()` treats a
+>         directory as a snapshot **iff** it contains a
+>         `.manifest.json` file. Before v1.3.0, a snapshot was
+>         recognized only when its name matched the
+>         `<YYYYMMDD>-<HHMMSS>-...` pattern.
+>         **Effect on this document**: a custom-named snapshot
+>         (e.g. `pre-v130-manual-...`) is now visible to the API
+>         and to rotation. §8.1 documents the new field semantics.
+>
+>       🔧 **SNAP-MTIME** — `main.go:buildBackupInfo()` selects
+>         `last_backup_name` by **mtime** (descending), not by
+>         lexicographic directory name. A name-based fallback is
+>         used only when `DirEntry.Info()` fails. This supersedes
+>         the v1.2.0 BUG-3 decision (name sort).
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection (ROT-MANIFEST), the same
+>         mtime sort (ROT-MTIME), and two additional protected
+>         targets on top of the 21-newest window (ROT-PROTECT):
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>         **Effect on this document**: §6.5 and §7.2 below have
+>         been updated. The previous version claimed that rotation
+>         sorts by **directory name** — that was the v1.2.0
+>         behavior and is **no longer accurate** in v1.3.0+.
+>
+>   • **Parallel application**: the same SNAP-MANIFEST /
+>     ROT-* semantics were applied to `watchdog.sh` (§[5b]
+>     snapshot counter), `status.sh` (`_list_snapshots`),
+>     `customize.sh` (`rotate_backups`), `action.sh`
+>     (`_inline_list_snapshots` + `_inline_rotate_backups` +
+>     `_inline_backup_summary`), and `uninstall.sh` (§[5b]
+>     `BACKUP_COUNT` / `BACKUP_LAST_NAME`). Every consumer of
+>     the persistent backup directory now agrees on which
+>     snapshots exist and which is the newest.
+>
+>   • **Why this matters for consumers**: for the standard
+>     snapshot naming convention (`<YYYYMMDD>-<HHMMSS>-...`),
+>     both the old (name) and new (mtime) orderings produce the
+>     same result. They diverge only when a snapshot is created
+>     with a name that does not follow the convention, or when
+>     the system clock is adjusted backwards.
+>
+>   • See `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13 for the full story.
+
+> **v1.2.0 — the data-preservation release**:
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
@@ -102,20 +181,98 @@ introduced in v1.2.0.
 >     concurrent backups and to give `rotate_backups` a stable
 >     ordering key. See §3.2 for the full naming convention.
 >   • 🛡️ **HARD-BK-06** — The `§7.2` listing command was rewritten
->     to sort by directory name (matching `rotate_backups`),
->     instead of by `mtime`. The previous command contradicted
->     the ordering rule documented in §6.5.
+>     to sort by directory name, instead of by `mtime`, matching
+>     the **v1.2.0** `rotate_backups` behavior. **⚠️ This is
+>     superseded by HARD-BK-20 below** — v1.3.0 rewrote
+>     `rotate_backups` to sort by **mtime** (ROT-MTIME), so the
+>     listing command now matches by mtime as well. See §6.5 and
+>     §7.2 for the corrected behavior.
 >   • 🛡️ **HARD-BK-16** — `§9.1` now clearly separates the
 >     "at least 3 files exist" rule (part of **Layer 1**) from
 >     the integrity checks (part of **Layer 3**), removing the
 >     implicit confusion between the two.
 >   • 🛡️ **HARD-BK-17** — The tiered retention table in `§6.1`
 >     is now explicitly labelled as a planned enhancement
->     (v1.3.0), with the actual count-based policy stated
+>     (v1.5.0), with the actual count-based policy stated
 >     first.
 >   • 🛡️ **HARD-BK-18** — `§4.2` now documents the BSD `stat`
 >     fallback used by `functions.sh:get_last_backup_time`.
 >   • 🛡️ **HARD-BK-19** — Minor formatting cleanups in §13.1.
+
+> **v1.4.0 — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 code
+>   identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-BK-20** — **v1.3.0 rotation semantics alignment.**
+>     The v1.3.0 release rewrote `functions.sh:rotate_backups`
+>     to use **manifest-based detection** (ROT-MANIFEST),
+>     **mtime sort** (ROT-MTIME), and **two additional protected
+>     targets** on top of the 21-newest window (ROT-PROTECT).
+>     This file previously described the **v1.2.0** behavior:
+>     §6.5 claimed rotation "sorts snapshots by directory name";
+>     §7.2 provided a listing command that matched that rule;
+>     HARD-BK-06 (above) documented the name-sort choice.
+>     All three sections have been rewritten to describe the
+>     actual v1.3.0+ behavior. The v1.2.0 behavior is preserved
+>     in this header for historical traceability.
+>
+>   🔧 **HARD-BK-21** — **`v1.3.0` block added.** This file
+>     previously jumped directly from a `v1.4.0` block to a
+>     `v1.2.0` block, with no `v1.3.0` block at all. The current
+>     header now includes a full `v1.3.0` block that documents
+>     SNAP-MANIFEST, SNAP-MTIME, and ROT-* (the exact identifiers
+>     used in `CHANGELOG.md` and `ARCHITECTURE.md` §4.13).
+>     This matches the documentation convention used by every
+>     other file in the module that received the same correction
+>     (`main.go`, `functions.sh`, `service.sh`, `watchdog.sh`,
+>     `customize.sh`, `status.sh`, `action.sh`, `uninstall.sh`,
+>     `module.prop`, `update.json`, `Makefile`, `.gitignore`,
+>     `.gitattributes`, `.editorconfig`, `scripts/fetch_app_apk.sh`,
+>     `scripts/package_module.sh`, `scripts/fetch_dns_binaries.sh`,
+>     `scripts/release.sh`, `scripts/release-patch.sh`,
+>     `scripts/generate-icons.sh`, `docs/API.md`).
+>
+>   🔧 **HARD-BK-22** — **`Last updated` corrected.** The header
+>     previously said `2026-10-02` (which corresponded to the
+>     v1.3.0 release date, not to the v1.4.0 file-editing date).
+>     It now reads `2026-10-08`, matching every other file in the
+>     v1.4.0 module.
+>
+>   🔧 **HARD-BK-23** — **§3.2 ordering key note updated.** The
+>     section now describes both detection (`SNAP-MANIFEST`) and
+>     sort key (`SNAP-MTIME`) accurately. The previous text
+>     stated that the ordering key is "directory name"; while
+>     that is still a useful informal signal, it is **not** the
+>     rule that `rotate_backups` uses in v1.3.0+. The current
+>     text lists the mtime sort as the authoritative key.
+>
+>   🔧 **HARD-BK-24** — **§6.5 rewritten.** The section was
+>     titled "Rotation ordering — directory name vs mtime" and
+>     concluded that directory name wins. That conclusion is
+>     **inverted in v1.3.0+**: mtime wins. The section now
+>     documents the v1.3.0 semantics (ROT-MANIFEST +
+>     ROT-MTIME + ROT-PROTECT) and preserves the v1.2.0 rule
+>     as historical context.
+>
+>   🔧 **HARD-BK-25** — **§7.2 listing command rewritten.** The
+>     old command used `ls -1d | sort -r` on directory names,
+>     matching the v1.2.0 rotation. The new command walks the
+>     directory, requires `.manifest.json`, reads `mtime`, and
+>     sorts by mtime descending — the same algorithm as
+>     `rotate_backups` in v1.3.0+. The output format is
+>     unchanged (one directory name per line).
+>
+>   🔧 **HARD-BK-26** — **§8.1 / §8.2 field descriptions
+>     updated.** The `available` and `last_backup_name` field
+>     descriptions in §8.1 now explicitly mention the v1.3.0
+>     detection and sort rules. §8.2 (the `status.sh --json`
+>     equivalent) receives the same treatment for symmetry.
+>
+>   🟢 **HARD-BK-27** — **§13 References updated.** Added a
+>     reference to `docs/ARCHITECTURE.md` §4.13 (the authoritative
+>     source for the v1.3.0 server-side refinements) and to
+>     `CHANGELOG.md` §[v1.3.0].
 
 ---
 
@@ -242,6 +399,7 @@ rebuilt, re-downloaded, or regenerated.
 | `run/` | Runtime state only (PIDs, status, progress) |
 | Binaries (`dnscrypt-proxy`, `dnscrypt-webui`) | Shipped fresh with each release |
 | Log files | Rotated; not user data |
+| **Companion APK** (`web/app-debug.apk`, v1.4.0) | Build artifact of the module ZIP; not user data |
 
 ### 2.2 Typical snapshot size
 
@@ -326,10 +484,24 @@ against collisions from the same PID.
 **`<rand4>`**: 4 hex characters (2 random bytes) generated by
 `main.go:createAutoBackup` — additional collision protection.
 
-**Ordering key**: directory name (`ls -1d */ | sed 's:/$::' |
-grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r`). The `-<pid>` and
-`-<rand4>` suffixes appear *after* the timestamp, so the
-lexicographic sort still produces chronological order.
+**Detection key (v1.3.0 — SNAP-MANIFEST)**:
+A directory is treated as a snapshot **iff** it contains a
+`.manifest.json` file. The name pattern is no longer the primary
+detection rule — it is a useful informal signal, but the presence
+of the manifest is what counts. This makes custom-named snapshots
+visible to the API and to rotation.
+
+**Ordering key (v1.3.0 — SNAP-MTIME / ROT-MTIME)**:
+The authoritative ordering key is **mtime** (numeric, descending),
+not the directory name. This is robust against clock drift and
+manual renames, and it aligns the API (`buildBackupInfo`) with
+the shell tool (`rotate_backups`).
+
+> **Historical note (v1.2.0)**: In v1.2.0, the detection rule was
+> a name-pattern match (`^[0-9]{8}-[0-9]{6}-`) and the ordering
+> key was the lexicographic directory name. Both were superseded
+> in v1.3.0. The name-pattern rule is retained here only as
+> historical context.
 
 ### 3.3 The `current/` directory
 
@@ -465,7 +637,7 @@ the user's intent.
 
 - Backs up the 5 user config files.
 - Writes `.manifest.json`.
-- Rotates old snapshots (keep 21).
+- Rotates old snapshots (keep 21, using v1.3.0 ROT-* semantics).
 - Prints the current backup state (snapshot count + age).
 
 **Code reference**: `action.sh` §[13].
@@ -489,8 +661,8 @@ Every snapshot directory contains a `.manifest.json` file:
 
 ```json
 {
-  "version": "v1.2.0",
-  "timestamp": "20260926-095826",
+  "version": "v1.4.0",
+  "timestamp": "20261008-095826",
   "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
   "root_solution": "magisk",
   "files_count": 5,
@@ -539,7 +711,7 @@ Every snapshot directory contains a `.manifest.json` file:
 >
 > | Creator | `version` value | `root_solution` value |
 > |---|---|---|
-> | `customize.sh` (install / upgrade) | Actual module version (e.g. `v1.2.0`) | Detected at install time |
+> | `customize.sh` (install / upgrade) | Actual module version (e.g. `v1.4.0`) | Detected at install time |
 > | `main.go:createAutoBackup` | **`"unknown"`** | **`"unknown"`** |
 > | `action.sh --backup` (via `functions.sh:backup_user_files`) | **`"unknown"`** | **`"unknown"`** |
 > | `service.sh:auto_backup_if_needed` | **`"unknown"`** | **`"unknown"`** |
@@ -563,6 +735,8 @@ Every snapshot directory contains a `.manifest.json` file:
 - **Layer 3** (integrity verification) — see §9.
 - **Layer 10** (observability) — `runtime_info.backups` reads
   the count and metadata, not the contents of each file.
+- **v1.3.0 rotation** (ROT-MANIFEST) — the **presence** of the
+  manifest is what marks a directory as a rotatable snapshot.
 
 **Note**: The manifest is **advisory**. Missing or invalid manifests
 do not block a restore.
@@ -573,7 +747,7 @@ Contains the **directory name** (not path) of the last known-good
 snapshot:
 
 ```text
-20260926-095826-v1.2.0-12345
+20261008-095826-v1.4.0-12345
 ```
 
 **Updated when**: A snapshot is created by `customize.sh` and
@@ -585,6 +759,9 @@ verification passes.
 - `main.go:buildBackupInfo()` (exposed as `runtime_info.backups.last_stable`).
 - `status.sh --json` (exposed as `.backups.last_stable`).
 - `status.sh --diagnose` (informational display).
+- **`functions.sh:rotate_backups()`** (v1.3.0 — ROT-PROTECT):
+  the `.last_stable` target is **never pruned**, even when it
+  would otherwise fall outside the 21-newest window.
 
 **Note**: This file is **not** updated by runtime backups
 (`main.go`, `service.sh`, `action.sh`). Only install-time
@@ -618,9 +795,9 @@ A JSON file that records every install / upgrade:
 {
   "upgrades": [
     {
-      "from": "v1.1.0",
-      "to": "v1.2.0",
-      "date": "2026-09-26T10:30:00Z",
+      "from": "v1.3.0",
+      "to": "v1.4.0",
+      "date": "2026-10-06T10:30:00Z",
       "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
       "root": "magisk",
       "files": 5
@@ -634,7 +811,7 @@ A JSON file that records every install / upgrade:
 **Fallback (no `jq`)**: A plain-text `.upgrade_history.txt`:
 
 ```text
-2026-09-26T10:30:00Z | v1.1.0 → v1.2.0 | source=/data/adb/modules/dnscrypt-proxy-webui/proxy | files=5
+2026-10-06T10:30:00Z | v1.3.0 → v1.4.0 | source=/data/adb/modules/dnscrypt-proxy-webui/proxy | files=5
 ```
 
 **Rotation**: The history file is **not rotated** — it grows slowly
@@ -679,13 +856,17 @@ A static user-facing guide generated on first install. It explains:
 
 Rotation caps the number of snapshots at **21**. The implementation
 is **count-based**: it keeps the 21 newest snapshots, sorted by
-**directory name** (not by mtime — see §6.5).
+**mtime descending** (v1.3.0 — ROT-MTIME), with two additional
+protected targets that are never pruned (ROT-PROTECT):
+
+- The `.last_stable` target (recovery pointer).
+- The newest install snapshot (name matching `-v<digit>`).
 
 There are no daily / weekly / monthly tiers today.
 
-**Planned enhancement (v1.3.0)**: The following tiered policy is
+**Planned enhancement (v1.5.0)**: The following tiered policy is
 under consideration for a future release, but is **not**
-implemented in v1.2.0:
+implemented in v1.4.0:
 
 | Tier (planned) | Count | Typical age |
 |----------------|:-----:|-------------|
@@ -703,9 +884,11 @@ Rotation runs **after** a successful backup, triggered by:
 
 - `service.sh:rotate_backups 21` (after periodic auto-backup).
 - `action.sh --backup` (after manual backup).
-
-**Not triggered** by `customize.sh` or `main.go` backups — the
-periodic and manual flows are the only ones that rotate.
+- `main.go:createAutoBackup` (after a pre-critical backup — v1.2.0
+  BUG-D fix; the rotation is invoked in the same shell call as
+  the backup itself).
+- `customize.sh` §[22b] (after an install-time snapshot — the
+  installer has its own copy of `rotate_backups`).
 
 ### 6.3 What is never rotated
 
@@ -714,7 +897,8 @@ periodic and manual flows are the only ones that rotate.
 | `current/` | Always needed for recovery |
 | `txn-*/` | In-flight transactions |
 | `orphan-txn-*/` | Preserved unfinished transactions |
-| `.last_stable` | Recovery pointer |
+| `.last_stable` | Recovery pointer — **v1.3.0 ROT-PROTECT target** |
+| The newest install snapshot (`-v<digit>`) | **v1.3.0 ROT-PROTECT target** — used by rollback and `.upgrade_history` |
 | `.last_auto_backup` | Age marker |
 | `.upgrade_history.json` / `.txt` | Audit trail |
 | `README.md` | User guide |
@@ -731,41 +915,85 @@ periodic and manual flows are the only ones that rotate.
 **Max theoretical footprint**: ~3 MB. This is negligible on any
 modern Android device.
 
-### 6.5 Rotation ordering — directory name vs mtime
+### 6.5 Rotation ordering — mtime (v1.3.0), not directory name
 
-**⚠️ Important implementation detail**:
+**⚠️ Important implementation detail (corrected in v1.3.0)**:
 
-`rotate_backups` sorts snapshots by **directory name**, not by
-modification time. Directory names start with `YYYYMMDD-HHMMSS-`,
-which produces the same order as the timestamps without relying
-on the filesystem's `mtime` field.
+`rotate_backups` sorts snapshots by **mtime**, not by directory
+name. This was changed in v1.3.0.
 
-**Why this matters**:
+**Why mtime, not directory name?**
 
-- If a user copies their backup directory to a new device with
-  `rsync` or a similar tool, `mtime` values are preserved but
-  may be reordered by the tool (e.g. `rsync -a` preserves
-  `mtime`, but manual `cp` does not).
-- Directory name ordering is **stable** across these operations.
-- The three rotation implementations
-  (`customize.sh:rotate_backups`, `functions.sh:rotate_backups`,
-  `service.sh:_inline_rotate_backups`) all use the same rule:
+- **Robust against clock drift**: if the system clock is set
+  backwards between two snapshots, the directory-name order
+  would no longer reflect the actual creation order. mtime
+  (which is written by the filesystem itself) is monotonic under
+  normal conditions.
+- **Robust against manual renames**: a user who renames a
+  snapshot directory (e.g. to add a memo) does not change its
+  position in the rotation order.
+- **Robust against custom-named snapshots**: a snapshot created
+  by a future `action.sh --backup` with a different naming scheme
+  is still correctly ordered.
+- **Aligns with the API**: `main.go:buildBackupInfo()` uses the
+  same mtime sort (SNAP-MTIME), so `runtime_info.backups.last_backup_name`
+  and `rotate_backups`'s "newest" agree.
 
-  ```sh
-  ls -1d */ | sed 's:/$::' | grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r
-  ```
+**Detection rule (v1.3.0 — ROT-MANIFEST)**:
 
-  The regex `^[0-9]{8}-[0-9]{6}-` matches:
-  - `20260926-095826-v1.2.0-12345`
-  - `20260926-095826-auto-12345`
-  - `20260926-095826-manual-12345`
-  - `20260926-095826-manual-12345-a1b2`
+A directory is a rotation candidate **iff**:
 
-  and **rejects**:
-  - `current`
-  - `txn-...`
-  - `orphan-txn-...`
-  - any file (not directory)
+1. Its name is not `current`, `txn-*`, or `orphan-txn-*`.
+2. It contains a `.manifest.json` file.
+
+Directories without a manifest are **ignored** by rotation, even
+if their name matches the timestamp pattern. This makes rotation
+robust against:
+- Directories created by a user (e.g. a scratch folder named
+  `20260926-095826-test`).
+- Partial/incomplete snapshots whose manifest write was
+  interrupted.
+- Custom-named snapshots (which are correctly counted because
+  they DO have a manifest).
+
+**Protected targets (v1.3.0 — ROT-PROTECT)**:
+
+Two additional targets are preserved on top of the 21-newest
+window:
+
+| Target | How it is identified | Why it is protected |
+|--------|----------------------|---------------------|
+| `.last_stable` target | Content of `$PERSISTENT_BACKUP/.last_stable` | The recovery pointer; pruning it would break recovery mode |
+| Newest install snapshot | Name matching `-[0-9]+-v[0-9]` (regex `-v<digit>`) | Used by rollback and by `.upgrade_history`; pruning it would break rollback |
+
+**Shell command used by `functions.sh:rotate_backups`** (v1.3.0):
+
+```sh
+for _d in */; do
+    _d="${_d%/}"
+    [ -d "$_d" ] || continue
+    case "$_d" in
+        current|txn-*|orphan-txn-*) continue ;;
+    esac
+    [ -f "$_d/.manifest.json" ] || continue
+    _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+        || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+        || _mt=0
+    printf '%s %s\n' "$_mt" "$_d"
+done | sort -rn -k1,1
+```
+
+The `sort -rn -k1,1` sorts numerically on the first field
+(`mtime`), descending. The second field (directory name) is
+used only as a stable tiebreaker when two snapshots share the
+same mtime.
+
+**Historical note (v1.2.0)**: In v1.2.0, the detection rule was
+a name-pattern match (`^[0-9]{8}-[0-9]{6}-`), and the ordering
+key was the lexicographic directory name
+(`ls -1d */ | sort -r`). This was replaced in v1.3.0. See
+`CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13.2 for
+the full story.
 
 ---
 
@@ -787,7 +1015,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
   Source: /data/adb/modules/dnscrypt-proxy-webui/proxy
   Target: /sdcard/dnscrypt-webui-backup
 
-  ✅ Backup created: /sdcard/dnscrypt-webui-backup/20260926-150000-manual-12345 (5 file(s))
+  ✅ Backup created: /sdcard/dnscrypt-webui-backup/20261008-150000-manual-12345 (5 file(s))
 
   Current backup state:
     7 snapshot(s), latest 0s ago
@@ -802,39 +1030,51 @@ If the backup fails (0 files copied), the script exits with code 3.
 
 ### 7.2 List snapshots
 
-**Correct** — sort by directory name (matching `rotate_backups`):
+**Correct** (v1.3.0+) — sort by **mtime descending**, matching
+`rotate_backups`'s ROT-MTIME rule:
 
 ```bash
-su -c "cd /sdcard/dnscrypt-webui-backup && ls -1d */ | sed 's:/$::' | grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r"
+su -c "cd /sdcard/dnscrypt-webui-backup && for d in */; do d=\"\${d%/}\"; [ -d \"\$d\" ] || continue; case \"\$d\" in current|txn-*|orphan-txn-*) continue;; esac; [ -f \"\$d/.manifest.json\" ] || continue; mt=\$(stat -c %Y \"\$d\" 2>/dev/null || stat -f %m \"\$d\" 2>/dev/null || echo 0); printf '%s %s\n' \"\$mt\" \"\$d\"; done | sort -rn -k1,1 | awk '{print \$2}'"
 ```
 
-Or via the CLI diagnose tool:
+Or via the CLI diagnose tool (which uses the shared helper
+`_list_snapshots` — same semantics):
 
 ```bash
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" | grep -A 20 "Backups"
 ```
 
-**⚠️ HARD-BK-06 fix**: The previous version of this section used
-`ls -1dt`, which sorts by `mtime`. That contradicted the
-directory-name ordering rule documented in §6.5 and would have
-produced inconsistent results on a device where `mtime` was
-modified (e.g. after a manual `cp`). The command above uses
-`sort -r` on the directory name — the same rule as
-`rotate_backups`.
+**⚠️ HARD-BK-20 fix (v1.4.0)**: The previous version of this
+section used `ls -1d | sort -r` on directory names. That matched
+the **v1.2.0** rotation rule but contradicted the **v1.3.0**
+rotation rule (ROT-MTIME). The command above uses the same
+algorithm as `functions.sh:rotate_backups` — walk the directory,
+require `.manifest.json`, read mtime, sort descending. The
+output format is unchanged (one directory name per line).
+
+**Why a one-liner is fragile**: the shell command above is
+essentially an inlined copy of `rotate_backups`. The authoritative
+implementation lives in `proxy/functions.sh` (and in
+`proxy/status.sh` as `_list_snapshots`). If you need to script
+this, consider sourcing the helper instead:
+
+```bash
+su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; _list_snapshots"
+```
 
 ### 7.3 Inspect a snapshot
 
 ```bash
 # Replace <pid> with the actual PID from the directory name
-su -c "ls -la /sdcard/dnscrypt-webui-backup/20260926-095826-v1.2.0-12345/"
-su -c "cat /sdcard/dnscrypt-webui-backup/20260926-095826-v1.2.0-12345/.manifest.json"
+su -c "ls -la /sdcard/dnscrypt-webui-backup/20261008-095826-v1.4.0-12345/"
+su -c "cat /sdcard/dnscrypt-webui-backup/20261008-095826-v1.4.0-12345/.manifest.json"
 ```
 
 ### 7.4 Restore manually
 
 ```bash
 # 1. Identify the desired snapshot (replace <pid> with the real PID)
-SNAP="20260926-095826-v1.2.0-12345"
+SNAP="20261008-095826-v1.4.0-12345"
 
 # 2. Copy the 5 files back
 su -c "cp /sdcard/dnscrypt-webui-backup/$SNAP/webui.conf /data/adb/modules/dnscrypt-proxy-webui/proxy/"
@@ -851,10 +1091,10 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
 **Tip**: To pick the newest snapshot programmatically (using the
-same ordering as `rotate_backups`):
+same ordering as `rotate_backups` in v1.3.0+):
 
 ```bash
-SNAP=$(su -c "cd /sdcard/dnscrypt-webui-backup && ls -1d */ | sed 's:/$::' | grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r | head -n1")
+SNAP=$(su -c "cd /sdcard/dnscrypt-webui-backup && for d in */; do d=\"\${d%/}\"; [ -d \"\$d\" ] || continue; case \"\$d\" in current|txn-*|orphan-txn-*) continue;; esac; [ -f \"\$d/.manifest.json\" ] || continue; mt=\$(stat -c %Y \"\$d\" 2>/dev/null || stat -f %m \"\$d\" 2>/dev/null || echo 0); printf '%s %s\n' \"\$mt\" \"\$d\"; done | sort -rn -k1,1 | head -n1 | awk '{print \$2}'")
 echo "Newest snapshot: $SNAP"
 ```
 
@@ -915,8 +1155,13 @@ See `ARCHITECTURE.md` §3.10 for the full flow, and
 
 ```bash
 # Replace <pid> with the actual PID
-su -c "rm -rf /sdcard/dnscrypt-webui-backup/20260924-140000-v1.0.0-12345"
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/20261006-140000-v1.4.0-12345"
 ```
+
+> **⚠️ Note**: Deleting the snapshot that `.last_stable` points
+> to will cause recovery mode to fall back to `current/` (or to
+> the in-place data). If you want to be safe, delete
+> non-`.last_stable` snapshots only.
 
 ### 7.7 Delete everything
 
@@ -934,7 +1179,7 @@ The next boot will recreate the directory (empty).
 ```bash
 # From PC (with adb + root)
 adb shell su -c "tar czf /sdcard/dnscrypt-backup-$(date +%Y%m%d).tar.gz /sdcard/dnscrypt-webui-backup"
-adb pull /sdcard/dnscrypt-backup-20260926.tar.gz
+adb pull /sdcard/dnscrypt-backup-20261008.tar.gz
 ```
 
 ### 7.9 What about the language preference?
@@ -962,16 +1207,16 @@ The choice is remembered on that device's browser.
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
 
-**Response (v1.2.0 — 7 fields)**:
+**Response (v1.4.0 — 7 fields)**:
 
 ```json
 {
   "available": 7,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-manual-12345",
-  "last_stable": "20260926-095826-v1.2.0-12345",
+  "last_backup": "2026-10-08 15:00:00",
+  "last_backup_name": "20261008-150000-manual-12345",
+  "last_stable": "20261008-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -980,11 +1225,11 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `available` | int | Number of snapshots (excludes `current/`, `txn-*/`, `orphan-txn-*/`) |
+| `available` | int | Number of snapshots. **Detection rule (v1.3.0 — SNAP-MANIFEST)**: a directory counts as a snapshot **iff** it contains a `.manifest.json` file. Excludes `current/`, `txn-*`, and `orphan-txn-*` by name. Before v1.3.0 the rule was a name-pattern match (`^[0-9]{8}-[0-9]{6}-`). |
 | `in_flight_txn` | int | Number of `txn-*` directories (install in progress or interrupted) |
 | `orphan_txn` | int | Number of `orphan-txn-*` directories (preserved interrupted installs) |
 | `last_backup` | string \| null | Modification time of the newest snapshot |
-| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20260926-150000-manual-12345`) |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20261008-150000-manual-12345`). **Sort key (v1.3.0 — SNAP-MTIME)**: mtime, descending, with a name-based fallback when `DirEntry.Info()` fails. Before v1.3.0 the selection was by lexicographic name. |
 | `last_stable` | string \| null | Content of the `.last_stable` pointer file, or null if not set |
 | `path` | string | Absolute path of the backup directory |
 
@@ -993,11 +1238,22 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 **Read-only**: `runtime_info` does not create or modify backups.
 
 **Consumer pattern**: If `in_flight_txn > 0` or `orphan_txn > 0`,
-the backup layer needs attention — see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §7.8–§7.10.
+the backup layer needs attention — see
+[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §7.8–§7.10.
 
 **Language-neutral**: The `backups` object is identical regardless
 of the WebUI's selected language (English default or Arabic
 toggle). The API never localizes JSON.
+
+**Effect of SNAP-MANIFEST on `available`**:
+Since v1.3.0, `available` counts **manifest-carrying**
+directories, not name-matching directories. For the standard
+toolchain's output, the two rules produce the same count. They
+differ only when:
+- A custom-named snapshot exists (SNAP-MANIFEST counts it,
+  name-pattern did not).
+- A directory matches the name pattern but lacks a manifest
+  (SNAP-MANIFEST excludes it, name-pattern counted it).
 
 ### 8.2 Via `status.sh --json`
 
@@ -1005,7 +1261,7 @@ toggle). The API never localizes JSON.
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups'
 ```
 
-**Response (same 7 fields as `runtime_info`)**:
+**Response (same 7 fields as `runtime_info`, plus 2 diagnostic-only)**:
 
 ```json
 {
@@ -1013,10 +1269,10 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backup
   "available": 7,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-manual-12345",
+  "last_backup": "2026-10-08 15:00:00",
+  "last_backup_name": "20261008-150000-manual-12345",
   "last_backup_age_seconds": 3600,
-  "last_stable": "20260926-095826-v1.2.0-12345",
+  "last_stable": "20261008-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -1032,6 +1288,12 @@ the seven shared fields. If they ever diverge, it indicates a
 `main.go` / `status.sh` version mismatch — restart the WebUI and
 re-run the commands.
 
+**v1.3.0 note**: The `status.sh --json` implementation uses the
+same SNAP-MANIFEST detection and SNAP-MTIME sort as `main.go`
+(via the shared `_list_snapshots` helper in `status.sh`). So
+`available` and `last_backup_name` agree between the API and the
+shell tool for every input, including custom-named snapshots.
+
 ### 8.3 Via `status.sh --check` (one-liner)
 
 ```bash
@@ -1041,7 +1303,7 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
 **Output example**:
 
 ```text
-v1.2.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | BACKUP=7snap/1h ago | RUNDIR=/data/adb/modules/dnscrypt-proxy-webui/proxy/run
+v1.4.0 | DNS=UP | WEBUI=UP | PROFILE=pro | MEM=120 MB (pro) | ENTRIES=250000 | BACKUP=7snap/1h ago | RUNDIR=/data/adb/modules/dnscrypt-proxy-webui/proxy/run
 ```
 
 The `BACKUP=` field format is `<count>snap/<age>`.
@@ -1056,7 +1318,8 @@ Produces a full human-readable report including:
 
 - System + module info.
 - The 5 user data files with size + mtime.
-- Backup listing (sorted by name).
+- Backup listing (sorted by mtime descending, via the shared
+  `_list_snapshots` helper — v1.3.0).
 - In-flight + orphan transaction listings.
 - Recovery mode state.
 - Pending notification content.
@@ -1110,9 +1373,16 @@ tooling is minimal.
 ### 9.2 Running verification manually
 
 ```bash
-# Pick the newest snapshot by directory name
+# Pick the newest snapshot by mtime (matching v1.3.0 rotation)
 cd /sdcard/dnscrypt-webui-backup
-SNAP=$(ls -1d */ | sed 's:/$::' | grep -E '^[0-9]{8}-[0-9]{6}-' | sort -r | head -1)
+SNAP=$(for d in */; do
+    d="${d%/}"
+    [ -d "$d" ] || continue
+    case "$d" in current|txn-*|orphan-txn-*) continue;; esac
+    [ -f "$d/.manifest.json" ] || continue
+    mt=$(stat -c %Y "$d" 2>/dev/null || stat -f %m "$d" 2>/dev/null || echo 0)
+    printf '%s %s\n' "$mt" "$d"
+done | sort -rn -k1,1 | head -n1 | awk '{print $2}')
 echo "Verifying: $SNAP"
 
 # Check each file
@@ -1160,6 +1430,13 @@ full report format.
 3. **Directory permissions** — rare, but possible if `/sdcard/`
    has restrictive SELinux contexts.
    - **Check**: `su -c "ls -ld /sdcard/dnscrypt-webui-backup/"`
+4. **Manifest-less snapshots (v1.3.0+)** — if a snapshot was
+   created without a `.manifest.json` (e.g. by an older toolchain,
+   or by a manual `mkdir`), it is **not counted** by
+   `runtime_info.backups.available` (SNAP-MANIFEST rule). It is
+   also not rotated. To make it visible:
+   - **Fix**: Write a minimal `.manifest.json` (even `{}` is
+     enough) into the snapshot directory.
 
 ### 10.2 Snapshot exists but cannot be restored
 
@@ -1187,6 +1464,11 @@ full report format.
 2. **`functions.sh` missing** — the inline fallback may have
    failed silently.
    - **Check**: `su -c "ls -l /data/adb/modules/dnscrypt-proxy-webui/functions.sh"`
+3. **Manifest-less snapshots (v1.3.0+)** — rotation only considers
+   directories with a `.manifest.json`. If a large number of
+   manifest-less directories exist, they accumulate.
+   - **Fix**: Add a minimal `.manifest.json` (`{}`) to each, or
+     delete them manually.
 
 **Fix**: Run rotation manually:
 
@@ -1234,7 +1516,7 @@ su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.state"
 while `status.sh --json` returns 7, or vice versa.
 
 **Cause**: A version mismatch between `main.go` and
-`status.sh`. This should not occur on v1.2.0 — both were updated
+`status.sh`. This should not occur on v1.4.0 — both were updated
 in the same release.
 
 **Fix**:
@@ -1243,10 +1525,10 @@ in the same release.
    ```bash
    su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
    ```
-   → must be `version=v1.2.0`.
+   → must be `version=v1.4.0`.
 
 2. If the binary is stale (older than the scripts), reinstall
-   the module from the v1.2.0 ZIP.
+   the module from the v1.4.0 ZIP.
 
 3. After fixing, restart the WebUI and re-run:
    ```bash
@@ -1276,6 +1558,30 @@ previous device.
 not supported by design (the project's design explicitly keeps
 the language preference out of the server state to avoid adding
 a user-tracking dimension). Community forks may extend this.
+
+### 10.8 Rotation "order" looks wrong (v1.3.0)
+
+**Symptom**: A snapshot appears to be in the "wrong" position in
+the rotation list — e.g. an older snapshot is kept while a newer
+one is pruned.
+
+**Possible causes**:
+
+1. **Clock drift** — if the device clock was set backwards at
+   some point, mtime-based ordering will reflect the actual
+   filesystem write times, which may not match the perceived
+   chronological order. This is the intended behavior
+   (ROT-MTIME is robust against directory-name manipulation, at
+   the cost of trusting the filesystem clock).
+2. **A `.last_stable` or `-v<digit>` protected target** — the
+   rotation intentionally preserves these two snapshots even if
+   they fall outside the 21-newest window (ROT-PROTECT). If the
+   kept snapshot is the target of `.last_stable` or the newest
+   install, this is expected.
+3. **Custom-named snapshot** — if a snapshot was created with a
+   name that does not follow `<YYYYMMDD>-<HHMMSS>-...`, its mtime
+   is still respected, but its position in the list may look
+   unexpected relative to the name-based view.
 
 ---
 
@@ -1347,7 +1653,7 @@ Then upgrade and restore if needed (see §7.4).
 ### 11.4 No-op migrations
 
 If the `SOURCE_VERSION` matches `TARGET_VERSION`, `migrate_config()`
-does nothing. This is the case for v1.2.0 → v1.2.0 reinstalls.
+does nothing. This is the case for v1.4.0 → v1.4.0 reinstalls.
 
 ### 11.5 Language preference across migrations
 
@@ -1363,6 +1669,40 @@ The WebUI's language toggle (English default + Arabic) is
 After a migration, the WebUI may briefly load in English (default)
 before the browser's `localStorage` is read and reapplied. This
 is expected and only lasts for the first render frame.
+
+### 11.6 From v1.2.0 or v1.3.0 to v1.4.0
+
+**The upgrade is automatic and identical to v1.1.0 → v1.2.0.**
+
+What happens during the v1.4.0 upgrade:
+
+1. **Layer 1** (multi-source detection) — unchanged.
+2. **Layer 2** (persistent backup) — unchanged. A new snapshot
+   is created with the name
+   `<timestamp>-v1.4.0-<pid>`.
+3. **Layer 3** (SHA256 verification) — unchanged.
+4. **Layer 4** (transactional install) — unchanged.
+5. **Layers 5–10** — all unchanged.
+
+**No new config migration was added in v1.4.0.** All v1.2.0
+migrations still apply.
+
+**Companion APK (new in v1.4.0)**:
+- The installer extracts `web/app-debug.apk` from the ZIP if it is
+  present (OPTIONAL — the build succeeds without it).
+- The APK is **NOT** one of the 5 preserved files.
+- The APK is **NOT** added to the persistent backup directory.
+- The APK is served at `GET /app-debug.apk` by `main.go`.
+
+**Result**: Your 5 config files are preserved as in v1.2.0, and
+the backup layer is byte-for-byte unchanged.
+
+**Rotation semantics (v1.3.0+)**:
+The v1.4.0 release does **not** change the rotation semantics that
+were introduced in v1.3.0 (ROT-MANIFEST + ROT-MTIME +
+ROT-PROTECT). If you upgraded from v1.2.0 to v1.4.0 in one step,
+your rotation behavior is now the v1.3.0 behavior, not the v1.2.0
+behavior. See §6.5 for the full description.
 
 ---
 
@@ -1399,6 +1739,7 @@ with `READ_EXTERNAL_STORAGE` or root.
 | DNSCrypt server list cache | ❌ | N/A |
 | Binaries | ❌ | N/A |
 | Log files | ❌ | N/A |
+| **Companion APK** (`web/app-debug.apk`, v1.4.0) | **❌** | **N/A** |
 | **WebUI language preference** | **❌** | **N/A (browser-side only)** |
 
 **Note**: The DNSCrypt credentials (username/password for the
@@ -1411,6 +1752,10 @@ is `0700`, so only root can read them.
 not on the device. This is a deliberate design decision: the
 backup layer preserves server-side **user configuration**, not
 **client-side UI preferences**.
+
+**Companion APK note (v1.4.0)**: The optional `web/app-debug.apk`
+is **not** part of the backup. It is a build artifact that is
+re-extracted from the module ZIP on every install.
 
 ### 12.3 SELinux contexts
 
@@ -1434,6 +1779,8 @@ restoration. This is rare on Android (both tools exist in
 | Malicious file substitution | Not mitigated (root-only directory) |
 | Unauthorized read | `0700`/`0600` permissions |
 | Directory deletion | `current/` and `.last_stable` ensure at least one recovery path |
+| Pruning the recovery target | **ROT-PROTECT (v1.3.0)** — `.last_stable` and the newest install snapshot are never pruned |
+| Orphaned manifest-less snapshots | **ROT-MANIFEST (v1.3.0)** — a snapshot requires a manifest to be a rotation candidate |
 
 ### 12.5 Threat model summary
 
@@ -1469,6 +1816,15 @@ second caller blocks until the first finishes. See
   for the manifest. The worst case is a duplicate snapshot
   directory, which rotation will eventually clean up.
 
+**What ROT-PROTECT does NOT protect against**:
+
+- A user manually deleting the `.last_stable` target directory.
+  ROT-PROTECT only prevents `rotate_backups` from pruning it —
+  it does not prevent explicit `rm -rf`.
+- A `.last_stable` file whose content names a directory that
+  no longer exists. In that case, recovery mode falls back to
+  `current/`, then to in-place data. See §7.5.
+
 ### 12.6 Language toggle — security considerations (v1.2.0)
 
 The WebUI's bilingual feature (English default + Arabic toggle)
@@ -1501,6 +1857,49 @@ For users who require stronger guarantees, they can:
 - Clear `localStorage` manually if they want the WebUI to
   forget the language choice.
 
+### 12.7 Companion APK — security considerations (v1.4.0)
+
+The optional companion Android app (`web/app-debug.apk`) is
+**not** part of the backup layer. From a security standpoint:
+
+- **Not preserved**: The APK is a build artifact of the module
+  ZIP, not user data. It is not added to the persistent backup
+  directory and is not one of the 5 preserved files.
+- **Re-extracted on every install**: If a future release ships a
+  new APK, the new APK is extracted fresh from the ZIP. The old
+  APK is not restored from any snapshot.
+- **Served locally**: `main.go` serves the APK at
+  `GET /app-debug.apk` with a strict `Cache-Control:
+  public, max-age=3600, immutable` header. The endpoint is
+  subject to `checkAuth` (same auth as every other protected
+  route).
+- **Optional**: A module ZIP can be built without the APK. The
+  build and the install succeed in either case.
+
+**Why this matters for the backup layer**: A compromised APK
+cannot inject itself into the 5 preserved config files. The
+backup layer remains orthogonal to the APK lifecycle.
+
+### 12.8 v1.3.0 rotation hardening
+
+The v1.3.0 rotation rewrite (ROT-MANIFEST + ROT-MTIME +
+ROT-PROTECT) tightens the backup layer in two ways:
+
+1. **Detection requires a manifest (ROT-MANIFEST)** — a
+   directory named like a snapshot but lacking `.manifest.json`
+   is not counted and not rotated. This prevents an attacker (or
+   a confused user) from injecting a fake snapshot directory
+   that would displace real snapshots in the rotation order.
+2. **Protected targets (ROT-PROTECT)** — the `.last_stable`
+   pointer and the newest install snapshot cannot be silently
+   pruned. This guarantees that the recovery path remains intact
+   even under aggressive rotation.
+
+The rotation policy is intentionally **count-based** (21
+snapshots) rather than tier-based (daily/weekly/monthly). The
+count-based approach is simpler to reason about and to test; a
+tier-based policy is a planned v1.5.0 enhancement (see §6.1).
+
 ---
 
 ## 13. References
@@ -1509,15 +1908,16 @@ For users who require stronger guarantees, they can:
 
 | File | Role |
 |------|------|
-| `proxy/customize.sh` | Creates install/upgrade snapshots (Layers 1–8) |
-| `proxy/functions.sh` | Backup helpers + rotation (Layers 2, 3, 9) |
+| `proxy/customize.sh` | Creates install/upgrade snapshots (Layers 1–8); its `rotate_backups` (§[22b]) uses the v1.3.0 ROT-* semantics |
+| `proxy/functions.sh` | Backup helpers + rotation (Layers 2, 3, 9); `rotate_backups` uses v1.3.0 ROT-* semantics |
 | `proxy/service.sh` | Triggers periodic auto-backup (Layer 9) |
-| `proxy/main.go` | Triggers pre-critical backup + reads pending notification (Layer 9 + Layer 10) |
-| `proxy/status.sh` | Provides `--diagnose` and `--json` (Layer 10) |
-| `proxy/action.sh` | Provides `--backup` (manual trigger) |
-| `proxy/uninstall.sh` | Preserves backup + cleans orphan transactions |
+| `proxy/main.go` | Triggers pre-critical backup + reads pending notification (Layer 9 + Layer 10); `buildBackupInfo` uses v1.3.0 SNAP-* semantics |
+| `proxy/status.sh` | Provides `--diagnose` and `--json` (Layer 10); `_list_snapshots` uses v1.3.0 SNAP-* semantics |
+| `proxy/action.sh` | Provides `--backup` (manual trigger); `_inline_rotate_backups` and `_inline_list_snapshots` use v1.3.0 ROT-* / SNAP-* semantics |
+| `proxy/uninstall.sh` | Preserves backup + cleans orphan transactions; `BACKUP_COUNT` / `BACKUP_LAST_NAME` use v1.3.0 SNAP-* semantics |
 | `proxy/post-fs-data.sh` | Does NOT touch backups (runs too early) |
-| `proxy/watchdog.sh` | Does NOT touch backups (read-only diagnostics) |
+| `proxy/watchdog.sh` | Does NOT touch backups (read-only diagnostics); §[5b] snapshot counter uses v1.3.0 SNAP-* semantics |
+| `scripts/fetch_app_apk.sh` | Fetches the companion APK (v1.4.0) — does NOT touch the backup layer |
 | `META-INF/com/google/android/update-binary` | Root manager entry point (does not touch backups) |
 
 ### 13.2 Related documentation
@@ -1528,6 +1928,8 @@ For users who require stronger guarantees, they can:
 | [`UPGRADE.md`](UPGRADE.md) §3.1 | v1.1.0 → v1.2.0 upgrade guide |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) §3.10 | Backup & Restore flow diagram |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.10 | v1.2.0 Backend additions (BAK-1..BAK-4) |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.13 | v1.3.0 server-side refinements (SNAP-* + ROT-*) — **authoritative** |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) §11.31–§11.34 | v1.3.0 trade-offs (manifest, mtime, protections, boot-path) |
 | [`SECURITY.md`](SECURITY.md) §5.31 | Data preservation security model |
 | [`SECURITY.md`](SECURITY.md) §5.32.1 | FIX-1 recovery-mode correctness (snapshot-and-reapply) |
 | [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §7.8–§7.10 | Backup-related issues |
@@ -1536,7 +1938,9 @@ For users who require stronger guarantees, they can:
 | [`API.md`](API.md) §10.6 | Backup diagnostics examples |
 | [`API.md`](API.md) §10.7 | Recovery mode examples |
 | [`FAQ.md`](FAQ.md) Q121–Q130 | Backup questions |
-| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0] | Release notes |
+| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.2.0] | Data-preservation release |
+| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.3.0] | Server-side refinements |
+| [`CHANGELOG.md`](../CHANGELOG.md) §[v1.4.0] | Integration release |
 | [`INSTALL.md`](INSTALL.md) §10.5 | Manual backup before uninstall |
 
 ### 13.3 External references
@@ -1549,6 +1953,6 @@ For users who require stronger guarantees, they can:
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
 *Author: gasciljh*

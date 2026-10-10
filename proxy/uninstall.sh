@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – uninstall.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -199,7 +201,7 @@
 #     be redundant.
 #
 # ============================================================
-# v1.2.0 (Global Edition) — Follow-up hardening (this revision)
+# v1.2.0 (Global Edition) — Follow-up hardening (historical)
 # ============================================================
 #   🛡️ HARD-UNI-08 — `_inline_kill_all` now WAITS for the
 #     processes to actually disappear (up to 3 seconds) before
@@ -263,11 +265,123 @@
 #     reset. Any custom resolvers set by the user are preserved.
 #   • No deletion of /sdcard/dnscrypt-webui-backup/ — see [0].
 #   • No deletion of orphan-txn-* — see [0.2].
+#   • No handling of the companion Android app APK — see [0.4].
+#
+# ============================================================
+# v1.3.0 — Server-side refinement: snapshot detection
+# ============================================================
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   However, the snapshot detection and ordering semantics
+#   used by EVERY consumer of the persistent backup directory
+#   were refined in v1.3.0, and this file is one of those
+#   consumers (via §[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+#
+#   Earlier revisions of this header had NO v1.3.0 block at
+#   all, while the two inline snapshot-enumeration pipelines
+#   in §[5b] still used the v1.2.0 name-pattern detection and
+#   lexicographic ordering. The v1.4.0 revision below
+#   (UNS-V14-03) brings those pipelines into sync with every
+#   other consumer in the module.
+#
+#   The v1.3.0 refinement is documented under two identifiers
+#   (also used in CHANGELOG.md and docs/ARCHITECTURE.md §4.13.1):
+#
+#   🔧 SNAP-MANIFEST — manifest-based snapshot detection.
+#     A directory is treated as a snapshot iff it contains a
+#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
+#     and `orphan-txn-*/`.
+#
+#     Before v1.3.0: only directories whose name matched the
+#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
+#     custom-named snapshots were silently skipped, and
+#     directories that happened to match the name pattern but
+#     lacked a manifest were silently counted.
+#
+#   🔧 SNAP-MTIME — mtime sort.
+#     Candidates are ordered by mtime (numeric, descending,
+#     `sort -rn -k1,1`), not by lexicographic directory name.
+#     Robust against clock drift and manual renames. Aligns
+#     the snapshot count and the "latest" name with the
+#     `runtime_info.backups` API and with every other consumer
+#     in the module (main.go, functions.sh, service.sh,
+#     watchdog.sh, status.sh, customize.sh, action.sh).
+#
+#   See CHANGELOG.md v1.3.0 section, and
+#   docs/ARCHITECTURE.md §4.13.1 and §11.31–§11.32.
+# ============================================================
+#
+# ============================================================
+# [0.4] v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 UNS-V14-01 — No behavior change. The module uninstall
+#     path does NOT touch the companion app APK.
+#
+#     `web/app-debug.apk` is a build artifact of the module
+#     ZIP. It is removed automatically when the root manager
+#     deletes the whole module folder after this script exits.
+#     There is nothing to clean up here:
+#       • The APK is NOT one of the 5 preserved config files.
+#       • The APK is NOT written to the persistent backup
+#         directory (/sdcard/dnscrypt-webui-backup/).
+#       • The user's separately-installed companion app (if
+#         any) lives in /data/data/<package>/ and is
+#         unaffected by this script.
+#
+#   📱 UNS-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     Documentation only. No change to the cleanup path, the
+#     transaction resolver, the recovery-trigger cleanup, or
+#     the final summary.
+#
+#   📚 UNS-V14-03 — Documentation-sync correction for v1.3.0.
+#     Two snapshot-enumeration pipelines in §[5b] were left
+#     behind when the snapshot detection semantics changed in
+#     v1.3.0:
+#
+#       1. `BACKUP_COUNT` — used to report "Snapshots: N" in
+#          the final summary (sections [17], [18], [19]). It
+#          used the v1.2.0 name-pattern detection
+#          (`grep -E '^[0-9]{8}-[0-9]{6}-'`), so it:
+#            • Under-counted custom-named snapshots
+#              (e.g. "pre-v130-manual-...") that lacked the
+#              timestamp prefix.
+#            • Over-counted any directory that matched the
+#              name pattern but lacked a `.manifest.json`
+#              file.
+#
+#       2. `BACKUP_LAST_NAME` — used to report "Latest: X" in
+#          the same summary. It used the v1.2.0 name-pattern
+#          detection AND `sort -r` (lexicographic reverse),
+#          so the reported "latest" name could disagree with
+#          the actual newest snapshot whenever:
+#            • mtimes and directory names diverged (e.g. clock
+#              drift, or two snapshots created in the same
+#              second with PID suffixes in different order), or
+#            • a custom-named snapshot was newer than every
+#              timestamp-named one.
+#
+#     Fix: both pipelines now use a new shared helper
+#     `_uninstall_list_snapshots`, which uses the v1.3.0
+#     manifest-based detection (SNAP-MANIFEST) and mtime
+#     descending sort (SNAP-MTIME), matching every other
+#     consumer in the module.
+#
+#     This is the SAME cross-file parity fix that was applied
+#     to watchdog.sh (WD-V14-03), status.sh (STS-V14-03),
+#     customize.sh (CSH-19), service.sh (SVC-V14-03), and
+#     action.sh (ACT-V14-03) in the v1.4.0 release.
+#
+#     No CLI behavior changes; only the numbers displayed by
+#     the final summary are now consistent with the actual
+#     on-disk state and with the other scripts.
 #
 # ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside its internal helper
-#   functions (_inline_cleanup_firewall, _resolve_txn_dirs).
+#   functions (_inline_cleanup_firewall, _resolve_txn_dirs,
+#   _uninstall_list_snapshots).
 #   The `local` keyword is supported by:
 #     • mksh (the default /system/bin/sh on modern Android)
 #     • busybox ash (older Android)
@@ -285,7 +399,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac
@@ -338,6 +452,10 @@ Note:
   A pending recovery trigger (/data/adb/dnscrypt-recovery), if any,
   is REMOVED — it has no meaning once the module is gone.
 
+  The companion Android app APK (web/app-debug.apk, v1.4.0) is
+  NOT touched. It is deleted with the module folder by the root
+  manager. Any separately-installed companion app is unaffected.
+
   If you want to keep your settings in a separate manual backup,
   copy them before uninstalling:
     su -c "cp -a /data/adb/modules/dnscrypt-proxy-webui/proxy/ \
@@ -368,6 +486,7 @@ BIN_DIR="$MODDIR/proxy"
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
+# shellcheck disable=SC2034
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
 # --- v1.2.0 — Recovery trigger paths (mirrors customize.sh) ---
@@ -391,7 +510,7 @@ log_msg() {
 }
 
 log_msg "════════════════════════════════════════════"
-log_msg "Uninstall started (v1.2.0 — Global Edition)"
+log_msg "Uninstall started (v1.4.0 — Global Edition)"
 log_msg "MODDIR=$MODDIR"
 log_msg "RUN_DIR=$RUN_DIR"
 log_msg "Backup dir (preserved): $PERSISTENT_BACKUP"
@@ -420,6 +539,48 @@ case "$MODULE_ID" in
         log_msg "⚠️ MODULE_ID=$MODULE_ID is not recognized, but continuing"
         ;;
 esac
+
+# ============================================================
+# [5a] v1.4.0 — shared snapshot enumeration helper (UNS-V14-03)
+# ============================================================
+# Prints one snapshot directory name per line, newest first.
+#
+# v1.3.0 semantics (parity with functions.sh:rotate_backups,
+# main.go:buildBackupInfo, service.sh:_inline_rotate_backups,
+# watchdog.sh §[5b], status.sh:_list_snapshots,
+# customize.sh:rotate_backups, and action.sh
+# :_inline_list_snapshots):
+#   • SNAP-MANIFEST: a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file.
+#   • SNAP-MTIME:    ordered by mtime, descending
+#     (`sort -rn -k1,1`), not by lexicographic directory name.
+#
+# Excludes: current/, txn-*, orphan-txn-* (by name).
+#
+# Introduced in UNS-V14-03 to eliminate the duplication
+# between the BACKUP_COUNT and BACKUP_LAST_NAME lookups in
+# §[5b].
+# ============================================================
+_uninstall_list_snapshots() {
+    [ -d "$PERSISTENT_BACKUP" ] || return 0
+
+    (
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            [ -f "$_d/.manifest.json" ] || continue
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1 | awk '{print $2}'
+    )
+}
 
 # ============================================================
 # [5b] Read active profile + root solution (v1.2.0 — summary)
@@ -453,7 +614,15 @@ detect_root_solution() {
 ROOT_SOLUTION=$(detect_root_solution)
 log_msg "Root solution: $ROOT_SOLUTION"
 
-# --- Count preserved snapshots (v1.2.0) ---
+# --- Count preserved snapshots (v1.2.0, corrected v1.4.0) ---
+# UNS-V14-03: both BACKUP_COUNT and BACKUP_LAST_NAME now use
+# the shared `_uninstall_list_snapshots` helper, which uses the
+# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
+# descending sort (SNAP-MTIME). Before this fix, the two
+# pipelines used the v1.2.0 name-pattern detection
+# (`grep -E '^[0-9]{8}-[0-9]{6}-'`) and lexicographic
+# `sort -r` for the "latest" lookup, disagreeing with every
+# other consumer in the module.
 BACKUP_COUNT=0
 BACKUP_LAST_NAME=""
 BACKUP_LAST_STABLE=""
@@ -461,20 +630,16 @@ BACKUP_TXN_COUNT=0
 BACKUP_ORPHAN_COUNT=0
 
 if [ -d "$PERSISTENT_BACKUP" ]; then
-    BACKUP_COUNT=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        wc -l | tr -d ' ')
-    [ -z "$BACKUP_COUNT" ] && BACKUP_COUNT=0
+    # UNS-V14-03: manifest-based detection + mtime sort.
+    _ul_list=$(_uninstall_list_snapshots)
 
-    if [ "$BACKUP_COUNT" -gt 0 ]; then
-        BACKUP_LAST_NAME=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d */ 2>/dev/null | \
-            sed 's:/$::' | \
-            grep -E '^[0-9]{8}-[0-9]{6}-' | \
-            sort -r | \
-            head -n1)
+    if [ -n "$_ul_list" ]; then
+        BACKUP_COUNT=$(printf '%s\n' "$_ul_list" | wc -l | tr -d ' ')
+        [ -z "$BACKUP_COUNT" ] && BACKUP_COUNT=0
+
+        if [ "$BACKUP_COUNT" -gt 0 ]; then
+            BACKUP_LAST_NAME=$(printf '%s\n' "$_ul_list" | head -n1)
+        fi
     fi
 
     BACKUP_TXN_COUNT=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -1046,8 +1211,13 @@ fi
 # RECOVERY_TRIGGER_1 would spuriously enter recovery mode on
 # the next install. Removing it here is cheap and closes that
 # race.
+#
+# v1.4.0 note: nothing here interacts with the companion APK.
+# The APK is inside $MODDIR/web/, which is deleted with the
+# module folder by the root manager.
 # ============================================================
 RECOVERY_TRIGGER_REMOVED=0
+RECOVERY_TRIGGER_INTERNAL_REMOVED=0
 
 if [ -f "$RECOVERY_TRIGGER_2" ]; then
     if rm -f "$RECOVERY_TRIGGER_2" 2>/dev/null; then
@@ -1163,6 +1333,8 @@ else
     log_msg "   • Persistent backup:        not present"
 fi
 log_msg "   • Note: no auto-backup was created (v1.1.0+ behavior)"
+log_msg "   • Note: the companion APK (web/app-debug.apk) is removed with the"
+log_msg "           module folder by the root manager — no action taken here."
 if [ -d "$PERSISTENT_BACKUP" ]; then
     log_msg "   • Note: the backup directory can be removed manually:"
     log_msg "           rm -rf $PERSISTENT_BACKUP"
@@ -1238,12 +1410,16 @@ if [ "$RECOVERY_TRIGGER_REMOVED" = "1" ]; then
     echo "     (It had no meaning once the module was uninstalled.)"
 fi
 
-if [ "${RECOVERY_TRIGGER_INTERNAL_REMOVED:-0}" = "1" ]; then
+if [ "$RECOVERY_TRIGGER_INTERNAL_REMOVED" = "1" ]; then
     echo ""
     echo "  ℹ️  An in-module recovery trigger was also removed:"
     echo "     $RECOVERY_TRIGGER_1"
 fi
 
+echo ""
+echo "  ℹ️  The optional companion Android app APK (v1.4.0) is not"
+echo "     touched by this script. If you installed the app"
+echo "     separately, it remains on your device."
 echo ""
 echo "  Exit code: 0 (success)"
 echo "════════════════════════════════════════════════════════════"

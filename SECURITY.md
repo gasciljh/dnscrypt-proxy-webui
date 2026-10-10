@@ -6,27 +6,136 @@
 > full threat model is available at:
 > **[docs/SECURITY.md](docs/SECURITY.md)**
 
-**Version**: v1.2.0
-**Last updated**: 2026-09-29
+**Version**: v1.4.0 (Global Edition)
+**Last updated**: 2026-10-08
+
+> **Identifier inventory in this file (7 total)**:
+>   • HARD-SECROOT-01 (`Last updated` correction — v1.4.0)
+>   • HARD-SECROOT-02 (v1.3.0 block extended with SNAP-* / ROT-* — v1.4.0)
+>   • HARD-SECROOT-03 (Cross-references section added — v1.4.0)
+>   • HARD-SECROOT-04 (Key Security Fixes v1.3.0 — rotation — v1.4.0)
+>   • HARD-SECROOT-05 (Applied Protections table — v1.3.0 row — v1.4.0)
+>   • HARD-SECROOT-06 (In Scope — v1.3.0 rotation semantics — v1.4.0)
+>   • HARD-SECROOT-07 (Notes — v1.3.0 / v1.4.0 clarification — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/SECURITY.md](docs/SECURITY.md) — full policy + Audit Corrections Registry
+>   • [docs/ARCHITECTURE.md §4.13](docs/ARCHITECTURE.md) — v1.3.0 server-side refinements (authoritative)
+>   • [docs/BACKUP.md](docs/BACKUP.md) — backup system reference (v1.2.0 + v1.3.0 rotation semantics)
+>   • [docs/EMERGENCY.md](docs/EMERGENCY.md) — emergency recovery guide
+>   • [CHANGELOG.md](CHANGELOG.md) — version history (v1.0.0 → v1.4.0)
+>   • [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) — companion app source
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • **No new audit corrections** — v1.4.0 is an integration
+>     release. The Audit Corrections Registry remains at **#33**
+>     (the last entry from v1.0.0).
+>   • **CodeQL `go/path-injection` fix** — Two alerts (#1, #2) in
+>     `removeModule` (proxy/main.go) were closed by routing the
+>     caller-provided path through `filepath.Base()` and rebuilding
+>     the final path from the trusted `MODULES_DIR` constant. No
+>     user-controlled data reaches any path expression.
+>     See §"Key Security Fixes (v1.4.0)".
+>   • **Companion Android app integration** — a native WebView
+>     wrapper (~3 MB) is bundled into the module ZIP as an
+>     **OPTIONAL** asset at `web/app-debug.apk`. It is served
+>     publicly at `GET /app-debug.apk` (no auth required, no
+>     telemetry). The file is static — no server-side logic is
+>     executed to serve it. See §"In Scope" and
+>     §"Key Security Fixes (v1.4.0)".
+>   • **iOS PWA logic removed** — Android-only project. This
+>     removes ~35 lines of iOS-specific code from
+>     `web/index.html`, reducing the browser-detection surface.
+>   • **All v1.0.0 / v1.1.0 / v1.2.0 / v1.3.0 security fixes
+>     remain in place.**
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **No new audit corrections** — v1.3.0 is a feature release.
+>     The Audit Corrections Registry remains at **#33**.
+>   • **PWA install button** — the WebUI's install button is a
+>     dynamic element that adapts to the browser. In v1.3.0 it was
+>     still a JavaScript-driven element (`beforeinstallprompt` for
+>     Chromium, iOS instructions for Safari, an unsupported-browser
+>     modal otherwise). No new attack surface was introduced: the
+>     handler operated entirely on static strings and DOM elements.
+>   • **Live status LED** — a 12×12 LED on the "Today" counter
+>     reflects DNS engine state (green = ON, red = OFF). Pure CSS
+>     + JS, no new network calls.
+>   • **DNS auto-start after boot** — a **critical fix in
+>     `service.sh`** closed a race where the DNS engine did not
+>     start automatically after reboot when the user had left the
+>     service in the ON state. Root cause: `watchdog.sh` waits a
+>     fixed 30-second interval before its first API call, and by
+>     the time it fires `POST /api/ensure_running_service`, the
+>     WebUI may not have finished binding to its port. The fix:
+>     `service.sh` now performs a direct, bounded wait for the
+>     WebUI to become ready, then calls the API itself. **No new
+>     attack surface** — the API call uses the same watchdog token
+>     (`X-Watchdog-Token`) that was introduced in v1.2.0.
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO refined the snapshot-detection and
+>     rotation semantics that underpin the persistent backup
+>     directory. Three identifiers document the change (also
+>     used in CHANGELOG.md [v1.3.0] and
+>     docs/ARCHITECTURE.md §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a `.manifest.json`
+>         file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`). This makes custom-named
+>         snapshots visible to the API and to rotation.
+>
+>       🔧 **SNAP-MTIME** — `buildBackupInfo()` now selects
+>         `last_backup_name` by **mtime** (descending), with a
+>         name-based fallback when `DirEntry.Info()` fails. This
+>         supersedes the v1.2.0 BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets on top of the
+>         21-newest window:
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>
+>     **Security rationale**: without ROT-PROTECT, the
+>     21-newest window could silently evict the exact snapshot
+>     that recovery mode or rollback depends on — a
+>     security-relevant outcome for a project whose primary goal
+>     is reliable, protected DNS. See
+>     docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
+>
+>   • **Parallel application** — the same SNAP-MANIFEST /
+>     SNAP-MTIME / ROT-* semantics were applied to
+>     `watchdog.sh` (§[5b] snapshot counter), `status.sh`
+>     (`_list_snapshots`), `customize.sh` (`rotate_backups`),
+>     `action.sh` (`_inline_list_snapshots` +
+>     `_inline_rotate_backups` + `_inline_backup_summary`), and
+>     `uninstall.sh` (§[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+>     Every consumer of the persistent backup directory now
+>     agrees on which snapshots exist and which is the newest.
 
 > **v1.2.0 changes**:
 >   • Version bumped from v1.1.0 to v1.2.0.
 >   • **No new audit corrections** — v1.2.0 is a data-preservation
 >     release. The Audit Corrections Registry remains at **#33** (the
 >     last entry from v1.0.0).
->   • **New §5.31** (docs/SECURITY.md) — Data Preservation Security
+>   • **New §5.31** (`docs/SECURITY.md`) — Data Preservation Security
 >     Model. Documents the 10 defensive layers, the `backupMu`
 >     serialization guarantee, and the threat model for the
 >     persistent backup directory at
 >     `/sdcard/dnscrypt-webui-backup/`.
->   • **New §5.32** (docs/SECURITY.md) — Correctness Fixes (FIX-1,
->     FIX-2). Documents the two correctness fixes that shipped with
->     v1.2.0. Neither is an exploitable vulnerability.
->   • **New §5.33** (docs/SECURITY.md) — Watchdog Token (WD-TOKEN).
->     Documents the `X-Watchdog-Token` authentication that replaces
->     the previous localhost bypass on
+>   • **New §5.32** (`docs/SECURITY.md`) — Correctness Fixes
+>     (FIX-1, FIX-2). Documents the two correctness fixes that shipped
+>     with v1.2.0. Neither is an exploitable vulnerability.
+>   • **New §5.33** (`docs/SECURITY.md`) — Watchdog Token
+>     (WD-TOKEN). Documents the `X-Watchdog-Token` authentication
+>     that replaces the previous localhost bypass on
 >     `POST /api/ensure_running_service`.
->   • **New §14.25–§14.30** (docs/SECURITY.md) — six new audit
+>   • **New §14.25–§14.30** (`docs/SECURITY.md`) — six new audit
 >     checklist sections covering backup directory permissions,
 >     `backupMu` serialization, the 7-field `backups` object, the
 >     watchdog token, recovery-mode interaction, and SELinux context
@@ -42,17 +151,72 @@
 >     the server. Documentation remains English-only. **No API
 >     impact** — see `docs/SECURITY.md` §5.31.7 for the security
 >     analysis.
+>
+>   ⚠️ **Note on rotation semantics (corrected in this revision)**:
+>     The v1.2.0 description of the backup rotation — "sorted by
+>     directory name" — was superseded in v1.3.0 by the
+>     **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** semantics
+>     documented in the v1.3.0 block above. The v1.2.0 mechanism
+>     is retained here only as historical context. The
+>     **authoritative** current description lives in
+>     `docs/ARCHITECTURE.md` §4.13.2 and `docs/BACKUP.md` §6.5.
 
 > **v1.2.0 (Global Edition) — Corrections in this revision**:
 >   • 🔧 **FIX-1 description** — The "Correctness fixes
->     (v1.2.0 — FIX-1, FIX-2)" section previously described FIX-1
->     as a "recovery-mode reorder" that "excludes the two files at
->     risk". The actual implementation in `customize.sh` uses a
+>     (v1.2.0 — FIX-1, FIX-2)" section describes FIX-1 as a
 >     **snapshot-and-reapply** strategy (`§[8a]` + `§[9]` +
 >     `§[9b2]`), which keeps the extraction logic of `§[9]`
->     untouched. The description has been corrected to match the
->     shipped code. See `docs/SECURITY.md` §5.32.1 for the full
->     analysis.
+>     untouched. The description matches the shipped code. See
+>     `docs/SECURITY.md` §5.32.1 for the full analysis.
+
+> **v1.4.0 — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 / v1.4.0
+>   code identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-SECROOT-01** — **`Last updated` corrected.** The
+>     header and footer previously said `2026-10-06` (which
+>     corresponded to the v1.4.0 release date, not to the v1.4.0
+>     file-editing date). Both now read `2026-10-08`, matching
+>     every other file in the v1.4.0 module.
+>
+>   🔧 **HARD-SECROOT-02** — **`v1.3.0` block extended.** The
+>     previous block mentioned only the client-side changes (PWA
+>     install button, live status LED) and the DNS auto-start fix.
+>     It did NOT mention the **server-side refinements** to
+>     snapshot detection and rotation (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) that are central to
+>     the backup-layer security model documented in
+>     `docs/SECURITY.md` §5.31. The v1.3.0 block above now
+>     documents them, with an explicit security rationale for
+>     ROT-PROTECT.
+>
+>   🟢 **HARD-SECROOT-03** — **Cross-references section added.**
+>     A dedicated block at the top of the file now lists the
+>     authoritative sources for the v1.3.0 rotation semantics
+>     (`docs/ARCHITECTURE.md` §4.13), the backup system reference
+>     (`docs/BACKUP.md`), and the companion app repository.
+>
+>   🔧 **HARD-SECROOT-04** — **"Key Security Fixes (v1.3.0)"
+>     section extended.** A new subsection documents the
+>     server-side rotation refinements and their security
+>     rationale. The previous version covered only the DNS
+>     auto-start fix, the PWA install button, and the status LED.
+>
+>   🟡 **HARD-SECROOT-05** — **"Applied Protections" table
+>     updated.** A new row documents the v1.3.0 rotation
+>     hardening (SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST +
+>     ROT-MTIME + ROT-PROTECT).
+>
+>   🟡 **HARD-SECROOT-06** — **"In Scope" section extended.** The
+>     persistent backup directory entry now mentions the v1.3.0
+>     rotation semantics, so that a reporter knows rotation
+>     behavior is in scope for security review.
+>
+>   🟡 **HARD-SECROOT-07** — **"Notes" section extended.** A new
+>     bullet clarifies that v1.3.0 and v1.4.0 do not introduce new
+>     attack vectors, and that the v1.2.0 rotation documentation
+>     is superseded by the v1.3.0 semantics.
 
 ---
 
@@ -60,8 +224,8 @@
 
 ### Do not open a public Issue
 
-The vulnerability may be exploited before a fix is deployed. Use one of the
-following channels:
+The vulnerability may be exploited before a fix is deployed. Use one of
+the following channels:
 
 | Channel | URL | SLA |
 |---|---|---|
@@ -90,7 +254,7 @@ To expedite handling, include:
 3. ...
 
 ## Affected Version
-v1.2.0 (or any version)
+v1.4.0 (or any version)
 
 ## Environment
 - Android version:
@@ -132,6 +296,15 @@ v1.2.0 (or any version)
   - Dynamic memory limit (`debug.SetMemoryLimit`, v1.1.0 — MEM-1)
   - **Pre-critical backups** (`createAutoBackup` + `backupMu`, v1.2.0)
   - **Watchdog token** (`X-Watchdog-Token`, v1.2.0)
+  - **Snapshot detection and rotation semantics** (v1.3.0 —
+    SNAP-MANIFEST + SNAP-MTIME in `buildBackupInfo`, ROT-MANIFEST +
+    ROT-MTIME + ROT-PROTECT in `functions.sh:rotate_backups`)
+  - **`removeModule` path sanitization** (`filepath.Base()` +
+    `filepath.Join()`, v1.4.0 — closes CodeQL `go/path-injection`
+    alerts #1, #2)
+  - **Static companion APK route** (`GET /app-debug.apk`, v1.4.0 —
+    no auth required; the response is a static file, no server-side
+    logic executes to serve it)
 
 - **Shell scripts** (`proxy/*.sh`):
   - Lifecycle (boot / uninstall)
@@ -141,7 +314,12 @@ v1.2.0 (or any version)
   - **Backup helpers** (`backup_user_files`, `restore_user_files`,
     `rotate_backups`, `copy_with_context`, `verify_backup_integrity` —
     v1.2.0)
+  - **Rotation hardening** (`rotate_backups` — v1.3.0 ROT-* semantics,
+    also mirrored in `customize.sh`, `action.sh`, `uninstall.sh`,
+    `status.sh` (`_list_snapshots`), and `watchdog.sh` (§[5b]))
   - **SELinux context preservation** (`restorecon` / `chcon`, v1.2.0)
+  - **DNS auto-start after boot** (`service.sh` §[19], v1.3.0 — uses
+    the same `X-Watchdog-Token` header as the watchdog)
 
 - **Frontend** (`web/`):
   - XSS
@@ -149,12 +327,19 @@ v1.2.0 (or any version)
   - Content Security Policy
   - Offline page behavior (`offline.html`, v1.1.0 fix)
   - **Bilingual language toggle** (client-side only, v1.2.0)
+  - **PWA install button** (dynamic per-browser behavior, v1.3.0;
+    converted to a direct `<a download>` link in v1.4.0)
+  - **Companion APK download** (v1.4.0 — the WebUI install button
+    points at `/app-debug.apk`)
 
-- **Persistent backup directory** (v1.2.0):
+- **Persistent backup directory** (v1.2.0, rotation hardened in v1.3.0):
   - `/sdcard/dnscrypt-webui-backup/` — permissions, rotation,
     transaction state files, SHA256 manifest
   - `txn-*` / `orphan-txn-*` — transaction handling
-  - `.last_stable` pointer
+  - `.last_stable` pointer — **ROT-PROTECT target (v1.3.0)**: never
+    pruned by rotation
+  - Newest install snapshot — **ROT-PROTECT target (v1.3.0)**: never
+    pruned by rotation
   - `.upgrade_history.json` — upgrade log
 
 ### Out of Scope
@@ -163,6 +348,9 @@ v1.2.0 (or any version)
 - **Magisk / KernelSU / APatch** → report to the relevant maintainer
 - **Android OS** → report to Google
 - **HaGeZi blocklists** → report [here](https://github.com/hagezi/dns-blocklists/issues)
+- **dnscrypt-proxy-app** (companion app) → report to the companion
+  repo's issue tracker:
+  https://github.com/gasciljh/dnscrypt-proxy-app/issues
 
 ---
 
@@ -189,16 +377,22 @@ v1.2.0 (or any version)
 | [docs/SECURITY.md §5.31](docs/SECURITY.md) | **v1.2.0 Data Preservation Security Model** |
 | [docs/SECURITY.md §5.32](docs/SECURITY.md) | **v1.2.0 Correctness Fixes (FIX-1, FIX-2)** |
 | [docs/SECURITY.md §5.33](docs/SECURITY.md) | **v1.2.0 Watchdog Token (WD-TOKEN)** |
+| [docs/SECURITY.md §5.34](docs/SECURITY.md) | **v1.4.0 CodeQL `go/path-injection` Fix** |
+| [docs/SECURITY.md §5.35](docs/SECURITY.md) | **v1.4.0 iOS PWA Removal + Companion APK Route** |
 | [docs/SECURITY.md §17.1](docs/SECURITY.md) | v1.1.0 improvements registry |
 | [docs/SECURITY.md §17.2](docs/SECURITY.md) | **v1.2.0 runtime additions registry** |
 | [docs/SECURITY.md §17.3](docs/SECURITY.md) | **v1.2.0 post-audit corrections** |
+| [docs/SECURITY.md §17.4](docs/SECURITY.md) | **v1.3.0 + v1.4.0 additions (registry unchanged at #33)** |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture + Trade-offs (§3.10, §4.10) |
-| [docs/BACKUP.md](docs/BACKUP.md) | **Backup system reference (v1.2.0)** |
+| **[docs/ARCHITECTURE.md §4.13](docs/ARCHITECTURE.md)** | **v1.3.0 server-side refinements (SNAP-* / ROT-* — authoritative)** |
+| [docs/ARCHITECTURE.md §11.31–§11.34](docs/ARCHITECTURE.md) | v1.3.0 trade-offs (manifest, mtime, protections, boot-path) |
+| [docs/BACKUP.md](docs/BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 rotation semantics)** |
 | [docs/EMERGENCY.md](docs/EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Diagnostics + memory-limit + backup debugging |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Contribution guide |
 | [docs/API.md](docs/API.md) | HTTP API Reference (§6.1.7) |
-| [CHANGELOG.md](CHANGELOG.md) | Version history (including v1.2.0) |
+| [CHANGELOG.md](CHANGELOG.md) | Version history (including v1.3.0 and v1.4.0) |
+| [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) | Companion app source repository (v1.4.0) |
 
 ---
 
@@ -209,7 +403,7 @@ v1.2.0 (or any version)
 | **Authentication** | Constant-time comparison, Rate limiting (5/15 min), Login POST-only, Cookie-only sessions, **Watchdog token (`X-Watchdog-Token`, v1.2.0)** |
 | **Sessions** | HttpOnly, SameSite=Lax, Secure (conditional), Session GC, Auth cache 60 s |
 | **Headers** | Strict CSP, X-Frame-Options, nosniff, COOP, CORP |
-| **Input** | MaxBytesReader (5 MB), Path whitelist, Atomic writes, `hasEndpoint` (exact match), `readConfPort` (range check), `shellQuote` (shell injection protection) |
+| **Input** | MaxBytesReader (5 MB), Path whitelist, Atomic writes, `hasEndpoint` (exact match), `readConfPort` (range check), `shellQuote` (shell injection protection), **`filepath.Base()` sanitization in `removeModule` (v1.4.0)** |
 | **DoS** | SSE Write Deadline (30 s), Rate limiting, limitedBuffer, dynamic per-profile memory limit (v1.1.0 — MEM-1), **bounded backup disk usage (v1.2.0)** |
 | **Health endpoints** | `/healthz` public, `/readyz` localhost-only |
 | **Firewall** | Custom Chains (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`), no orphans |
@@ -219,6 +413,165 @@ v1.2.0 (or any version)
 | **Memory** | Per-profile `debug.SetMemoryLimit` (v1.1.0 — MEM-1), `profile_key` + `memory_limit_mb` exposed via `runtime_info` |
 | **Offline page** | CSP removed from `offline.html` (v1.1.0 — no real attack surface exists; see full policy for reintroduction conditions) |
 | **Data preservation (v1.2.0)** | 10 defensive layers, persistent backup directory with `0700`/`0600` permissions, SHA256 integrity verification (advisory), transactional install with rollback, recovery mode via trigger file, SELinux context preservation |
+| **Backup rotation hardening (v1.3.0)** | **SNAP-MANIFEST + SNAP-MTIME (main.go `buildBackupInfo`) and ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (`functions.sh:rotate_backups`)** — manifest-based detection, mtime sort, and protection of `.last_stable` + newest install snapshot from pruning |
+| **Boot reliability (v1.3.0)** | DNS auto-start after boot via direct API call in `service.sh` (uses the same watchdog token as the watchdog process) |
+| **Static asset safety (v1.4.0)** | Companion APK served as a static file — no server-side logic executes to serve it; the WebUI install button is a plain `<a download>` link (no JS-driven install flow) |
+
+---
+
+## Key Security Fixes (v1.4.0)
+
+### CodeQL `go/path-injection` hardening (v1.4.0)
+
+- **Two CodeQL alerts (#1, #2) closed in `removeModule`
+  (proxy/main.go)** — the caller-provided path is now routed through
+  `filepath.Base()`, which CodeQL recognizes as an effective
+  path-injection sanitizer. The returned value contains no path
+  separators and no `..`.
+
+  The final path is then reconstructed from the trusted
+  `MODULES_DIR` constant plus the sanitized basename:
+
+  ```go
+  name := filepath.Base(modulePath)
+  if name == "" || name == "." || name == ".." || name == "/" {
+      return error("Invalid module name")
+  }
+  // ...
+  cleanPath := filepath.Join(MODULES_DIR, name)
+  ```
+
+  A defence-in-depth prefix check is kept as a second layer, but it
+  does **not** participate in path construction — no
+  user-controlled data reaches any path expression from this point
+  onwards.
+
+- **No API contract change** — the `POST /api/remove_module`
+  endpoint keeps the same path, method, auth requirements, and
+  response shape. Existing clients are unaffected.
+
+### Companion APK integration (v1.4.0)
+
+- **A static companion Android app** (`web/app-debug.apk`) is now
+  bundled into the module ZIP as an **OPTIONAL** asset. It is served
+  publicly at `GET /app-debug.apk`.
+
+- **Security posture**:
+  - The file is **static** — no server-side logic executes to serve it
+    (`http.ServeFile` only).
+  - The route is **public** (no auth required) — same policy as the
+    static SVG/PNG/ICO assets. This is intentional: the APK contains
+    no user data and needs to be downloadable before login.
+  - The route returns **404** when the file is absent, which is the
+    intended behaviour for local developer builds without a network
+    fetch.
+  - Per-extension `Cache-Control` is applied (`.apk` →
+    `public, max-age=3600, immutable`; everything else →
+    `no-store`).
+
+- **WebUI install button** — converted from a JavaScript-driven modal
+  (`beforeinstallprompt`) to a direct `<a download>` link pointing at
+  `/app-debug.apk`. This removes the JS-driven install flow
+  entirely, reducing the browser-detection surface.
+
+- **iOS PWA logic removed** — Android-only project. This removes
+  ~35 lines of iOS-specific code from `web/index.html`, including
+  `isIOSDevice()`, `pwaStepIos1/2/3` translations, and iOS branches
+  in `getBrowserName()`, `isBrowserSupported()`,
+  `getPWAInstallSteps()`, and `showPWAInstructionsModal()`.
+
+---
+
+## Key Security Fixes (v1.3.0)
+
+### Backup rotation hardening (v1.3.0 — SNAP-* / ROT-*)
+
+- **Why this matters for security**: The persistent backup directory
+  at `/sdcard/dnscrypt-webui-backup/` is the **last line of defense**
+  for user configuration. If rotation silently evicts the snapshot
+  that recovery mode depends on (`.last_stable`) or the snapshot that
+  rollback depends on (the newest install), the user can lose their
+  configuration during a failed upgrade. The v1.3.0 refinements close
+  this class of failure.
+
+- **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now detects a
+  snapshot by `.manifest.json` presence, not by the v1.2.0 name
+  pattern. Custom-named snapshots are therefore visible to the API
+  (and cannot be silently orphaned).
+
+- **SNAP-MTIME** — `last_backup_name` is now selected by mtime
+  (descending), with a name-based fallback. This is robust against
+  clock drift and manual renames, and it aligns `runtime_info` with
+  the shell-side `status.sh --json` object.
+
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** — `functions.sh:
+  rotate_backups()` was rewritten with the same detection, the same
+  sort, and two additional protected targets:
+
+  | Target | Why it is protected |
+  |---|---|
+  | `.last_stable` target | Recovery mode priority-1 source; pruning it would break recovery. |
+  | Newest install snapshot | Used by rollback and `.upgrade_history`; pruning it would break rollback. |
+
+  **Threat model coverage**:
+
+  | Threat | Mitigation |
+  |---|---|
+  | Manifest-less directory mistaken for a snapshot | **ROT-MANIFEST** excludes it. |
+  | Clock drift or manual rename displacing the newest snapshot | **ROT-MTIME** sorts by mtime, not name. |
+  | Rotation evicting the recovery pointer | **ROT-PROTECT** never prunes `.last_stable`. |
+  | Rotation evicting the rollback target | **ROT-PROTECT** never prunes the newest install snapshot. |
+
+- **Parallel application** — the same semantics are now in
+  `watchdog.sh` (§[5b] counter), `status.sh` (`_list_snapshots`),
+  `customize.sh` (`rotate_backups`), `action.sh`
+  (`_inline_list_snapshots` + `_inline_rotate_backups` +
+  `_inline_backup_summary`), and `uninstall.sh` (§[5b]
+  `BACKUP_COUNT` / `BACKUP_LAST_NAME`). Every consumer of the
+  persistent backup directory now agrees on which snapshots exist
+  and which is the newest.
+
+- **Reference**: `docs/ARCHITECTURE.md` §4.13 (authoritative),
+  §11.31–§11.34 (trade-offs), `docs/BACKUP.md` §6.5 (rotation
+  ordering — corrected in the v1.4.0 audit cycle).
+
+### DNS auto-start after boot (v1.3.0)
+
+- **A race condition in the boot sequence closed** — the DNS engine
+  was not starting automatically after a device reboot when the user
+  had previously left the service in the ON state.
+
+  **Root cause**: `watchdog.sh` waits a fixed 30-second interval
+  before its first API call. By the time it fires
+  `POST /api/ensure_running_service`, the WebUI may not have
+  finished binding to its port. The watchdog would then retry with
+  exponential backoff (30s → 60s → 120s → ...), leaving DNS
+  unavailable for minutes after boot.
+
+  **Fix**: `service.sh` now performs a direct, bounded wait for the
+  WebUI to become ready (up to 60 seconds, checking for the watchdog
+  token file + the WebUI TCP port), then calls the API itself. This
+  guarantees DNS starts within a few seconds of the WebUI coming up,
+  without depending on the watchdog's polling interval.
+
+  **Security**: The API call uses the same `X-Watchdog-Token`
+  header that was introduced in v1.2.0 (WD-TOKEN). No new
+  authentication surface was added. The watchdog token remains the
+  sole credential for the `ensure_running_service` endpoint.
+
+### PWA install button (v1.3.0)
+
+- **No new attack surface.** The v1.3.0 install button was a
+  JavaScript-driven element that adapted to the browser. It
+  operated entirely on static strings and DOM elements. The v1.4.0
+  release removed this JS-driven flow and replaced it with a plain
+  `<a download>` link.
+
+### Live status LED (v1.3.0)
+
+- **No security implications.** A 12×12 CSS LED reflecting the DNS
+  engine state (green = ON, red = OFF). Pure CSS + JS, no new
+  network calls, no new user input surface.
 
 ---
 
@@ -371,12 +724,30 @@ These are documented in `docs/SECURITY.md` §5.30 as
 - **Critical vulnerabilities** may warrant a **hotfix** release.
 - **Responsible disclosure** is always appreciated.
 - Read [docs/SECURITY.md](docs/SECURITY.md) for full details.
-- **Audit Corrections Registry remains at #33** — v1.2.0 does not
-  extend it. New audit corrections will resume at **#34** in
-  **v1.3.x**. See `docs/SECURITY.md` §17.
-- **v1.2.0 does not introduce new attack vectors.** All v1.0.0 and
-  v1.1.0 security fixes remain in place. The v1.2.0 additions
-  (BAK-1..BAK-4, FIX-1, FIX-2, WD-TOKEN) are strictly defensive.
+- **Audit Corrections Registry remains at #33** — v1.2.0, v1.3.0,
+  and v1.4.0 do not extend it. New audit corrections will resume at
+  **#34** in a future release (v1.5.0 or later). See
+  `docs/SECURITY.md` §17.
+- **v1.3.0 and v1.4.0 do not introduce new attack vectors.** All
+  v1.0.0, v1.1.0, and v1.2.0 security fixes remain in place.
+  - The v1.3.0 additions (PWA install button, live status LED, DNS
+    auto-start) are feature/correctness improvements. The PWA button
+    operated entirely on static strings; the status LED is pure CSS;
+    the DNS auto-start uses the existing watchdog token.
+  - The v1.3.0 **server-side refinements** (SNAP-MANIFEST,
+    SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) **harden** the
+    backup layer: they eliminate a class of failure where rotation
+    could silently prune a snapshot that recovery mode or rollback
+    depends on. They are strictly defensive and do not change the
+    API contract.
+  - The v1.4.0 additions (Companion APK, CodeQL fix, iOS removal) are
+    strictly defensive. The APK is a static file served publicly;
+    the CodeQL fix closes two path-injection alerts; the iOS removal
+    reduces the browser-detection surface.
+- **The v1.2.0 rotation description ("sorted by directory name") is
+  superseded.** The authoritative current description is the v1.3.0
+  **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** semantics in
+  `docs/ARCHITECTURE.md` §4.13.2 and `docs/BACKUP.md` §6.5.
 - **`web/offline.html` no longer has a CSP meta.** If you add dynamic
   content to that page in the future, reintroduce CSP — preferably
   with a nonce rather than `'unsafe-inline'`.
@@ -386,6 +757,10 @@ These are documented in `docs/SECURITY.md` §5.30 as
   is owned by root with mode `0700` on directories and `0600` on
   files. A malicious root app can still read it. See
   `docs/BACKUP.md` §12.5.
+- **Companion APK** is served publicly at `GET /app-debug.apk`. It is
+  a static file with no telemetry. If you build the module locally
+  without fetching the APK, the route returns 404 — this is the
+  intended behaviour.
 
 ---
 
@@ -396,5 +771,6 @@ These are documented in `docs/SECURITY.md` §5.30 as
 
 ---
 
-*Last updated: 2026-09-29*
-*Version: v1.2.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
+*Author: gasciljh*

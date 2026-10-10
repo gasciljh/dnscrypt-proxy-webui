@@ -12,7 +12,139 @@
 
 ---
 
-> **Post-Release Verification (v1.2.0 — 2026-09-29)**:
+> **Identifier inventory in this file (5 total)**:
+>   • HARD-ADR5-01 (v1.3.0 verification block extended with
+>     server-side rotation refinements — v1.4.0)
+>   • HARD-ADR5-02 (v1.4.0 verification block extended with
+>     MAIN-01 — v1.4.0)
+>   • HARD-ADR5-03 (Release verification section extended —
+>     v1.3.0 SNAP-*/ROT-* + v1.4.0 MAIN-01 — v1.4.0)
+>   • HARD-ADR5-04 (References section extended with rotation
+>     cross-references — v1.4.0)
+>   • HARD-ADR5-05 (Header identifier inventory + cross-references
+>     added — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](../ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/ARCHITECTURE.md §4.1, §11.37](../ARCHITECTURE.md) —
+>     MAIN-01 (`LOG_LEVEL` load-order fix)
+>   • [docs/COMPATIBILITY.md §10.3.5](../COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification procedure
+>   • [docs/GLOSSARY.md](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+>     Rotation Guardian badge
+>   • [docs/HALL_OF_FAME.md](../HALL_OF_FAME.md) — Rotation Guardian
+>     + Companion App Champion badges
+>   • [docs/BRANCHING.md §4.4](../BRANCHING.md) — when to use which
+>     template
+>   • [docs/RELEASE_PROCESS.md §5, §6.5, §10](../RELEASE_PROCESS.md)
+>     — release PR flow + sync documentation
+>   • [ADR-0004](0004-unified-pr-template.md) — the superseded
+>     decision
+>   • [CHANGELOG.md](../../CHANGELOG.md) — version history
+
+---
+
+> **Post-Release Verification (v1.4.0 — 2026-10-06)**:
+>
+> This ADR was reviewed during the v1.4.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The release-specific template
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) has now been used
+>     for **five releases**: `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.3.0`,
+>     and `v1.4.0`.
+>   • The template's **version-first layout** continues to prove
+>     effective — reviewers find the critical release fields faster
+>     than with the unified template.
+>   • The **`?template=release.md` query-string pattern** documented
+>     in `docs/BRANCHING.md` §4.4 and `docs/RELEASE_PROCESS.md` §6.5
+>     has worked as intended across all five cycles.
+>   • The **unified template** (from ADR-0004) remains the default
+>     for all non-release PRs — the two templates continue to
+>     coexist without conflict.
+>   • **v1.4.0 additions worked as designed**: the release template
+>     was **NOT modified** for the v1.4.0 integration release. The
+>     companion app integration, CodeQL `go/path-injection` fix,
+>     iOS PWA removal, and **MAIN-01** (`LOG_LEVEL` load-order fix
+>     in `main.go`) were all described in the "Changes overview"
+>     section without needing a new dedicated section — the
+>     existing structure was sufficient. This is the intended
+>     behavior for additive releases: the template scales, it does
+>     not grow.
+>   • The **post-merge checklist** in the release template reminded
+>     the maintainer of the tag push and auto-sync steps for
+>     `v1.4.0`.
+>   • The **rollback plan section** documented the resilience of the
+>     v1.4.0 pipeline: a failed companion APK fetch is
+>     **best-effort** and does **not** fail the release (matching
+>     the `release.yml` behaviour). No rollback was required.
+>   • The **reversal of ADR-0004** has been validated across five
+>     release cycles — no contributor has requested reverting it.
+>
+> **Result**: The decision is validated by five release cycles
+> including the v1.4.0 integration release. No superseding ADR is
+> required.
+
+> **Post-Release Verification (v1.3.0 — 2026-10-02)**:
+>
+> This ADR was reviewed during the v1.3.0 release cycle and
+> **remains in effect**. No amendments were needed.
+>
+> **Verification notes**:
+>
+>   • The release-specific template
+>     (`.github/PULL_REQUEST_TEMPLATE/release.md`) has been used
+>     for **four releases**: `v1.0.0`, `v1.1.0`, `v1.2.0`, and
+>     `v1.3.0`.
+>   • The template's **version-first layout** continued to prove
+>     effective.
+>   • The **`?template=release.md` query-string pattern** worked as
+>     intended for the `release/v1.3.0` → `main` PR.
+>   • The **unified template** remained the default for all
+>     non-release PRs.
+>   • **v1.3.0 was a small feature release**: the PWA install
+>     button, live status LED, and DNS auto-start fix did **not**
+>     require a new section in the release template. The "Changes
+>     overview" section captured them adequately.
+>   • **Server-side rotation refinements shipped in v1.3.0** — this
+>     release ALSO contained five new semantics that underpin the
+>     persistent backup directory (also documented in
+>     `CHANGELOG.md` [v1.3.0] and
+>     [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13):
+>       - **SNAP-MANIFEST** — `main.go:buildBackupInfo()` detects
+>         a snapshot by the presence of a `.manifest.json` file,
+>         not by the v1.2.0 name pattern (`^[0-9]{8}-[0-9]{6}-`).
+>       - **SNAP-MTIME** — `last_backup_name` is selected by
+>         **mtime** (descending), not by lexicographic directory
+>         name. Supersedes the v1.2.0 BUG-3 rule.
+>       - **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets on top of the
+>         21-newest window: the `.last_stable` recovery pointer
+>         and the newest install snapshot (name matching
+>         `-v<digit>`).
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 other
+>     shell scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
+>     **This further validates the release template**: a
+>     cross-cutting release touching client-side JS, shell
+>     scripts, Go code, and backup/rotation semantics across 8+
+>     files was handled cleanly without touching the template's
+>     structure.
+>   • The **post-merge checklist** worked as intended — the tag
+>     push and auto-sync steps were documented and executed.
+>   • The **reversal of ADR-0004** has been validated across four
+>     release cycles — no contributor has requested reverting it.
+>
+> **Result**: The decision is validated by four release cycles
+> including a focused feature release with server-side
+> refinements. No superseding ADR is required.
+
+> **Post-Release Verification (v1.2.0 — 2026-09-29)** (retained as history):
 >
 > This ADR was reviewed during the v1.2.0 release cycle and
 > **remains in effect**. No amendments were needed.
@@ -43,10 +175,9 @@
 >     release cycles — no contributor has requested reverting it.
 >
 > **Result**: The decision is validated by three release cycles
-> including the v1.2.0 data-preservation release. No superseding
-> ADR is required.
+> including the v1.2.0 data-preservation release.
 
-> **Post-Release Verification (v1.1.0 — 2026-09-26)**:
+> **Post-Release Verification (v1.1.0 — 2026-09-26)** (retained as history):
 >
 > This ADR was reviewed during the v1.1.0 release cycle and
 > **remains in effect**. No amendments were needed.
@@ -75,7 +206,7 @@
 >     caught the maintainer at least once per release.
 >
 > **Result**: The decision is validated by real-world usage across
-> two release cycles. No superseding ADR is required.
+> two release cycles.
 
 ---
 
@@ -190,7 +321,7 @@ Because GitHub only auto-applies the **default** template, the
 release template must be selected explicitly:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.4.0?template=release.md
 ```
 
 **Mitigation**:
@@ -373,12 +504,13 @@ journey**.
 - [`docs/BRANCHING.md`](../BRANCHING.md) §4.4 — when to use which
   template.
 - [`docs/RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) §5 — the
-  release PR flow.
+  release PR flow; §6.5 — the query-string pattern.
 - [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) §6 — release summary
   for developers.
 - [`docs/UPGRADE.md`](../UPGRADE.md) — version upgrade guide
-  (§3.0 covers v1.0.0 → v1.1.0; §3.1 covers v1.1.0 → v1.2.0, which
-  used the release template).
+  (§3.1 covers v1.0.0 → v1.1.0; §3.2 covers v1.1.0 → v1.2.0;
+  §3.3 covers v1.2.0 → v1.3.0; §3.4 covers v1.3.0 → v1.4.0 — all
+  four used the release template).
 - [`scripts/release.sh`](../../scripts/release.sh) — the local
   release automation.
 - [`scripts/release-patch.sh`](../../scripts/release-patch.sh) —
@@ -389,6 +521,15 @@ journey**.
   (v1.2.0 additions to the release template).
 - [`docs/EMERGENCY.md`](../EMERGENCY.md) — emergency recovery
   (v1.2.0 additions to the release template).
+- [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.13 — v1.3.0
+  server-side rotation refinements (SNAP-*/ROT-*); §4.1 and §11.37
+  — MAIN-01 load-order fix (v1.4.0).
+- [`docs/COMPATIBILITY.md`](../COMPATIBILITY.md) §10.3.5 — on-device
+  SNAP-*/ROT-* verification procedure.
+- [`docs/GLOSSARY.md`](../GLOSSARY.md) — SNAP-*/ROT-* terms,
+  Rotation Guardian badge.
+- [`docs/HALL_OF_FAME.md`](../HALL_OF_FAME.md) — Rotation Guardian
+  + Companion App Champion badges.
 
 ### External references
 
@@ -442,15 +583,60 @@ journey**.
   - Auto-sync triggered correctly.
   - The **rollback plan section** documented the data-preservation
     safety net (persistent backup directory preserved on rollback).
+- **v1.3.0** (2026-10-02) — fourth release; template **unchanged**.
+  - `release/v1.3.0` → PR against `main` via
+    `?template=release.md`.
+  - Version-first layout: `version=v1.3.0`, `versionCode=1030000`.
+  - All pre-flight checklists completed.
+  - The **feature-release scope** was documented in the "Changes
+    overview" section without needing a new dedicated section.
+    This release shipped **three categories** of changes:
+    - **Client-side**: PWA install button + live status LED.
+    - **Shell-side**: DNS auto-start fix in `service.sh`.
+    - **Server-side rotation refinements**: **SNAP-MANIFEST** +
+      **SNAP-MTIME** (in `main.go:buildBackupInfo()`) and
+      **ROT-MANIFEST** + **ROT-MTIME** + **ROT-PROTECT** (in
+      `functions.sh:rotate_backups()`), mirrored in 5 other
+      scripts. See [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md)
+      §4.13.
+  - Post-merge tag push documented and executed.
+  - Auto-sync triggered correctly.
+  - **Cross-cutting validation**: a release touching client-side
+    JS, shell scripts, Go code, and backup/rotation semantics
+    across 8+ files was handled by the same release template
+    without any structural change.
+- **v1.4.0** (2026-10-06) — fifth release; template **unchanged**.
+  - `release/v1.4.0` → PR against `main` via
+    `?template=release.md`.
+  - Version-first layout: `version=v1.4.0`, `versionCode=1040000`.
+  - All pre-flight checklists completed.
+  - The **integration-release scope** was documented in the
+    "Changes overview" section. It shipped:
+    - Companion Android app (`web/app-debug.apk`, **optional**).
+    - CodeQL `go/path-injection` fix in `removeModule`.
+    - iOS PWA logic removal.
+    - **MAIN-01** — `LOG_LEVEL` loaded immediately after
+      `initPaths()` in `main.go`. See
+      [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) §4.1 and
+      §11.37.
+  - The companion app is an **optional** asset — the release
+    template's rollback plan section documented that a failed
+    companion APK fetch does **not** fail the release. No
+    rollback was required.
+  - Post-merge tag push documented and executed.
+  - Auto-sync triggered correctly.
+  - **No new template section** was needed for the companion
+    integration, the CodeQL fix, or the startup-order fix — the
+    existing structure scaled as intended.
 - **Discoverability** — verified:
   - `docs/BRANCHING.md` §4.4 documents the query-string pattern.
   - `docs/RELEASE_PROCESS.md` §5 includes a pre-built link.
   - `.github/PULL_REQUEST_TEMPLATE.md` contains the one-line
     reminder.
   - No contributor has needed to ask which template to use.
-- **Rollback plan section** — never exercised (all three releases
+- **Rollback plan section** — never exercised (all five releases
   were successful).
-- **Next review**: v1.3.0 cycle.
+- **Next review**: v1.5.0 cycle (or when the PR workflow changes).
 - See `CHANGELOG.md` for the full release history.
 
 ---

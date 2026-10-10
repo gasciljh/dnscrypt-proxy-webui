@@ -1,28 +1,92 @@
 # ============================================================
 # DNSCrypt Smart Filter – Feature Request Template
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # GitHub Issue Forms (YAML-based) — the modern standard
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
 # ============================================================
-# v1.1.0 additions (kept):
-#   • Pre-flight checklist now requires checking docs/adr/ for
-#     existing architectural decisions on the same topic.
-#   • Added "ADR proposal" as a request_type option — feature
-#     requests that reverse or amend an accepted architectural
-#     decision should be routed through the ADR system.
-#   • Added an "ADR-related features" section to make this path
-#     explicit and give the proposer a place to reference the
-#     relevant ADR(s).
-#   • Updated pre-flight to reference docs/BRANCHING.md and
-#     docs/RELEASE_PROCESS.md for process-related ideas.
-#   • ROADMAP reference updated to mention the version numbers
-#     currently tracked.
+# Cross-references:
+# ============================================================
+#   • .github/ISSUE_TEMPLATE/bug_report.yml        — bug report form
+#   • .github/ISSUE_TEMPLATE/config.yml            — templates config
+#   • .github/PULL_REQUEST_TEMPLATE.md             — PR template
+#   • .github/PULL_REQUEST_TEMPLATE/release.md     — release PR template
+#   • docs/ROADMAP.md                              — v1.5.0 + v2.0.0
+#   • docs/BACKUP.md                               — backup system (v1.2.0)
+#   • docs/EMERGENCY.md                            — recovery (v1.2.0)
+#   • docs/UPGRADE.md §3.x                         — upgrade paths
+#   • docs/ARCHITECTURE.md §4.13                   — v1.3.0 refinements
+#   • docs/adr/README.md                           — ADR system
+#   • docs/HALL_OF_FAME.md                         — badges
+#   • docs/COMPATIBILITY.md                        — device matrix
+#   • CHANGELOG.md                                 — version history
+#   • gasciljh/dnscrypt-proxy-app                  — companion repo (v1.4.0)
+# ============================================================
+# v1.4.0 additions:
+#   • Pre-flight checklist now also references v1.4.0 concepts:
+#     companion Android app, iOS removal, and CodeQL hardening.
+#   • New request_type option:
+#       - "📱 Companion app / native client (v1.4.0)"
+#   • New request_type option:
+#       - "📲 PWA / install experience (v1.3.0)"
+#   • New "willing_to_contribute" option:
+#       - "📱 I can help with the companion app (v1.4.0)"
+#   • ROADMAP reference updated: v1.5.0 and v2.0.0 are now the
+#     currently-tracked future versions (v1.3.0 and v1.4.0 have
+#     shipped).
+#   • References section extended with the companion app repo.
+#   • MAIN-01 (v1.4.0, source-level): `main.go` now loads
+#     `LOG_LEVEL` immediately after `initPaths()`. This is
+#     transparent to feature requests, but any proposal that
+#     depends on the WebUI's startup log ordering should be
+#     aware of the fix.
 #
 # ============================================================
-# v1.2.0 additions:
+# v1.3.0 additions (extended in this revision):
+# ============================================================
+#   • Pre-flight checklist now references docs/BRANCHING.md and
+#     docs/RELEASE_PROCESS.md for process-related ideas.
+#   • ROADMAP reference updated to mention v1.4.0 and v2.0.0 as
+#     the currently-tracked future versions (this was the state
+#     at the time of the v1.3.0 release).
+#
+#   Server-side refinements (backup layer):
+#     The v1.3.0 release ALSO refined snapshot-detection and
+#     rotation semantics that underpin the persistent backup
+#     system. Three identifiers (used in CHANGELOG.md [v1.3.0]
+#     and docs/ARCHITECTURE.md §4.13):
+#
+#       🔧 SNAP-MANIFEST — `main.go:buildBackupInfo()` detects
+#         a snapshot by `.manifest.json` presence, not by name
+#         pattern.
+#
+#       🔧 SNAP-MTIME — `last_backup_name` is selected by
+#         mtime, descending (with a name-based fallback).
+#
+#       🔧 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT —
+#         `functions.sh:rotate_backups()` uses the same
+#         detection + sort, plus two protected targets
+#         (`.last_stable` + newest install snapshot).
+#
+#   ⚠️ Impact on THIS file:
+#     The v1.3.0 release did NOT add or remove any request_type
+#     option. But proposals that **touch the backup layer** (the
+#     "💾 Backup / data preservation improvement (v1.2.0)"
+#     option) now need to be aware of the v1.3.0 semantics:
+#       • Any new snapshot-producing path MUST write a
+#         `.manifest.json` file (SNAP-MANIFEST).
+#       • Any new rotation logic MUST sort by mtime
+#         (SNAP-MTIME / ROT-MTIME), not by name.
+#       • The `.last_stable` target and the newest install
+#         snapshot MUST be protected from pruning (ROT-PROTECT).
+#     The "Data-preservation impact" section below is the right
+#     place to discuss this.
+#
+# ============================================================
+# v1.2.0 additions (carried forward):
 #   • Version bumped to v1.2.0.
 #   • Pre-flight checklist now also requires checking:
 #       - docs/BACKUP.md      (backup system reference)
@@ -37,28 +101,15 @@
 #       - Extends existing layer(s)
 #       - Adds a new layer (11th)
 #       - Changes existing behavior (needs a migration path)
-#     This makes the reasoning explicit from the very first
-#     discussion.
 #   • Added "Data Guardian (v1.2.0)" to the "willing to
-#     contribute" options — mirroring the new badge introduced
-#     in docs/HALL_OF_FAME.md.
+#     contribute" options.
 #   • The "Request type" dropdown gained a new option:
 #       - "💾 Backup / data preservation improvement (v1.2.0)"
-#   • ROADMAP reference updated to mention v1.3.0 and v2.0.0 as
-#     the currently-tracked future versions.
-#   • Cross-references at the bottom updated:
-#       - docs/BACKUP.md
-#       - docs/EMERGENCY.md
-#       - docs/UPGRADE.md §3.1
-#   • All text is English-only (global edition). No Arabic
-#     strings exist in this file.
+#   • All text is English-only (global edition).
 #
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# v1.2.0 — POST-AUDIT FIXES (still applies):
 # ============================================================
-# A pre-release audit of this file identified the following
-# issues. All of them are addressed in-place; no version bump.
-#
 #   🔧 ISS-5 — The last item of the "Pre-flight checks" section
 #     asked the proposer to confirm that their idea "aligns with
 #     the project philosophy (Zero-Telemetry, Localhost-Only,
@@ -72,15 +123,7 @@
 #     The term has been replaced with a lowercase descriptive
 #     phrase — "user-data preservation" — which conveys the same
 #     intent (respect for the 10 defensive layers) without
-#     inventing a capitalized proper noun. The corresponding
-#     details live in docs/BACKUP.md, which the pre-flight
-#     already requires the proposer to read.
-#
-# Cross-references (v1.2.0):
-#   • docs/BACKUP.md       — backup system reference
-#   • docs/EMERGENCY.md    — emergency recovery guide
-#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
-#   • docs/HALL_OF_FAME.md — Data Guardian badge
+#     inventing a capitalized proper noun.
 # ============================================================
 
 name: ✨ Feature Request
@@ -122,15 +165,12 @@ body:
         >   fill in the "Data-preservation impact" section below.
         >   v1.2.0 encodes a strict contract here — see
         >   [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md).
+        > - If your idea **touches the companion Android app** (v1.4.0),
+        >   note that it lives in a **separate repository**
+        >   ([gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)).
 
   # ============================================================
   # [2] Pre-flight checks
-  # ============================================================
-  # ISS-5 fix: replaced the undefined term
-  # "Data-Preservation-First" with the lowercase descriptive
-  # phrase "user-data preservation". The intent (respect for
-  # the 10 defensive layers) is unchanged; the capitalization
-  # that made it look like a proper noun is removed.
   # ============================================================
   - type: checkboxes
     id: preflight
@@ -171,6 +211,8 @@ body:
         - ♻️ Refactor
         - 🐳 Deployment / Docker
         - 💾 Backup / data preservation improvement (v1.2.0)
+        - 📲 PWA / install experience (v1.3.0)
+        - 📱 Companion app / native client (v1.4.0)
         - 📋 ADR proposal (reverses or amends an existing decision)
         - 🔄 Other
     validations:
@@ -268,7 +310,7 @@ body:
       placeholder: |
         Example:
         **UC-1: Major upgrade**
-        - User wants to upgrade the module from v1.1.0 to v1.2.0
+        - User wants to upgrade the module from v1.3.0 to v1.4.0
         - Exports the rules first
         - Updates the module
         - Imports the rules immediately
@@ -320,6 +362,13 @@ body:
         > This is not a gate — it is a **planning aid**. It
         > ensures the discussion starts with the right context.
         >
+        > **⚠️ v1.3.0 semantics apply** (SNAP-MANIFEST,
+        > SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
+        > If your proposal adds or modifies a snapshot-producing
+        > path, or changes how rotation selects candidates, you
+        > must align with these rules — see
+        > [docs/ARCHITECTURE.md §4.13](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ARCHITECTURE.md).
+        >
         > See [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md)
         > for the full reference.
 
@@ -352,6 +401,8 @@ body:
         - Whether the .manifest.json schema needs to change
         - Whether existing backups would still be valid
         - Whether a migration is needed for users upgrading from v1.1.0
+        - (v1.3.0) Whether the proposal respects the
+          SNAP-MANIFEST / SNAP-MTIME / ROT-* semantics
       placeholder: |
         Example:
         - Affected file: allowlist.txt (extension of Layer 2)
@@ -359,6 +410,8 @@ body:
         - Existing backups remain valid
         - Migration: none needed; v1.2.0 already handles 5 files
         - Uninstall behavior: unchanged (backup dir preserved)
+        - (v1.3.0) Snapshot-producing path writes a manifest
+          (.manifest.json). Rotation sorts by mtime.
     validations:
       required: false
 
@@ -378,6 +431,7 @@ body:
         - 🧪 I can help with testing
         - 📖 I can help with documentation
         - 💾 I can help with backup testing across devices (v1.2.0)
+        - 📱 I can help with the companion app (v1.4.0)
         - 👀 Sadly no — I leave it to the maintainer
     validations:
       required: false
@@ -495,7 +549,7 @@ body:
         - Related links
         - Articles or discussions
         - Assumed timeline (aligned with which ROADMAP version —
-          v1.3.0, v2.0.0, or later?)
+          v1.5.0, v2.0.0, or later?)
         - Any other information
     validations:
       required: false
@@ -525,9 +579,12 @@ body:
 
         ## 📚 References
 
-        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.3.0 and v2.0.0 are the currently-tracked future versions
-        - [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) — backup system reference (v1.2.0)
+        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.5.0 and v2.0.0 are the currently-tracked future versions
+        - [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) — backup system reference (v1.2.0 + v1.3.0 rotation semantics)
         - [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) — emergency recovery guide (v1.2.0)
         - [docs/UPGRADE.md §3.1](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/UPGRADE.md) — v1.1.0 → v1.2.0 upgrade path
-        - [docs/HALL_OF_FAME.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/HALL_OF_FAME.md) — Data Guardian badge (v1.2.0)
+        - [docs/ARCHITECTURE.md §4.13](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ARCHITECTURE.md) — v1.3.0 server-side refinements (SNAP-*/ROT-*)
+        - [docs/HALL_OF_FAME.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/HALL_OF_FAME.md) — Data Guardian badge (v1.2.0) + Memory Architect badge (v1.1.0)
         - [docs/adr/README.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md) — ADR system and index
+        - [Companion app repository](https://github.com/gasciljh/dnscrypt-proxy-app) — separate repo (v1.4.0)
+        - [CHANGELOG.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md) — version history (v1.0.0 → v1.4.0)

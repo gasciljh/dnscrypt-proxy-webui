@@ -1,0 +1,56 @@
+# ============================================================
+# ShellCheck configuration — DNSCrypt Smart Filter
+# ============================================================
+# This file configures ShellCheck behavior project-wide.
+# Documentation: https://www.shellcheck.net/wiki/Directive
+#
+# Principle: disable only FALSE POSITIVES and NOTES that
+# would require invasive rewrites of correct code. Real
+# bugs and warnings are NOT disabled here — they are fixed
+# in the source files.
+# ============================================================
+
+# ------------------------------------------------------------
+# [1] Notes that are style preferences, not bugs
+# ------------------------------------------------------------
+#
+# SC2012 — "Use find instead of ls to better handle non-
+#   alphanumeric filenames."
+#   The project intentionally uses `ls -1` in read-only
+#   listing paths where the directory contents are known
+#   (backup snapshots) and where `find` would add
+#   complexity without benefit. Reviewed and accepted.
+disable=SC2012
+
+# ------------------------------------------------------------
+# [2] False positives in the mksh/ksh environment
+# ------------------------------------------------------------
+#
+# SC1091 — "Not following: ... was not specified as input"
+#   `source` targets use variables (`$SCRIPT_DIR/lib.sh`).
+#   ShellCheck cannot resolve them at parse time. The
+#   sources are always available at runtime in the module
+#   environment.
+disable=SC1091
+
+# ------------------------------------------------------------
+# [3] File-level suppressions (see comments in each file)
+# ------------------------------------------------------------
+#
+# The following checks are disabled per-file with inline
+# directives (not globally) because they only apply to
+# specific files or patterns:
+#
+#   • SC2059 — printf format string is a variable
+#     (color codes). Applies to proxy/*.sh with a
+#     consistent trusted-constant pattern.
+#
+#   • SC2329 — function never invoked directly
+#     (invoked via `trap`). Applies to proxy/release.sh,
+#     scripts/release*.sh.
+#
+#   • SC2034 — variable appears unused
+#     (intentionally documented for readers / consumed by
+#     Magisk at runtime). Applies to specific variables
+#     in proxy/*.sh.
+# ============================================================

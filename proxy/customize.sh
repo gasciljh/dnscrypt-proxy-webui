@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – customize.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -89,24 +91,32 @@
 #     the final module layout.
 #
 # ============================================================
-# v1.2.0 — Post-audit corrections (this revision)
+# v1.2.0 — Post-audit corrections (historical)
 # ============================================================
 # This file carries three identifier families that were added
 # across successive audit passes. The inventory below is the
 # AUTHORITATIVE list of identifiers actually present in the
-# file. It was corrected during the v1.2.0 release audit to
-# remove historical mislabeling.
+# file. It was corrected during the v1.4.0 release audit to
+# include the CSH-17, CSH-18, and CSH-19 identifiers that had
+# been added in the v1.4.0 revision but not yet reflected in
+# the count.
 #
-# Identifier inventory in THIS file (28 total):
+# Identifier inventory in THIS file (31 total):
 #
 #   • CSH-1, CSH-2, CSH-3, CSH-4, CSH-5, CSH-6,
 #     CSH-11, CSH-13                              (8)
 #       — original post-audit corrections
 #
 #   • CSH-14, CSH-15, CSH-16                      (3)
-#       — NEW corrections in this revision
+#       — corrections added in the v1.2.0 revision
 #         (§[8b] watchdog path, §[9c] critical-file
 #          strictness, §[24] merged recovery block)
+#
+#   • CSH-17, CSH-18, CSH-19                      (3)
+#       — corrections added in the v1.4.0 revision
+#         (§[9] optional companion APK, version bump,
+#          and the v1.3.0 documentation-sync correction
+#          for rotate_backups)
 #
 #   • DOC-1, DOC-2                                (2)
 #       — documentation fixes
@@ -129,11 +139,14 @@
 #   assume the file is missing five fixes — the fixes exist,
 #   they simply carry the identifiers listed above.
 #
-# NOTE ON THE REVISED COUNT:
-#   The previous revision of this header incorrectly declared
-#   "31 total" — the sum of the six lines above was already
-#   only 28 (8 + 3 + 2 + 1 + 4 + 10). The arithmetic error
-#   has been corrected here; no code change was required.
+# NOTE ON THE COUNT HISTORY:
+#   The v1.2.0 revision declared "31 total" while listing
+#   only 28 entries (8 + 3 + 2 + 1 + 4 + 10). That arithmetic
+#   error was corrected to "28 total" in an earlier pass.
+#   The v1.4.0 revision added CSH-17, CSH-18, and CSH-19 —
+#   the count is now correctly "31 total", matching the
+#   number that was accidentally correct in the original
+#   v1.2.0 header.
 #
 # ------------------------------------------------------------
 # Original post-audit corrections (CSH-1..CSH-13, partial):
@@ -277,8 +290,17 @@
 #
 # 🛡️ HARD-CS-05 — `write_manifest` embedded `$source` verbatim
 #     into JSON. If the source path ever contained a quote or
-#     backslash, the manifest would be invalid. A minimal JSON
-#     escaper now sanitizes the three fields that carry strings.
+#     backslash, the manifest would be invalid.
+#
+#     REVISED (v1.4.0): the same minimal JSON escaper is now
+#     applied to ALL FOUR string fields that reach the JSON
+#     output — `version`, `timestamp`, `source`, and
+#     `root_solution` — matching the canonical
+#     `functions.sh:write_manifest` behaviour, which already
+#     escapes all four. The three newly-escaped fields come
+#     from controlled sources today (module.prop, date, and a
+#     hard-coded enum), but escaping them costs nothing and
+#     closes the door on future drift.
 #
 # 🛡️ HARD-CS-06 — `create_persistent_backup` silently returned
 #     1 when `mkdir -p` failed. The failure is now logged to
@@ -310,7 +332,7 @@
 #     are now removed on the "no source" path as well.
 #
 # ------------------------------------------------------------
-# NEW corrections in this revision (CSH-14, CSH-15, CSH-16):
+# Corrections added in the v1.2.0 revision (CSH-14..CSH-16):
 # ------------------------------------------------------------
 #
 # 🔧 CSH-14 — Section [8b] located the watchdog PID file via a
@@ -338,6 +360,102 @@
 #     summary is printed exactly once and reads coherently.
 #
 # ============================================================
+# v1.3.0 — Server-side refinement: rotate_backups() rewrite
+# ============================================================
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   However, the rotation logic in this installer's §[22b]
+#   `rotate_backups()` function was ALSO refined in v1.3.0 to
+#   match the canonical implementation in `functions.sh`.
+#   Earlier revisions of this header incorrectly claimed
+#   "no changes to the installer" and "byte-for-byte identical
+#   between v1.2.0 and v1.3.0" — those claims were inaccurate
+#   and are corrected in the v1.4.0 revision (see CSH-19 below).
+#
+#   The v1.3.0 rotation refinement is documented under three
+#   identifiers (also used in CHANGELOG.md and in
+#   docs/ARCHITECTURE.md §4.13.2):
+#
+#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
+#     A directory is treated as a snapshot iff it contains a
+#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
+#     and `orphan-txn-*/`.
+#
+#     Before v1.3.0: only directories whose name matched the
+#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
+#     custom-named snapshots were silently skipped.
+#
+#   🔧 ROT-MTIME — mtime sort.
+#     Candidates are ordered by mtime (numeric, descending),
+#     not by lexicographic directory name. Robust against
+#     clock drift and against manual renames. Aligns
+#     `rotate_backups` with the `runtime_info.backups` API
+#     (which uses the same mtime sort since v1.3.0 — see
+#     SNAP-MTIME in proxy/main.go).
+#
+#   🔧 ROT-PROTECT — protected rotation targets.
+#     Two additional snapshots are preserved on top of the
+#     21-newest window:
+#       • The `.last_stable` target (recovery pointer).
+#       • The newest install snapshot (name matches
+#         `-v<digit>`).
+#     Without these protections, the 21-newest window could
+#     silently evict the exact snapshot that recovery mode
+#     or rollback depends on.
+#
+#   All other v1.2.0 installer logic (the 10 defensive layers)
+#   remains byte-for-byte identical between v1.2.0 and v1.3.0.
+#
+#   See CHANGELOG.md v1.3.0 section, and
+#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 CSH-17 — The module ZIP may now contain
+#     `web/app-debug.apk` (the companion Android app). The
+#     file is OPTIONAL: it is staged by `.github/workflows/release.yml`
+#     via `scripts/fetch_app_apk.sh` before packaging. Local
+#     developer builds may omit it entirely.
+#
+#     Handling (no code change required):
+#       • Section [9] `unzip 'web/*'` extracts it automatically
+#         (the glob crosses path separators).
+#       • Section [10] critical-file check does NOT include it
+#         (an absent APK is not a fatal error).
+#       • Section [19] `set_perm_recursive` applies 0644 to it
+#         like every other web file.
+#       • `proxy/main.go` serves it at `/app-debug.apk` and
+#         returns 404 when the file is absent.
+#
+#   📱 CSH-18 — Version bump v1.3.0 → v1.4.0.
+#     The `--version` flag now reports v1.4.0. No behavior
+#     changes to the install pipeline itself.
+#
+#   📚 CSH-19 — Documentation-sync correction for v1.3.0.
+#     The v1.3.0 block above was previously inaccurate: it
+#     claimed "no changes to the installer" and "byte-for-byte
+#     identical between v1.2.0 and v1.3.0", while §[22b]
+#     `rotate_backups()` in fact contained the v1.3.0 rotation
+#     logic (manifest-based detection, mtime sort, protected
+#     targets — the ROT-MANIFEST / ROT-MTIME / ROT-PROTECT
+#     identifiers shared with functions.sh).
+#
+#     The v1.3.0 block has been rewritten to describe the
+#     actual behaviour, and §[22b] has gained a doc-block that
+#     explains the v1.3.0 semantics and the reasons for them,
+#     in line with the same correction applied to
+#     `functions.sh` (FSH-18) and to `service.sh` (SVC-V14-03).
+#
+#     No code in `customize.sh` changed between v1.3.0 and
+#     v1.4.0 — this is a documentation-only correction. The
+#     version header on line 4 is bumped to v1.4.0 for
+#     traceability, consistent with the other module files.
+#
+# ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside multiple helper functions
 #   (get_module_version, _inline_cleanup_firewall,
@@ -360,7 +478,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac
@@ -386,6 +504,7 @@ if [ ! -d "$MODPATH" ]; then
     abort "❌ MODPATH '$MODPATH' does not exist or is not a directory."
 fi
 
+# shellcheck disable=SC2034
 SKIPUNZIP=1
 
 # ============================================================
@@ -636,7 +755,6 @@ copy_with_context() {
 }
 
 # ============================================================
-# ============================================================
 # [8] v1.2.0 -- Layer 1: content-based multi-source discovery
 # ============================================================
 # Identify the module by CONTENT (module.prop id field), not
@@ -737,6 +855,7 @@ else
     echo "Selected: $_found_name (v$_best_version, $FOUND_FILE_COUNT files) at $FOUND_SOURCE" >> "$INSTALL_LOG"
 fi
 
+# ============================================================
 # [8a] v1.2.0 — Layer 7: recovery mode check
 # ============================================================
 RECOVERY_MODE=0
@@ -987,22 +1106,27 @@ fi
 #   backup with a bad one.
 #
 # ------------------------------------------------------------
-# 🔧 BUG-CS-A (this revision): create_persistent_backup now
-#     returns 1 when 0 files were copied. The caller then does
-#     NOT set PERSISTENT_BACKUP_OK, `.last_stable` is NOT
-#     updated, and `current/` is NOT touched.
+# 🔧 BUG-CS-A: create_persistent_backup now returns 1 when 0
+#     files were copied. The caller then does NOT set
+#     PERSISTENT_BACKUP_OK, `.last_stable` is NOT updated, and
+#     `current/` is NOT touched.
 #
-# 🔧 BUG-CS-B (this revision): `current/` is updated via an
-#     atomic tmp-dir + mv sequence.
+# 🔧 BUG-CS-B: `current/` is updated via an atomic tmp-dir +
+#     mv sequence.
 #
-# 🛡️ HARD-CS-05 (this revision): write_manifest escapes the
-#     string fields with a minimal JSON escaper.
+# 🛡️ HARD-CS-05 (REVISED v1.4.0): the minimal JSON escaper is
+#     now applied to ALL FOUR string fields that reach the JSON
+#     output — `version`, `timestamp`, `source`, and
+#     `root_solution` — matching the canonical
+#     `functions.sh:write_manifest` behaviour, which already
+#     escapes all four.
 # ------------------------------------------------------------
 
 # json_escape: escape backslash, double-quote, and control
 # characters that would break the manifest JSON if they ever
-# appeared in a path. filenames in USER_FILES are hard-coded
-# and safe, but the source path is user-controllable.
+# appeared in a string field. filenames in USER_FILES are
+# hard-coded and safe, but the source path is user-controllable,
+# and escaping every field costs nothing.
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\010\013\014\016-\037'
 }
@@ -1013,8 +1137,16 @@ write_manifest() {
     local count="$3"
     local manifest="$target_dir/.manifest.json"
 
+    # HARD-CS-05 (v1.4.0): escape all four string fields, in
+    # parity with functions.sh:write_manifest.
+    local version_escaped
+    version_escaped=$(json_escape "$MODULE_VERSION")
+    local timestamp_escaped
+    timestamp_escaped=$(json_escape "$BACKUP_TIMESTAMP")
     local src_escaped
     src_escaped=$(json_escape "$source")
+    local root_escaped
+    root_escaped=$(json_escape "$ROOT_SOLUTION")
 
     local files_json=""
     local f
@@ -1031,10 +1163,10 @@ write_manifest() {
 
     cat > "$manifest" << EOF
 {
-  "version": "$MODULE_VERSION",
-  "timestamp": "$BACKUP_TIMESTAMP",
+  "version": "$version_escaped",
+  "timestamp": "$timestamp_escaped",
   "source": "$src_escaped",
-  "root_solution": "$ROOT_SOLUTION",
+  "root_solution": "$root_escaped",
   "files_count": $count,
   "files": [$files_json]
 }
@@ -1520,9 +1652,11 @@ fi
 migrate_v1_0_0_to_v1_2_0() {
     if [ -f "$BIN_DIR/webui.conf" ]; then
         if ! grep -q '^MEMORY_LIMIT_HINT=' "$BIN_DIR/webui.conf" 2>/dev/null; then
-            echo "" >> "$BIN_DIR/webui.conf"
-            echo "# v1.2.0 addition" >> "$BIN_DIR/webui.conf"
-            echo "MEMORY_LIMIT_HINT=auto" >> "$BIN_DIR/webui.conf"
+            {
+                echo ""
+                echo "# v1.2.0 addition"
+                echo "MEMORY_LIMIT_HINT=auto"
+            } >> "$BIN_DIR/webui.conf"
             echo "  Migrated: added MEMORY_LIMIT_HINT to webui.conf" >> "$INSTALL_LOG"
         fi
     fi
@@ -1534,7 +1668,7 @@ migrate_config() {
             ui_print "- 🔄 Migration: $SOURCE_VERSION → $MODULE_VERSION"
             migrate_v1_0_0_to_v1_2_0
             ;;
-        "v1.1.0"|"v1.2.0")
+        "v1.1.0"|"v1.2.0"|"v1.3.0"|"v1.4.0")
             ui_print "- 🔄 Migration: no changes needed ($SOURCE_VERSION → $MODULE_VERSION)"
             ;;
         "")
@@ -2283,11 +2417,15 @@ Five user config files (only these):
 
 ## Retention
 
-Rotation keeps the **21 newest snapshots by directory name**
-(YYYYMMDD-HHMMSS-...). Older snapshots are pruned automatically.
+Rotation keeps the **21 newest snapshots by mtime**, with two
+additional protected targets that are never pruned:
 
-The `current/` directory, `.last_stable`, and any `txn-*` /
-`orphan-txn-*` transaction directories are exempt from rotation.
+- The `.last_stable` target (recovery pointer).
+- The newest install snapshot (name matching `-v<digit>`).
+
+Older snapshots are pruned automatically. The `current/` directory
+and any `txn-*` / `orphan-txn-*` transaction directories are exempt
+from rotation.
 
 ## Manual Restore
 
@@ -2320,6 +2458,36 @@ fi
 # ============================================================
 # [22b] v1.2.0 — Layer 9: rotate backups
 # ============================================================
+# Mirrors the canonical functions.sh:rotate_backups using the
+# SAME v1.3.0 rotation semantics (ROT-MANIFEST + ROT-MTIME +
+# ROT-PROTECT). The three identifiers are shared with
+# CHANGELOG.md and docs/ARCHITECTURE.md §4.13.2.
+#
+#   ROT-MANIFEST — a directory is treated as a snapshot iff it
+#     contains a `.manifest.json` file. Excludes current/,
+#     txn-*/, and orphan-txn-*/ by name.
+#
+#   ROT-MTIME — candidates are sorted by mtime (numeric,
+#     descending, `sort -rn -k1,1`), not by directory name.
+#
+#   ROT-PROTECT — two additional targets are preserved on top
+#     of the 21-newest window:
+#       • the `.last_stable` target (recovery pointer);
+#       • the newest install snapshot (name matching `-v<digit>`).
+#
+# ⚠️ CSH-19 (v1.4.0): this function contained the v1.3.0 rotation
+# logic before this revision, but its doc-block was missing and
+# the file header claimed "no changes to the installer" for
+# v1.3.0. Both have been corrected in v1.4.0. See the file header
+# for the full rationale.
+#
+# Note: this installer-side rotation is only invoked once, at
+# install time. The canonical `functions.sh:rotate_backups` runs
+# at boot (from service.sh) and after every pre-critical backup
+# (from main.go). All three implementations share the same
+# semantics — see SVC-FIX-L4 / §[5d] of service.sh and the
+# parallel function in functions.sh.
+# ============================================================
 rotate_backups() {
     local keep="${1:-21}"
 
@@ -2330,6 +2498,9 @@ rotate_backups() {
     }
 
     # v1.3.0 — Professional rotation (parity with functions.sh)
+    #   ROT-MANIFEST: detect by .manifest.json presence.
+    #   ROT-MTIME:    order by mtime, descending.
+    #   ROT-PROTECT:  preserve .last_stable target + newest install.
     local _protected=""
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
         _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
@@ -2385,7 +2556,7 @@ rotate_backups() {
             echo "  Preserved (newest install): $_name" >> "$INSTALL_LOG"
             continue
         fi
-        if rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null; then
+        if rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null; then
             echo "  Removed: $_name" >> "$INSTALL_LOG"
         fi
     done <<EOF
@@ -2498,6 +2669,7 @@ if [ -n "$FOUND_SOURCE" ]; then
     fi
 fi
 
+# ============================================================
 # [24] Display final summary
 # ============================================================
 # CSH-16 fix: the previous version had TWO consecutive

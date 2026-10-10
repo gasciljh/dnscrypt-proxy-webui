@@ -1,9 +1,73 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – devcontainer setup
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 DC-V14-01 — No configuration change. The devcontainer
+#     setup does not build the companion Android app APK. That
+#     APK lives in a separate repository (gasciljh/dnscrypt-proxy-app)
+#     and is fetched by scripts/fetch_app_apk.sh at release time.
+#
+#   📱 DC-V14-02 — Version bump v1.2.0 → v1.4.0 (skipping
+#     v1.3.0, which did not affect the devcontainer — see the
+#     v1.3.0 block below for the rationale).
+#
+#   📱 DC-V14-03 — No new tool is added for the CodeQL
+#     `go/path-injection` fix in `main.go::removeModule`, or for
+#     the iOS PWA logic removal in `web/index.html`. Both are
+#     pure source-level edits covered by the existing toolchain
+#     (Go, shellcheck, shfmt, golangci-lint).
+# ============================================================
+# v1.3.0 — No changes to the devcontainer setup
+# ============================================================
+#   📌 The v1.3.0 release did not touch this file.
+#
+#   The v1.3.0 release added three runtime changes:
+#     • PWA install button (client-side, web/index.html)
+#     • Live status LED (client-side, web/index.html)
+#     • DNS auto-start fix (shell-side, proxy/service.sh)
+#
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
+#
+#   Why this file was NOT modified:
+#     • The devcontainer setup installs DEVELOPMENT tools
+#       (shellcheck, shfmt, golangci-lint, staticcheck,
+#       actionlint, pre-commit, yamllint, markdownlint,
+#       detect-secrets). None of these tools is required for,
+#       or interacts with, the v1.3.0 runtime changes.
+#     • The v1.3.0 server-side refinements are pure source
+#       edits in Go and shell files, all of which are already
+#       covered by the installed toolchain:
+#         - `main.go` (SNAP-*)  → gofmt, go vet, golangci-lint
+#         - `functions.sh`, `service.sh` (ROT-*) → bash -n,
+#           shellcheck, shfmt
+#     • No new tool, no version bump of an existing tool, and
+#       no new configuration key is required.
+#
+#   Therefore the entire setup script is byte-for-byte identical
+#   between v1.2.0 and v1.3.0. See CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13 for the full delta.
+# ============================================================
+# Cross-references:
+# ============================================================
+#   • .devcontainer/devcontainer.json — postCreateCommand
+#   • .github/workflows/ci.yml        — CI matrix
+#   • .github/workflows/upgrade-test.yml
+#                                     — 42-scenario matrix
+#   • .pre-commit-config.yaml         — pre-commit hooks
+#   • docs/BACKUP.md                  — backup reference
+#   • docs/EMERGENCY.md               — recovery guide
+#   • docs/ARCHITECTURE.md §4.13      — v1.3.0 server-side
+#   • CHANGELOG.md §[v1.3.0], §[v1.4.0]
+# ============================================================
 # ============================================================
 # Purpose:
 #   Runs automatically after the devcontainer is created
@@ -46,7 +110,7 @@
 #   │ 5 │ Python tools (pip, pre-commit, yamllint, ...)  │
 #   │ 6 │ Android NDK check (optional)                   │
 #   │ 7 │ Project setup (permissions, pre-commit)        │
-#   └────────────────────────────────────────────┘
+#   └───┴────────────────────────────────────────┘
 #
 #   Each phase prints a header (─────) so the log is scannable.
 #   Every tool install is wrapped in a `command -v` check, so
@@ -168,7 +232,7 @@ log_info()  { echo -e "  ${DIM}·${NC} $1"; }
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  🔧 DNSCrypt Smart Filter – DevContainer Setup           ║${NC}"
-echo -e "${BOLD}║  ${DIM}v1.2.0${NC}                                                 ${BOLD}║${NC}"
+echo -e "${BOLD}║  ${DIM}v1.4.0${NC}                                                 ${BOLD}║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
