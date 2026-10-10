@@ -3,10 +3,117 @@
 Thank you for your interest in contributing! This guide explains how
 to contribute effectively.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **Identifier inventory in this file (7 total)**:
+>   • HARD-CON-01 (`Last updated` correction — v1.4.0)
+>   • HARD-CON-02 (v1.3.0 block extended with server-side
+>     refinements — v1.4.0)
+>   • HARD-CON-03 (§7.2 Shell rotation-sorting text corrected —
+>     v1.4.0)
+>   • HARD-CON-04 (§7.3 JavaScript v1.3.0 block updated for the
+>     v1.4.0 `<a download>` change — v1.4.0)
+>   • HARD-CON-05 (§8.14 rotation invariants added — v1.4.0)
+>   • HARD-CON-06 (§13.3 checklist extended with v1.3.0 rotation
+>     rows — v1.4.0)
+>   • HARD-CON-07 (header + footer sync — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/BRANCHING.md](BRANCHING.md) — Git workflow
+>   • [docs/RELEASE_PROCESS.md](RELEASE_PROCESS.md) — release guide
+>   • [docs/adr/README.md](adr/README.md) — ADR index
+>   • [docs/UPGRADE.md](UPGRADE.md) — version upgrade guide
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification
+>   • [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — contributors
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
+>   • **Companion Android app integration** — the module ZIP may
+>     now include `web/app-debug.apk`. The WebUI install button
+>     is a direct `<a download>` link (no `beforeinstallprompt`).
+>   • **CodeQL `go/path-injection` closed** in `removeModule` via
+>     `filepath.Base()` + `filepath.Join()` sanitization.
+>   • **iOS PWA logic removed** — Android-only project.
+>   • New section **§8.15 — Companion App Testing (v1.4.0)**.
+>   • New section **§4.8 — Companion App String/Script Contribution**.
+>   • §5.5 gained 2 new commit examples: `feat(app): bundle
+>     companion APK` and `fix(api): close CodeQL path-injection in
+>     removeModule`.
+>   • §10 release examples updated from `v1.3.0` to `v1.4.0`
+>     (stable) and `v1.4.1` (PATCH), since v1.4.0 is now the
+>     current release.
+>   • §12.2 Badges gained **Companion App Tester (v1.4.0)**.
+>   • §13.1 Golden Rules gained **Rule #24** — companion APK
+>     safety requirement.
+>   • §13.3/§13.4 checklists extended with v1.4.0 runtime
+>     additions and fix patterns.
+>   • Global edition — English-only documentation; WebUI remains
+>     bilingual (English default + Arabic toggle).
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side changes** (WebUI):
+>       - Smart dynamic PWA install button that adapts to the
+>         browser: native `beforeinstallprompt` dialog on
+>         Chromium-based browsers, or a friendly unsupported-
+>         browser modal with Play Store links for Chrome/Edge/Brave.
+>         (This chain was later **replaced in v1.4.0** with a
+>         direct `<a download>` link — see the v1.4.0 block.)
+>       - Live status LED on the Today counter — pulses green
+>         when the DNS engine is running, solid red when stopped.
+>   • **Boot-path fix** (`service.sh §[19]`): DNS auto-start after
+>     boot via a direct API call. Root cause: `watchdog.sh` waits
+>     30 s before its first API call, by which time the WebUI may
+>     not have finished binding. Fix: `service.sh` performs a
+>     bounded wait for the WebUI ready state (up to 60 s,
+>     watchdog token + TCP port), then calls
+>     `POST /api/ensure_running_service` itself.
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO refined the snapshot-detection and
+>     rotation semantics that underpin the persistent backup
+>     directory. Three identifiers document the change (also
+>     used in `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending), with a name-based fallback.
+>         This supersedes the v1.2.0 BUG-3 lexicographic-name
+>         rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort,
+>         and two additional protected targets on top of the
+>         21-newest window:
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>
+>   • **Parallel application** — the same SNAP-* / ROT-*
+>     semantics were applied to `watchdog.sh` (§[5b] snapshot
+>     counter), `status.sh` (`_list_snapshots`),
+>     `customize.sh` (`rotate_backups`), `action.sh`
+>     (`_inline_list_snapshots` + `_inline_rotate_backups` +
+>     `_inline_backup_summary`), and `uninstall.sh` (§[5b]
+>     `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+>   • No new audit corrections.
+>   • No breaking changes.
 
 > **v1.2.0 changes**:
 >   • Version bumped from v1.1.0 to v1.2.0.
@@ -20,63 +127,56 @@ to contribute effectively.
 >     7-step verification of the 10 defensive layers, with the
 >     commands to reproduce each layer.
 >   • **§8.10 (new)** — Testing the `upgrade-test.yml` matrix.
->     Documents the 42-scenario CI matrix introduced in v1.2.0
->     and how to reproduce it locally.
->   • **§8.11 (new)** — Bilingual WebUI testing (English default
->     + Arabic toggle). A browser-and-layout verification
->     checklist.
->   • §9.1 (When to Update Documentation) gained rows for:
->       - Backup/restore changes (v1.2.0).
->       - Recovery mode changes (v1.2.0).
->       - `runtime_info.backups` schema changes.
->       - WebUI language toggle changes (v1.2.0).
+>   • **§8.11 (new)** — Bilingual WebUI testing.
+>   • §9.1 (When to Update Documentation) gained rows for
+>     backup/restore, recovery mode, `runtime_info.backups`, and
+>     the WebUI language toggle.
 >   • **§9.5 (new)** — v1.2.0 Backup documentation pattern.
->     A template for documenting any change that touches the
->     10 defensive layers.
 >   • **§9.6 (new)** — WebUI language documentation pattern.
->     A template for documenting any change that adds or modifies
->     user-facing strings in the bilingual interface.
->   • §12.2 (Badges) gained:
->       - **Data Guardian** (v1.2.0) — for contributors who
->         test the backup/restore system across devices, root
->         solutions, and upgrade scenarios.
->   • §13.1 (Golden Rules) gained **Rule #22** — v1.2.0 backup
->     observability requirement.
->   • §13.3 (When Adding a New Feature) gained 4 checkboxes
->     for v1.2.0 runtime additions (backup events, recovery
->     mode, config migrations, rotation policy) and 1 checkbox
->     for bilingual string additions.
->   • §13.4 (When Fixing a Bug) gained 2 checkboxes for
->     v1.2.0 correctness fixes (recovery reorder, SW update
->     banner) and 1 checkbox for language toggle fixes.
->   • §13.6 (Quick References) and §13.7 (Full References)
->     extended with the three new v1.2.0 docs:
->       - [`docs/BACKUP.md`](BACKUP.md)
->       - [`docs/EMERGENCY.md`](EMERGENCY.md)
->       - [`docs/UPGRADE.md`](UPGRADE.md) §3.1
->   • Release examples in §10 updated from `v1.2.0` to `v1.3.0`
->     (release) and `v1.1.1` to `v1.2.1` (PATCH), since v1.2.0
->     is now the current release.
->   • **Global edition note**: the WebUI ships with English as
->     the default language and an in-page Arabic toggle. Any PR
->     that adds a user-facing string must supply both `en` and
->     `ar` entries. Documentation remains English-only.
+>   • §12.2 (Badges) gained **Data Guardian** (v1.2.0).
+>   • §13.1 (Golden Rules) gained **Rule #22** — backup
+>     observability requirement — and **Rule #23** — bilingual
+>     WebUI string requirement.
+>   • §13.3/§13.4 checklists extended.
+>   • §13.6/§13.7 references extended.
 
-> **v1.2.0 — Corrections in this revision**:
->   • 🔧 **FIX-1 (snapshot-and-reapply)** — The example commit for
->     FIX-1 in §5.5 was corrected to match the actual implementation
->     in `customize.sh` (`§[8a]` + `§[9]` + `§[9b2]`). The previous
->     text described a "reorder + exclude" strategy that was
->     **never shipped**. See the updated example below and the
->     authoritative description in `docs/ARCHITECTURE.md` §3.10
->     and `docs/SECURITY.md` §5.32.1.
->   • 🔧 **Reason string correction** — The BAK-2 example in §5.5
->     previously listed `pre-append-denylist` as the reason string
->     for the `appendDenylist` call site. The actual reason string
->     recorded by `main.go` is `pre-denylist-save`, because
->     `appendDenylist` delegates to `saveDenylist` (which is where
->     the pre-critical backup is triggered). See the corrected
->     example below and `docs/BACKUP.md` §4.3.
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-CON-01** — `Last updated` corrected. The header
+>     and footer previously said `2026-10-06` (the v1.4.0
+>     release date, not the v1.4.0 file-editing date). Both now
+>     read `2026-10-08`, matching every other file in the v1.4.0
+>     module.
+>   • 🔧 **HARD-CON-02** — `v1.3.0` block extended. It previously
+>     listed only the client-side changes (PWA install button,
+>     live status LED) and the boot-path fix, but **omitted**
+>     the server-side rotation refinements (SNAP-MANIFEST,
+>     SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) that
+>     touched 8 files in v1.3.0. The block above now documents
+>     them, and explains why no branching-strategy change was
+>     required.
+>   • 🔧 **HARD-CON-03** — §7.2 (Shell Standards) corrected.
+>     The v1.2.0-specific bullet on rotation sorting said
+>     "sort by directory name, not mtime" — this was the
+>     v1.2.0 behavior, and it was **reversed in v1.3.0**. The
+>     bullet now states the v1.3.0 semantics (manifest-based
+>     detection + mtime sort + protected targets) and points at
+>     `docs/ARCHITECTURE.md` §4.13.2.
+>   • 🔧 **HARD-CON-04** — §7.3 (JavaScript Standards) v1.3.0
+>     block updated. The PWA install button is no longer a
+>     `beforeinstallprompt` chain — it was replaced by a direct
+>     `<a href="/app-debug.apk" download>` link in v1.4.0. The
+>     section now reflects the v1.4.0 reality and cross-refers
+>     to the v1.4.0-specific bullet.
+>   • 🟡 **HARD-CON-05** — §8.14 (Backup Debugging) extended
+>     with the v1.3.0 rotation invariants (SNAP-MANIFEST,
+>     SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) and a
+>     reference to `docs/COMPATIBILITY.md` §10.3.5 for on-device
+>     verification.
+>   • 🟡 **HARD-CON-06** — §13.3 (When Adding a New Feature)
+>     checklist extended with rows for the v1.3.0 rotation
+>     refinements.
+>   • 🟢 **HARD-CON-07** — Header and footer `Last updated`
+>     synchronized.
 
 > **📖 Branching, Release & Decisions**:
 > - Git workflow → [`docs/BRANCHING.md`](BRANCHING.md)
@@ -85,6 +185,7 @@ to contribute effectively.
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 > - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
 > - Emergency recovery → [`docs/EMERGENCY.md`](EMERGENCY.md)
+> - Companion app repository → https://github.com/gasciljh/dnscrypt-proxy-app
 
 ---
 
@@ -102,7 +203,7 @@ to contribute effectively.
 10. [Release Process](#10-release-process)
 11. [Where to Ask for Help](#11-where-to-ask-for-help)
 12. [Recognition](#12-recognition)
-13. [v1.2.0 — Contributors Reference](#13-v120--contributors-reference)
+13. [v1.4.0 — Contributors Reference](#13-v140--contributors-reference)
 
 ---
 
@@ -157,7 +258,7 @@ Maintainers have the right to:
 
 **WebUI (bilingual: English default + Arabic toggle)**:
 
-As of v1.2.0, the WebUI ships with:
+The WebUI ships with:
 
 - **English as the default language** (on first load).
 - **An in-page toggle** (`langToggle` button) to switch to Arabic.
@@ -174,7 +275,7 @@ As of v1.2.0, the WebUI ships with:
 - Community-contributed **documentation translations** are welcome
   as **separate files** (`docs/*.<lang>.md`).
 - Additional WebUI languages beyond English + Arabic (FR, DE, ES,
-  RU, ZH, ...) are deferred to **v1.4.0** — see
+  RU, ZH, ...) are deferred to **v1.5.0** — see
   [`docs/ROADMAP.md`](ROADMAP.md) §6.
 
 See [CODE_OF_CONDUCT.md §FAQ Q9](../CODE_OF_CONDUCT.md) for the full
@@ -199,6 +300,8 @@ rationale.
 | Architecture decisions | Propose an ADR — see §4.7 |
 | **Memory tests (v1.1.0)** | **Report GC behavior per RAM tier — see §12.2** |
 | **Backup tests (v1.2.0)** | **Verify the 10 defensive layers on a real device — see §8.9 and §12.2** |
+| **Rotation-semantics verification (v1.3.0)** | **Verify SNAP-*/ROT-* on device — see §8.14 and `docs/COMPATIBILITY.md` §10.3.5** |
+| **Companion app testing (v1.4.0)** | **Verify the APK bundles correctly and installs — see §8.15 and §12.2** |
 
 ### 2.2 Before Starting
 
@@ -228,6 +331,9 @@ rationale.
 - **v1.2.0**: Backup/restore reports across devices, root
   solutions, and upgrade scenarios (see §8.9).
 - **v1.2.0**: Bilingual WebUI reports across browsers (see §8.11).
+- **v1.3.0**: Rotation-semantics verification reports (SNAP-*/ROT-*
+  on real devices — see §8.14).
+- **v1.4.0**: Companion app testing reports (see §8.15).
 
 **Not accepted**:
 - Complete rewrite without discussion.
@@ -239,6 +345,12 @@ rationale.
   [`docs/EMERGENCY.md`](EMERGENCY.md).
 - **v1.2.0**: Adding an English string to the WebUI **without**
   the matching Arabic entry.
+- **v1.3.0**: Changing the rotation semantics without keeping
+  `main.go`, `functions.sh`, and the 5 mirroring shell scripts in
+  sync (see `docs/ARCHITECTURE.md` §4.13.2).
+- **v1.4.0**: Changing the APK fetch/stage logic without updating
+  `scripts/fetch_app_apk.sh`, `proxy/app-apk.version`, and the
+  release workflow in lockstep.
 
 ---
 
@@ -260,7 +372,7 @@ rationale.
 | **actionlint** | latest | GitHub Actions linting | Recommended |
 | **python3** | 3.8+ | JSON/YAML validation | Recommended |
 | **jq** | 1.6+ | JSON manipulation | Recommended |
-| **curl** or **wget** | — | Download DNS binaries | Yes |
+| **curl** or **wget** | — | Download DNS binaries + companion APK | Yes |
 | **zip/unzip** | — | Packaging | Yes |
 
 "Recommended" means "not required for local development, but required
@@ -268,9 +380,15 @@ for full CI".
 
 **v1.2.0 note**: No new tools were added for the data-preservation
 release. The 10 defensive layers use only tools already present in
-the dev environment (`bash`, `coreutils`, `sha256sum`, `jq`,
-`restorecon`/`chcon` on device). See §8.9 for the local testing
-procedure.
+the dev environment.
+
+**v1.3.0 note**: The rotation refinements (SNAP-*/ROT-*) do not
+introduce any new tool. They rely on `stat`, `sort`, and `awk`,
+which are already required.
+
+**v1.4.0 note**: The companion APK fetcher (`scripts/fetch_app_apk.sh`)
+uses `curl` and `sha256sum` (already required). No new tool was
+introduced.
 
 ### 3.2 Quick Install
 
@@ -344,7 +462,7 @@ All tools are installed automatically via `.devcontainer/setup.sh`.
 # Show the project version
 make version
 
-# Expected: v1.2.0
+# Expected: v1.4.0
 
 # Show available targets
 make help
@@ -495,16 +613,65 @@ instead of (or alongside) a regular PR.
 | Small refactor | Regular PR (no ADR) |
 | **v1.2.0**: runtime improvement that does NOT change architecture | Regular PR + SECURITY.md note (no ADR) |
 | **v1.2.0**: adding an EN/AR string pair | Regular PR (no ADR) |
+| **v1.3.0**: PWA install button + live status LED | Regular PR (no ADR) |
+| **v1.3.0**: server-side rotation refinements (SNAP-*/ROT-*) | Regular PR (no ADR — functional change to existing mechanisms) |
+| **v1.4.0**: companion APK integration | Regular PR (no ADR — the file shape is additive) |
 
 **v1.2.0 example**: The 10 data-preservation layers and 4 runtime
 additions (BAK-1..BAK-4) did **not** warrant an ADR — they modify
-the values and behavior of existing mechanisms (backup, restore,
-`runtime_info`) without changing the architecture. See
-[`docs/adr/README.md`](adr/README.md) §3.3 for the criteria.
+the values and behavior of existing mechanisms without changing the
+architecture.
+
+**v1.3.0 example**: The rotation refinements (SNAP-MANIFEST,
+SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) are **functional
+changes** to existing mechanisms. They are documented in
+`CHANGELOG.md` §[v1.3.0] and `docs/ARCHITECTURE.md` §4.13 — not in
+an ADR.
+
+**v1.4.0 example**: The companion APK is an **additive** asset — it
+does not change the module architecture, the API contract, or the
+install pipeline. It is documented in `docs/ARCHITECTURE.md`,
+`docs/API.md`, and `README.md`, not in an ADR.
 
 **Full guide**: [`docs/adr/README.md`](adr/README.md) §3 and §7.
 
 **Current ADRs**: 6 (see [`docs/adr/README.md`](adr/README.md) §6).
+
+### 4.8 Companion App String/Script Contribution
+
+The companion Android app lives in a **separate repository**
+([`gasciljh/dnscrypt-proxy-app`](https://github.com/gasciljh/dnscrypt-proxy-app)).
+
+**In this repository**, changes related to the companion app are
+limited to:
+
+| File | Role | Change policy |
+|---|---|---|
+| `proxy/app-apk.version` | Single Source of Truth for the APK version | Manual bump when the companion repo releases a new APK |
+| `scripts/fetch_app_apk.sh` | Fetches the APK at release time | Changes require a matching change in the release workflow |
+| `.github/workflows/release.yml` | Stages the APK into the module ZIP | Any change here must be verified with a dry-run |
+| `web/index.html` | Install button (`<a download>`) | Keep the link stable across releases |
+
+**Rules**:
+
+- ❌ Do **not** commit `web/app-debug.apk` — it is a build artifact
+  (see `.gitignore` §[20]).
+- ✅ Do commit updates to `proxy/app-apk.version` (a new version).
+- ✅ Do update `scripts/fetch_app_apk.sh` if the companion repo's
+  asset naming changes.
+- ❌ Do **not** modify the companion app's Kotlin/Android code in
+  this repository — open a PR in the companion repo instead.
+
+**Companion app version vs module version**:
+
+| Version | Source | Example |
+|---|---|---|
+| Module version | `VERSION` | `v1.4.0` |
+| Companion app version | `proxy/app-apk.version` | `1.0.0` (no `v` prefix) |
+| Upstream DNS engine version | `proxy/dnscrypt-proxy.version` | `2.1.18` |
+
+These three versions are **independent**. A module release does not
+require a companion app release, and vice versa.
 
 ---
 
@@ -564,10 +731,10 @@ BREAKING CHANGE: /v1/* endpoints removed.
 Use /api/* instead.
 ```
 
-### 5.5 Examples for v1.0.0 / v1.1.0 / v1.2.0 Fixes
+### 5.5 Examples for v1.0.0 / v1.1.0 / v1.2.0 / v1.3.0 / v1.4.0 Fixes
 
-When fixing similar issues to those addressed in v1.0.0, v1.1.0,
-or v1.2.0, follow these patterns:
+When fixing similar issues to those addressed in earlier releases,
+follow these patterns.
 
 #### v1.0.0 examples (kept for reference)
 
@@ -734,7 +901,7 @@ Behavior is unchanged.
 Refs: docs/SECURITY.md §5.30.3"
 ```
 
-#### v1.2.0 examples (new)
+#### v1.2.0 examples (kept for reference)
 
 ```bash
 # BAK-1 — 7-field backups schema (v1.2.0)
@@ -751,8 +918,7 @@ Added:
   orphan_txn     — count of orphan-txn-* directories
 
 The two endpoints now produce identical JSON on the 7 shared
-fields. This is an additive change — clients that read only the
-original 5 fields continue to work.
+fields. This is an additive change.
 
 Refs: docs/SECURITY.md §5.31
 Refs: docs/API.md §6.1.7
@@ -823,7 +989,7 @@ Idempotent: missing file → no-op. Empty file → removed silently.
 Refs: docs/ARCHITECTURE.md §4.10.4
 Refs: docs/BACKUP.md §5.5"
 
-# FIX-1 — Recovery mode correctness via snapshot-and-reapply (v1.2.0)
+# FIX-1 — Recovery-mode correctness via snapshot-and-reapply (v1.2.0)
 git commit -m "fix(installer): use snapshot-and-reapply in recovery mode
 
 In an early v1.2.0 draft, the ZIP extraction step (customize.sh
@@ -890,24 +1056,149 @@ Refs: docs/ARCHITECTURE.md §6.7
 Refs: docs/CONTRIBUTING.md §8.11"
 ```
 
-**Rule for v1.0.0 fixes**: Every "Audit Correction" commit must:
-1. Mention the number in the footer: `Audit Correction #XX`.
-2. Reference the document: `Refs: docs/SECURITY.md`.
-3. Explain **why** (not just what).
+#### v1.3.0 examples
 
-**Rule for v1.1.0 runtime improvements**: MEM-1 / MEM-2 / MEM-3 are
-**not** audit corrections. Use `Refs: docs/SECURITY.md §5.30.N`
-instead of `Audit Correction #XX`.
+```bash
+# PWA install button + live status LED (v1.3.0)
+git commit -m "feat(webui): add PWA install button and live status LED
 
-**Rule for v1.2.0 data-preservation additions**: BAK-1..BAK-4 and
-FIX-1 / FIX-2 are **not** audit corrections. Use
-`Refs: docs/SECURITY.md §5.31` (for BAK-*) or
-`Refs: docs/SECURITY.md §5.32` (for FIX-*) instead of an audit
-correction number.
+PWA install button:
+  - Always visible (except when already installed / standalone).
+  - Chromium-based: opens the native beforeinstallprompt dialog.
+  - Unsupported browsers: friendly modal with Play Store links
+    for Chrome / Edge / Brave.
 
-**Rule for WebUI language changes**: Always reference
-`docs/ARCHITECTURE.md §6.7` and ensure the commit mentions that
-**both** languages were updated.
+Live status LED:
+  - 12x12 LED on the Today counter.
+  - Pulses green when the DNS engine is running.
+  - Solid red when the service is stopped.
+
+NOTE: the beforeinstallprompt chain was replaced in v1.4.0 by
+a direct <a download> link.
+
+Refs: docs/ARCHITECTURE.md §6.4
+Refs: CHANGELOG.md §[v1.3.0]"
+
+# service.sh — DNS auto-start after boot (v1.3.0 critical fix)
+git commit -m "fix(service): ensure DNS starts after boot
+
+Root cause: watchdog.sh waits a fixed 30s before its first API
+call. By the time it fires POST /api/ensure_running_service, the
+WebUI may not have finished binding to its port. The watchdog
+retries with exponential backoff, leaving DNS unavailable for
+minutes after boot.
+
+Fix: service.sh now performs a direct, bounded wait for the WebUI
+to become ready (up to 60s, checking the watchdog token file +
+the WebUI TCP port), then calls POST /api/ensure_running_service
+itself.
+
+Verified on-device: DNS engine reaches ON within 5s of service.sh
+startup, with 3 processes running (webui + proxy + watchdog).
+
+Refs: service.sh §[19]
+Refs: CHANGELOG.md §[v1.3.0] → Fixed"
+
+# Rotation refinements (v1.3.0 server-side)
+git commit -m "refactor(backup): use SNAP-MANIFEST + ROT-MTIME for rotation
+
+Rewrote snapshot detection and rotation across 8 files:
+
+  main.go:buildBackupInfo
+    - SNAP-MANIFEST: detect snapshots by .manifest.json presence
+      (not by name pattern).
+    - SNAP-MTIME: sort by mtime descending for last_backup_name.
+
+  functions.sh:rotate_backups
+    - ROT-MANIFEST: same detection rule.
+    - ROT-MTIME: same sort order.
+    - ROT-PROTECT: preserve .last_stable + newest install
+      snapshot on top of the 21-newest window.
+
+  Mirrored in 5 shell scripts:
+    - watchdog.sh §[5b] snapshot counter
+    - status.sh _list_snapshots
+    - customize.sh rotate_backups
+    - action.sh _inline_list_snapshots + _inline_rotate_backups
+    - uninstall.sh §[5b] BACKUP_COUNT / BACKUP_LAST_NAME
+
+Refs: docs/ARCHITECTURE.md §4.13.2
+Refs: CHANGELOG.md §[v1.3.0]"
+```
+
+#### v1.4.0 examples
+
+```bash
+# Companion APK bundle (v1.4.0)
+git commit -m "feat(app): bundle companion Android app in module ZIP
+
+Added an OPTIONAL companion app asset to the module ZIP:
+
+  - proxy/app-apk.version       — Single Source of Truth (1.0.0)
+  - scripts/fetch_app_apk.sh    — fetcher (cache + SHA256 + JSON)
+  - GET /app-debug.apk          — new static route in main.go
+  - web/index.html              — install button uses <a download>
+  - .github/workflows/release.yml — fetch + stage APK steps
+  - .github/workflows/ci.yml      — verify companion app metadata
+  - scripts/package_module.sh     — optional APK bundling
+
+The APK is best-effort: a missing APK is a warning, not a failure,
+so local developer builds work without a network fetch.
+
+Refs: docs/ARCHITECTURE.md
+Refs: docs/API.md §1.3
+Refs: CHANGELOG.md §[v1.4.0]"
+
+# CodeQL path-injection fix (v1.4.0)
+git commit -m "fix(api): close CodeQL path-injection in removeModule
+
+Two alerts (go/path-injection #1, #2) closed by routing the
+caller-provided path through filepath.Base() and rebuilding the
+final path from the trusted MODULES_DIR constant + the sanitized
+basename.
+
+Before: os.RemoveAll(modulePath)
+After:  name := filepath.Base(modulePath)
+        cleanPath := filepath.Join(MODULES_DIR, name)
+        os.RemoveAll(cleanPath)
+
+Defence-in-depth prefix check kept as a second layer.
+
+Refs: docs/SECURITY.md
+Refs: CHANGELOG.md §[v1.4.0] → Fixed"
+
+# iOS PWA removal (v1.4.0)
+git commit -m "refactor(webui): remove iOS PWA logic (Android-only)
+
+The project is Android-only. Removed ~35 lines of iOS-specific
+logic from web/index.html:
+
+  - isIOSDevice() helper
+  - pwaStepIos1/2/3 translations (EN + AR)
+  - iOS branches in getBrowserName(), isBrowserSupported(),
+    getPWAInstallSteps(), showPWAInstructionsModal()
+
+Browsers that never fire beforeinstallprompt (Firefox, legacy
+Samsung Internet) now fall through to the unified unsupported
+modal that lists Chrome / Edge / Brave with Play Store links.
+
+Refs: docs/ARCHITECTURE.md §6.4
+Refs: CHANGELOG.md §[v1.4.0] → Removed"
+```
+
+**Rules**:
+- **v1.0.0 fixes**: Mention `Audit Correction #XX` in the footer.
+- **v1.1.0 runtime improvements**: Use
+  `Refs: docs/SECURITY.md §5.30.N` (not an audit number).
+- **v1.2.0 additions**: Use `Refs: docs/SECURITY.md §5.31` (BAK-N)
+  or `§5.32` (FIX-N).
+- **v1.3.0 features**: Reference `CHANGELOG.md §[v1.3.0]` and the
+  relevant `docs/ARCHITECTURE.md` section (§4.13 for server-side
+  refinements, §6.4 for client-side features).
+- **v1.4.0 features**: Reference `CHANGELOG.md §[v1.4.0]`,
+  `docs/ARCHITECTURE.md`, and `docs/API.md`.
+- **WebUI language changes**: Always mention **both** languages
+  were updated.
 
 ### 5.6 ADR Commits
 
@@ -943,7 +1234,8 @@ Use a short, lowercase scope that names the affected area:
 | `status` | `proxy/status.sh` |
 | `action` | `proxy/action.sh` |
 | `functions` | `proxy/functions.sh` |
-| `backup` | **(v1.2.0)** anything touching the 10 defensive layers |
+| `backup` | (v1.2.0+) anything touching the 10 defensive layers or the v1.3.0 rotation semantics |
+| `app` | **(v1.4.0)** companion APK integration |
 | `webui` | `web/index.html` |
 | `dashboard` | `web/dashboard.html` |
 | `pwa` | `web/manifest.json`, `web/sw.js`, `web/offline.html` |
@@ -982,6 +1274,9 @@ shfmt -d -i 4 -ci proxy/*.sh scripts/*.sh
 
 # 6. (v1.2.0) Verify the backup shell functions
 make check-backup
+
+# 7. (v1.4.0) Verify companion app metadata
+make check-app-version
 ```
 
 ### 6.2 Choose the Correct Base Branch
@@ -1007,7 +1302,7 @@ make check-backup
 `hotfix/*` → `main`), use the release-specific template:
 
 ```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.3.0?template=release.md
+https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...release/v1.5.0?template=release.md
 ```
 
 See [ADR-0005](adr/0005-release-specific-pr-template.md) for why.
@@ -1024,21 +1319,29 @@ See [`docs/BRANCHING.md`](BRANCHING.md) §5.5 for the release template URL patte
 **v1.2.0 additions to the default template**:
 
 - New "Data-preservation checklist" section — mandatory for any
-  PR that touches:
-  - `proxy/customize.sh`
-  - `proxy/functions.sh`
-  - `proxy/service.sh`
-  - `proxy/status.sh`
-  - `proxy/uninstall.sh`
-  - `proxy/main.go` (backup helpers only)
-  - `docs/BACKUP.md`
-  - `docs/EMERGENCY.md`
+  PR that touches the 10 defensive layers.
 - New "Global edition (English default + Arabic toggle)" checklist
   item — any PR that adds user-facing text must supply both EN and
   AR strings, with English as the default.
 - New "Backup shell verification" grep block.
 - New "runtime_info.backups" verification.
 - New "Test on a real device" checklist for backup/restore cycles.
+
+**v1.3.0 additions**:
+
+- New "Rotation-semantics checklist" — mandatory for any PR that
+  touches `buildBackupInfo`, `rotate_backups`, or their 5 mirrored
+  implementations.
+- Verification that SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+  ROT-MTIME, and ROT-PROTECT remain in sync across
+  `main.go`, `functions.sh`, and the 5 shell scripts.
+
+**v1.4.0 additions**:
+
+- Companion app checklist — verify `proxy/app-apk.version` format
+  and `scripts/fetch_app_apk.sh` presence (`make check-app-version`).
+- CI is expected to run the `Verify companion app metadata` smoke
+  test.
 
 ### 6.4 Review
 
@@ -1057,6 +1360,13 @@ See [`docs/BRANCHING.md`](BRANCHING.md) §5.5 for the release template URL patte
   `docs/BACKUP.md` and `docs/EMERGENCY.md`.
 - **v1.2.0**: Adding a user-facing string without the matching
   Arabic entry.
+- **v1.3.0**: Changes to the rotation semantics that do not keep
+  `main.go`, `functions.sh`, and the 5 mirroring scripts in sync.
+- **v1.4.0**: Committing `web/app-debug.apk` to git (it is a build
+  artifact and must remain in `.gitignore`).
+- **v1.4.0**: Changing the APK fetch logic without updating
+  `scripts/fetch_app_apk.sh`, `proxy/app-apk.version`, and the
+  release workflow in lockstep.
 
 ### 6.5 Merge Strategy
 
@@ -1107,45 +1417,57 @@ goimports -w proxy/
 
 **v1.0.0-specific:**
 - `getSystemShell()` — any new shell execution must use it.
-- `hasEndpoint()` — any new endpoint must use it (no `strings.Contains`).
+- `hasEndpoint()` — any new endpoint must use it.
 - `parsePrometheus` + `buildDashboardJSON` — for new metrics.
 - `isPortOpenCached(port)` — with per-port map.
 - Rate limiting — any new auth must record in `loginAttempts`.
 - `shellQuote()` — for any dynamic path in a shell command.
 - `readConfPort` — for any port read from config.
-- **`rebuildMu`** — for any operation touching `rebuildBlocklist` (RACE-1).
-- **`runtime_info`** — for any endpoint needing actual ports (PORT-2).
-- **`sync.Once`** — for one-time initialization (shell detection).
+- `rebuildMu` — for any operation touching `rebuildBlocklist` (RACE-1).
+- `runtime_info` — for any endpoint needing actual ports (PORT-2).
+- `sync.Once` — for one-time initialization (shell detection).
 
 **v1.1.0-specific:**
-- **`memoryLimitForProfile(key string) int64`** — any new profile
+- `memoryLimitForProfile(key string) int64` — any new profile
   must be added here.
-- **`applyMemoryLimit(key string)`** — call this only from `main()`
+- `applyMemoryLimit(key string)` — call this only from `main()`
   and `updateProfile()`.
-- **`MEMORY_LIMIT_*` constants** — any new profile needs a constant.
-- **`readSelectedProfile()`** — use it whenever you need the active
+- `MEMORY_LIMIT_*` constants — any new profile needs a constant.
+- `readSelectedProfile()` — use it whenever you need the active
   profile; do NOT read `selected_profile.txt` directly elsewhere.
-- **`MONITORING_UI_PORT`** — always reference the constant; never
+- `MONITORING_UI_PORT` — always reference the constant; never
   hardcode `"8080"` again.
-- **`memLimitMu`** — access `currentMemLimit` / `currentProfile`
+- `memLimitMu` — access `currentMemLimit` / `currentProfile`
   only while holding this mutex.
 
 **v1.2.0-specific:**
-- **`createAutoBackup(reason string)`** — call this before any
-  destructive operation on user data. It is best-effort; never
-  block the user's action on a backup failure.
-- **`backupMu`** — the mutex that serializes pre-critical backups.
-  Any new auto-backup call site is automatically covered; do NOT
-  add a second mutex.
-- **`checkPendingNotifications()`** — called once at startup. If
-  you add a new notification producer, write to
-  `PENDING_NOTIFY_FILE` and let this function handle it.
-- **`cleanupOldTransactions()`** — called once at startup. Any
-  change to the transaction cleanup policy must respect the
-  preservation of `START`, `ROLLBACK`, and `orphan-txn-*`.
-- **`buildBackupInfo()`** — returns **7 fields**. Any change to
-  the schema must be matched by an identical change in
-  `status.sh --json` (see [`docs/API.md`](API.md) §6.1.7).
+- `createAutoBackup(reason string)` — call this before any
+  destructive operation on user data.
+- `backupMu` — the mutex that serializes pre-critical backups.
+- `checkPendingNotifications()` — called once at startup.
+- `cleanupOldTransactions()` — called once at startup.
+- `buildBackupInfo()` — returns **7 fields**. Any change to the
+  schema must be matched by an identical change in
+  `status.sh --json`.
+
+**v1.3.0-specific:**
+- `buildBackupInfo()` — snapshot detection is **manifest-based**
+  (SNAP-MANIFEST), not name-pattern-based. `last_backup_name` is
+  chosen by mtime (SNAP-MTIME). Do NOT revert to name-based
+  detection or lexicographic sort.
+- Any change to `buildBackupInfo` must be mirrored in
+  `functions.sh:rotate_backups` and the 5 shell scripts that
+  implement the same semantics.
+
+**v1.4.0-specific:**
+- `APK_FILE` — the constant pointing to `web/app-debug.apk`. Use
+  it for any new route; do not hardcode the filename.
+- `serveStaticAssets` — new static routes must go through this
+  helper so the security headers + per-extension Cache-Control
+  are applied consistently.
+- `removeModule` — any change to the path handling must keep the
+  `filepath.Base()` + `filepath.Join()` sanitization to keep the
+  CodeQL path-injection alerts closed.
 
 ### 7.2 Shell
 
@@ -1171,33 +1493,55 @@ shfmt -w -i 4 -ci proxy/*.sh scripts/*.sh
 - `fuser -n tcp ... | tr ' ' '\n' | head -1` — correct parsing (Fix #9).
 - `STATUS_FILE` — write only from `startService` / `stopService`.
 - Custom Chains — never pollute `OUTPUT` / `INPUT` / `FORWARD`.
-- **`getSystemShell()`** — for shell commands (safe fallback).
+- `getSystemShell()` — for shell commands (safe fallback).
 
 **v1.1.0-specific:**
-- **`get_profile_memory_hint()`** — read-only helper; use it for
+- `get_profile_memory_hint()` — read-only helper; use it for
   user-facing display in `service.sh`, `action.sh`, `status.sh`.
-- **`_inline_get_profile_memory_hint()`** — inline fallback in each
+- `_inline_get_profile_memory_hint()` — inline fallback in each
   of the four scripts when `functions.sh` is unavailable.
-- **`SELECTED_PROFILE_FILE`** — use the global; do NOT hardcode
+- `SELECTED_PROFILE_FILE` — use the global; do NOT hardcode
   `$MODDIR/proxy/selected_profile.txt` elsewhere.
 
 **v1.2.0-specific:**
-- **`PERSISTENT_BACKUP`** — the canonical backup directory path
+- `PERSISTENT_BACKUP` — the canonical backup directory path
   (`/sdcard/dnscrypt-webui-backup`). Reference the global; never
   hardcode the path.
-- **`USER_FILES`** — the canonical list of the 5 preserved files.
+- `USER_FILES` — the canonical list of the 5 preserved files.
   Any change to this list must be matched in all 5 scripts that
-  define it (`customize.sh`, `functions.sh`, `service.sh`,
-  `status.sh`, `uninstall.sh`).
-- **`copy_with_context(src, dst)`** — use this instead of a bare
-  `cp -f` for any user file. It restores the SELinux context and
-  sets `chmod 0600` automatically.
-- **Rotation sorting** — `rotate_backups` sorts by **directory
-  name**, not mtime, for stability across `rsync` copies. Any
-  change must preserve this.
-- **Transaction state files** — any transaction directory must
-  contain a `.state` file with `START`, `COMMIT`, or `ROLLBACK`.
-  The `.pid` file is optional but recommended.
+  define it.
+- `copy_with_context(src, dst)` — use this instead of a bare
+  `cp -f` for any user file.
+- Transaction state files — any transaction directory must contain
+  a `.state` file with `START`, `COMMIT`, or `ROLLBACK`.
+
+**v1.3.0-specific:**
+- **Rotation sorting** — `rotate_backups` now sorts candidates by
+  **mtime** (`sort -rn -k1,1`), not by directory name. This
+  reverses the v1.2.0 behavior. Robust against clock drift and
+  manual renames. See `docs/ARCHITECTURE.md` §4.13.2.
+- **Snapshot detection** — a directory is treated as a snapshot
+  iff it contains a `.manifest.json` file (SNAP-MANIFEST /
+  ROT-MANIFEST), not by matching the name pattern
+  `^[0-9]{8}-[0-9]{6}-`.
+- **Protected rotation targets** — `rotate_backups` preserves
+  two additional targets on top of the 21-newest window:
+  the `.last_stable` target (recovery pointer) and the newest
+  install snapshot (name matching `-v<digit>`). See ROT-PROTECT
+  in `docs/ARCHITECTURE.md` §4.13.2.
+- `service.sh §[19]` — the DNS auto-start fix. Any change to the
+  startup flow must preserve the bounded wait + direct API call.
+- The `WATCHDOG_TOKEN_FILE` guard in `service.sh §[19]` must
+  remain in place (it allows the script to run even if
+  `functions.sh` failed to load).
+
+**v1.4.0-specific:**
+- `scripts/fetch_app_apk.sh` — the APK fetcher. Changes must
+  preserve the cache-first + SHA256 + JSON output behavior.
+- `proxy/app-apk.version` — the Single Source of Truth for the
+  APK version. Do NOT read the version from anywhere else.
+- Release workflow — any change to the APK fetch/stage steps must
+  be verified with a full dry-run of `release.yml`.
 
 ### 7.3 JavaScript
 
@@ -1214,27 +1558,50 @@ shfmt -w -i 4 -ci proxy/*.sh scripts/*.sh
 - Avoid global scope pollution.
 
 **v1.1.0-specific:**
-- **`data.profile_key`** and **`data.memory_limit_mb`** — new fields
-  in `runtime_info`. Display them in System Info panels; fall back
+- `data.profile_key` and `data.memory_limit_mb` — new fields in
+  `runtime_info`. Display them in System Info panels; fall back
   to `"unknown"` if missing.
 
 **v1.2.0-specific:**
-- **`data.backups`** — new object in `runtime_info` with 7 fields.
-  Display the 6 user-facing fields (`available`,
-  `last_backup_name`, `last_stable`, `in_flight_txn`, `orphan_txn`,
-  `path`) in System Info panels; fall back to "none yet" or
-  "not initialized" if missing.
-- **Bilingual (EN + AR)** — do **not** add a user-facing string
+- `data.backups` — new object in `runtime_info` with 7 fields.
+  Display the 6 user-facing fields in System Info panels; fall
+  back to "none yet" or "not initialized" if missing.
+- Bilingual (EN + AR) — do **not** add a user-facing string
   without an entry in both `translations.en` and `translations.ar`.
-  Both objects must have the same keys.
-- **Default language** — always English on first load.
-- **Language preference** — persist only in
+- Default language — always English on first load.
+- Language preference — persist only in
   `localStorage['dnscrypt-lang']`. Never send it to the server.
-- **RTL rules** — any new layout element must respect `[dir="rtl"]`.
-- **SW update banner** — when handling the update banner, send
-  `SKIP_WAITING` to `swRegistration.waiting` (the NEW worker), not
-  to `navigator.serviceWorker.controller`. Reload on the
-  `controllerchange` event.
+- RTL rules — any new layout element must respect `[dir="rtl"]`.
+- SW update banner — when handling the update banner, send
+  `SKIP_WAITING` to `swRegistration.waiting` (the NEW worker).
+
+**v1.3.0-specific:**
+- The `langToggle` header button must remain in the top-right
+  corner (LTR) / top-left (RTL).
+- Live status LED — the LED is bound to `currentStatus`. Any
+  change to the status flow must keep the LED in sync (see
+  `updateStatsDisplay()`).
+- ⚠️ The v1.3.0 PWA install button used a smart dynamic chain
+  with `beforeinstallprompt`. **This chain was removed in v1.4.0**
+  in favour of a direct `<a download>` link — see the
+  v1.4.0-specific block below for the current behavior.
+
+**v1.4.0-specific:**
+- **Install button** — the `pwaInstallBtn` element is now an
+  `<a href="/app-debug.apk" download>` link. Do **not** reintroduce
+  a JavaScript click handler or a `beforeinstallprompt` listener
+  for installation.
+- **iOS detection removed** — `isIOSDevice()`, `pwaStepIos1/2/3`,
+  and all iOS branches have been removed. The project is
+  Android-only. If you need to re-add iOS support, open an Issue
+  first.
+- **Unsupported-browser fallback** — the modal still exists for
+  browsers that never fire `beforeinstallprompt`. Keep the Play
+  Store link building logic as-is.
+- **Caching** — the install button does not require Service Worker
+  involvement; `web/app-debug.apk` is served by `main.go` with a
+  long-lived `Cache-Control` header (see `docs/ARCHITECTURE.md`
+  §6.2 and §4.12.1).
 
 ### 7.4 YAML
 
@@ -1256,8 +1623,15 @@ Any new file type must be added to:
 - `.editorconfig` — if it has specific formatting rules.
 - `.gitignore` — if it can be generated at build/run time.
 
-See [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) §4.3 for the current
-file inventory.
+**v1.3.0 note**: `proxy/run/.watchdog_token` and any
+`.manifest.json` file inside `/sdcard/dnscrypt-webui-backup/`
+never appear in the repository — they live on the device.
+
+**v1.4.0 note**: `web/app-debug.apk` and `proxy/app-apk.version`
+are already covered:
+- `web/app-debug.apk` — in `.gitignore` §[20].
+- `proxy/app-apk.version` — enforced `text eol=lf` in
+  `.gitattributes`.
 
 ---
 
@@ -1277,14 +1651,18 @@ include:
 | CI/CD | Full CI test on GitHub Actions |
 | Security fix (Audit) | Static verification via `grep` |
 | Firewall change | Manual verification via `iptables -L` |
-| **Shell execution** | **Build on Linux + Android** |
-| **Auth change** | **Manual rate-limit test** |
-| **Endpoint matching** | **`curl` for the endpoint + fake variations** |
-| **Concurrency change** | **Manual test: run 2 operations simultaneously** |
-| **Runtime info change** | **`curl` `/api?action=runtime_info`** |
-| **Memory-limit change (v1.1.0)** | **Test all 5 profiles — see §8.8** |
-| **Backup-layer change (v1.2.0)** | **Run all 7 steps of §8.9** |
-| **WebUI string change (v1.2.0)** | **Verify both EN and AR render correctly — see §8.11** |
+| Shell execution | Build on Linux + Android |
+| Auth change | Manual rate-limit test |
+| Endpoint matching | `curl` for the endpoint + fake variations |
+| Concurrency change | Manual test: run 2 operations simultaneously |
+| Runtime info change | `curl` `/api?action=runtime_info` |
+| Memory-limit change (v1.1.0) | Test all 5 profiles — see §8.8 |
+| Backup-layer change (v1.2.0) | Run all 7 steps of §8.9 |
+| WebUI string change (v1.2.0) | Verify both EN and AR render correctly — see §8.11 |
+| **PWA install button change (v1.3.0 → v1.4.0)** | **Verify the download link works — see §8.11 and §8.15** |
+| **DNS auto-start change (v1.3.0)** | **Test with a fresh reboot — see §8.9 / §8.13** |
+| **Rotation semantics change (v1.3.0)** | **Verify SNAP-*/ROT-* on-device — see §8.14** |
+| **Companion APK change (v1.4.0)** | **Run `make check-app-version` and the release dry-run — see §8.15** |
 
 ### 8.2 Go Build Check
 
@@ -1333,6 +1711,10 @@ curl -i "http://127.0.0.1:9090/api?action=unknown_xyz"
 # 6. (v1.2.0) runtime_info.backups — 7 fields
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'
 # → ["available","in_flight_txn","last_backup","last_backup_name","last_stable","orphan_txn","path"]
+
+# 7. (v1.4.0) companion APK route
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -i content-type
+# → application/vnd.android.package-archive (or 404 if the APK is absent)
 ```
 
 ### 8.5 Manual Verification with `grep`
@@ -1396,6 +1778,15 @@ grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
 # BAK-4 — checkPendingNotifications (v1.2.0)
 grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
 
+# SNAP-MANIFEST + SNAP-MTIME (v1.3.0)
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime().Before' && echo "✅ SNAP-MTIME"
+
+# ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (v1.3.0)
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q '_d/.manifest.json' && echo "✅ ROT-MANIFEST"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q '_last_stable\|_protected' && echo "✅ ROT-PROTECT"
+
 # Bilingual WebUI (v1.2.0)
 for f in web/index.html web/dashboard.html web/offline.html; do
     grep -q 'id="langToggle"' "$f" && echo "✅ $f toggle"
@@ -1403,6 +1794,22 @@ for f in web/index.html web/dashboard.html web/offline.html; do
     grep -q "dnscrypt-lang" "$f" && echo "✅ $f localStorage"
     grep -q '\[dir="rtl"\]' "$f" && echo "✅ $f RTL"
 done
+
+# Direct download link (v1.4.0)
+grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ direct download link"
+grep -q 'download="DNS-Proxy.apk"' web/index.html && echo "✅ download attribute"
+grep -q 'led-on\|led-off' web/index.html && echo "✅ status LED"
+
+# DNS auto-start fix (v1.3.0)
+grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ service.sh fix"
+grep -q 'ensure_running_service' proxy/service.sh && echo "✅ direct API call"
+
+# Companion APK (v1.4.0)
+grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+grep -q '/app-debug.apk' proxy/main.go && echo "✅ APK route"
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ CodeQL fix"
+test -f scripts/fetch_app_apk.sh && echo "✅ APK fetcher"
+test -f proxy/app-apk.version && echo "✅ APK version file"
 ```
 
 ### 8.6 Manual Testing on Device
@@ -1425,11 +1832,17 @@ Before pushing any PR, test manually on a real device:
 - [ ] BLOCKLIST consistent after concurrent rebuilds (RACE-1).
 - [ ] `runtime_info.memory_limit_mb` matches active profile (MEM-1, v1.1.0).
 - [ ] `runtime_info.profile_key` matches `selected_profile.txt` (MEM-1, v1.1.0).
-- [ ] **(v1.2.0)** `runtime_info.backups` returns 7 fields.
-- [ ] **(v1.2.0)** WebUI/Dashboard System Info shows backup state.
-- [ ] **(v1.2.0)** Both English (default) and Arabic (toggle) render correctly.
-- [ ] **(v1.2.0)** In-place upgrade preserves all 5 files.
-- [ ] **(v1.2.0)** Recovery mode restores all 5 files.
+- [ ] `runtime_info.backups` returns 7 fields (v1.2.0).
+- [ ] WebUI/Dashboard System Info shows backup state (v1.2.0).
+- [ ] Both English (default) and Arabic (toggle) render correctly (v1.2.0).
+- [ ] In-place upgrade preserves all 5 files (v1.2.0).
+- [ ] Recovery mode restores all 5 files (v1.2.0).
+- [ ] Snapshot detection is manifest-based (SNAP-MANIFEST, v1.3.0).
+- [ ] Rotation preserves `.last_stable` + newest install (ROT-PROTECT, v1.3.0).
+- [ ] DNS auto-starts within ~5 s of boot (v1.3.0).
+- [ ] Direct download link works (`<a download>`, v1.4.0).
+- [ ] Companion APK download works when the file is present (v1.4.0).
+- [ ] Companion APK route returns 404 when the file is absent (v1.4.0).
 
 ### 8.7 Pre-PR Checklist
 
@@ -1452,13 +1865,16 @@ make check-backup
 
 # 6. (v1.2.0) All local validations
 make check-all
+
+# 7. (v1.4.0) Companion app metadata
+make check-app-version
 ```
 
 ### 8.8 v1.1.0 — Memory-Limit Testing
 
-If your PR touches the memory-limit logic (`main.go`, `functions.sh`,
-`service.sh`, `action.sh`, `status.sh`, `watchdog.sh`), you **must**
-test all 5 profiles:
+If your PR touches the memory-limit logic (`main.go`,
+`functions.sh`, `service.sh`, `action.sh`, `status.sh`,
+`watchdog.sh`), you **must** test all 5 profiles:
 
 ```bash
 # For each profile in: light, normal, pro, proplus, ultimate
@@ -1494,10 +1910,17 @@ su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
 
 **Cross-reference (v1.2.0)**: The chosen profile is preserved by the
 10 defensive layers (it lives in `selected_profile.txt`, one of the
-5 preserved files). If your PR changes the profile list, also check
-that the backup layer still restores the new profile correctly.
+5 preserved files).
 
-### 8.9 v1.2.0 — Backup/Restore Testing (new)
+**Cross-reference (v1.3.0)**: The `selected_profile.txt` file is
+one of the 5 preserved files. Its preservation is unchanged by the
+rotation refinements.
+
+**Cross-reference (v1.4.0)**: The companion APK is independent of the
+memory limit — its presence or absence does not affect the WebUI
+process's memory profile.
+
+### 8.9 v1.2.0 — Backup/Restore Testing
 
 If your PR touches **any** of the 10 defensive layers, you **must**
 run the following 7-step test on a real device.
@@ -1643,72 +2066,71 @@ su -c "ls -1d /sdcard/dnscrypt-webui-backup/*/ | \
 **Cleanup after testing**:
 
 ```bash
-# Restore the original number of snapshots (if desired)
-# Simply let the next rotation handle it, or manually delete extras:
+# Manually delete extra snapshots if desired:
 su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
        grep -vE '/(current|txn-|orphan-txn-)' | \
        tail -n +22 | xargs -r rm -rf"
 ```
 
-### 8.10 v1.2.0 — Testing the `upgrade-test.yml` Matrix (new)
+### 8.10 v1.2.0 — Testing the `upgrade-test.yml` Matrix
 
 The `.github/workflows/upgrade-test.yml` file defines a
-**42-scenario matrix** (3 root solutions × 2 source versions ×
-7 scenarios) that runs on-demand and on a schedule. This section
-explains how to reproduce it locally.
+**42-scenario matrix** that validates the 9 tested data-preservation
+layers (Layer 10 — Observability — is not exercised by this
+workflow; see the file's header for details).
 
 **Matrix definition**:
 
-| Dimension | Values |
-|---|---|
-| Root solution | Magisk, KernelSU, APatch |
-| Source version | v1.0.0, v1.1.0 |
-| Scenario | fresh-install, in-place-upgrade, rename-folder, reinstall-after-uninstall, recovery-mode, interrupted-install, custom-ports |
+| Layer | Scenarios | Count |
+|---|:---:|:---:|
+| Layer 1 — Multi-source detection | L1-01 .. L1-10 | 10 |
+| Layer 2 — Persistent backup | L2-01 .. L2-07 | 7 |
+| Layer 3 — Integrity (SHA256) | L3-01 .. L3-05 | 5 |
+| Layer 4 — Transactional upgrades | L4-01 .. L4-07 | 7 |
+| Layer 5 — Root-solution compat | L5-01 .. L5-03 | 3 |
+| Layer 6 — SELinux preservation | L6-01 .. L6-02 | 2 |
+| Layer 7 — Recovery mode | L7-01 .. L7-03 | 3 |
+| Layer 8 — Config migrations | L8-01 .. L8-02 | 2 |
+| Layer 9 — Automation + rotation | L9-01 .. L9-03 | 3 |
+| **Total** | | **42** |
 
-**Total**: 3 × 2 × 7 = **42 combinations**.
+**v1.3.0 update**: L9-02 and L9-03 were updated to write
+`.manifest.json` files into each synthetic snapshot directory, so
+that the v1.3.0 SNAP-MANIFEST detection rule sees them.
 
-**Running locally** (Linux/macOS dev machine):
+**Running locally**:
 
 ```bash
-# 1. Pull the workflow definition
-cat .github/workflows/upgrade-test.yml
-
-# 2. Trigger it via GitHub CLI
+# 1. Trigger it via GitHub CLI
 gh workflow run upgrade-test.yml
 
-# 3. Watch the run
+# 2. Watch the run
 gh run list --workflow=upgrade-test.yml --limit 1
 gh run watch
 
-# 4. Read the results
+# 3. Read the results
 gh run view
 ```
-
-**Triggering manually from GitHub UI**:
-1. Open the **Actions** tab.
-2. Select **Upgrade Test**.
-3. Click **Run workflow**.
-4. Choose the branch (usually `develop`).
-5. Click the green **Run workflow** button.
 
 **When to trigger**:
 - ✅ Before any release.
 - ✅ After any change to the 10 defensive layers.
 - ✅ After any change to `upgrade-test.yml` itself.
-- ✅ Weekly (the workflow has a `schedule:` trigger).
+- ✅ After any change to the v1.3.0 rotation semantics.
+- ✅ Weekly / monthly, as a regression sweep (manual only).
 
 **Emulation limitation**: The matrix runs in a container, not on a
-real device. It cannot fully emulate:
-- SELinux contexts (`restorecon` / `chcon` are stubbed).
-- The Magisk/KernelSU/APatch module folder lifecycle.
-- Real FUSE mount behavior on `/sdcard/`.
+real device. It cannot fully emulate SELinux contexts, the
+Magisk/KernelSU/APatch module folder lifecycle, or real FUSE mount
+behavior on `/sdcard/`.
 
 For the FULL test, use a real device — see §8.9.
 
-### 8.11 v1.2.0 — Bilingual WebUI Testing (new)
+### 8.11 v1.2.0 + v1.3.0 + v1.4.0 — WebUI Testing
 
 If your PR touches any **user-facing string** in the WebUI, or the
-language toggle mechanism itself, you must verify both languages.
+install button, or the live status LED, verify both languages and
+the relevant browser families.
 
 **Affected files**:
 - `web/index.html`
@@ -1716,7 +2138,7 @@ language toggle mechanism itself, you must verify both languages.
 - `web/offline.html`
 - `web/manifest.json` (if `lang`/`dir` defaults change)
 
-#### Step 1 — Static verification
+#### Static verification
 
 ```bash
 # Verify both language objects exist in all three pages
@@ -1730,9 +2152,7 @@ for f in web/index.html web/dashboard.html web/offline.html; do
 done
 ```
 
-#### Step 2 — Browser matrix
-
-Test on the following browsers (at minimum):
+#### Browser matrix (v1.2.0+)
 
 | Browser | Default EN | Toggle to AR | RTL layout | Preference persists |
 |---|:---:|:---:|:---:|:---:|
@@ -1740,23 +2160,21 @@ Test on the following browsers (at minimum):
 | Firefox 92+ | [ ] | [ ] | [ ] | [ ] |
 | Samsung Internet 16+ | [ ] | [ ] | [ ] | [ ] |
 
-#### Step 3 — First-load default check
+#### First-load default check
 
 ```bash
-# 1. Clear the localStorage key
-#    (browser DevTools console)
+# 1. Clear the localStorage key (browser DevTools console)
 localStorage.removeItem('dnscrypt-lang');
 
 # 2. Reload the page
 # → Verify the page loads in ENGLISH.
 ```
 
-#### Step 4 — Toggle and persistence check
+#### Toggle and persistence check
 
 ```bash
 # 1. Click the langToggle button in the header
-# → Verify the page switches to ARABIC.
-# → Verify the layout is RTL (right-to-left).
+# → Verify the page switches to ARABIC and the layout is RTL.
 
 # 2. Reload the page
 # → Verify the page STILL shows Arabic (preference persisted).
@@ -1765,23 +2183,11 @@ localStorage.removeItem('dnscrypt-lang');
 localStorage.getItem('dnscrypt-lang')  // → "ar"
 ```
 
-#### Step 5 — Both directions
+#### No server impact
 
 ```bash
-# 1. Click the langToggle button again (from AR to EN)
-# → Verify the page switches back to ENGLISH.
-# → Verify the layout is LTR (left-to-right).
-
-# 2. Reload the page
-# → Verify the page STILL shows English.
-```
-
-#### Step 6 — No server impact
-
-```bash
-# 1. Open the browser DevTools → Network tab.
-
-# 2. Click the langToggle button.
+# 1. Open DevTools → Network tab.
+# 2. Click langToggle.
 # → Verify NO new network request is made.
 
 # 3. Verify the API is language-neutral:
@@ -1789,22 +2195,51 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 # → The response does NOT contain a "lang" or "language" field.
 ```
 
-#### What to look for
+#### Install button (v1.4.0 — direct download)
 
-- ✅ English is always the default on first load (after clearing
-  `localStorage`).
-- ✅ The toggle switches both ways (EN → AR → EN).
-- ✅ The layout flips correctly (LTR ↔ RTL).
-- ✅ The preference persists across page reloads.
-- ✅ No new network requests are made when toggling.
-- ✅ The API responses are identical regardless of language.
+```bash
+# 1. Chromium-based browser (Chrome / Edge / Brave)
+# 2. Firefox
+# 3. Samsung Internet
+#    → In ALL browsers, verify:
+#      a. The install button is visible.
+#      b. Clicking it starts a direct download of
+#         `DNS-Proxy.apk`.
+#      → NO modal, NO beforeinstallprompt dependency.
 
-**If a new string is missing in one language**:
-- The `t()` helper falls back to the raw key name.
-- This should be caught before merge — see the static check in
-  Step 1.
+# 4. If the APK is absent (developer build without a network fetch)
+#    → Verify the click leads to a 404 (browser "file not found")
+#      and the rest of the WebUI continues to work normally.
+```
 
-### 8.12 Pre-PR Checklist (v1.2.0)
+#### Live status LED (v1.3.0)
+
+```bash
+# 1. Start the service
+#    → Verify the LED pulses green.
+# 2. Stop the service
+#    → Verify the LED turns solid red.
+```
+
+#### DNS auto-start after boot (v1.3.0)
+
+```bash
+# 1. Ensure the service is ON
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+
+# 2. Reboot
+su -c "reboot"
+
+# 3. After boot completes, check
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: DNS=UP
+
+# 4. Check the log for the fix marker
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log | tail -3"
+# Expected: 2-3 lines describing the WebUI wait + API call
+```
+
+### 8.12 Pre-PR Checklist (v1.4.0)
 
 ```bash
 # 1. Build check
@@ -1826,12 +2261,242 @@ make check-backup
 # 6. All local validations
 make check-all
 
-# 7. Bilingual WebUI check (only if web/*.html changed)
+# 7. Companion app metadata
+make check-app-version
+
+# 8. Bilingual WebUI check (only if web/*.html changed)
 for f in web/index.html web/dashboard.html web/offline.html; do
     grep -q 'id="langToggle"' "$f" && echo "✅ $f toggle"
     grep -q 'en:' "$f" && grep -q 'ar:' "$f" && echo "✅ $f en+ar"
 done
+
+# 9. Rotation-semantics check (only if backup code changed)
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q '_d/.manifest.json' && echo "✅ ROT-MANIFEST"
 ```
+
+### 8.13 v1.3.0 — DNS Auto-Start Testing
+
+If your PR touches the boot flow (`service.sh`, `watchdog.sh`, or
+`main.go`'s service lifecycle), you must verify the v1.3.0 DNS
+auto-start fix still works.
+
+```bash
+# 1. Set the user intent to ON (start the service)
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh"
+sleep 5
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: DNS=UP
+
+# 2. Reboot without changing the intent
+su -c "reboot"
+
+# 3. After boot, wait ~30s and check
+sleep 30
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: DNS=UP (started automatically by service.sh)
+
+# 4. Check the log for the [v1.3.0 FIX] markers
+su -c "grep 'v1.3.0 FIX' /data/local/tmp/dnscrypt_main.log"
+# Expected:
+#   🔧 [v1.3.0 FIX] Ensuring DNS starts after boot...
+#   ✅ WebUI ready after Ns
+#   Calling ensure_running_service API...
+#   ✅ [v1.3.0 FIX] DNS start requested successfully
+```
+
+**What to look for**:
+- ✅ DNS engine is running within ~5 s of service.sh startup.
+- ✅ Log markers appear in order.
+- ✅ The watchdog does **not** need to intervene (its backoff
+  remains at 30 s).
+- ✅ If the user intent is OFF, service.sh skips the auto-start.
+
+### 8.14 v1.2.0 + v1.3.0 — Backup Debugging
+
+```bash
+# 1. Verify the layer functions are present
+for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
+         begin_transaction rollback_transaction commit_transaction \
+         detect_root_solution copy_with_context RECOVERY_TRIGGER \
+         migrate_config; do
+    grep -q "$L" proxy/customize.sh && echo "✅ $L" || echo "❌ $L"
+done
+
+# 2. Verify the backup helpers in functions.sh
+for H in auto_backup_if_needed rotate_backups backup_user_files \
+         restore_user_files cleanup_old_transactions \
+         get_backup_dir ensure_backup_dir get_last_backup_time \
+         copy_with_context verify_backup_integrity write_manifest; do
+    grep -q "$H" proxy/functions.sh && echo "✅ $H" || echo "❌ $H"
+done
+
+# 3. Verify the runtime_info.backups schema
+curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'
+# Expected: ["available","in_flight_txn","last_backup","last_backup_name","last_stable","orphan_txn","path"]
+
+# 4. Verify the two sources agree
+diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups') \
+     <(su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | jq -S '.backups | del(.status, .last_backup_age_seconds)'")
+# Expected: no diff
+
+# 5. (v1.3.0) Verify the rotation invariants across all consumers
+#    SNAP-MANIFEST: detect snapshots by .manifest.json presence
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' \
+    && echo "✅ main.go SNAP-MANIFEST"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ functions.sh ROT-MANIFEST"
+grep -A60 '_inline_rotate_backups()' proxy/service.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ service.sh ROT-MANIFEST (inline)"
+grep -A60 '_list_snapshots()' proxy/status.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ status.sh SNAP-MANIFEST"
+grep -A60 'rotate_backups()' proxy/customize.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ customize.sh ROT-MANIFEST"
+grep -A60 '_inline_list_snapshots()' proxy/action.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ action.sh ROT-MANIFEST (inline)"
+grep -A60 '_uninstall_list_snapshots()' proxy/uninstall.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ uninstall.sh SNAP-MANIFEST"
+
+# 6. (v1.3.0) Verify mtime sort (ROT-MTIME / SNAP-MTIME)
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime().Before' \
+    && echo "✅ main.go SNAP-MTIME"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' \
+    && echo "✅ functions.sh ROT-MTIME"
+
+# 7. (v1.3.0) Verify protected targets (ROT-PROTECT)
+grep -A80 'rotate_backups()' proxy/functions.sh | grep -q '_last_stable\|_protected' \
+    && echo "✅ functions.sh ROT-PROTECT"
+
+# 8. (v1.3.0) On-device SNAP-*/ROT-* verification
+#    See docs/COMPATIBILITY.md §10.3.5 for the full procedure.
+```
+
+### 8.15 v1.4.0 — Companion App Testing
+
+If your PR touches the companion APK integration, run all checks.
+
+**Affected files**:
+- `proxy/app-apk.version`
+- `scripts/fetch_app_apk.sh`
+- `proxy/main.go` (the `APK_FILE` constant + the
+  `serveStaticAssets` entry)
+- `.github/workflows/release.yml`
+- `.github/workflows/ci.yml`
+- `scripts/package_module.sh`
+- `web/index.html` (the install button)
+- `README.md` (the "Optional Android App" section)
+
+#### Static checks
+
+```bash
+# 1. The APK version file exists and has a valid format
+cat proxy/app-apk.version
+# Expected: a line like "1.0.0" (no "v" prefix)
+
+# 2. The APK fetcher exists and is executable
+test -x scripts/fetch_app_apk.sh && echo "✅ fetcher present"
+
+# 3. The main.go route is present
+grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+grep -q '/app-debug.apk' proxy/main.go && echo "✅ APK route"
+grep -q 'application/vnd.android.package-archive' proxy/main.go && echo "✅ APK mime type"
+
+# 4. The install button uses <a download>
+grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ download link"
+
+# 5. The release workflow has both steps
+grep -q 'Fetch companion Android app APK' .github/workflows/release.yml && echo "✅ fetch step"
+grep -q 'Stage APK for module ZIP' .github/workflows/release.yml && echo "✅ stage step"
+
+# 6. The CI workflow verifies metadata
+grep -q 'Verify companion app metadata' .github/workflows/ci.yml && echo "✅ CI check"
+
+# 7. The package_module.sh handles the optional APK
+grep -q 'app-debug.apk' scripts/package_module.sh && echo "✅ packaging handles APK"
+```
+
+#### Local fetcher test
+
+```bash
+# 1. Clear any cached APK
+rm -rf ~/.cache/dnscrypt-proxy-webui/app
+rm -rf dist/DNS-Proxy-*.apk dist/DNS-Proxy-*.apk.sha256
+
+# 2. Run the fetcher
+./scripts/fetch_app_apk.sh --output-dir ./dist --verbose
+# Expected: downloads, verifies SHA256, writes .sha256 sidecar
+
+# 3. Verify the output
+ls -la dist/DNS-Proxy-*.apk
+ls -la dist/DNS-Proxy-*.apk.sha256
+cat ~/.cache/dnscrypt-proxy-webui/app/.manifest.json | jq
+
+# 4. Run again (should hit the cache)
+./scripts/fetch_app_apk.sh --output-dir ./dist
+# Expected: "cache hit" and no network request
+```
+
+#### Offline mode test
+
+```bash
+# 1. Clear the cache
+rm -rf ~/.cache/dnscrypt-proxy-webui/app
+
+# 2. Run with --offline
+./scripts/fetch_app_apk.sh --output-dir ./dist --offline
+# Expected: exit code 1 with "cache missing (offline mode)"
+```
+
+#### Runtime test on device
+
+```bash
+# 1. Install a build that includes the APK
+# 2. Verify the route
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -i content-type
+# Expected: application/vnd.android.package-archive
+
+# 3. Verify the Cache-Control header
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -i cache-control
+# Expected: public, max-age=3600, immutable
+
+# 4. Verify the WebUI install button works
+# → Open the WebUI → click the install button → verify download starts
+```
+
+#### Fallback test (APK absent)
+
+```bash
+# 1. Temporarily move the APK away
+su -c "mv /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk /data/local/tmp/app-debug.apk.bak"
+
+# 2. Verify the route now returns 404
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -1
+# Expected: HTTP/1.1 404 Not Found
+
+# 3. Restore the APK
+su -c "mv /data/local/tmp/app-debug.apk.bak /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+```
+
+#### Release dry-run test
+
+```bash
+# 1. Verify the release workflow can stage the APK
+gh workflow run release.yml --ref develop
+# (Or, for a local check, run the equivalent steps manually.)
+
+# 2. Watch the run
+gh run list --workflow=release.yml --limit 1
+gh run watch
+```
+
+**What to look for**:
+- ✅ The APK version file matches the companion repo's latest release.
+- ✅ The fetcher downloads and verifies the APK correctly.
+- ✅ The route serves the correct mime type + Cache-Control.
+- ✅ The install button starts the download.
+- ✅ A missing APK produces a warning (not a failure) in the
+  release pipeline.
+- ✅ `web/app-debug.apk` is **not** committed to git.
 
 ---
 
@@ -1849,23 +2514,29 @@ done
 | New common question | `docs/FAQ.md` |
 | Security procedure | `docs/SECURITY.md` |
 | Security fix (Audit) | `docs/SECURITY.md` + `docs/ARCHITECTURE.md` + `docs/TROUBLESHOOTING.md` |
-| **Behavioral change** | `docs/API.md` + `docs/ARCHITECTURE.md` |
-| **Shell fix** | `docs/TROUBLESHOOTING.md` + `docs/DEVELOPMENT.md` |
-| **CI change** | `docs/DEVELOPMENT.md` + `CHANGELOG.md` |
-| **Concurrency change** | `docs/ARCHITECTURE.md` (Concurrency section) |
-| **Ports change** | `docs/API.md` (runtime_info) + `docs/ARCHITECTURE.md` |
-| **RACE fix** | `docs/SECURITY.md` + `docs/ARCHITECTURE.md` |
-| **PORT fix** | `docs/SECURITY.md` + `docs/API.md` + `docs/ARCHITECTURE.md` |
-| **Branch/release policy** | `docs/BRANCHING.md` + `docs/RELEASE_PROCESS.md` |
-| **Architectural decision** | `docs/adr/` (new ADR) |
-| **Memory-limit change (v1.1.0)** | `docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9 + `docs/COMPATIBILITY.md` §5.4 + `docs/API.md` §2.1 |
-| **New runtime_info field (v1.1.0)** | `docs/API.md` §6.1.7 + `docs/ARCHITECTURE.md` §16.7 + `web/index.html` + `web/dashboard.html` |
-| **Upgrade path change (v1.1.0)** | `docs/UPGRADE.md` (add a §3.X section) |
-| **Backup layer change (v1.2.0)** | `docs/BACKUP.md` + `docs/EMERGENCY.md` + `docs/SECURITY.md` §5.31 + `docs/ARCHITECTURE.md` §3.10, §4.10 |
-| **Recovery mode change (v1.2.0)** | `docs/EMERGENCY.md` + `docs/SECURITY.md` §5.32 + `docs/ARCHITECTURE.md` §3.10 |
-| **runtime_info.backups schema change (v1.2.0)** | `docs/API.md` §6.1.7 + `docs/ARCHITECTURE.md` §4.10.1 + `web/index.html` + `web/dashboard.html` + `status.sh` (keep both in sync) |
-| **Rotation policy change (v1.2.0)** | `docs/BACKUP.md` §6 + the rotation constant in 4 scripts |
-| **WebUI language toggle change (v1.2.0)** | `docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8 + `CODE_OF_CONDUCT.md` §FAQ Q9 + all three HTML files |
+| Behavioral change | `docs/API.md` + `docs/ARCHITECTURE.md` |
+| Shell fix | `docs/TROUBLESHOOTING.md` + `docs/DEVELOPMENT.md` |
+| CI change | `docs/DEVELOPMENT.md` + `CHANGELOG.md` |
+| Concurrency change | `docs/ARCHITECTURE.md` (Concurrency section) |
+| Ports change | `docs/API.md` (runtime_info) + `docs/ARCHITECTURE.md` |
+| RACE fix | `docs/SECURITY.md` + `docs/ARCHITECTURE.md` |
+| PORT fix | `docs/SECURITY.md` + `docs/API.md` + `docs/ARCHITECTURE.md` |
+| Branch/release policy | `docs/BRANCHING.md` + `docs/RELEASE_PROCESS.md` |
+| Architectural decision | `docs/adr/` (new ADR) |
+| Memory-limit change (v1.1.0) | `docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9 + `docs/COMPATIBILITY.md` §5.4 + `docs/API.md` §2.1 |
+| New runtime_info field (v1.1.0) | `docs/API.md` §6.1.7 + `docs/ARCHITECTURE.md` §16.7 + `web/index.html` + `web/dashboard.html` |
+| Upgrade path change (v1.1.0) | `docs/UPGRADE.md` (add a §3.X section) |
+| Backup layer change (v1.2.0) | `docs/BACKUP.md` + `docs/EMERGENCY.md` + `docs/SECURITY.md` §5.31 + `docs/ARCHITECTURE.md` §3.10, §4.10 |
+| Recovery mode change (v1.2.0) | `docs/EMERGENCY.md` + `docs/SECURITY.md` §5.32 + `docs/ARCHITECTURE.md` §3.10 |
+| runtime_info.backups schema change (v1.2.0) | `docs/API.md` §6.1.7 + `docs/ARCHITECTURE.md` §4.10.1 + `web/index.html` + `web/dashboard.html` + `status.sh` (keep both in sync) |
+| Rotation policy change (v1.2.0) | `docs/BACKUP.md` §6 + the rotation constant in 4 scripts |
+| WebUI language toggle change (v1.2.0) | `docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8 + `CODE_OF_CONDUCT.md` §FAQ Q9 + all three HTML files |
+| **Rotation semantics change (v1.3.0)** | **`docs/ARCHITECTURE.md` §4.13.2 + `docs/BACKUP.md` §6 + all 8 files that mirror the semantics + `CHANGELOG.md` §[v1.3.0]** |
+| **Snapshot detection change (v1.3.0)** | **`docs/ARCHITECTURE.md` §4.13.1 + `docs/API.md` §6.1.7 + `manifest.json` x-note-backup-schema + `CHANGELOG.md` §[v1.3.0]** |
+| **DNS auto-start change (v1.3.0)** | **`docs/ARCHITECTURE.md` §3.3, §9.3 + `docs/TROUBLESHOOTING.md` + `CHANGELOG.md` §[v1.3.0] + `service.sh` header** |
+| **Companion APK integration (v1.4.0)** | **`docs/ARCHITECTURE.md` + `docs/API.md` §1.3 + `README.md` + `CHANGELOG.md` §[v1.4.0]** |
+| **CodeQL path-injection fix (v1.4.0)** | **`docs/SECURITY.md` + `CHANGELOG.md` §[v1.4.0]** |
+| **iOS PWA removal (v1.4.0)** | **`docs/ARCHITECTURE.md` §6.4 + `CHANGELOG.md` §[v1.4.0]** |
 
 ### 9.2 Documentation Standards
 
@@ -1882,12 +2553,10 @@ done
 - `README.md`: English.
 - `docs/*.md`: English.
 - Code comments: English.
-- **v1.2.0**: All documentation is English-only. Community
-  translations are welcome as separate files
-  (`docs/*.<lang>.md`) — see §1.4.
-- **v1.2.0**: The WebUI itself is bilingual (English default +
-  Arabic toggle), but this does not affect the documentation
-  convention.
+- All documentation is English-only. Community translations are
+  welcome as separate files (`docs/*.<lang>.md`) — see §1.4.
+- The WebUI itself is bilingual (English default + Arabic toggle),
+  but this does not affect the documentation convention.
 
 ### 9.4 Audit Correction Documentation Pattern
 
@@ -1925,18 +2594,17 @@ When adding a security/architecture fix, follow this pattern:
 *(Reference: docs/SECURITY.md)*
 ```
 
-**Anchor pattern** (important for docs/SECURITY.md):
+**Anchor pattern** (important for `docs/SECURITY.md`):
 
 ```markdown
 <a name="5XX"></a>
 ### 5.XX — Title — v1.0.0
 ```
 
-### 9.5 v1.2.0 — Backup Documentation Pattern (new)
+### 9.5 v1.2.0 — Backup Documentation Pattern
 
 For any change that touches the 10 defensive layers, use this
-pattern. It is the same structure as §9.4 but with the v1.2.0
-sections:
+pattern:
 
 ```markdown
 <a name="531"></a>
@@ -1967,11 +2635,10 @@ must be mirrored in:
 - `docs/EMERGENCY.md` (the recovery procedures).
 - `docs/ARCHITECTURE.md` §3.10 (the flow diagram).
 
-### 9.6 v1.2.0 — WebUI Language Documentation Pattern (new)
+### 9.6 v1.2.0 — WebUI Language Documentation Pattern
 
 Any change that adds or modifies user-facing strings in the WebUI
-must document both languages. Use this pattern in PR descriptions
-and, if the change is significant, in the corresponding docs:
+must document both languages.
 
 ```markdown
 ### Change: <string-key> — v1.2.0
@@ -2002,7 +2669,7 @@ and, if the change is significant, in the corresponding docs:
 ### 9.7 v1.1.0 Runtime Improvement Pattern
 
 For v1.1.0 runtime improvements (MEM-1 / MEM-2 / MEM-3), use this
-pattern instead — they are **not** audit corrections:
+pattern — they are **not** audit corrections:
 
 ```markdown
 #### 5.30.X — <Title> (MEM-X)
@@ -2029,10 +2696,36 @@ pattern instead — they are **not** audit corrections:
 ```
 
 The same pattern applies for the v1.2.0 additions, using `BAK-N`
-identifiers instead of `MEM-N` and `§5.31` / `§17.2` instead of
-`§5.30` / `§17.1`.
+identifiers instead of `MEM-N`.
 
-### 9.8 ADR Documentation Pattern
+### 9.8 v1.3.0 / v1.4.0 Feature Documentation Pattern
+
+For feature releases (like v1.3.0's rotation refinements and v1.4.0's
+companion app), use this pattern:
+
+```markdown
+### <Feature Name> — v1.4.0
+
+**Purpose**: [one-sentence summary]
+
+**Added files**:
+- [ ] `<path>` — <role>
+
+**Changed files**:
+- [ ] `<path>` — <what changed>
+
+**How it works**: [short description + diagram if helpful]
+
+**Compatibility**: [breaking / additive / internal]
+
+**Testing**: [reference §8.X]
+
+**References**:
+- `CHANGELOG.md` §[v1.4.0]
+- `docs/ARCHITECTURE.md` §<section>
+```
+
+### 9.9 ADR Documentation Pattern
 
 When proposing a new ADR, follow the template in
 [`docs/adr/README.md`](adr/README.md) §7:
@@ -2074,10 +2767,10 @@ A release is triggered by pushing a version tag:
 
 ```bash
 # Stable / Prerelease (from develop)
-./scripts/release.sh v1.3.0
+./scripts/release.sh v1.5.0
 
 # PATCH-only (from main)
-./scripts/release-patch.sh v1.2.1
+./scripts/release-patch.sh v1.4.1
 ```
 
 Both scripts:
@@ -2098,10 +2791,10 @@ Both scripts:
 GitHub Actions (`.github/workflows/release.yml`) then:
 
 1. Builds 4 architectures.
-2. Packages the Magisk ZIP.
-3. Generates SBOM + Cosign signature.
+2. Fetches the companion APK (v1.4.0+) and stages it for the ZIP.
+3. Packages the Magisk ZIP.
 4. Creates the GitHub Release.
-5. **Auto-syncs `main → develop`**.
+5. Auto-syncs `main → develop`.
 
 **Total time**: ~5-10 minutes.
 
@@ -2112,9 +2805,11 @@ v<MAJOR>.<MINOR>.<PATCH>[-prerelease]
 
 v1.0.0        ← first stable release
 v1.1.0        ← second stable (polish)
-v1.2.0        ← third stable (current — data preservation)
-v1.2.1        ← next patch (hotfix) if needed
-v1.3.0        ← next minor (feature)
+v1.2.0        ← third stable (data preservation)
+v1.3.0        ← fourth stable (PWA + boot fix + rotation refinements)
+v1.4.0        ← fifth stable (current — companion app)
+v1.4.1        ← next patch (hotfix) if needed
+v1.5.0        ← next minor (feature)
 v2.0.0        ← next major (breaking)
 ```
 
@@ -2132,6 +2827,9 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.1.1 | 1010001 |
 | v1.2.0 | 1020000 |
 | v1.2.1 | 1020001 |
+| v1.3.0 | 1030000 |
+| v1.4.0 | 1040000 |
+| v1.4.1 | 1040001 |
 | v2.0.0 | 2000000 |
 
 **Constraints**:
@@ -2145,13 +2843,19 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 - [ ] Working tree is clean.
 - [ ] `CHANGELOG.md` has an entry for the new version.
 - [ ] CI is green.
-- [ ] **v1.2.0**: `make check-backup` passes.
-- [ ] **v1.2.0**: The 10 defensive layers have not regressed (see §8.9).
-- [ ] **v1.2.0**: The bilingual WebUI is intact in all three HTML files (see §8.11).
+- [ ] `make check-backup` passes.
+- [ ] `make check-app-version` passes (v1.4.0+).
+- [ ] The 10 defensive layers have not regressed (see §8.9).
+- [ ] The v1.3.0 rotation semantics are intact (see §8.14, Step 5).
+- [ ] The bilingual WebUI is intact in all three HTML files (see §8.11).
+- [ ] The install button works as a direct download (v1.4.0+, see §8.11).
+- [ ] The live status LED works (v1.3.0+).
+- [ ] The DNS auto-start fix still works (v1.3.0+, see §8.13).
+- [ ] The companion APK integration is intact (v1.4.0+, see §8.15).
 - [ ] `./scripts/release.sh vX.Y.Z --dry-run` shows the expected result.
 - [ ] `./scripts/release.sh vX.Y.Z` executed.
 - [ ] GitHub Actions run succeeds.
-- [ ] Release is published with 6 artifacts.
+- [ ] Release is published with all artifacts.
 - [ ] `develop` is synced with `main`.
 - [ ] `update.json` reflects the new version.
 
@@ -2165,7 +2869,7 @@ git checkout main
 git pull origin main
 
 # 2. Prepare the PATCH release
-./scripts/release-patch.sh v1.2.1
+./scripts/release-patch.sh v1.4.1
 
 # 3. After the release publishes: back-merge
 make sync
@@ -2184,15 +2888,49 @@ make sync
 See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for:
 - Release types (Stable, Prerelease, Hotfix).
 - `release.sh` + `release-patch.sh` options.
-- GitHub Actions pipeline (11 steps).
-- Post-release verification (Cosign, SBOM, SHA256).
+- GitHub Actions pipeline (16 steps, plus the v1.4.0 APK steps).
+- Post-release verification.
 - Rollback procedures.
 - Manual release fallback.
 - Back-merge after hotfixes.
 
 **Upgrade guide**: [`docs/UPGRADE.md`](UPGRADE.md) — for users
-upgrading between versions (including the full
-`v1.0.0 → v1.1.0 → v1.2.0` path).
+upgrading between versions.
+
+### 10.7 Companion App Release Integration (v1.4.0)
+
+The companion APK is published from a **separate repository**
+([`gasciljh/dnscrypt-proxy-app`](https://github.com/gasciljh/dnscrypt-proxy-app)).
+The release pipeline in **this** repository does **not** build the
+APK — it only **fetches** it.
+
+**The fetch flow**:
+
+1. `release.yml` runs the `Fetch companion Android app APK` step,
+   which calls `scripts/fetch_app_apk.sh`.
+2. The script reads `proxy/app-apk.version` to determine which
+   APK version to download.
+3. The APK is placed in `dist/DNS-Proxy-v<version>.apk`.
+4. The `Stage APK for module ZIP` step copies it to
+   `web/app-debug.apk`.
+5. `scripts/package_module.sh` bundles it into the ZIP
+   (best-effort: a missing APK is a warning, not an error).
+
+**Best-effort semantics**:
+
+| Stage | If APK is missing |
+|---|---|
+| `scripts/fetch_app_apk.sh` | exits non-zero; the workflow logs `::warning::` |
+| `release.yml` Fetch step | logs `::warning::`, release continues |
+| `release.yml` Stage step | logs `::warning::`, packaging continues |
+| `scripts/package_module.sh` | logs warning, ZIP built without APK |
+| `proxy/main.go` route | returns 404 for `/app-debug.apk` |
+| WebUI install button | click leads to 404 (browser "file not found") |
+
+**When to bump `proxy/app-apk.version`**:
+
+- When the companion repo publishes a **new APK release**.
+- Not on every module release.
 
 ---
 
@@ -2216,28 +2954,34 @@ upgrading between versions (including the full
 - [ ] Read `docs/BRANCHING.md` — for workflow questions.
 - [ ] Read `docs/RELEASE_PROCESS.md` — for release questions.
 - [ ] Read `docs/UPGRADE.md` — for version-upgrade questions.
-- [ ] Read `docs/BACKUP.md` — for backup/restore questions (v1.2.0).
-- [ ] Read `docs/EMERGENCY.md` — for recovery scenarios (v1.2.0).
+- [ ] Read `docs/BACKUP.md` — for backup/restore questions.
+- [ ] Read `docs/EMERGENCY.md` — for recovery scenarios.
 - [ ] Read `docs/adr/README.md` — for architectural decisions.
+- [ ] Read `docs/COMPATIBILITY.md` §10.3.5 — for SNAP-*/ROT-*
+  verification.
 - [ ] Search existing Issues.
 - [ ] Try the latest version.
 
 ### 11.3 A Good Question
 
 Should include:
-- Module version (`v1.2.0`).
+- Module version (`v1.4.0`).
 - Android version and device.
 - Clear reproduction steps.
 - Attached logs.
 - Dashboard state (see `docs/TROUBLESHOOTING.md`).
 - `runtime_info` output (with `profile_key` + `memory_limit_mb`).
-- **v1.2.0**: `runtime_info.backups` output (7 fields).
-- **v1.2.0**: `status.sh --diagnose` output.
-- **v1.2.0**: If the issue is about the language toggle, browser
-  version + a screenshot in both English and Arabic.
+- `runtime_info.backups` output (7 fields).
+- `status.sh --diagnose` output.
+- If the issue is about the language toggle, browser version +
+  a screenshot in both English and Arabic.
+- If the issue is about rotation, `ls -la /sdcard/dnscrypt-webui-backup/`
+  output.
+- If the issue is about the companion APK, whether the APK was
+  present in the module ZIP.
 - Steps already attempted.
 
-### 11.4 v1.2.0 Debug Information
+### 11.4 Debug Information
 
 When reporting an issue, attach:
 
@@ -2255,16 +2999,20 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" > metrics.json
 # 4. Runtime Info (PORT-2 + MEM-1 + BAK-1)
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info" > runtime_info.json
 
-# 5. Memory profile (v1.1.0+)
+# 5. Memory profile
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'" >> memory.json
 
-# 6. Backup state (v1.2.0)
+# 6. Backup state
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'" > backups.json
 su -c "ls -la /sdcard/dnscrypt-webui-backup/" >> backups.json 2>&1
 su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable" >> backups.json 2>&1
 su -c "cat /sdcard/dnscrypt-webui-backup/.upgrade_history.json" >> backups.json 2>&1
 
-# 7. Bilingual WebUI state (v1.2.0)
+# 6b. (v1.3.0) Rotation-state snapshot
+su -c "ls -la /sdcard/dnscrypt-webui-backup/ | head -30" > rotation.txt
+su -c "find /sdcard/dnscrypt-webui-backup -maxdepth 2 -name '.manifest.json' | wc -l" >> rotation.txt
+
+# 7. Bilingual WebUI state
 for f in /data/adb/modules/dnscrypt-proxy-webui/web/index.html \
          /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html \
          /data/adb/modules/dnscrypt-proxy-webui/web/offline.html; do
@@ -2273,10 +3021,15 @@ for f in /data/adb/modules/dnscrypt-proxy-webui/web/index.html \
     grep -q 'en:' "$f" && grep -q 'ar:' "$f" && echo "en+ar present"
 done > webui_lang.txt
 
-# 8. Full diagnostic report (v1.2.0)
+# 8. Companion APK state (v1.4.0)
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1" > app-apk.txt
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version 2>&1" >> app-apk.txt 2>&1
+curl -sI http://127.0.0.1:9090/app-debug.apk >> app-apk.txt 2>&1
+
+# 9. Full diagnostic report
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose" > diagnose.txt
 
-# 9. Logs
+# 10. Logs
 tail -100 /data/local/tmp/dnscrypt_main.log > logs.txt
 ```
 
@@ -2304,31 +3057,36 @@ Every contributor is added to `docs/HALL_OF_FAME.md` after:
 | Auditor | New Audit Correction |
 | Platform Fixer | Platform-agnostic fixes (Linux/macOS/Android) |
 | Metrics Wizard | Improvements in metrics/Dashboard |
-| Concurrency Guardian | RACE-1 fixes (mutex/concurrency) — **v1.2.0: also covers `backupMu`** |
+| Concurrency Guardian | RACE-1 fixes (mutex/concurrency) — also covers `backupMu` |
 | Port Architect | PORT-2 fixes (dynamic ports) |
 | Decision Architect | Proposing an accepted ADR |
-| **Memory Architect (v1.1.0)** | **Test dynamic memory limit across RAM tiers + report GC behavior** |
-| **Data Guardian (v1.2.0)** | **Test the backup/restore system across devices, root solutions, and upgrade scenarios** |
+| Memory Architect (v1.1.0) | Test dynamic memory limit across RAM tiers + report GC behavior |
+| Data Guardian (v1.2.0) | Test the backup/restore system across devices, root solutions, and upgrade scenarios |
+| **Rotation Guardian (v1.3.0)** | **Verify SNAP-*/ROT-* on a real device and report the results — see `docs/COMPATIBILITY.md` §10.3.5** |
+| **PWA Pioneer (v1.3.0)** | **Contributions to the PWA install flow or DNS auto-start flow** |
+| **Companion App Tester (v1.4.0)** | **Test the companion APK integration across devices and browsers, report fetch/stage/install behavior** |
 
 **Detailed conditions**: see [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md).
 
-**v1.2.0 note on Concurrency Guardian**: The badge now recognizes
-contributions to **both** the `rebuildMu` mutex (v1.0.0) and the
-`backupMu` mutex (v1.2.0). If you fix or improve either, you can
-qualify.
+**v1.3.0 note on Rotation Guardian**: This badge is granted for
+substantive testing of the v1.3.0 rotation refinements
+(SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT)
+across multiple devices and root solutions.
 
-**v1.2.0 note on Data Guardian**: To earn this badge, follow the
-testing procedure in §8.9 and report your findings. See
+**v1.4.0 note on Concurrency Guardian**: The badge recognizes
+contributions to **both** the `rebuildMu` mutex (v1.0.0) and the
+`backupMu` mutex (v1.2.0).
+
+**v1.4.0 note on Translator**: With the bilingual WebUI, the
+Translator badge recognizes:
+- Complete documentation translation (`docs/*.<lang>.md`).
+- OR a significant contribution to the WebUI's `translations.ar`
+  object.
+
+**v1.4.0 note on Companion App Tester**: This badge is granted for
+substantive testing of the v1.4.0 companion APK integration. See
 [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) for the acceptance
 criteria.
-
-**v1.2.0 note on Translator**: With the bilingual WebUI (English
-default + Arabic toggle), the Translator badge recognizes:
-
-- Complete documentation translation (`docs/*.<lang>.md`).
-- **OR** a significant contribution to the WebUI's `translations.ar`
-  object (e.g. adding many new keys with correct Arabic strings and
-  RTL verification).
 
 ### 12.3 Contributors Image
 
@@ -2336,7 +3094,7 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 
 ---
 
-## 13. v1.2.0 — Contributors Reference
+## 13. v1.4.0 — Contributors Reference
 
 ### 13.1 Golden Rules
 
@@ -2374,13 +3132,13 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 >
 > **17.** Use `window.location.hostname` in JS instead of `127.0.0.1` (LAN support).
 >
-> **18.** Open PRs against `develop` — never against `main` (see `docs/BRANCHING.md`).
+> **18.** Open PRs against `develop` — never against `main`.
 >
-> **19.** Document non-trivial decisions as ADRs — reversals require a new ADR, never an edit (see `docs/adr/README.md`).
+> **19.** Document non-trivial decisions as ADRs — reversals require a new ADR, never an edit.
 >
-> **20.** Use `release-patch.sh` for PATCH-only releases — never `release.sh` directly from `main` (see [ADR-0006](adr/0006-rename-hotfix-to-release-patch.md)).
+> **20.** Use `release-patch.sh` for PATCH-only releases — never `release.sh` directly from `main`.
 >
-> **21.** **(v1.1.0)** Never hardcode the memory limit — always use
+> **21.** Never hardcode the memory limit — always use
 > `memoryLimitForProfile(key)` and expose the effective value via
 > `runtime_info.memory_limit_mb`. Any new profile must be added to
 > **five** places: `MEMORY_LIMIT_*`, `memoryLimitForProfile()`, the
@@ -2388,21 +3146,40 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 > `service.sh`/`action.sh`/`status.sh`/`watchdog.sh`, and the profile
 > table in `customize.sh`.
 >
-> **22.** **(v1.2.0)** Never remove a user data file without a
-> backup. Any destructive operation on user data must call
+> **22.** Never remove a user data file without a backup. Any
+> destructive operation on user data must call
 > `createAutoBackup(reason)` first (or be routed through
 > `copy_with_context` for restore). Any change to the 10 defensive
 > layers must update **all** of: `docs/BACKUP.md`,
 > `docs/EMERGENCY.md`, `docs/SECURITY.md` §5.31, and
 > `docs/ARCHITECTURE.md` §3.10.
 >
-> **23.** **(v1.2.0)** Never add a user-facing string to the WebUI
-> without the matching **Arabic** entry. Every new key must appear
-> in `translations.en` **and** `translations.ar` of `index.html`,
+> **23.** Never add a user-facing string to the WebUI without the
+> matching **Arabic** entry. Every new key must appear in
+> `translations.en` **and** `translations.ar` of `index.html`,
 > `dashboard.html`, and `offline.html`. The default must remain
 > English. The language preference lives in
 > `localStorage['dnscrypt-lang']` and is **never** sent to the
 > server.
+>
+> **24. (v1.4.0)** Never commit the companion APK
+> (`web/app-debug.apk`) to git — it is a build artifact. Never
+> change the APK fetch/stage logic without a matching update in
+> `proxy/app-apk.version`, `scripts/fetch_app_apk.sh`, and
+> `.github/workflows/release.yml`. Always keep the install button
+> as `<a href="/app-debug.apk" download>`; do not reintroduce a
+> JavaScript click handler for installation.
+>
+> **25. (v1.4.0)** Never change the rotation semantics
+> (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT)
+> in only one file. They must stay in sync across **all 8**
+> consumers: `main.go:buildBackupInfo`, `functions.sh:rotate_backups`,
+> `service.sh` (`_inline_rotate_backups`), `watchdog.sh` (§[5b]
+> snapshot counter), `status.sh` (`_list_snapshots`),
+> `customize.sh` (`rotate_backups`), `action.sh`
+> (`_inline_list_snapshots` + `_inline_rotate_backups`), and
+> `uninstall.sh` (§[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`). See
+> `docs/ARCHITECTURE.md` §4.13.2.
 
 ### 13.2 Branch Policy Reminder
 
@@ -2415,6 +3192,7 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 | Refactor | `refactor/*` | `develop` | Default |
 | Tests | `test/*` | `develop` | Default |
 | WebUI string change (EN + AR) | `feature/*` or `fix/*` | `develop` | Default |
+| Rotation-semantics change (v1.3.0) | `feature/*` or `fix/*` | `develop` | Default |
 | Release prep | `release/*` | `main` | `?template=release.md` |
 | Emergency fix (PATCH) | `hotfix/*` | `main` | `?template=release.md` |
 
@@ -2443,29 +3221,35 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 - [ ] **(v1.1.0)** If adding a `runtime_info` field: update
       `buildRuntimeInfo()`, `web/index.html`, and
       `web/dashboard.html`.
-- [ ] **(v1.1.0)** If adding a new port or changing
-      `MONITORING_UI_PORT`: update the constant, `customize.sh`,
-      `functions.sh`, and `docs/API.md` §1.2.
 - [ ] **(v1.2.0)** If adding a new destructive operation on user
       data: call `createAutoBackup(reason)` first, and document
       the new reason in `docs/BACKUP.md` §4.3.
 - [ ] **(v1.2.0)** If adding a new preserved file: update the
-      `USER_FILES` list in **all 5** scripts (`customize.sh`,
-      `functions.sh`, `service.sh`, `status.sh`, `uninstall.sh`),
-      the "5 Preserved Files" table in `README.md`, and
-      `docs/BACKUP.md` §2.
+      `USER_FILES` list in **all 5** scripts, the "5 Preserved
+      Files" table in `README.md`, and `docs/BACKUP.md` §2.
 - [ ] **(v1.2.0)** If adding a new config migration: add it to
       `migrate_config()` in `customize.sh` and document it in
       `docs/UPGRADE.md`.
-- [ ] **(v1.2.0)** If changing the rotation policy: update the
-      constant in **all 4** scripts (`customize.sh`,
-      `functions.sh`, `service.sh`, `action.sh`) and
-      `docs/BACKUP.md` §6.
 - [ ] **(v1.2.0)** If adding a user-facing string: update
       `translations.en` **and** `translations.ar` in all three
-      HTML files (`index.html`, `dashboard.html`, `offline.html`).
+      HTML files.
 - [ ] **(v1.2.0)** If touching the language toggle: verify RTL
       layout in Chrome 88+, Firefox 92+, and Samsung Internet 16+.
+- [ ] **(v1.3.0)** If changing the rotation semantics (SNAP-* or
+      ROT-*): update all **8** consumers in sync (see Golden Rule
+      #25) and `docs/ARCHITECTURE.md` §4.13.2.
+- [ ] **(v1.3.0)** If touching the boot flow: verify the DNS
+      auto-start fix still works (see §8.13).
+- [ ] **(v1.3.0)** If touching the PWA install flow: verify the
+      download link works in all three browser families.
+- [ ] **(v1.4.0)** If adding a new static route: use
+      `serveStaticAssets` and follow the per-extension
+      Cache-Control pattern.
+- [ ] **(v1.4.0)** If touching the companion APK integration:
+      update `proxy/app-apk.version`, `scripts/fetch_app_apk.sh`,
+      and the release workflow in lockstep.
+- [ ] **(v1.4.0)** If touching `removeModule`: keep the
+      `filepath.Base()` + `filepath.Join()` sanitization.
 
 ### 13.4 When Fixing a Bug
 
@@ -2483,6 +3267,14 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
       `customize.sh` still preserves all 5 files.
 - [ ] **(v1.2.0)** If the fix touches a user-facing string → verify
       both English and Arabic render correctly (§8.11).
+- [ ] **(v1.3.0)** If the fix touches the rotation semantics →
+      verify all 8 consumers are in sync (§8.14, Step 5).
+- [ ] **(v1.3.0)** If the fix is boot-flow-related → verify the DNS
+      auto-start fix (see §8.13).
+- [ ] **(v1.4.0)** If the fix is companion-APK-related → run the
+      full §8.15 test suite.
+- [ ] **(v1.4.0)** If the fix touches `removeModule` → verify the
+      CodeQL path-injection fix is preserved.
 - [ ] Target `develop` in your PR.
 
 ### 13.5 When Publishing a Release
@@ -2491,11 +3283,15 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 - [ ] For **PATCH-only** → use `./scripts/release-patch.sh vX.Y.Z` from `main`.
 - [ ] Use the release PR template (`?template=release.md`).
 - [ ] After PATCH release → run `make sync`.
-- [ ] **(v1.2.0)** Run `make check-backup` before tagging.
-- [ ] **(v1.2.0)** Verify the `upgrade-test.yml` matrix is green
-      (see §8.10).
-- [ ] **(v1.2.0)** Verify the bilingual WebUI is intact
-      (§8.11, Step 1).
+- [ ] Run `make check-backup`.
+- [ ] Run `make check-app-version` (v1.4.0+).
+- [ ] Verify the `upgrade-test.yml` matrix is green (see §8.10).
+- [ ] Verify the bilingual WebUI is intact (§8.11, Step 1).
+- [ ] Verify the rotation semantics are intact (v1.3.0+, §8.14).
+- [ ] Verify the install button works (v1.4.0+, §8.11).
+- [ ] Verify the live status LED works (v1.3.0+).
+- [ ] Verify the DNS auto-start fix (v1.3.0+, §8.13).
+- [ ] Verify the companion APK integration (v1.4.0+, §8.15).
 - [ ] See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) for the full flow.
 
 ### 13.6 Quick References
@@ -2505,6 +3301,8 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 | v1.0.0 fixes | `CHANGELOG.md` §[v1.0.0] |
 | v1.1.0 features | `CHANGELOG.md` §[v1.1.0] |
 | v1.2.0 features | `CHANGELOG.md` §[v1.2.0] |
+| v1.3.0 features | `CHANGELOG.md` §[v1.3.0] |
+| v1.4.0 features | `CHANGELOG.md` §[v1.4.0] |
 | Branch workflow | `docs/BRANCHING.md` |
 | Release process | `docs/RELEASE_PROCESS.md` |
 | ADR system | `docs/adr/README.md` |
@@ -2527,36 +3325,39 @@ https://contrib.rocks/image?repo=gasciljh/dnscrypt-proxy-webui
 | v1.1.0 Memory limit (MEM-1) | `docs/SECURITY.md` §5.30.1 + `docs/ARCHITECTURE.md` §3.9 |
 | v1.1.0 shellQuote (MEM-2) | `docs/SECURITY.md` §5.30.2 |
 | v1.1.0 Monitoring port (MEM-3) | `docs/SECURITY.md` §5.30.3 |
-| **v1.2.0 Backup system** | **`docs/BACKUP.md`** |
-| **v1.2.0 Emergency recovery** | **`docs/EMERGENCY.md`** |
-| **v1.2.0 Data-preservation model** | **`docs/SECURITY.md` §5.31** |
-| **v1.2.0 Recovery-mode fix** | **`docs/SECURITY.md` §5.32** |
-| **v1.2.0 Backup & restore flow** | **`docs/ARCHITECTURE.md` §3.10** |
-| **v1.2.0 BAK-1..BAK-4** | **`docs/ARCHITECTURE.md` §4.10** |
-| **v1.2.0 7-field backups schema** | **`docs/API.md` §6.1.7** |
-| **v1.2.0 Bilingual WebUI** | **`docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8** |
-| **v1.0.0 → v1.1.0 upgrade** | **`docs/UPGRADE.md` §3.0** |
-| **v1.1.0 → v1.2.0 upgrade** | **`docs/UPGRADE.md` §3.1** |
+| v1.2.0 Backup system | `docs/BACKUP.md` |
+| v1.2.0 Emergency recovery | `docs/EMERGENCY.md` |
+| v1.2.0 Data-preservation model | `docs/SECURITY.md` §5.31 |
+| v1.2.0 Recovery-mode fix | `docs/SECURITY.md` §5.32 |
+| v1.2.0 Backup & restore flow | `docs/ARCHITECTURE.md` §3.10 |
+| v1.2.0 BAK-1..BAK-4 | `docs/ARCHITECTURE.md` §4.10 |
+| v1.2.0 7-field backups schema | `docs/API.md` §6.1.7 |
+| v1.2.0 Bilingual WebUI | `docs/ARCHITECTURE.md` §6.7 + `docs/API.md` §10.8 |
+| **v1.3.0 Rotation refinements (SNAP-*/ROT-*)** | **`docs/ARCHITECTURE.md` §4.13 (authoritative) + `docs/COMPATIBILITY.md` §10.3.5** |
+| **v1.3.0 DNS auto-start fix** | **`proxy/service.sh` §[19] + `docs/ARCHITECTURE.md` §3.3, §9.3** |
+| **v1.3.0 PWA install flow** | **`docs/ARCHITECTURE.md` §6.4** |
+| **v1.4.0 Companion APK** | **`scripts/fetch_app_apk.sh` + `proxy/app-apk.version` + `docs/API.md` §1.3** |
+| **v1.4.0 CodeQL fix** | **`docs/SECURITY.md` + `proxy/main.go` (`removeModule`)** |
 | Release scripts | `scripts/release.sh`, `scripts/release-patch.sh` |
 
 ### 13.7 Full References
 
 | Document | Purpose |
 |---|---|
-| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture + Trade-offs + §3.10, §4.10, §6.7 |
+| [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture + Trade-offs + §3.10, §4.10, §4.13, §6.7 |
 | [`docs/SECURITY.md`](SECURITY.md) | Audit Corrections Registry + §5.31, §5.32 |
 | [`docs/API.md`](API.md) | HTTP API Reference + §6.1.7, §10.8 |
 | [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) | Developer guide |
 | [`docs/TROUBLESHOOTING.md`](TROUBLESHOOTING.md) | Troubleshooting (§7.8–§7.11 for backups) |
-| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix + §5.5 |
+| [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) | Compatibility matrix + §10.3.5 (SNAP-*/ROT-* verification) |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries (Level 4) |
 | [`docs/UPGRADE.md`](UPGRADE.md) | Upgrade guide (§3.0, §3.1) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
-| [`docs/FAQ.md`](FAQ.md) | Common questions (Q121–Q130 = v1.2.0) |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 + v1.1.0 + v1.2.0) |
-| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary (BAK/MEM terms) |
-| [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition (Data Guardian) |
+| [`docs/BACKUP.md`](BACKUP.md) | Backup system reference (v1.2.0 + v1.3.0 rotation) |
+| [`docs/EMERGENCY.md`](EMERGENCY.md) | Emergency recovery (v1.2.0) |
+| [`docs/FAQ.md`](FAQ.md) | Common questions |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history |
+| [`docs/GLOSSARY.md`](GLOSSARY.md) | Glossary (BAK/MEM/ROT/SNAP terms) |
+| [`docs/HALL_OF_FAME.md`](HALL_OF_FAME.md) | Contributors recognition |
 | [`docs/ROADMAP.md`](ROADMAP.md) | Roadmap |
 | [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) | Community guidelines |
 | [`docs/BRANCHING.md`](BRANCHING.md) | Branching strategy |
@@ -2589,6 +3390,6 @@ through code, documentation, testing, or simply reporting an issue.
 
 ---
 
-**Last updated**: 2026-10-02
-**Version**: v1.3.0
+**Last updated**: 2026-10-08
+**Version**: v1.4.0
 **Author**: gasciljh

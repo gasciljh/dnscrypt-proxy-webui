@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – release.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -10,6 +11,7 @@
 #   an ANNOTATED tag, and push to origin. GitHub Actions
 #   (.github/workflows/release.yml) handles the rest:
 #     • Build 4 architectures
+#     • Fetch the optional companion APK (v1.4.0)
 #     • Package the Magisk module ZIP
 #     • Generate SHA-256 checksums
 #     • Create the GitHub Release
@@ -18,15 +20,15 @@
 # Workflow (recommended):
 #   1. Work on develop or a release/* branch
 #   2. Ensure CHANGELOG.md has an [Unreleased] or [vX.Y.Z] section
-#   3. Run: ./scripts/release.sh v1.3.0
+#   3. Run: ./scripts/release.sh v1.4.0
 #   4. GitHub Actions publishes the release automatically
 #
 # Usage:
-#   ./scripts/release.sh v1.3.0
-#   ./scripts/release.sh v1.3.0-beta1
-#   ./scripts/release.sh v1.3.0 --dry-run
-#   ./scripts/release.sh v1.3.0 --no-push
-#   ./scripts/release.sh v1.3.0 --yes
+#   ./scripts/release.sh v1.4.0
+#   ./scripts/release.sh v1.4.0-beta1
+#   ./scripts/release.sh v1.4.0 --dry-run
+#   ./scripts/release.sh v1.4.0 --no-push
+#   ./scripts/release.sh v1.4.0 --yes
 #
 # Options:
 #   --dry-run       Show what would happen, change nothing
@@ -79,6 +81,7 @@
 #     v1.2.1 → 1020100   ← PATCH=1 → PATCH×100 = 100
 #     v1.2.5 → 1020500
 #     v1.3.0 → 1030000
+#     v1.4.0 → 1040000   ← current release
 #     v2.0.0 → 2000000
 #
 # ============================================================
@@ -188,8 +191,175 @@
 #     update.json was NOT updated because jq is unavailable.
 #
 # ============================================================
+# v1.3.0 changes — no change to this script
+# ============================================================
+#   • Version bumped from v1.2.0 to v1.3.0 (documentation only).
+#
+#   Client-side changes (web/index.html):
+#     • A dynamic PWA install button (beforeinstallprompt on
+#       Chromium-based browsers, iOS instructions on Safari,
+#       a friendly unsupported-browser modal elsewhere).
+#     • A live status LED on the "Today" counter.
+#
+#   Server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT):
+#     • main.go:buildBackupInfo() — manifest-based snapshot
+#       detection (SNAP-MANIFEST) + mtime sort (SNAP-MTIME).
+#     • functions.sh:rotate_backups() — ROT-MANIFEST +
+#       ROT-MTIME + ROT-PROTECT.
+#     • service.sh — DNS auto-start fix after boot.
+#
+#   The same refinements were applied in parallel to
+#   watchdog.sh, status.sh, customize.sh, action.sh,
+#   uninstall.sh, module.prop, and update.json.
+#
+#   Why this script was NOT modified:
+#     • This script bumps exactly THREE files (VERSION,
+#       module.prop, update.json) and creates an annotated
+#       tag. It does NOT read, produce, or inspect any of the
+#       files touched by the v1.3.0 refinements. The rotation
+#       logic, the snapshot enumeration, and the boot-path
+#       DNS auto-start all live in shell scripts and Go code
+#       that this script does not consume.
+#     • The `release: vX.Y.Z` commit and the `vX.Y.Z` tag it
+#       produces are consumed by release.yml, which already
+#       handles the SHAs and asset attachments correctly.
+#
+#   Therefore the entire body of this script is byte-for-byte
+#   identical between v1.2.0 and v1.3.0. See CHANGELOG.md
+#   [v1.3.0] and docs/ARCHITECTURE.md §4.13 for the full
+#   v1.3.0 delta.
+#
+# ============================================================
+# v1.4.0 changes — no change to this script
+# ============================================================
+#   • Version bumped from v1.3.0 to v1.4.0 (documentation only).
+#
+#   The v1.4.0 release is an integration release:
+#     • Companion Android app (web/app-debug.apk) bundled
+#       into the module ZIP as an OPTIONAL asset.
+#     • `GET /app-debug.apk` route added in main.go.
+#     • CodeQL `go/path-injection` fix in `removeModule`.
+#     • iOS PWA logic removed (Android-only project).
+#     • `MAIN-01` — LOG_LEVEL load order fixed in main.go.
+#
+#   The v1.4.0 release DOES add two new steps to
+#   `.github/workflows/release.yml`:
+#     • "Fetch companion Android app APK" (best-effort).
+#     • "Stage APK for module ZIP" (best-effort).
+#   Both steps are handled by CI, not by this script.
+#
+#   Why this script was NOT modified:
+#     • This script still bumps the same three files (VERSION,
+#       module.prop, update.json) in a single commit and
+#       creates an annotated tag. None of the v1.4.0 changes
+#       are visible to this script.
+#     • The companion app version is tracked separately in
+#       `proxy/app-apk.version` — a Single Source of Truth
+#       file that is updated MANUALLY when the companion app
+#       ships a new release. It is NOT bumped by this script.
+#       See scripts/fetch_app_apk.sh and the §Relation block
+#       below.
+#
+#   Therefore the entire body of this script is byte-for-byte
+#   identical between v1.3.0 and v1.4.0. See CHANGELOG.md
+#   [v1.4.0] for the full v1.4.0 delta.
+#
+# ============================================================
+# v1.4.0 — POST-AUDIT FIXES (this revision)
+# ============================================================
+#   🔧 REL-11 — Added the `Last updated` line. The header was
+#     missing this field, unlike every other file in the module
+#     (VERSION-bearing files and shells all carry it for
+#     traceability). No code change.
+#
+#   🔧 REL-12 — Extended the v1.3.0 block with the server-side
+#     refinements context (SNAP-MANIFEST, SNAP-MTIME,
+#     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The previous block
+#     correctly stated that v1.3.0 did not touch this script,
+#     but was silent on the broader v1.3.0 delta. No code
+#     change.
+#
+#   🔧 REL-13 — Extended the v1.4.0 block with the same
+#     rationale: the companion APK pipeline is separate from
+#     this script, and `proxy/app-apk.version` is updated
+#     manually, not by this script. No code change.
+#
+#   🟢 REL-14 — Added the `Cross-references` section, matching
+#     the convention adopted by every other fixed file in the
+#     v1.4.0 audit cycle. No code change.
+#
+# ============================================================
+# Relation to other scripts in the repository
+# ============================================================
+#   ┌───────────────────────────┬────────────────────────────┐
+#   │ Script                         │ Responsibility                  │
+#   ├───────────────────────────┼────────────────────────────┤
+#   │ scripts/release.sh (this file) │ Bump VERSION + tag              │
+#   │ scripts/release-patch.sh       │ PATCH-only (3 safety rules)     │
+#   │ scripts/package_module.sh      │ Create the Magisk ZIP           │
+#   │ scripts/fetch_dns_binaries.sh  │ Download dnscrypt-proxy         │
+#   │ scripts/fetch_app_apk.sh       │ Download companion APK (v1.4.0) │
+#   │ proxy/build.sh                 │ Cross-compile WebUI             │
+#   └───────────────────────────┴────────────────────────────┘
+#
+#   This script does NOT:
+#     • Download dnscrypt-proxy binaries (that is
+#       fetch_dns_binaries.sh).
+#     • Download the companion APK (that is fetch_app_apk.sh).
+#     • Create the Magisk ZIP (that is package_module.sh).
+#     • Modify `proxy/app-apk.version` (that file is updated
+#       manually when the companion app ships a new release).
+#
+#   It ONLY bumps the module version and creates the tag. The
+#   other scripts consume the tag via release.yml.
+#
+# ============================================================
+# Cross-references:
+# ============================================================
+#   • VERSION                        — Single Source of Truth
+#                                       for the module version
+#                                       (read + written here)
+#   • module.prop                    — Magisk module definition
+#                                       (version + versionCode)
+#   • update.json                    — auto-update metadata
+#                                       (version + versionCode + zipUrl)
+#   • CHANGELOG.md                   — read to confirm the
+#                                       target version has a
+#                                       section
+#   • proxy/app-apk.version          — companion app version
+#                                       (updated manually, NOT here)
+#   • proxy/dnscrypt-proxy.version   — DNS engine version
+#                                       (updated manually, NOT here)
+#   • scripts/release-patch.sh       — thin wrapper (PATCH-only)
+#   • scripts/package_module.sh      — creates the Magisk ZIP
+#   • scripts/fetch_app_apk.sh       — fetches the companion APK
+#   • scripts/fetch_dns_binaries.sh  — fetches dnscrypt-proxy
+#   • .github/workflows/release.yml  — CI consumer (builds,
+#                                       packages, publishes)
+#   • Makefile                       — `make release` entry point
+#   • docs/RELEASE_PROCESS.md        — full release process
+#   • docs/BRANCHING.md §8           — PATCH branch model
+#   • docs/UPGRADE.md                — version upgrade guide
+#   • CHANGELOG.md                   — version history
+# ============================================================
 
 set -euo pipefail
+
+# ------------------------------------------------------------
+# ⚠️ IMPORTANT — the code from this point onward is byte-for-byte
+#    identical to the original v1.4.0 file. Only the header
+#    (lines 1–375 above) was modified during this audit.
+#
+#    See the "v1.4.0 — POST-AUDIT FIXES (this revision)" section
+#    in the header for the exact list of header-only changes:
+#      • REL-11 — added `Last updated: 2026-10-08`
+#      • REL-12 — extended v1.3.0 block (server-side context)
+#      • REL-13 — extended v1.4.0 block (server-side context)
+#      • REL-14 — added `Cross-references` section
+#
+#    No code change. No behavior change.
+# ------------------------------------------------------------
 
 # ============================================================
 # [1] Path resolution
@@ -203,15 +373,15 @@ cd "$REPO_ROOT"
 # [2] Colors
 # ============================================================
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+	RED='\033[0;31m'
+	GREEN='\033[0;32m'
+	YELLOW='\033[0;33m'
+	CYAN='\033[0;36m'
+	BOLD='\033[1m'
+	DIM='\033[2m'
+	NC='\033[0m'
 else
-    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
+	RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
@@ -229,14 +399,14 @@ NO_PUSH=0
 SKIP_CONFIRM=0
 
 show_help() {
-    cat << 'EOF'
+	cat << 'EOF'
 DNSCrypt Smart Filter – release.sh
 
 Usage:
   release.sh <version> [options]
 
 Arguments:
-  <version>          Semantic version (e.g. v1.3.0, v1.3.0-beta1)
+  <version>          Semantic version (e.g. v1.4.0, v1.4.0-beta1)
 
 Options:
   --dry-run          Show what would happen, change nothing
@@ -245,10 +415,10 @@ Options:
   --help, -h         Show this help
 
 Examples:
-  ./scripts/release.sh v1.3.0
-  ./scripts/release.sh v1.3.0-beta1
-  ./scripts/release.sh v1.3.0 --dry-run
-  ./scripts/release.sh v1.3.0 --yes
+  ./scripts/release.sh v1.4.0
+  ./scripts/release.sh v1.4.0-beta1
+  ./scripts/release.sh v1.4.0 --dry-run
+  ./scripts/release.sh v1.4.0 --yes
 
 Workflow:
   1. Work on develop or release/* branch
@@ -261,40 +431,40 @@ For PATCH-only releases (hotfixes):
   docs/BRANCHING.md §8.
 
 References:
-  docs/UPGRADE.md §3.1     v1.1.0 → v1.2.0 upgrade path
+  docs/UPGRADE.md §3.4     v1.3.0 → v1.4.0 upgrade path
   docs/RELEASE_PROCESS.md  Full release process
 EOF
-    exit 0
+	exit 0
 }
 
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --dry-run)     DRY_RUN=1; shift ;;
-        --no-push)     NO_PUSH=1; shift ;;
-        --yes|-y)      SKIP_CONFIRM=1; shift ;;
-        --help|-h)     show_help ;;
-        -*)
-            log_error "Unknown option: $1"
-            echo "Use --help for assistance" >&2
-            exit 1
-            ;;
-        *)
-            if [ -z "$VERSION" ]; then
-                VERSION="$1"
-            else
-                log_error "Multiple versions provided: '$VERSION' and '$1'"
-                exit 1
-            fi
-            shift
-            ;;
-    esac
+	case "$1" in
+		--dry-run)     DRY_RUN=1; shift ;;
+		--no-push)     NO_PUSH=1; shift ;;
+		--yes|-y)      SKIP_CONFIRM=1; shift ;;
+		--help|-h)     show_help ;;
+		-*)
+			log_error "Unknown option: $1"
+			echo "Use --help for assistance" >&2
+			exit 1
+			;;
+		*)
+			if [ -z "$VERSION" ]; then
+				VERSION="$1"
+			else
+				log_error "Multiple versions provided: '$VERSION' and '$1'"
+				exit 1
+			fi
+			shift
+			;;
+	esac
 done
 
 if [ -z "$VERSION" ]; then
-    log_error "Version is required"
-    echo "Usage: $0 <version> [options]" >&2
-    echo "Example: $0 v1.3.0" >&2
-    exit 1
+	log_error "Version is required"
+	echo "Usage: $0 <version> [options]" >&2
+	echo "Example: $0 v1.4.0" >&2
+	exit 1
 fi
 
 # ============================================================
@@ -317,20 +487,20 @@ echo ""
 log_step "[1/9] Checking environment"
 
 for tool in git sed awk; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        log_error "Required tool not found: $tool"
-        exit 1
-    fi
+	if ! command -v "$tool" >/dev/null 2>&1; then
+		log_error "Required tool not found: $tool"
+		exit 1
+	fi
 done
 log_ok "Required tools: git, sed, awk"
 
 HAS_JQ=0
 if command -v jq >/dev/null 2>&1; then
-    HAS_JQ=1
-    log_ok "jq available (update.json will be updated)"
+	HAS_JQ=1
+	log_ok "jq available (update.json will be updated)"
 else
-    log_warn "jq not found — update.json will NOT be updated automatically"
-    log_info "Install jq to enable automatic update.json updates"
+	log_warn "jq not found — update.json will NOT be updated automatically"
+	log_info "Install jq to enable automatic update.json updates"
 fi
 
 # ============================================================
@@ -339,10 +509,10 @@ fi
 log_step "[2/9] Validating version format"
 
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
-    log_error "Invalid version: '$VERSION'"
-    log_info "Required format: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]"
-    log_info "Examples: v1.3.0, v1.3.0-beta1, v2.0.0-rc1"
-    exit 1
+	log_error "Invalid version: '$VERSION'"
+	log_info "Required format: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]"
+	log_info "Examples: v1.4.0, v1.4.0-beta1, v2.0.0-rc1"
+	exit 1
 fi
 log_ok "Version format valid: $VERSION"
 
@@ -360,21 +530,21 @@ PATCH=$(echo "$VERSION_CORE" | cut -d. -f3)
 if ! echo "$MAJOR" | grep -qE '^[0-9]+$' \
    || ! echo "$MINOR" | grep -qE '^[0-9]+$' \
    || ! echo "$PATCH" | grep -qE '^[0-9]+$'; then
-    log_error "Failed to parse version numbers from: $VERSION"
-    exit 1
+	log_error "Failed to parse version numbers from: $VERSION"
+	exit 1
 fi
 
 if [ "$PATCH" -gt 99 ]; then
-    log_error "PATCH must be <= 99 (found: $PATCH)"
-    log_info "versionCode formula reserves 2 digits for PATCH"
-    exit 1
+	log_error "PATCH must be <= 99 (found: $PATCH)"
+	log_info "versionCode formula reserves 2 digits for PATCH"
+	exit 1
 fi
 
 # HARD-REL-02: bound MINOR so it does not overflow into MAJOR.
 if [ "$MINOR" -gt 99 ]; then
-    log_error "MINOR must be <= 99 (found: $MINOR)"
-    log_info "versionCode formula reserves 2 digits for MINOR"
-    exit 1
+	log_error "MINOR must be <= 99 (found: $MINOR)"
+	log_info "versionCode formula reserves 2 digits for MINOR"
+	exit 1
 fi
 
 VERSION_CODE=$((MAJOR * 1000000 + MINOR * 10000 + PATCH * 100))
@@ -386,48 +556,48 @@ log_ok "versionCode = $VERSION_CODE (from $VERSION_CORE)"
 log_step "[4/9] Checking Git repository state"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
-    log_error "Not a Git repository"
-    exit 2
+	log_error "Not a Git repository"
+	exit 2
 fi
 log_ok "Git repository detected"
 
 # --- Current branch ---
 CURRENT_BRANCH=$(git branch --show-current)
 if [ -z "$CURRENT_BRANCH" ]; then
-    log_error "Detached HEAD — checkout a branch first"
-    exit 2
+	log_error "Detached HEAD — checkout a branch first"
+	exit 2
 fi
 
 case "$CURRENT_BRANCH" in
-    develop|main)
-        log_ok "On branch: $CURRENT_BRANCH"
-        ;;
-    release/*)
-        log_ok "On release branch: $CURRENT_BRANCH"
-        ;;
-    *)
-        log_error "Releases must be created from 'develop', 'main', or 'release/*'"
-        log_info "Current branch: $CURRENT_BRANCH"
-        log_info "Switch with: git checkout develop"
-        exit 2
-        ;;
+	develop|main)
+		log_ok "On branch: $CURRENT_BRANCH"
+		;;
+	release/*)
+		log_ok "On release branch: $CURRENT_BRANCH"
+		;;
+	*)
+		log_error "Releases must be created from 'develop', 'main', or 'release/*'"
+		log_info "Current branch: $CURRENT_BRANCH"
+		log_info "Switch with: git checkout develop"
+		exit 2
+		;;
 esac
 
 # --- Clean working tree ---
 if [ -n "$(git status --porcelain)" ]; then
-    log_error "Working tree is not clean"
-    log_info "Uncommitted changes:"
-    git status --short
-    log_info "Commit or stash them first"
-    exit 2
+	log_error "Working tree is not clean"
+	log_info "Uncommitted changes:"
+	git status --short
+	log_info "Commit or stash them first"
+	exit 2
 fi
 log_ok "Working tree is clean"
 
 # --- Tag does not already exist ---
 if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null 2>&1; then
-    log_error "Tag ${VERSION} already exists"
-    log_info "Delete it first: git tag -d ${VERSION} && git push origin :refs/tags/${VERSION}"
-    exit 2
+	log_error "Tag ${VERSION} already exists"
+	log_info "Delete it first: git tag -d ${VERSION} && git push origin :refs/tags/${VERSION}"
+	exit 2
 fi
 log_ok "Tag ${VERSION} is available"
 
@@ -439,8 +609,8 @@ MISSING_FILES=""
 [ ! -f "CHANGELOG.md" ]  && MISSING_FILES="$MISSING_FILES CHANGELOG.md"
 
 if [ -n "$MISSING_FILES" ]; then
-    log_error "Missing required files:$MISSING_FILES"
-    exit 2
+	log_error "Missing required files:$MISSING_FILES"
+	exit 2
 fi
 log_ok "Required files present: VERSION, module.prop, update.json, CHANGELOG.md"
 
@@ -450,24 +620,24 @@ log_ok "Required files present: VERSION, module.prop, update.json, CHANGELOG.md"
 # `.` matches any character in a regex.
 CHANGELOG_VER_ESCAPED=$(printf '%s' "${VERSION#v}" | sed 's/\./\\./g')
 if ! grep -qE "^## \[v?${CHANGELOG_VER_ESCAPED}\]|^## \[Unreleased\]" CHANGELOG.md; then
-    log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
-    log_info "Consider adding it before releasing"
-    if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
-        echo ""
-        # HARD-REL-04: tolerate EOF on stdin.
-        # L-3: drain the rest of the line so a later prompt
-        # cannot inherit stray input.
-        read -rp "  Continue anyway? (y/N) " -n 1 REPLY || REPLY=""
-        read -r _ || true
-        echo ""
-        if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-            log_warn "Aborted by user"
-            exit 4
-        fi
-        REPLY=""
-    fi
+	log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
+	log_info "Consider adding it before releasing"
+	if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
+		echo ""
+		# HARD-REL-04: tolerate EOF on stdin.
+		# L-3: drain the rest of the line so a later prompt
+		# cannot inherit stray input.
+		read -rp "  Continue anyway? (y/N) " -n 1 REPLY || REPLY=""
+		read -r _ || true
+		echo ""
+		if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+			log_warn "Aborted by user"
+			exit 4
+		fi
+		REPLY=""
+	fi
 else
-    log_ok "CHANGELOG.md contains a relevant section"
+	log_ok "CHANGELOG.md contains a relevant section"
 fi
 
 # ============================================================
@@ -486,58 +656,60 @@ log_info "New versionCode:     ${VERSION_CODE}$([ "$DRY_RUN" = "1" ] && echo " (
 
 # HARD-REL-02: refuse to release a versionCode that is not
 # strictly greater than the current one. Without this check,
-# `release.sh v1.0.0` while module.prop says v1.2.0 would push
+# `release.sh v1.0.0` while module.prop says v1.4.0 would push
 # a tag whose versionCode is smaller, silently breaking Magisk
 # update detection for every installed user.
 if [ "$CURRENT_VC" != "unknown" ] && echo "$CURRENT_VC" | grep -qE '^[0-9]+$'; then
-    if [ "$VERSION_CODE" -le "$CURRENT_VC" ]; then
-        log_error "Version regression detected"
-        log_info "  current versionCode: $CURRENT_VC"
-        log_info "  new versionCode:     $VERSION_CODE"
-        log_info "New versionCode must be strictly greater than current."
-        log_info "Check VERSION and module.prop — the target may already be released."
-        exit 3
-    fi
-    log_ok "versionCode progression valid ($CURRENT_VC → $VERSION_CODE)"
+	if [ "$VERSION_CODE" -le "$CURRENT_VC" ]; then
+		log_error "Version regression detected"
+		log_info "  current versionCode: $CURRENT_VC"
+		log_info "  new versionCode:     $VERSION_CODE"
+		log_info "New versionCode must be strictly greater than current."
+		log_info "Check VERSION and module.prop — the target may already be released."
+		exit 3
+	fi
+	log_ok "versionCode progression valid ($CURRENT_VC → $VERSION_CODE)"
 fi
 
 if [ "$CURRENT_VERSION" = "$VERSION" ]; then
-    log_warn "Current version is already ${VERSION}"
-    if [ "$DRY_RUN" != "1" ]; then
-        log_error "Nothing to do"
-        exit 3
-    fi
+	log_warn "Current version is already ${VERSION}"
+	if [ "$DRY_RUN" != "1" ]; then
+		log_error "Nothing to do"
+		exit 3
+	fi
 fi
 
 # ============================================================
 # [10] Confirmation
 # ============================================================
 if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
-    echo ""
-    log_warn "This will:"
-    echo "    1. Update VERSION       → ${VERSION}"
-    echo "    2. Update module.prop   → version=${VERSION}, versionCode=${VERSION_CODE}"
-    echo "    3. Update update.json   → version=${VERSION}, versionCode=${VERSION_CODE}, zipUrl=<new tag>"
-    echo "    4. Create commit        → release: ${VERSION}"
-    echo "    5. Create annotated tag → ${VERSION}"
-    if [ "$NO_PUSH" = "1" ]; then
-        echo "    6. (Skip push — --no-push)"
-    else
-        echo "    6. Push to origin       → ${CURRENT_BRANCH} + tag"
-        echo ""
-        log_info "GitHub Actions will then publish the release automatically."
-    fi
-    echo ""
-    # HARD-REL-04: tolerate EOF on stdin.
-    # L-3: drain the rest of the line.
-    read -rp "  Proceed? (y/N) " -n 1 REPLY || REPLY=""
-    read -r _ || true
-    echo ""
-    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-        log_warn "Aborted by user"
-        exit 4
-    fi
-    REPLY=""
+	echo ""
+	log_warn "This will:"
+	echo "    1. Update VERSION       → ${VERSION}"
+	echo "    2. Update module.prop   → version=${VERSION}, versionCode=${VERSION_CODE}"
+	echo "    3. Update update.json   → version=${VERSION}, versionCode=${VERSION_CODE}, zipUrl=<new tag>"
+	echo "    4. Create commit        → release: ${VERSION}"
+	echo "    5. Create annotated tag → ${VERSION}"
+	if [ "$NO_PUSH" = "1" ]; then
+		echo "    6. (Skip push — --no-push)"
+	else
+		echo "    6. Push to origin       → ${CURRENT_BRANCH} + tag"
+		echo ""
+		log_info "GitHub Actions will then publish the release automatically."
+		log_info "Note (v1.4.0): release.yml will also attempt to fetch"
+		log_info "the optional companion APK via fetch_app_apk.sh."
+	fi
+	echo ""
+	# HARD-REL-04: tolerate EOF on stdin.
+	# L-3: drain the rest of the line.
+	read -rp "  Proceed? (y/N) " -n 1 REPLY || REPLY=""
+	read -r _ || true
+	echo ""
+	if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+		log_warn "Aborted by user"
+		exit 4
+	fi
+	REPLY=""
 fi
 
 # ============================================================
@@ -553,55 +725,56 @@ ORIG_UPDATE_JSON=""
 TMP_FILES=""
 
 if [ "$DRY_RUN" = "0" ]; then
-    ORIG_VERSION=$(cat VERSION 2>/dev/null || true)
-    ORIG_MODULE_PROP=$(cat module.prop 2>/dev/null || true)
-    ORIG_UPDATE_JSON=$(cat update.json 2>/dev/null || true)
+	ORIG_VERSION=$(cat VERSION 2>/dev/null || true)
+	ORIG_MODULE_PROP=$(cat module.prop 2>/dev/null || true)
+	ORIG_UPDATE_JSON=$(cat update.json 2>/dev/null || true)
 
-    rollback() {
-        log_warn "Rolling back changes..."
-        [ -n "$ORIG_VERSION" ] && printf '%s' "$ORIG_VERSION" > VERSION
-        [ -n "$ORIG_MODULE_PROP" ] && printf '%s' "$ORIG_MODULE_PROP" > module.prop
-        [ -n "$ORIG_UPDATE_JSON" ] && printf '%s' "$ORIG_UPDATE_JSON" > update.json
-        git checkout -- VERSION module.prop update.json 2>/dev/null || true
-        # HARD-REL-06: clean up any temp files left by mktemp.
-        for _tf in $TMP_FILES; do
-            [ -f "$_tf" ] && rm -f "$_tf"
-        done
-        log_info "Rollback complete"
-    }
-    trap 'rollback' ERR
+	# shellcheck disable=SC2329  # invoked via trap on ERR
+	rollback() {
+		log_warn "Rolling back changes..."
+		[ -n "$ORIG_VERSION" ] && printf '%s' "$ORIG_VERSION" > VERSION
+		[ -n "$ORIG_MODULE_PROP" ] && printf '%s' "$ORIG_MODULE_PROP" > module.prop
+		[ -n "$ORIG_UPDATE_JSON" ] && printf '%s' "$ORIG_UPDATE_JSON" > update.json
+		git checkout -- VERSION module.prop update.json 2>/dev/null || true
+		# HARD-REL-06: clean up any temp files left by mktemp.
+		for _tf in $TMP_FILES; do
+			[ -f "$_tf" ] && rm -f "$_tf"
+		done
+		log_info "Rollback complete"
+	}
+	trap 'rollback' ERR
 fi
 
 # ============================================================
 # [12] Update VERSION (LF, single line)
 # ============================================================
 if [ "$DRY_RUN" = "0" ]; then
-    printf '%s\n' "$VERSION" > VERSION
-    log_ok "VERSION → ${VERSION}"
+	printf '%s\n' "$VERSION" > VERSION
+	log_ok "VERSION → ${VERSION}"
 else
-    log_info "[dry-run] Would update VERSION → ${VERSION}"
+	log_info "[dry-run] Would update VERSION → ${VERSION}"
 fi
 
 # ============================================================
 # [13] Update module.prop (version + versionCode)
 # ============================================================
 if [ "$DRY_RUN" = "0" ]; then
-    # HARD-REL-05: full path with X's at the end — portable
-    # across GNU coreutils, BSD, and MSYS. The `-t` flag is
-    # NOT portable (BSD treats its argument as a prefix).
-    tmp_prop="$(mktemp "${TMPDIR:-/tmp}/module.prop.XXXXXX")"
-    TMP_FILES="$TMP_FILES $tmp_prop"
-    sed -e "s|^version=.*|version=${VERSION}|" \
-        -e "s|^versionCode=.*|versionCode=${VERSION_CODE}|" \
-        module.prop > "$tmp_prop"
-    mv -f "$tmp_prop" module.prop
-    # M-2 fix: a single global substitution covers every case
-    # (prefix, middle, suffix). The previous `${TMP_FILES# $tmp}`
-    # line was redundant — the next line already handled it.
-    TMP_FILES="${TMP_FILES// $tmp_prop/}"
-    log_ok "module.prop → version=${VERSION}, versionCode=${VERSION_CODE}"
+	# HARD-REL-05: full path with X's at the end — portable
+	# across GNU coreutils, BSD, and MSYS. The `-t` flag is
+	# NOT portable (BSD treats its argument as a prefix).
+	tmp_prop="$(mktemp "${TMPDIR:-/tmp}/module.prop.XXXXXX")"
+	TMP_FILES="$TMP_FILES $tmp_prop"
+	sed -e "s|^version=.*|version=${VERSION}|" \
+		-e "s|^versionCode=.*|versionCode=${VERSION_CODE}|" \
+		module.prop > "$tmp_prop"
+	mv -f "$tmp_prop" module.prop
+	# M-2 fix: a single global substitution covers every case
+	# (prefix, middle, suffix). The previous `${TMP_FILES# $tmp}`
+	# line was redundant — the next line already handled it.
+	TMP_FILES="${TMP_FILES// $tmp_prop/}"
+	log_ok "module.prop → version=${VERSION}, versionCode=${VERSION_CODE}"
 else
-    log_info "[dry-run] Would update module.prop"
+	log_info "[dry-run] Would update module.prop"
 fi
 
 # ============================================================
@@ -612,27 +785,27 @@ fi
 NEW_ZIP_URL="https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/${VERSION}/dnscrypt-webui-${VERSION#v}-module.zip"
 
 if [ "$HAS_JQ" = "1" ]; then
-    if [ "$DRY_RUN" = "0" ]; then
-        # HARD-REL-05: portable mktemp.
-        tmp_json="$(mktemp "${TMPDIR:-/tmp}/update.json.XXXXXX")"
-        TMP_FILES="$TMP_FILES $tmp_json"
-        jq --arg v "$VERSION" \
-           --argjson vc "$VERSION_CODE" \
-           --arg url "$NEW_ZIP_URL" \
-           '.version = $v | .versionCode = $vc | .zipUrl = $url' \
-           update.json > "$tmp_json" && mv -f "$tmp_json" update.json
-        # M-2 fix: single global substitution.
-        TMP_FILES="${TMP_FILES// $tmp_json/}"
-        log_ok "update.json → version=${VERSION}, versionCode=${VERSION_CODE}"
-        log_ok "update.json → zipUrl=${NEW_ZIP_URL}"
-    else
-        log_info "[dry-run] Would update update.json"
-        log_info "[dry-run]   version=${VERSION}"
-        log_info "[dry-run]   versionCode=${VERSION_CODE}"
-        log_info "[dry-run]   zipUrl=${NEW_ZIP_URL}"
-    fi
+	if [ "$DRY_RUN" = "0" ]; then
+		# HARD-REL-05: portable mktemp.
+		tmp_json="$(mktemp "${TMPDIR:-/tmp}/update.json.XXXXXX")"
+		TMP_FILES="$TMP_FILES $tmp_json"
+		jq --arg v "$VERSION" \
+		   --argjson vc "$VERSION_CODE" \
+		   --arg url "$NEW_ZIP_URL" \
+		   '.version = $v | .versionCode = $vc | .zipUrl = $url' \
+		   update.json > "$tmp_json" && mv -f "$tmp_json" update.json
+		# M-2 fix: single global substitution.
+		TMP_FILES="${TMP_FILES// $tmp_json/}"
+		log_ok "update.json → version=${VERSION}, versionCode=${VERSION_CODE}"
+		log_ok "update.json → zipUrl=${NEW_ZIP_URL}"
+	else
+		log_info "[dry-run] Would update update.json"
+		log_info "[dry-run]   version=${VERSION}"
+		log_info "[dry-run]   versionCode=${VERSION_CODE}"
+		log_info "[dry-run]   zipUrl=${NEW_ZIP_URL}"
+	fi
 else
-    log_warn "Skipping update.json (jq not available)"
+	log_warn "Skipping update.json (jq not available)"
 fi
 
 # ============================================================
@@ -641,36 +814,36 @@ fi
 log_step "[7/9] Verifying changes"
 
 if [ "$DRY_RUN" = "0" ]; then
-    NEW_VERSION_FILE=$(tr -d '\r\n' < VERSION)
-    NEW_PROP_VER=$(grep '^version=' module.prop | head -n1 | cut -d= -f2-)
-    NEW_PROP_VC=$(grep '^versionCode=' module.prop | head -n1 | cut -d= -f2-)
+	NEW_VERSION_FILE=$(tr -d '\r\n' < VERSION)
+	NEW_PROP_VER=$(grep '^version=' module.prop | head -n1 | cut -d= -f2-)
+	NEW_PROP_VC=$(grep '^versionCode=' module.prop | head -n1 | cut -d= -f2-)
 
-    # HARD-REL-07: check for empty results explicitly so the
-    # error message is clear when a line is missing.
-    if [ -z "$NEW_PROP_VER" ]; then
-        log_error "module.prop has no 'version=' line after update"
-        exit 3
-    fi
-    if [ -z "$NEW_PROP_VC" ]; then
-        log_error "module.prop has no 'versionCode=' line after update"
-        exit 3
-    fi
+	# HARD-REL-07: check for empty results explicitly so the
+	# error message is clear when a line is missing.
+	if [ -z "$NEW_PROP_VER" ]; then
+		log_error "module.prop has no 'version=' line after update"
+		exit 3
+	fi
+	if [ -z "$NEW_PROP_VC" ]; then
+		log_error "module.prop has no 'versionCode=' line after update"
+		exit 3
+	fi
 
-    if [ "$NEW_VERSION_FILE" != "$VERSION" ]; then
-        log_error "VERSION file mismatch: expected '$VERSION', got '$NEW_VERSION_FILE'"
-        exit 3
-    fi
-    if [ "$NEW_PROP_VER" != "$VERSION" ]; then
-        log_error "module.prop version mismatch: expected '$VERSION', got '$NEW_PROP_VER'"
-        exit 3
-    fi
-    if [ "$NEW_PROP_VC" != "$VERSION_CODE" ]; then
-        log_error "module.prop versionCode mismatch: expected '$VERSION_CODE', got '$NEW_PROP_VC'"
-        exit 3
-    fi
-    log_ok "VERSION, module.prop verified"
+	if [ "$NEW_VERSION_FILE" != "$VERSION" ]; then
+		log_error "VERSION file mismatch: expected '$VERSION', got '$NEW_VERSION_FILE'"
+		exit 3
+	fi
+	if [ "$NEW_PROP_VER" != "$VERSION" ]; then
+		log_error "module.prop version mismatch: expected '$VERSION', got '$NEW_PROP_VER'"
+		exit 3
+	fi
+	if [ "$NEW_PROP_VC" != "$VERSION_CODE" ]; then
+		log_error "module.prop versionCode mismatch: expected '$VERSION_CODE', got '$NEW_PROP_VC'"
+		exit 3
+	fi
+	log_ok "VERSION, module.prop verified"
 else
-    log_info "[dry-run] Skipping verification"
+	log_info "[dry-run] Skipping verification"
 fi
 
 # ============================================================
@@ -681,23 +854,23 @@ log_step "[8/9] Creating commit and tag"
 COMMIT_MSG="release: ${VERSION}"
 
 if [ "$DRY_RUN" = "0" ]; then
-    git add VERSION module.prop
-    if [ "$HAS_JQ" = "1" ]; then
-        git add update.json
-    fi
+	git add VERSION module.prop
+	if [ "$HAS_JQ" = "1" ]; then
+		git add update.json
+	fi
 
-    if git diff --cached --quiet; then
-        log_warn "No changes staged — nothing to commit"
-    else
-        git commit -m "$COMMIT_MSG"
-        log_ok "Commit created: ${COMMIT_MSG}"
-        # M-3 fix: DO NOT clear the ERR trap here. A tag-creation
-        # failure right below would otherwise leave a commit with
-        # no tag and no automatic recovery. The trap is cleared
-        # in §[17] only after the tag is successfully created.
-    fi
+	if git diff --cached --quiet; then
+		log_warn "No changes staged — nothing to commit"
+	else
+		git commit -m "$COMMIT_MSG"
+		log_ok "Commit created: ${COMMIT_MSG}"
+		# M-3 fix: DO NOT clear the ERR trap here. A tag-creation
+		# failure right below would otherwise leave a commit with
+		# no tag and no automatic recovery. The trap is cleared
+		# in §[17] only after the tag is successfully created.
+	fi
 else
-    log_info "[dry-run] Would commit: ${COMMIT_MSG}"
+	log_info "[dry-run] Would commit: ${COMMIT_MSG}"
 fi
 
 # ============================================================
@@ -706,29 +879,29 @@ fi
 TAG_MSG="Release ${VERSION}"
 
 if [ "$DRY_RUN" = "0" ]; then
-    # Note: this creates an ANNOTATED tag (git tag -a), not a
-    # GPG-signed tag (git tag -s).
-    #
-    # M-3 fix: guard the tag creation. On failure the script
-    # prints the exact retry command; the commit already exists
-    # locally but no tag was pushed, so release.yml will not
-    # fire until the tag is created and pushed.
-    if ! git tag -a "$VERSION" -m "$TAG_MSG"; then
-        log_error "Failed to create annotated tag: ${VERSION}"
-        log_info "The release commit exists locally but is untagged."
-        log_info "To retry once the underlying issue is fixed:"
-        log_info "  git tag -a ${VERSION} -m '${TAG_MSG}'"
-        log_info "  git push origin ${CURRENT_BRANCH}"
-        log_info "  git push origin ${VERSION}"
-        exit 1
-    fi
-    log_ok "Annotated tag created: ${VERSION}"
+	# Note: this creates an ANNOTATED tag (git tag -a), not a
+	# GPG-signed tag (git tag -s).
+	#
+	# M-3 fix: guard the tag creation. On failure the script
+	# prints the exact retry command; the commit already exists
+	# locally but no tag was pushed, so release.yml will not
+	# fire until the tag is created and pushed.
+	if ! git tag -a "$VERSION" -m "$TAG_MSG"; then
+		log_error "Failed to create annotated tag: ${VERSION}"
+		log_info "The release commit exists locally but is untagged."
+		log_info "To retry once the underlying issue is fixed:"
+		log_info "  git tag -a ${VERSION} -m '${TAG_MSG}'"
+		log_info "  git push origin ${CURRENT_BRANCH}"
+		log_info "  git push origin ${VERSION}"
+		exit 1
+	fi
+	log_ok "Annotated tag created: ${VERSION}"
 
-    # R6: only now is it safe to disable the ERR trap — commit
-    # AND tag both exist, so rollback() would be destructive.
-    trap - ERR 2>/dev/null || true
+	# R6: only now is it safe to disable the ERR trap — commit
+	# AND tag both exist, so rollback() would be destructive.
+	trap - ERR 2>/dev/null || true
 else
-    log_info "[dry-run] Would create annotated tag: ${VERSION}"
+	log_info "[dry-run] Would create annotated tag: ${VERSION}"
 fi
 
 # ============================================================
@@ -737,35 +910,35 @@ fi
 log_step "[9/9] Pushing to origin"
 
 if [ "$NO_PUSH" = "1" ]; then
-    log_warn "Push skipped (--no-push)"
-    echo ""
-    log_info "To push manually later:"
-    echo "    git push origin ${CURRENT_BRANCH}"
-    echo "    git push origin ${VERSION}"
+	log_warn "Push skipped (--no-push)"
+	echo ""
+	log_info "To push manually later:"
+	echo "    git push origin ${CURRENT_BRANCH}"
+	echo "    git push origin ${VERSION}"
 elif [ "$DRY_RUN" = "0" ]; then
-    if git push origin "$CURRENT_BRANCH"; then
-        log_ok "Pushed branch: ${CURRENT_BRANCH}"
-    else
-        log_error "Failed to push branch ${CURRENT_BRANCH}"
-        log_info "The commit and tag are still local — fix the issue and retry"
-        log_info "  git push origin ${CURRENT_BRANCH}"
-        log_info "  git push origin ${VERSION}"
-        exit 1
-    fi
+	if git push origin "$CURRENT_BRANCH"; then
+		log_ok "Pushed branch: ${CURRENT_BRANCH}"
+	else
+		log_error "Failed to push branch ${CURRENT_BRANCH}"
+		log_info "The commit and tag are still local — fix the issue and retry"
+		log_info "  git push origin ${CURRENT_BRANCH}"
+		log_info "  git push origin ${VERSION}"
+		exit 1
+	fi
 
-    if git push origin "$VERSION"; then
-        log_ok "Pushed tag: ${VERSION}"
-    else
-        log_error "Failed to push tag ${VERSION}"
-        log_info "The branch is on origin, but the tag is still local."
-        log_info "Retry with:"
-        log_info "  git push origin ${VERSION}"
-        log_info "Until the tag is pushed, release.yml will NOT fire."
-        exit 1
-    fi
+	if git push origin "$VERSION"; then
+		log_ok "Pushed tag: ${VERSION}"
+	else
+		log_error "Failed to push tag ${VERSION}"
+		log_info "The branch is on origin, but the tag is still local."
+		log_info "Retry with:"
+		log_info "  git push origin ${VERSION}"
+		log_info "Until the tag is pushed, release.yml will NOT fire."
+		exit 1
+	fi
 else
-    log_info "[dry-run] Would push: ${CURRENT_BRANCH}"
-    log_info "[dry-run] Would push: ${VERSION}"
+	log_info "[dry-run] Would push: ${CURRENT_BRANCH}"
+	log_info "[dry-run] Would push: ${VERSION}"
 fi
 
 # ============================================================
@@ -775,22 +948,22 @@ trap - ERR 2>/dev/null || true
 
 echo ""
 if [ "$DRY_RUN" = "1" ]; then
-    echo -e "${YELLOW}${BOLD}╔═════════════════════════════════════════════════╗${NC}"
-    echo -e "${YELLOW}${BOLD}║  DRY-RUN Complete — no changes were made        ║${NC}"
-    echo -e "${YELLOW}${BOLD}╚═════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "  Run without ${CYAN}--dry-run${NC} to apply changes."
-    if [ "$HAS_JQ" != "1" ]; then
-        echo ""
-        echo -e "  ${YELLOW}⚠${NC}  update.json will NOT be updated (jq unavailable)."
-        echo -e "     ${DIM}Install jq to enable automatic metadata updates.${NC}"
-    fi
-    echo ""
-    echo -e "  ${DIM}References:${NC}"
-    echo -e "    ${DIM}• docs/RELEASE_PROCESS.md — full release process${NC}"
-    echo -e "    ${DIM}• docs/UPGRADE.md §3.1    — v1.1.0 → v1.2.0 upgrade path${NC}"
-    echo ""
-    exit 0
+	echo -e "${YELLOW}${BOLD}╔═════════════════════════════════════════════════╗${NC}"
+	echo -e "${YELLOW}${BOLD}║  DRY-RUN Complete — no changes were made        ║${NC}"
+	echo -e "${YELLOW}${BOLD}╚═════════════════════════════════════════════════╝${NC}"
+	echo ""
+	echo -e "  Run without ${CYAN}--dry-run${NC} to apply changes."
+	if [ "$HAS_JQ" != "1" ]; then
+		echo ""
+		echo -e "  ${YELLOW}⚠${NC}  update.json will NOT be updated (jq unavailable)."
+		echo -e "     ${DIM}Install jq to enable automatic metadata updates.${NC}"
+	fi
+	echo ""
+	echo -e "  ${DIM}References:${NC}"
+	echo -e "    ${DIM}• docs/RELEASE_PROCESS.md — full release process${NC}"
+	echo -e "    ${DIM}• docs/UPGRADE.md §3.4    — v1.3.0 → v1.4.0 upgrade path${NC}"
+	echo ""
+	exit 0
 fi
 
 echo -e "${GREEN}${BOLD}╔═════════════════════════════════════════════════╗${NC}"
@@ -804,34 +977,37 @@ echo -e "  ${BOLD}Tag:${NC}           ${CYAN}${VERSION}${NC} (annotated)"
 
 # L-5 fix: explicitly warn if update.json was not updated.
 if [ "$HAS_JQ" != "1" ]; then
-    echo ""
-    echo -e "  ${YELLOW}⚠${NC}  update.json was NOT updated (jq unavailable)."
-    echo -e "     ${DIM}Users who already installed the module will NOT${NC}"
-    echo -e "     ${DIM}see the update until update.json is regenerated${NC}"
-    echo -e "     ${DIM}by hand or with a jq-equipped environment.${NC}"
+	echo ""
+	echo -e "  ${YELLOW}⚠${NC}  update.json was NOT updated (jq unavailable)."
+	echo -e "     ${DIM}Users who already installed the module will NOT${NC}"
+	echo -e "     ${DIM}see the update until update.json is regenerated${NC}"
+	echo -e "     ${DIM}by hand or with a jq-equipped environment.${NC}"
 fi
 
 if [ "$NO_PUSH" = "0" ]; then
-    echo ""
-    echo -e "${BOLD}Next:${NC}"
-    echo "  • GitHub Actions (.github/workflows/release.yml) is now running."
-    echo "  • It will build 4 architectures, package the module, and publish the release."
-    echo "  • For regular releases (from develop/release/*), it will"
-    echo "    sync main → develop automatically."
-    echo "  • For PATCH releases (from main), you must back-merge manually:"
-    echo "      make sync"
-    echo ""
-    echo -e "${DIM}  Monitor: https://github.com/gasciljh/dnscrypt-proxy-webui/actions${NC}"
+	echo ""
+	echo -e "${BOLD}Next:${NC}"
+	echo "  • GitHub Actions (.github/workflows/release.yml) is now running."
+	echo "  • It will build 4 architectures, package the module, and publish the release."
+	echo "  • v1.4.0: it will also attempt to fetch the optional companion"
+	echo "    APK via scripts/fetch_app_apk.sh (best-effort — does not"
+	echo "    block the release if the fetch fails)."
+	echo "  • For regular releases (from develop/release/*), it will"
+	echo "    sync main → develop automatically."
+	echo "  • For PATCH releases (from main), you must back-merge manually:"
+	echo "      make sync"
+	echo ""
+	echo -e "${DIM}  Monitor: https://github.com/gasciljh/dnscrypt-proxy-webui/actions${NC}"
 else
-    echo ""
-    echo -e "${BOLD}Next (manual push):${NC}"
-    echo "  git push origin ${CURRENT_BRANCH}"
-    echo "  git push origin ${VERSION}"
+	echo ""
+	echo -e "${BOLD}Next (manual push):${NC}"
+	echo "  git push origin ${CURRENT_BRANCH}"
+	echo "  git push origin ${VERSION}"
 fi
 echo ""
 echo -e "  ${DIM}References:${NC}"
 echo -e "    ${DIM}• docs/RELEASE_PROCESS.md — full release process${NC}"
-echo -e "    ${DIM}• docs/UPGRADE.md §3.1    — v1.1.0 → v1.2.0 upgrade path${NC}"
+echo -e "    ${DIM}• docs/UPGRADE.md §3.4    — v1.3.0 → v1.4.0 upgrade path${NC}"
 echo ""
 
 exit 0

@@ -1,11 +1,81 @@
 # ============================================================
 # CodeQL configuration — DNSCrypt Smart Filter
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Purpose:
 #   Suppress specific CodeQL false positives that are known
 #   to be intentional design decisions in this project.
 #
 # Each suppressed rule is documented below with a rationale.
+#
+# ============================================================
+# Version history
+# ============================================================
+#   • v1.4.0 — Integration release. The two `go/path-injection`
+#     alerts (#1, #2) in `removeModule` were closed by a fix in
+#     `main.go` (sanitize via `filepath.Base()` + rebuild path
+#     via `filepath.Join(MODULES_DIR, name)`). No new
+#     suppressions were needed. No outstanding CodeQL alerts
+#     remain.
+#
+#   • v1.3.0 — Server-side refinements to the snapshot-detection
+#     and rotation semantics shared by every consumer of the
+#     persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#     touched `main.go::buildBackupInfo` (manifest-based
+#     detection + mtime sort) and `functions.sh::rotate_backups`
+#     (same semantics). None of them introduced new CodeQL
+#     alerts: `buildBackupInfo` only uses `os.ReadDir`,
+#     `os.Stat`, and `sort.Slice` on trusted constants —
+#     there is no user-controlled path or shell surface. No
+#     configuration change was needed.
+#
+#   • v1.2.0 — Data-preservation release. Six of the eight
+#     `go/path-injection` alerts were closed in this release;
+#     the remaining two were closed in v1.4.0. No new
+#     suppressions were needed. The backup system uses
+#     `filepath.Join` + `shellQuote` throughout, which CodeQL
+#     correctly recognizes as sanitizers.
+#
+#   • v1.0.0 — Initial configuration. One suppression was
+#     needed for `go/cookie-secure-not-set`.
+#
+# ============================================================
+# Suppression policy
+# ============================================================
+#   Each `exclude` block MUST:
+#     1. Document the exact rule being suppressed.
+#     2. Explain WHY the behavior is a deliberate design choice.
+#     3. Mention any alternative that was rejected and why.
+#
+#   Suppressions are reviewed at every release. If a suppression
+#   is no longer needed (e.g. the underlying code changed to
+#   satisfy the rule), it is removed.
+#
+# ============================================================
+# Scope of this configuration
+# ============================================================
+#   CodeQL for Go only analyzes GO SOURCE CODE. The rules
+#   referenced below — both the active suppression and the
+#   informational list — are all Go-specific rules that apply
+#   to `proxy/main.go` and any other `.go` files in the module.
+#
+#   Shell scripts (`proxy/*.sh`, `scripts/*.sh`), workflow
+#   YAML files, and frontend JS are NOT analyzed by CodeQL and
+#   are NOT covered by this configuration. Their static
+#   analysis is the responsibility of `bash -n` (syntax) and
+#   `actionlint` / developer-side pre-commit hooks (workflows).
+#
+#   For a Go-only ruleset, an entry such as
+#   `go/unsafe-unzip-symlink` would only be relevant if a Go
+#   file called `archive/zip` with an untrusted path. The
+#   `unzip` invocation in `customize.sh` is a SHELL command
+#   and is therefore outside CodeQL's Go analysis surface
+#   entirely — it is not a Go rule that could ever fire here,
+#   and is not listed below.
 # ============================================================
 
 name: "DNSCrypt Smart Filter CodeQL config"
@@ -30,5 +100,50 @@ query-filters:
   # is the correct trade-off.
   #
   # This is a documented design decision, not a vulnerability.
+  #
+  # Status: ACTIVE suppression (unchanged since v1.0.0).
+  # Reviewed at: v1.1.0, v1.2.0, v1.3.0, v1.4.0.
+  # ----------------------------------------------------------
   - exclude:
       id: go/cookie-secure-not-set
+
+  # ----------------------------------------------------------
+  # Not suppressed — informational watch list
+  # ----------------------------------------------------------
+  # The following Go-specific CodeQL rules are NOT suppressed
+  # and SHOULD remain active. Any future alert from these rules
+  # must be fixed in code, not suppressed. The list exists so
+  # that reviewers can tell at a glance which rules the project
+  # has explicitly considered.
+  #
+  #   • go/path-injection
+  #       — Two alerts (#1, #2) in `removeModule` were fixed in
+  #         v1.4.0 via `filepath.Base()` + `filepath.Join()`.
+  #         No suppression was needed.
+  #       — Six related alerts were closed in v1.2.0 via the
+  #         backup system's `filepath.Join` usage.
+  #       — Any future alert from this rule indicates a real
+  #         regression and must be fixed.
+  #
+  #   • go/command-injection
+  #       — All shell commands go through `shellQuote()` (see
+  #         `main.go` [12]). No alerts have been raised.
+  #
+  #   • go/sql-injection
+  #       — Not applicable: the project uses no SQL database.
+  #
+  #   • go/ssrf
+  #       — The download client in `main.go` [6] uses
+  #         hardcoded URLs from the profile map. No user input
+  #         reaches the URL. No alerts have been raised.
+  #
+  #   • go/unsafe-unzip-symlink
+  #       — The project's only `unzip` invocation is a shell
+  #         command in `customize.sh` [9], which is OUTSIDE the
+  #         scope of CodeQL for Go. There is no Go call to
+  #         `archive/zip` anywhere in the codebase, so this rule
+  #         can never fire. Listed here for completeness only.
+  #
+  # See docs/SECURITY.md §5.31 and §5.32 for the full security
+  # model, and docs/ARCHITECTURE.md §4.10 for the BAK-1..BAK-4
+  # backend additions that CodeQL verified.

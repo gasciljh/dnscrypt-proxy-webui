@@ -1,6 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CODEOWNERS
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -36,6 +37,25 @@
 #     • Repository Settings → Branches
 #     • Repository Settings → Rules → Rulesets
 #
+# ============================================================
+# Identifier inventory in this file (6 total):
+#   • CO-1, CO-2, CO-3                            (3)
+#       — v1.2.0 post-audit corrections
+#   • CO-V14-01, CO-V14-02, CO-V14-03             (3)
+#       — v1.4.0 additions
+#   • HARD-CO-01 (v1.4.0 audit — Last updated fix)
+#   • HARD-CO-02 (v1.4.0 audit — v1.3.0 block added)
+#   • HARD-CO-03 (v1.4.0 audit — Cross-references added)
+#
+# Cross-references:
+#   • docs/BRANCHING.md §6           — branch protection policy
+#   • docs/CONTRIBUTING.md           — contribution guide
+#   • docs/ARCHITECTURE.md §4.13     — v1.3.0 server-side refinements (authoritative)
+#   • docs/BACKUP.md                 — backup system reference (v1.2.0 + v1.3.0 rotation)
+#   • docs/EMERGENCY.md              — emergency recovery (v1.2.0)
+#   • docs/adr/README.md §4          — ADR lifecycle
+#   • .github/workflows/release.yml  — release pipeline (Non-goals section)
+#   • CHANGELOG.md                   — version history (v1.0.0 → v1.4.0)
 # ============================================================
 # v1.1.0 additions (kept):
 #   • Added /docs/adr/ — all Architecture Decision Records are
@@ -92,7 +112,7 @@
 #     edition). No Arabic strings exist in this file.
 #
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
+# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
 # ============================================================
 # A pre-release audit of this file identified the following
 # issues. All of them are addressed in-place; no version bump.
@@ -133,6 +153,115 @@
 #     example, so the reader understands both styles.
 #
 # ============================================================
+# v1.3.0 — Server-side rotation refinements (HARD-CO-02)
+# ============================================================
+#   📌 The v1.3.0 release did not change the CODEOWNERS
+#      patterns themselves. All v1.2.0 patterns remain valid.
+#
+#   However, the v1.3.0 release DID change the internal
+#   semantics of several files that are already covered by
+#   §[2] and §[10] below. The change is documented here so
+#   that a future reviewer understands what to look for when
+#   those files change.
+#
+#   Server-side refinements (backup layer):
+#     The v1.3.0 release rewrote the snapshot-detection and
+#     rotation semantics shared by every consumer of the
+#     persistent backup directory. Three identifiers (used in
+#     CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13):
+#
+#       🔧 SNAP-MANIFEST — `main.go:buildBackupInfo()` now
+#         detects a snapshot by `.manifest.json` presence,
+#         not by the v1.2.0 name pattern.
+#
+#       🔧 SNAP-MTIME — `last_backup_name` is now selected by
+#         mtime (descending), with a name-based fallback.
+#
+#       🔧 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT —
+#         `functions.sh:rotate_backups()` was rewritten with
+#         the same detection, the same sort, and two
+#         additional protected targets (`.last_stable` +
+#         newest install snapshot).
+#
+#   Files affected by the v1.3.0 refinement:
+#     • /proxy/main.go            (SNAP-* — §[2])
+#     • /proxy/functions.sh       (ROT-* — §[2])
+#     • /proxy/service.sh         (boot-path DNS auto-start)
+#     • /proxy/watchdog.sh        (§[5b] counter)
+#     • /proxy/status.sh          (_list_snapshots)
+#     • /proxy/customize.sh       (rotate_backups)
+#     • /proxy/action.sh          (_inline_rotate_backups +
+#                                  _inline_backup_summary)
+#     • /proxy/uninstall.sh       (§[5b] BACKUP_COUNT /
+#                                  BACKUP_LAST_NAME)
+#     • /docs/BACKUP.md           (rotation semantics — §[10])
+#     • /docs/ARCHITECTURE.md     (§4.13 — not explicitly
+#                                  owned; falls back to `*`)
+#
+#   Ownership impact: NONE.
+#     All affected files were already covered by their
+#     respective patterns. No new entry is required.
+#
+#   Review reminder: any future change to one of the files
+#   above MUST keep the SNAP-* / ROT-* semantics consistent
+#   across the module. See docs/ARCHITECTURE.md §4.13.2.
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   🆕 CO-V14-01 — The module now bundles an OPTIONAL companion
+#     Android app APK (`web/app-debug.apk`). The file is staged
+#     by `.github/workflows/release.yml` via
+#     `scripts/fetch_app_apk.sh` before packaging. It is NOT
+#     committed to git (see `.gitignore`).
+#
+#     Ownership impact:
+#       • `/web/` — already covers `app-debug.apk` (via the
+#         existing directory pattern). No new entry needed.
+#       • `scripts/fetch_app_apk.sh` — added to §[8] (release
+#         tooling), because it participates in the release
+#         pipeline.
+#       • `proxy/app-apk.version` — added to §[2] (critical core),
+#         because it is the Single Source of Truth for the
+#         companion app version (read by `fetch_app_apk.sh`).
+#
+#   🆕 CO-V14-02 — New CodeQL fix in `/proxy/main.go`
+#     (`removeModule` — `go/path-injection` hardening). Already
+#     covered by the `/proxy/main.go` entry in §[2].
+#
+#   🆕 CO-V14-03 — Documentation review unchanged. The
+#     v1.4.0 release did not add new documentation files under
+#     `docs/`. The existing `/docs/` pattern covers everything.
+#
+# ============================================================
+# v1.4.0 — POST-AUDIT FIXES (this revision)
+# ============================================================
+#   A post-audit review of this file against the v1.3.0 / v1.4.0
+#   code identified the following documentation gaps. All are
+#   addressed in-place; no version bump.
+#
+#   🔧 HARD-CO-01 — `Last updated` corrected. The header
+#     previously said `2026-10-02` (the v1.3.0 release date,
+#     not the v1.4.0 file-editing date). It now reads
+#     `2026-10-08`, matching every other file in the v1.4.0
+#     module.
+#
+#   🔧 HARD-CO-02 — `v1.3.0` block added. The file previously
+#     jumped directly from the v1.2.0 POST-AUDIT block to the
+#     v1.4.0 block, with no mention of the v1.3.0 server-side
+#     refinements (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+#     ROT-MTIME, ROT-PROTECT). A new v1.3.0 block above
+#     documents them, and lists the affected files for
+#     reviewer awareness.
+#
+#   🟢 HARD-CO-03 — Cross-references block added at the top of
+#     the file, listing the authoritative sources for the
+#     v1.3.0 rotation semantics (`docs/ARCHITECTURE.md` §4.13),
+#     the branch protection policy (`docs/BRANCHING.md` §6),
+#     and the release-pipeline non-goals
+#     (`.github/workflows/release.yml`).
+#
+# ============================================================
 
 # ============================================================
 # [1] Default — all files
@@ -147,6 +276,11 @@
 # ============================================================
 
 # --- Backend Go (security core) ---
+# HARD-CO-02 note: /proxy/main.go also carries the v1.3.0
+# SNAP-MANIFEST + SNAP-MTIME refinements to buildBackupInfo(),
+# and the v1.4.0 CodeQL go/path-injection hardening in
+# removeModule(). Any change here requires alignment with
+# docs/ARCHITECTURE.md §4.13.
 /proxy/main.go              @gasciljh
 /proxy/go.mod               @gasciljh
 
@@ -154,12 +288,21 @@
 # These scripts implement the 10 defensive layers. Any change
 # requires a careful review of the corresponding section in
 # docs/BACKUP.md and docs/EMERGENCY.md.
+# HARD-CO-02 note: /proxy/customize.sh's rotate_backups() was
+# rewritten in v1.3.0 with the ROT-* semantics (parity with
+# functions.sh).
 /proxy/customize.sh         @gasciljh
 /proxy/service.sh           @gasciljh
 /proxy/post-fs-data.sh      @gasciljh
 /proxy/uninstall.sh         @gasciljh
 
 # --- Runtime scripts (firewall + lifecycle + observability) ---
+# HARD-CO-02 note: /proxy/functions.sh:rotate_backups() uses
+# the v1.3.0 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT semantics;
+# /proxy/status.sh uses the same SNAP-* semantics in
+# _list_snapshots; /proxy/watchdog.sh uses the SNAP-* semantics
+# in its §[5b] snapshot counter; /proxy/action.sh uses both via
+# _inline_list_snapshots + _inline_rotate_backups.
 /proxy/functions.sh         @gasciljh
 /proxy/watchdog.sh          @gasciljh
 /proxy/action.sh            @gasciljh
@@ -171,11 +314,16 @@
 # ProjectURL). Any change here affects every binary shipped.
 /proxy/build.sh             @gasciljh
 
-# --- DNS engine version (single source of truth) ---
+# --- Version files (single sources of truth) ---
 # CO-2 fix: this file is read by scripts/fetch_dns_binaries.sh
 # to determine which upstream dnscrypt-proxy version to fetch.
 # Changing it affects every install and every upgrade.
 /proxy/dnscrypt-proxy.version  @gasciljh
+
+# CO-V14-01 (v1.4.0): the companion app version is the Single
+# Source of Truth for scripts/fetch_app_apk.sh. Any change here
+# triggers a re-fetch of the companion APK at the next release.
+/proxy/app-apk.version      @gasciljh
 
 # --- Config (security — Port Guard + credentials) ---
 /proxy/dnscrypt-proxy.toml  @gasciljh
@@ -184,6 +332,10 @@
 # ============================================================
 # [3] Frontend
 # ============================================================
+# CO-V14-01 note (v1.4.0): this pattern already covers
+# `web/app-debug.apk` when it is staged for a release build.
+# The APK is a build artifact and is not committed (see
+# `.gitignore`), so no explicit pattern is required.
 /web/                       @gasciljh
 
 # ============================================================
@@ -239,6 +391,15 @@
 # See docs/BACKUP.md for the full scenario list.
 /.github/workflows/upgrade-test.yml  @gasciljh
 
+# --- v1.4.0: companion APK release steps ---
+# CO-V14-01: the release workflow gained two new steps that
+# handle the companion APK ("Fetch companion Android app APK"
+# and "Stage APK for module ZIP"). Any change to those steps
+# requires the same review as the rest of the release pipeline.
+# (Covered by /.github/workflows/ above; listed here for
+# traceability.)
+/.github/workflows/release.yml      @gasciljh
+
 # ============================================================
 # [6] Documentation (lighter review)
 # ============================================================
@@ -260,10 +421,15 @@
 # ============================================================
 # These files define the workflow used by contributors and must
 # be reviewed together with the corresponding CI/CD changes.
+#
+# v1.4.0 — CO-V14-01: `scripts/fetch_app_apk.sh` joins this
+# section because it participates in the release pipeline. It
+# is the tool that downloads the companion APK before packaging.
 /docs/BRANCHING.md          @gasciljh
 /docs/RELEASE_PROCESS.md    @gasciljh
 /scripts/release.sh         @gasciljh
 /scripts/release-patch.sh   @gasciljh
+/scripts/fetch_app_apk.sh   @gasciljh
 
 # ============================================================
 # [9] Architecture Decision Records (ADRs)
@@ -287,6 +453,9 @@
 #   Full reference for the persistent backup system:
 #   directory layout, rotation policy, .manifest.json schema,
 #   .upgrade_history.json schema, manual backup/restore.
+#   HARD-CO-02 note: §6.5 was corrected in the v1.4.0 audit
+#   cycle to describe the v1.3.0 ROT-MANIFEST + ROT-MTIME +
+#   ROT-PROTECT semantics (not the v1.2.0 name-sort rule).
 #
 # /docs/EMERGENCY.md
 #   Step-by-step recovery guide for catastrophic scenarios:
@@ -332,6 +501,16 @@
 #       /proxy/customize.sh @gasciljh @data-guardian
 #       /docs/BACKUP.md     @gasciljh @data-guardian
 #       /docs/EMERGENCY.md  @gasciljh @data-guardian
+#
+#   • Rotation semantics (v1.3.0 — critical):
+#       /proxy/functions.sh @gasciljh @data-guardian
+#       /proxy/status.sh    @gasciljh @data-guardian
+#       /proxy/watchdog.sh  @gasciljh @data-guardian
+#       /proxy/action.sh    @gasciljh @data-guardian
+#
+#   • Companion app (v1.4.0):
+#       /scripts/fetch_app_apk.sh @gasciljh @release-manager
+#       /proxy/app-apk.version    @gasciljh @release-manager
 #
 #   • Installer bootstrap:
 #       /META-INF/          @gasciljh @installer-reviewer
@@ -384,6 +563,9 @@
 #   → matched by `/docs/` and `/docs/BACKUP.md`.
 #     Any change here MUST be reviewed together with
 #     /proxy/customize.sh — they describe the same contract.
+#   → HARD-CO-02 (v1.3.0): §6.5 now documents the ROT-*
+#     semantics. A reviewer MUST verify that any change keeps
+#     the rotation contract in sync with functions.sh.
 #
 # When a PR modifies /META-INF/com/google/android/update-binary
 # (CO-2 fix):
@@ -391,6 +573,22 @@
 #   → A reviewer MUST confirm the change does not break the
 #     Magisk install pipeline — this file is the first thing
 #     the root manager runs.
+#
+# When a PR modifies /scripts/fetch_app_apk.sh (v1.4.0):
+#   → matched by `/scripts/` and `/scripts/fetch_app_apk.sh`.
+#   → This script downloads the companion APK at release time.
+#     A reviewer MUST confirm it still respects the
+#     `--offline` / `--force` semantics and does not block
+#     the release on a network failure (the APK is OPTIONAL).
+#
+# When a PR modifies /proxy/functions.sh (v1.3.0 rotation):
+#   → matched by `/proxy/` and `/proxy/functions.sh`.
+#   → This file carries the ROT-MANIFEST + ROT-MTIME +
+#     ROT-PROTECT semantics. A reviewer MUST cross-check
+#     /proxy/main.go (SNAP-*), /proxy/status.sh
+#     (_list_snapshots), /proxy/customize.sh (rotate_backups),
+#     /proxy/action.sh (_inline_rotate_backups), and
+#     /docs/BACKUP.md §6.5 before approving.
 #
 # ============================================================
 # Benefits
@@ -404,6 +602,12 @@
 # ✅ ADR-aware: architectural decisions trigger the right reviewer.
 # ✅ Data-preservation-aware (v1.2.0): critical backup/restore
 #    files are explicitly enumerated.
+# ✅ Rotation-aware (v1.3.0): the six files carrying the
+#    SNAP-* / ROT-* semantics are cross-referenced so a
+#    reviewer knows to check them together.
+# ✅ Companion-app-aware (v1.4.0): the release tooling for the
+#    optional Android app is enumerated with the rest of the
+#    release pipeline.
 #
 # ============================================================
 # Notes on branch policy

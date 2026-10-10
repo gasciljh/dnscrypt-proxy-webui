@@ -1,38 +1,138 @@
 # FAQ — Frequently Asked Questions
 
-> Quick answers to 130+ common questions.
+> Quick answers to 150+ common questions.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
->   • Version bumped from v1.1.0 to v1.2.0.
->   • Added a new section: **"v1.2.0 Specific Questions"** (Q121–Q130),
->     covering the 10 data-preservation layers, the persistent
->     backup directory, recovery mode, transactional upgrades,
->     and the `runtime_info.backups` 7-field schema.
->   • Updated Q8 (What's new) to also describe v1.2.0.
->   • Updated Q43 (Performance improvements) with the v1.2.0
->     backup layer's storage metrics.
->   • Updated Q64 (Uninstall) — v1.2.0 preserves the backup
->     directory on uninstall.
->   • Updated Q66 (Rollback) with v1.2.0 caveats.
->   • Updated Q73 (Settings lost) — v1.2.0 fixes the legacy
->     bug via the 10 defensive layers.
->   • Updated Q112 (Memory limit) with cross-reference to the
->     v1.2.0 backup layer.
->   • Preserved the v1.0.0-specific section (Q78–Q89) and the
->     v1.1.0-specific section (Q111–Q120) as-is, with version
->     numbers updated to reference the current release.
->   • No questions were removed.
->   • **Global edition — English default with Arabic toggle**:
->     the WebUI ships with English as the default language and an
+> **Identifier inventory in this file (8 total)**:
+>   • HARD-FAQ-01 (`Last updated` correction — v1.4.0)
+>   • HARD-FAQ-02 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-FAQ-03 (§Q43 Performance: duplicate `proplus` row
+>     removed — v1.4.0)
+>   • HARD-FAQ-04 (§Q43 Rotation policy corrected from
+>     "directory name" to "mtime + SNAP/ROT" — v1.4.0)
+>   • HARD-FAQ-05 (§Q66 + §Q130 + §Q131 + §Q138 rotation
+>     semantics added — v1.4.0)
+>   • HARD-FAQ-06 (header + footer `Last updated` sync —
+>     v1.4.0)
+>   • HARD-FAQ-07 (Cross-references block added — v1.4.0)
+>   • HARD-FAQ-08 (v1.4.0 corrections block added — v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/EMERGENCY.md](EMERGENCY.md) — emergency recovery
+>   • [docs/UPGRADE.md](UPGRADE.md) — version upgrade guide
+>   • [docs/BRANCHING.md](BRANCHING.md) — Git workflow
+>   • [docs/RELEASE_PROCESS.md](RELEASE_PROCESS.md) — release guide
+>   • [docs/API.md](API.md) — HTTP API (§6.1.7 runtime_info)
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections
+>   • [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
+>   • [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Contributors
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
+>   • Added new section: **"v1.4.0 Specific Questions"** (Q141–Q150),
+>     covering the companion Android app, CodeQL hardening, and
+>     iOS PWA removal.
+>   • Added new section: **"v1.3.0 Specific Questions"** (Q131–Q140),
+>     covering the PWA install button, live status LED, DNS
+>     auto-start after boot, **and the server-side rotation
+>     refinements (SNAP-*/ROT-*)**.
+>   • Updated Q8 (What's new) to describe v1.4.0.
+>   • Updated Q14 (Installation) — new ZIP filename.
+>   • Updated Q64 (Uninstall) — companion APK handling.
+>   • Updated Q66 (Rollback) — v1.4.0 caveats + rotation semantics.
+>   • References updated to point at v1.4.0.
+>   • **Global edition (English default + Arabic toggle)**: the
+>     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
 >     user's preference is stored client-side in
 >     `localStorage['dnscrypt-lang']`. Documentation remains
 >     English-only by project convention.
+
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side additions**:
+>       - PWA install button added (dynamic, browser-aware;
+>         later **replaced in v1.4.0** by a direct
+>         `<a download>` link).
+>       - Live status LED added on the Today counter.
+>   • **Boot-path correctness fix**: DNS engine now starts
+>     automatically after boot (via a direct API call from
+>     `service.sh` §[19]).
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Three
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets: the `.last_stable`
+>         recovery pointer and the newest install snapshot.
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
+>   • **No breaking API changes.**
+>   • **No new audit corrections.**
+
+> **v1.2.0 changes**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Added section: **"v1.2.0 Specific Questions"** (Q121–Q130),
+>     covering the 10 data-preservation layers, the persistent
+>     backup directory, recovery mode, transactional upgrades,
+>     and the `runtime_info.backups` 7-field schema.
+>   • Updated Q8 (What's new) to also describe v1.2.0.
+>   • Preserved the v1.0.0-specific section (Q78–Q89) and the
+>     v1.1.0-specific section (Q111–Q120) as-is.
+>   • No questions were removed.
+
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-FAQ-01 + HARD-FAQ-06** — `Last updated` corrected
+>     in both the header metadata block and the trailing footer.
+>     Both now read `2026-10-08`, matching every other file in
+>     the v1.4.0 module.
+>   • 🔧 **HARD-FAQ-02** — The v1.3.0 block in the header
+>     previously listed only the client-side changes (PWA install
+>     button, live status LED) and the boot-path fix, but
+>     **omitted** the server-side rotation refinements
+>     (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME,
+>     ROT-PROTECT) that touched 8 files in v1.3.0.
+>   • 🔧 **HARD-FAQ-03** — §Q43 (Performance) had a **duplicate
+>     `proplus` row** in the memory-limit table (the value
+>     `160 MB` appeared twice).
+>   • 🔧 **HARD-FAQ-04** — §Q43 described the rotation policy as
+>     "Keep 21 newest by **directory name**" — this was the
+>     v1.2.0 behavior and was **reversed in v1.3.0** in favour
+>     of mtime sort. The description is now accurate.
+>   • 🟡 **HARD-FAQ-05** — Added v1.3.0 rotation semantics to
+>     §Q66 (Rollback), §Q130 (v1.2.0 vs v1.1.0 comparison),
+>     §Q131 (What's new in v1.3.0), and §Q138 (Compatibility).
+>   • 🟢 **HARD-FAQ-07** — Added a proper Cross-references block
+>     at the top of the file.
+>   • 🟢 **HARD-FAQ-08** — Added this corrections block.
 
 > **📖 Related documents**:
 > - Backup system reference → [`docs/BACKUP.md`](BACKUP.md)
@@ -40,6 +140,7 @@
 > - Version upgrade guide → [`docs/UPGRADE.md`](UPGRADE.md)
 > - Branching strategy → [`docs/BRANCHING.md`](BRANCHING.md)
 > - Release process → [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
+> - Architecture (rotation) → [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13
 
 ---
 
@@ -57,6 +158,8 @@
 - [v1.0.0 Specific Questions](#v100-specific-questions)
 - [v1.1.0 Specific Questions](#v110-specific-questions)
 - [v1.2.0 Specific Questions](#v120-specific-questions)
+- [v1.3.0 Specific Questions](#v130-specific-questions)
+- [v1.4.0 Specific Questions](#v140-specific-questions)
 - [For Developers](#for-developers)
 - [Contributing](#contributing)
 
@@ -81,7 +184,10 @@ A Magisk/KernelSU module that turns an Android device into a **system-wide encry
 | PWA | ❌ | ✅ |
 | Zero telemetry | ⚠️ | ✅ |
 | Dynamic memory limit | ❌ | ✅ (v1.1.0) |
-| **Data preservation** | ❌ | ✅ **(v1.2.0)** |
+| Data preservation | ❌ | ✅ (v1.2.0) |
+| **PWA install button** | ❌ | ✅ **(v1.3.0)** |
+| **Live status LED** | ❌ | ✅ **(v1.3.0)** |
+| **Companion Android app** | ❌ | ✅ **(v1.4.0)** |
 
 ### 3. How is it different from NextDNS / AdGuard DNS?
 
@@ -108,35 +214,38 @@ The project does not connect to any analytics server, does not collect statistic
 - DNSCrypt/DoH (for DNS encryption).
 - Blocklist sources (e.g. HaGeZi via jsDelivr, for downloading lists).
 
-### 8. What's new in v1.2.0?
+### 8. What's new in v1.4.0?
 
-**Data Preservation Release — the biggest reliability improvement since v1.0.0.**
+**Integration release — companion Android app + CodeQL cleanup.**
 
 **No breaking changes for users.** The WebUI remains bilingual
-(English default + Arabic toggle), exactly as in v1.1.0.
+(English default + Arabic toggle).
 
-**The 10 defensive layers**:
+**What's new**:
 
-- **Multi-source detection** — searches 7 candidate locations for user data.
-- **Persistent backup** — `/sdcard/dnscrypt-webui-backup/` survives uninstall and `/data` reset.
-- **SHA256 integrity verification** — advisory check of every snapshot.
-- **Transactional upgrades** — atomic install with automatic rollback.
-- **Root-solution compatibility** — Magisk / KernelSU / APatch.
-- **SELinux preservation** — `restorecon` / `chcon` on every restore.
-- **Recovery mode** — a `recovery` trigger file restores last known-good config.
-- **Config migrations** — version-aware transformations.
-- **Auto-backup + rotation** — periodic (24 h) + pre-critical; max 21 snapshots.
-- **Observability** — `.upgrade_history.json`, `status.sh --diagnose`, 7-field `runtime_info.backups`.
+- **Companion Android app** — a native WebView wrapper (~3 MB) is
+  now bundled into the module ZIP as an OPTIONAL asset
+  (`web/app-debug.apk`). Served at `GET /app-debug.apk` by
+  `main.go`. The WebUI install button is now a direct
+  `<a download>` link.
+- **CodeQL `go/path-injection` hardening** — `removeModule` in
+  `main.go` now uses `filepath.Base()` sanitization. No outstanding
+  CodeQL alerts.
+- **iOS PWA logic removed** — Android-only project. Removed
+  `isIOSDevice()`, iOS-specific translations, and iOS branches in
+  the PWA install flow.
 
-**What this fixes**: A **data-loss bug** in v1.1.0 that silently erased the 5 user config files on every in-place upgrade. Users no longer lose their settings.
+**What's carried forward from earlier releases**:
 
-**New tools**:
+- **v1.3.0**: PWA install button (now superseded by direct
+  download), live status LED, DNS auto-start after boot,
+  **server-side rotation refinements (SNAP-*/ROT-*)**.
+- **v1.2.0**: 10 data-preservation layers, persistent backup
+  directory, recovery mode, transactional upgrades,
+  `runtime_info.backups` 7-field schema.
 
-- `action.sh --backup` — trigger a manual backup.
-- `status.sh --diagnose` — full diagnostic report.
-- `runtime_info.backups` — 7-field observability object (see Q127).
-
-See [CHANGELOG.md](../CHANGELOG.md) for details. See Q121–Q130 for the specifics.
+**See also**: [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0]. See
+Q141–Q150 for the specifics of v1.4.0, Q131–Q140 for v1.3.0.
 
 ### 9. What is the release cadence?
 
@@ -188,10 +297,16 @@ size checks if `sha256sum` is missing. See
 
 See [`INSTALL.md`](INSTALL.md). In short:
 
-1. Download `dnscrypt-webui-1.2.0-module.zip` from [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
+1. Download `dnscrypt-webui-1.4.0-module.zip` from
+   [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases).
 2. Install via Magisk Manager → Modules.
 3. Reboot.
 4. Open `http://127.0.0.1:9090` from a browser.
+
+**Optional (v1.4.0)**: The module ZIP may contain the companion
+Android app (`web/app-debug.apk`). You can install it from the
+WebUI install button (a direct `<a download>` link) or by
+navigating to `http://127.0.0.1:9090/app-debug.apk`.
 
 ### 15. Can I install multiple DNS modules together?
 
@@ -212,6 +327,12 @@ Q73, and Q121.
 `/sdcard/dnscrypt-webui-backup/`, which survives uninstall and
 factory reset of `/data`.
 
+**v1.3.0 and v1.4.0**: The backup layer is unchanged from v1.2.0
+in terms of what is preserved and where it lives. The **rotation
+semantics** were refined in v1.3.0 (manifest-based detection +
+mtime sort + protected targets — see Q131) but the user-visible
+behavior is unchanged: your 5 config files are preserved.
+
 ---
 
 ## Usage
@@ -223,6 +344,10 @@ factory reset of `/data`.
 
 **Manually**:
 - Open the browser at `http://127.0.0.1:9090`.
+
+**From the companion app (v1.4.0)**:
+- If installed, the companion app opens the same WebUI in a native
+  WebView wrapper.
 
 ### 18. I forgot my password. What do I do?
 
@@ -249,9 +374,11 @@ su -c "nano /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
 ```
 
-⚠️ **Warning**: Do not use port 8080 (reserved for monitoring_ui). The system will refuse to start.
+⚠️ **Warning**: Do not use port 8080 (reserved for monitoring_ui).
+The system will refuse to start.
 
-⚠️ **Fix NEW-3**: Invalid values (`0`, `99999`, `-1`, `abc`) → automatic fallback to default.
+⚠️ **Fix NEW-3**: Invalid values (`0`, `99999`, `-1`, `abc`) →
+automatic fallback to default.
 
 **v1.2.0 note**: The new port is preserved by the 10 defensive
 layers on the next upgrade.
@@ -302,15 +429,18 @@ Same as above, but add it to the **Denylist**.
 
 Possible reasons:
 
-1. The ad is served from the same domain as content (e.g. YouTube, Facebook) → DNS cannot block it.
-2. The application uses its own DoH servers (hardcoded) → bypasses system DNS.
+1. The ad is served from the same domain as content (e.g. YouTube,
+   Facebook) → DNS cannot block it.
+2. The application uses its own DoH servers (hardcoded) → bypasses
+   system DNS.
 3. Cache → restart the device or clear browser cache.
 4. You are using a weak list → try "PRO" or "Ultimate".
 
 ### 25. How do I block YouTube ads?
 
 It's difficult to block them via DNS for the following reasons:
-- Ads come from the same domain as `youtube.com` and `googlevideo.com`.
+- Ads come from the same domain as `youtube.com` and
+  `googlevideo.com`.
 - Blocking the entire domain would disable YouTube videos entirely.
 
 **Solutions**:
@@ -324,14 +454,17 @@ DNS can block:
 - `an.facebook.com` (ads)
 - `connect.facebook.net`
 
-**However**: Ads integrated into the Feed may not be blocked because they come from the same source as posts.
+**However**: Ads integrated into the Feed may not be blocked
+because they come from the same source as posts.
 
 ### 27. Why is DNS sometimes slow?
 
 Reasons:
 
-1. A slow remote resolver → DNSCrypt-proxy switches servers automatically but takes some time.
-2. Using a very large list (Ultimate = 500K entries) delays engine startup.
+1. A slow remote resolver → DNSCrypt-proxy switches servers
+   automatically but takes some time.
+2. Using a very large list (Ultimate = 500K entries) delays engine
+   startup.
 3. Poor or interrupted internet connection.
 4. Cache is full → restart the service.
 
@@ -348,10 +481,12 @@ su -c "iptables -t nat -I PREROUTING -i wlan+ -p udp --dport 53 -j DNAT --to-des
 
 ### 29. Does it work with a VPN?
 
-No. The VPN app routes all traffic through its own tunnel, bypassing `iptables`.
+No. The VPN app routes all traffic through its own tunnel,
+bypassing `iptables`.
 
 **Alternatives**:
-- Use DNSCrypt inside a VPN app if it supports custom DNS (DNSCrypt-over-VPN).
+- Use DNSCrypt inside a VPN app if it supports custom DNS
+  (DNSCrypt-over-VPN).
 - Or use only one of them.
 
 ### 30. What is the difference between DNSCrypt and DoH?
@@ -362,7 +497,8 @@ No. The VPN app routes all traffic through its own tunnel, bypassing `iptables`.
 | **DoH** | 443 | HTTPS | TLS 1.3 |
 | **DoT** | 853 | TLS | TLS 1.3 |
 
-Both are fully secure, but DNSCrypt is preferred on weak mobile networks due to its lower data overhead.
+Both are fully secure, but DNSCrypt is preferred on weak mobile
+networks due to its lower data overhead.
 
 ---
 
@@ -370,7 +506,8 @@ Both are fully secure, but DNSCrypt is preferred on weak mobile networks due to 
 
 ### 31. What is the Dashboard?
 
-A separate monitoring panel on `http://127.0.0.1:9091` that displays:
+A separate monitoring panel on `http://127.0.0.1:9091` that
+displays:
 - Total + blocked queries.
 - Cache hit ratio.
 - Resolver health.
@@ -379,14 +516,15 @@ A separate monitoring panel on `http://127.0.0.1:9091` that displays:
 
 ### 32. Why doesn't the Dashboard show any data?
 
-**Before v1.0.0**: This was a known issue (Dashboard broken) due to Prometheus text → JSON conversion.
+**Before v1.0.0**: This was a known issue (Dashboard broken) due
+to Prometheus text → JSON conversion.
 
-**Now**: In v1.2.0 (and v1.0.0+), it works correctly. Verify:
+**Now**: In v1.4.0 (and v1.0.0+), it works correctly. Verify:
 
 ```bash
 # 1. Version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.2.0
+# Expected: version=v1.4.0
 
 # 2. Binary updated
 su -c "strings /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-webui 2>/dev/null | grep -q 'buildDashboardJSON' && echo 'OK'"
@@ -458,9 +596,11 @@ Full schema in [`API.md`](API.md).
 
 ### 37. Dashboard links are broken. Why?
 
-**Before v1.0.0**: `index.html` and `dashboard.html` links were hardcoded (`127.0.0.1:9090/9091`) → broken when ports are changed.
+**Before v1.0.0**: `index.html` and `dashboard.html` links were
+hardcoded (`127.0.0.1:9090/9091`) → broken when ports are changed.
 
-**After v1.0.0 (PORT-2)**: Links are dynamically built from `runtime_info`:
+**After v1.0.0 (PORT-2)**: Links are dynamically built from
+`runtime_info`:
 - Uses `window.location.hostname` (supports LAN).
 - Falls back to 9090/9091 before `runtime_info` loads.
 - Works with any custom port.
@@ -471,7 +611,8 @@ Full schema in [`API.md`](API.md).
 su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'"
 ```
 
-**v1.1.0+ addition**: The System Info panel shows profile + memory. See Q117.
+**v1.1.0+ addition**: The System Info panel shows profile + memory.
+See Q117.
 
 **v1.2.0 addition**: The System Info panel also shows backup state
 (6 user-facing fields). See Q127.
@@ -486,7 +627,8 @@ In normal use:
 - ~1-2% / day (DNS queries processed locally).
 - ~5-10% / day (when downloading new lists — rare).
 
-**Conclusion**: Never drains the battery — it is not a VPN app and does not require a persistent connection.
+**Conclusion**: Never drains the battery — it is not a VPN app and
+does not require a persistent connection.
 
 ### 39. How much memory does it consume?
 
@@ -502,16 +644,20 @@ Q111.
 ### 40. Does it slow down the internet?
 
 No. On the contrary:
-- The local DNS cache provides faster responses for previously visited pages.
+- The local DNS cache provides faster responses for previously
+  visited pages.
 - DNSCrypt/DoH may be faster than the ISP's default DNS.
 
 ### 41. The device gets hot. Why?
 
 Possible reasons:
 
-1. The blocklist is huge (Ultimate) → takes a long time to load into memory.
-2. Watchdog loop (service failing repeatedly) → but exponential backoff prevents this.
-3. Old CPU → blocking 500K entries consumes resources on a weak processor.
+1. The blocklist is huge (Ultimate) → takes a long time to load
+   into memory.
+2. Watchdog loop (service failing repeatedly) → but exponential
+   backoff prevents this.
+3. Old CPU → blocking 500K entries consumes resources on a weak
+   processor.
 
 **Solution**:
 - Try "Light" or "Normal" instead of Ultimate.
@@ -521,16 +667,20 @@ Possible reasons:
 
 Yes:
 
-- **`isRunDirUsable` cache** (30 s) — prevents repeated I/O on every `/readyz`.
-- **`isPortOpen` native Go** — instead of `fork/exec` (~30× faster).
+- **`isRunDirUsable` cache** (30 s) — prevents repeated I/O on
+  every `/readyz`.
+- **`isPortOpen` native Go** — instead of `fork/exec` (~30×
+  faster).
 - **`isPortOpenCached` per-port map** — correct cache per port.
 - **`getSystemShell` sync.Once** — no overhead after first call.
-- **Auth cache (60 s)** — `getMonitoringAuth` ~0.05ms instead of ~5-10ms.
-- **`hasEndpoint` (string equality)** — <100 ns instead of O(n) `strings.Contains`.
+- **Auth cache (60 s)** — `getMonitoringAuth` ~0.05ms instead of
+  ~5-10ms.
+- **`hasEndpoint` (string equality)** — <100 ns instead of O(n)
+  `strings.Contains`.
 
 **Impact**: Less CPU, faster response, less disk I/O.
 
-### 43. What performance improvements came in v1.1.0 and v1.2.0?
+### 43. What performance improvements came in v1.1.0 / v1.2.0 / v1.3.0 / v1.4.0?
 
 **v1.1.0 — MEM-1 (Dynamic memory limit per profile)**:
 
@@ -550,20 +700,6 @@ WebUI becomes slow/unresponsive during heavy DNS activity.
 | proplus | 160 MB |
 | ultimate | 220 MB |
 
-**Impact**:
-- No more GC thrashing on `ultimate`.
-- CPU stays low even under load.
-- Memory remains bounded on lighter profiles.
-
-**How to verify the limit is active**:
-
-```bash
-su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
-# Expected: 120 for pro, 220 for ultimate, etc.
-```
-
-See Q111–Q120 for more details.
-
 **v1.2.0 — Backup layer storage metrics**:
 
 | Metric | Value |
@@ -572,21 +708,48 @@ See Q111–Q120 for more details.
 | Total with rotation (21 snapshots) | ~2 MB max |
 | Backup duration | < 5 seconds |
 | Restore duration | < 3 seconds |
-| Rotation policy | Keep 21 newest by directory name |
+| Rotation policy | Keep 21 newest by **mtime** (v1.3.0+), with the `.last_stable` target and the newest install snapshot always protected from pruning |
+| Snapshot detection | Manifest-based (`SNAP-MANIFEST` / `ROT-MANIFEST`, v1.3.0+): a directory is a snapshot iff it contains a `.manifest.json` file |
 | Pre-critical backup frequency | On every destructive write |
 | Periodic backup interval | 24 h (service.sh) |
 
-**Impact**:
-- Negligible storage footprint (~2 MB max).
-- No measurable CPU or battery impact.
-- Pre-critical backups run in parallel with the user's action
-  and are bounded by `AUTO_BACKUP_TIMEOUT = 15 s`.
+**v1.3.0 — DNS auto-start after boot**:
+
+- **Before**: DNS engine could take up to 60 s to start after
+  reboot (Watchdog's first API call fires after a 30 s backoff,
+  and the WebUI may not be ready yet).
+- **After**: `service.sh` performs a direct, bounded wait for the
+  WebUI to be ready (up to 60 s), then calls
+  `POST /api/ensure_running_service` itself. DNS starts within a
+  few seconds.
+
+**v1.3.0 — Rotation refinements** (SNAP-*/ROT-*):
+
+- **SNAP-MANIFEST** — snapshots are now detected by the presence
+  of a `.manifest.json` file, not by name pattern.
+- **SNAP-MTIME** — `last_backup_name` is now selected by mtime,
+  not lexicographic directory name.
+- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** — `rotate_backups`
+  uses the same manifest-based detection + mtime sort, and
+  preserves two additional targets on top of the 21-newest
+  window: the `.last_stable` recovery pointer and the newest
+  install snapshot (matching `-v<digit>`).
+
+**v1.4.0 — No performance change**:
+
+- The companion APK is a static asset, not a running process.
+- The CodeQL fix in `removeModule` is internal and does not affect
+  runtime performance.
+- The removed iOS PWA logic was client-side only.
 
 **Does `rebuildMu` slow down rebuildBlocklist?**
 
-No. `rebuildBlocklist` takes ~200 ms (100K) or ~1 s (500K). The coarse-grained lock adds no noticeable overhead.
+No. `rebuildBlocklist` takes ~200 ms (100K) or ~1 s (500K). The
+coarse-grained lock adds no noticeable overhead.
 
-**However**: When `updateProfile` + `saveAllowlist` run simultaneously, they serialize — may seem slightly slower (acceptable — rare operation).
+**However**: When `updateProfile` + `saveAllowlist` run
+simultaneously, they serialize — may seem slightly slower
+(acceptable — rare operation).
 
 **Does `backupMu` slow down save operations?**
 
@@ -594,7 +757,8 @@ No. `backupMu` serializes pre-critical backups, but each backup
 takes < 5 s and runs in parallel with the main write operation
 (both are best-effort). The user perceives no delay.
 
-See Q121–Q130 for the full v1.2.0 picture.
+See Q121–Q130 for the full v1.2.0 picture, Q131–Q140 for v1.3.0,
+Q141–Q150 for v1.4.0.
 
 ---
 
@@ -615,7 +779,8 @@ Q123.
 ### 45. Can a malicious app steal my data?
 
 Very difficult for the following reasons:
-- WebUI server is available only on `127.0.0.1` (no external network access).
+- WebUI server is available only on `127.0.0.1` (no external
+  network access).
 - Authentication is mandatory.
 - Rate limiting for login + Basic Auth.
 - Session cookies protected with `HttpOnly`, `SameSite=Lax`.
@@ -623,18 +788,23 @@ Very difficult for the following reasons:
 - Login POST-only (prevents CSRF).
 - `/readyz` localhost-only (prevents reconnaissance).
 
-*Only exception*: Any app with full root privileges can read everything on the device.
+*Only exception*: Any app with full root privileges can read
+everything on the device.
 
 **v1.2.0 note**: The persistent backup directory is owned by root
 with mode `0700`. A malicious root app can still read it, but a
-non-root app cannot. See
-[`docs/BACKUP.md`](BACKUP.md) §12.
+non-root app cannot. See [`docs/BACKUP.md`](BACKUP.md) §12.
+
+**v1.4.0 note**: The companion APK is served at
+`GET /app-debug.apk` subject to the same authentication as every
+other protected route.
 
 ### 46. What is BIND_ADDR?
 
 The listening address for the WebUI.
 - `127.0.0.1` (default): Local access only.
-- `0.0.0.0`: Whole network → refuses to start unless strong credentials are set.
+- `0.0.0.0`: Whole network → refuses to start unless strong
+  credentials are set.
 
 ### 47. How do I expose the WebUI on the local network?
 
@@ -656,16 +826,21 @@ Yes (only if you changed `BIND_ADDR`):
 http://192.168.1.5:9090
 ```
 
-Default (`127.0.0.1`) means it cannot be accessed from any external device.
+Default (`127.0.0.1`) means it cannot be accessed from any external
+device.
 
 ### 49. Are my queries logged?
 
-- **Locally**: Yes (saved in `dnscrypt-blocked.log` and `dnscrypt-query.log`). Can be disabled in `dnscrypt-proxy.toml`.
-- **Externally**: No. The DNSCrypt/DoH provider does not know your identity.
+- **Locally**: Yes (saved in `dnscrypt-blocked.log` and
+  `dnscrypt-query.log`). Can be disabled in `dnscrypt-proxy.toml`.
+- **Externally**: No. The DNSCrypt/DoH provider does not know your
+  identity.
 
 ### 50. Why was STATUS_FILE behavior changed?
 
-In previous versions, `STATUS_FILE` was written by the read-only `getStatusUncached` function — causing loss of "user intent" when the DNS engine crashed.
+In previous versions, `STATUS_FILE` was written by the read-only
+`getStatusUncached` function — causing loss of "user intent" when
+the DNS engine crashed.
 
 **After v1.0.0**:
 - `STATUS_FILE` = "User Intent" only.
@@ -676,31 +851,41 @@ In previous versions, `STATUS_FILE` was written by the read-only `getStatusUncac
 
 ### 51. Why does the module refuse port 8080?
 
-Port `8080` is reserved for `monitoring_ui` (dnscrypt-proxy's internal interface).
-- `main.go` refuses to start if `PORT=8080` or `DASHBOARD_PORT=8080`.
-- `customize.sh` automatically replaces any `8080` value in `webui.conf` with `9090` / `9091`.
+Port `8080` is reserved for `monitoring_ui` (dnscrypt-proxy's
+internal interface).
+- `main.go` refuses to start if `PORT=8080` or
+  `DASHBOARD_PORT=8080`.
+- `customize.sh` automatically replaces any `8080` value in
+  `webui.conf` with `9090` / `9091`.
 
 **v1.1.0**: The reserved port is now also enforced as a Go
-constant (`MONITORING_UI_PORT`) in `metricsProxyHandler`. See Q120.
+constant (`MONITORING_UI_PORT`) in `metricsProxyHandler`. See
+Q120.
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #20.
 
 ### 52. Do Custom Chains pollute the firewall?
 
-No. Since v1.0.0, the module uses Custom Chains (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`) instead of writing directly to OUTPUT:
+No. Since v1.0.0, the module uses Custom Chains
+(`DNSCRYPT_OUT` / `DNSCRYPT_OUT6`) instead of writing directly to
+OUTPUT:
 - Public `OUTPUT` contains only two static rules (jump rules).
 - All dynamic rules are inside the dedicated chains.
 - Cleanup = `-F` + `-X` (complete wipe in one shot).
-- No orphans even if you change `bootstrap_resolvers` hundreds of times.
+- No orphans even if you change `bootstrap_resolvers` hundreds of
+  times.
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #17.
 
 ### 53. Why is Basic Auth now rate-limited?
 
 **Before v1.0.0**:
-- `handleLogin` (POST `/api/auth/login`) was protected by rate limiting.
-- But `checkAuth` (accepts Basic Auth) **did not** record failed attempts.
-- **Result**: An attacker on LAN could send unlimited Basic Auth requests.
+- `handleLogin` (POST `/api/auth/login`) was protected by rate
+  limiting.
+- But `checkAuth` (accepts Basic Auth) **did not** record failed
+  attempts.
+- **Result**: An attacker on LAN could send unlimited Basic Auth
+  requests.
 
 **After v1.0.0**:
 - Basic Auth is limited to **5 attempts / 15 minutes** (per IP).
@@ -714,10 +899,13 @@ No. Since v1.0.0, the module uses Custom Chains (`DNSCRYPT_OUT` / `DNSCRYPT_OUT6
 
 Yes, **for API consumers**.
 
-**Before**: `GET /api?action=unknown` → `200 OK` + `{"status": "unknown"}`.
-**After**: `GET /api?action=unknown` → `404 Not Found` + a clear message.
+**Before**: `GET /api?action=unknown` → `200 OK` +
+`{"status": "unknown"}`.
+**After**: `GET /api?action=unknown` → `404 Not Found` + a clear
+message.
 
-**Solution**: Update scripts to expect `404` (see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)).
+**Solution**: Update scripts to expect `404` (see
+[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)).
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #24.
 
@@ -749,7 +937,8 @@ if hasEndpoint(r.URL.Path, "update_profile") {
 
 ### 56. What is `shellQuote`?
 
-A function in `main.go` (Fix NEW-5) that wraps a path with safe quotes for use in `runShell`.
+A function in `main.go` (Fix NEW-5) that wraps a path with safe
+quotes for use in `runShell`.
 
 **Before**:
 ```go
@@ -772,7 +961,8 @@ cmd := fmt.Sprintf(". %s/functions.sh; ...", shellQuote(MODDIR))  // ✅ safe
 
 ### 57. What is the `readConfPort` range check?
 
-The `readConfPort` function in `main.go` (Fix NEW-3) verifies the range `[1, 65535]`:
+The `readConfPort` function in `main.go` (Fix NEW-3) verifies the
+range `[1, 65535]`:
 
 ```go
 func readConfPort(key, defaultPort string) string {
@@ -798,7 +988,8 @@ func readConfPort(key, defaultPort string) string {
 
 ### 58. What is `rebuildMu` (RACE-1)?
 
-A `sync.Mutex` that protects `rebuildBlocklist` from race conditions:
+A `sync.Mutex` that protects `rebuildBlocklist` from race
+conditions:
 
 ```go
 var rebuildMu sync.Mutex
@@ -810,10 +1001,13 @@ func rebuildBlocklist() error {
 }
 ```
 
-**Before**: `updateProfile` + `saveAllowlist` concurrent → inconsistent BLOCKLIST.
-**After**: Both operations serialized → BLOCKLIST always consistent.
+**Before**: `updateProfile` + `saveAllowlist` concurrent →
+inconsistent BLOCKLIST.
+**After**: Both operations serialized → BLOCKLIST always
+consistent.
 
-**Constraint**: Rebuild may seem slower during concurrent edit (acceptable — rare operation).
+**Constraint**: Rebuild may seem slower during concurrent edit
+(acceptable — rare operation).
 
 **Reference**: [SECURITY.md](SECURITY.md) — Audit #32.
 
@@ -828,7 +1022,8 @@ const AUTH_CACHE_TTL = 60 * time.Second
 **Before**: Every HTTP request reads the TOML (~5-10 ms).
 **After**: Cache hit → ~0.05 ms.
 
-**Constraint**: Changing credentials in the TOML → applies after ≤ 60 s.
+**Constraint**: Changing credentials in the TOML → applies after
+≤ 60 s.
 **For immediate effect**: Restart the WebUI.
 
 **Reference**: [SECURITY.md](SECURITY.md) — Fix NEW-6.
@@ -863,13 +1058,16 @@ const AUTH_CACHE_TTL = 60 * time.Second
     "available": 5,
     "in_flight_txn": 0,
     "orphan_txn": 0,
-    "last_backup": "2026-09-26 15:00:00",
-    "last_backup_name": "20260926-150000-v1.2.0",
-    "last_stable": "20260926-150000-v1.2.0",
+    "last_backup": "2026-10-02 15:00:00",
+    "last_backup_name": "20261002-150000-v1.4.0",
+    "last_stable": "20261002-150000-v1.4.0",
     "path": "/sdcard/dnscrypt-webui-backup"
   }
 }
 ```
+
+**v1.4.0**: No new fields added. The `/app-debug.apk` route is a
+new **endpoint**, not a `runtime_info` field.
 
 **Benefits**:
 - HTML/JS updates links dynamically.
@@ -878,9 +1076,11 @@ const AUTH_CACHE_TTL = 60 * time.Second
 - No broken links when ports change.
 - System Info panel shows profile + memory limit + backup state.
 
-**Constraint**: PWA shortcuts (`manifest.json`) do not read `runtime_info` — they stay static (documented).
+**Constraint**: PWA shortcuts (`manifest.json`) do not read
+`runtime_info` — they stay static (documented).
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 + §5.31.4.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 +
+§5.31.4.
 
 ---
 
@@ -888,11 +1088,16 @@ const AUTH_CACHE_TTL = 60 * time.Second
 
 ### 61. How do I update the module?
 
-1. **From Magisk**: Modules → DNSCrypt → Update (if auto-update is enabled).
+1. **From Magisk**: Modules → DNSCrypt → Update (if auto-update is
+   enabled).
 2. **Manually**: Download the new ZIP → install over the old one.
 
 **v1.2.0 note**: The installer now preserves all 5 user config
 files across the update. See Q123.
+
+**v1.4.0 note**: If the new ZIP contains a companion APK, it is
+extracted to `web/app-debug.apk`. The existing APK (if any) is
+replaced.
 
 ### 62. How do I update the lists?
 
@@ -937,11 +1142,21 @@ su -c "cp /sdcard/backup/* /data/adb/modules/dnscrypt-proxy-webui/proxy/"
 backup directory (`/sdcard/dnscrypt-webui-backup/`) so you can
 restore your settings if you reinstall later. See Q126.
 
+**v1.4.0 note**: The companion APK (`web/app-debug.apk`) is a build
+artifact of the module ZIP and is removed with the module folder.
+However, the **separately-installed** companion app (if the user
+installed it from the WebUI) remains on the device — just like any
+other Android app.
+
 To remove the backup directory manually:
 
 ```bash
 su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 ```
+
+To remove the companion app (if installed):
+
+- From the system's **Settings → Apps** → DNSCrypt Proxy → Uninstall.
 
 ### 65. Are settings preserved on upgrade?
 
@@ -962,7 +1177,8 @@ su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 6. Layer 6 — SELinux context preservation.
 7. Layer 7 — recovery mode (if triggered).
 8. Layer 8 — config migrations.
-9. Layer 9 — rotation (keep max 21 snapshots).
+9. Layer 9 — rotation (keep max 21 snapshots; **v1.3.0+** uses
+   mtime sort + protected targets).
 10. Layer 10 — observability.
 
 See [`docs/BACKUP.md`](BACKUP.md) §1.3 for the full model.
@@ -987,16 +1203,36 @@ hardened in v1.2.0).
 
 **Rollback caveats**:
 
+- **From v1.4.0 to v1.3.0**:
+  - ⚠️ The companion APK (`web/app-debug.apk`) is removed with the
+    module ZIP.
+  - ⚠️ The WebUI install button reverts to the PWA-flow behavior
+    (was a direct `<a download>` link in v1.4.0).
+  - ⚠️ `removeModule` reverts to the pre-CodeQL-fix version
+    (functionally equivalent, but CodeQL alerts may reappear).
+  - ⚠️ iOS PWA logic is restored (iOS users see iOS instructions).
+- **From v1.3.0 to v1.2.0**:
+  - ⚠️ PWA install button reverts to a modal-based flow.
+  - ⚠️ Live status LED on the Today counter is removed.
+  - ⚠️ DNS auto-start after boot reverts to the Watchdog-only path
+    (may take up to 60 s).
+  - ⚠️ **Rotation semantics revert**: snapshot detection goes back
+    to name-pattern matching (`^[0-9]{8}-[0-9]{6}-`) and rotation
+    sorting goes back to lexicographic directory name (no
+    `.last_stable` or newest-install protection). Custom-named
+    snapshots will no longer be visible to the API or to rotation.
 - **From v1.2.0 to v1.1.0**:
   - ⚠️ `runtime_info.backups` reverts to 5 fields.
   - ⚠️ `action.sh --backup` stops working.
   - ⚠️ `status.sh --diagnose` stops working.
-  - ⚠️ The `/sdcard/dnscrypt-webui-backup/` directory is preserved (not touched).
+  - ⚠️ The `/sdcard/dnscrypt-webui-backup/` directory is preserved
+    (not touched).
 - **From v1.1.0 to v1.0.0**:
   - ⚠️ Dynamic memory limit reverts to hardcoded 80 MB.
   - ⚠️ `runtime_info` loses `profile_key` / `memory_limit_mb`.
   - ⚠️ `shellQuote` reverts to 20 chars.
-- **From v1.0.0 to pre-v1.0.0**: Not recommended (data loss possible).
+- **From v1.0.0 to pre-v1.0.0**: Not recommended (data loss
+  possible).
 
 See [`UPGRADE.md`](UPGRADE.md) for the full upgrade path.
 
@@ -1017,6 +1253,9 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100 + HOTFIX
 | v1.1.0 | 1010000 |
 | v1.2.0 | 1020000 |
 | v1.2.1 | 1020001 |
+| v1.3.0 | 1030000 |
+| v1.4.0 | 1040000 |
+| v1.4.1 | 1040001 |
 | v2.0.0 | 2000000 |
 
 **Note**: `hotfix` must be ≤ 99 (because `patch` uses ×100).
@@ -1066,9 +1305,11 @@ the last known-good config without reinstalling.
 
 ### 71. Dashboard does not display metrics. What do I do?
 
-- **Symptom**: The Dashboard (`:9091`) opens, but Metrics tables are empty.
-- **Cause (before v1.0.0)**: `metricsProxyHandler` returned Prometheus text with `Content-Type: application/json`.
-- **Solution**: Update to `v1.2.0` (or v1.0.0+).
+- **Symptom**: The Dashboard (`:9091`) opens, but Metrics tables
+  are empty.
+- **Cause (before v1.0.0)**: `metricsProxyHandler` returned
+  Prometheus text with `Content-Type: application/json`.
+- **Solution**: Update to `v1.4.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -1082,8 +1323,10 @@ su -c "curl -s http://127.0.0.1:9091/api/metrics" | jq '.total_queries'
 ### 72. Watchdog does not restart after a crash. What do I do?
 
 - **Symptom**: DNS Engine crashes; Watchdog runs but does nothing.
-- **Cause (before v1.0.0)**: WebUI called `getStatus` every 10 seconds, and `getStatusUncached` wrote `STATUS_FILE = "OFF"` on crash.
-- **Solution**: Update to `v1.2.0` (or v1.0.0+).
+- **Cause (before v1.0.0)**: WebUI called `getStatus` every 10
+  seconds, and `getStatusUncached` wrote `STATUS_FILE = "OFF"` on
+  crash.
+- **Solution**: Update to `v1.4.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -1103,15 +1346,15 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq .dns_eng
   (`$_EXISTING_MODULE != $MODPATH`) silently failed on in-place
   upgrades. Result: the 5 user config files were lost on every
   upgrade from v1.1.0.
-- **Solution**: Update to **v1.2.0** — the 10 defensive layers
+- **Solution**: Update to **v1.4.0** — the 10 defensive layers
   replace the broken check with multi-source detection (Layer 1)
   and persistent backup (Layer 2).
 
 **If you lost settings on v1.1.0**:
 
 ```bash
-# v1.2.0 preserves the backup at /sdcard/dnscrypt-webui-backup/.
-# After installing v1.2.0, the installer will restore them automatically.
+# v1.2.0+ preserves the backup at /sdcard/dnscrypt-webui-backup/.
+# After installing v1.4.0, the installer will restore them automatically.
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 ```
 
@@ -1131,10 +1374,11 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) §7.8.
 
 ### 74. Basic Auth is too restricted after upgrade. What do I do?
 
-- **Symptom**: After upgrading to v1.2.0, Basic Auth fails after 5 attempts.
+- **Symptom**: After upgrading, Basic Auth fails after 5 attempts.
 - **Cause**: Intentional — Basic Auth is rate-limited.
 - **Solution**:
-  - ✅ **Solution 1**: Use correct credentials (will not be locked).
+  - ✅ **Solution 1**: Use correct credentials (will not be
+    locked).
   - ✅ **Solution 2**: Use Cookie auth (no rate limit).
   - ✅ **Solution 3**: Restart the WebUI to reset the counter.
 
@@ -1185,9 +1429,11 @@ See [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
 
 ### 77. BLOCKLIST appears inconsistent. Why?
 
-- **Symptom**: Some sites remain blocked even after being added to the allowlist.
-- **Cause (before v1.0.0)**: `rebuildBlocklist` was not protected by a mutex → race condition with `updateProfile`.
-- **Solution**: Update to `v1.2.0` (or v1.0.0+).
+- **Symptom**: Some sites remain blocked even after being added to
+  the allowlist.
+- **Cause (before v1.0.0)**: `rebuildBlocklist` was not protected
+  by a mutex → race condition with `updateProfile`.
+- **Solution**: Update to `v1.4.0` (or v1.0.0+).
 
 **Verify**:
 
@@ -1203,15 +1449,14 @@ grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1 pr
 
 > **Note**: This section documents the v1.0.0 features and
 > verifications. It is preserved for historical reference and for
-> users upgrading from pre-v1.0.0 releases. Current version
-> verification is in the next sections (v1.1.0 and v1.2.0).
+> users upgrading from pre-v1.0.0 releases.
 
 ### 78. How do I know a version contains v1.0.0?
 
 Verify:
 
-1. `VERSION` file = `v1.0.0` (for v1.0.0) / `v1.2.0` (for v1.2.0).
-2. `module.prop` → `version=v1.0.0` / `version=v1.2.0`.
+1. `VERSION` file = `v1.0.0` (for v1.0.0) / `v1.4.0` (for v1.4.0).
+2. `module.prop` → `version=v1.0.0` / `version=v1.4.0`.
 3. `runtime_info` endpoint:
    ```bash
    curl -s http://127.0.0.1:9090/api/runtime_info | jq .version
@@ -1303,23 +1548,34 @@ grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo
     "available": 5,
     "in_flight_txn": 0,
     "orphan_txn": 0,
-    "last_backup": "2026-09-26 15:00:00",
-    "last_backup_name": "20260926-150000-v1.2.0",
-    "last_stable": "20260926-150000-v1.2.0",
+    "last_backup": "2026-10-02 15:00:00",
+    "last_backup_name": "20261002-150000-v1.4.0",
+    "last_stable": "20261002-150000-v1.4.0",
     "path": "/sdcard/dnscrypt-webui-backup"
   }
 }
 ```
 
+**v1.3.0**: The two ordering fields (`available` count and
+`last_backup_name` value) are now computed differently — but the
+**7-field schema itself is unchanged**. See Q131.
+
+**v1.4.0**: No new fields added. The `/app-debug.apk` route is a
+new **endpoint**, not a `runtime_info` field.
+
 All previous fields remain (`version`, `commit`, `run_dir`, ...).
 
-**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 + §5.31.4.
+**Reference**: [SECURITY.md](SECURITY.md) — Audit #33 + §5.30.1 +
+§5.31.4.
 
 ### 81. Did `/api/metrics` change its format?
 
-**Yes** — `/api/metrics` now returns **JSON** instead of Prometheus text (since v1.0.0):
-- **Before**: Prometheus text with `Content-Type: application/json` (lies).
-- **After**: JSON schema with `Content-Type: application/json; charset=utf-8`.
+**Yes** — `/api/metrics` now returns **JSON** instead of Prometheus
+text (since v1.0.0):
+- **Before**: Prometheus text with `Content-Type: application/json`
+  (lies).
+- **After**: JSON schema with `Content-Type: application/json;
+  charset=utf-8`.
 
 **v1.1.0**: The upstream URL is built from `MONITORING_UI_PORT`
 constant instead of the hardcoded string. Behavior is unchanged.
@@ -1350,11 +1606,15 @@ su -c "curl -u \"user:pass\" http://127.0.0.1:8080/api/metrics"
 
 **Yes** — core fix (v1.0.0):
 - **Before**: `proxy/run/` (result: `.gitkeep` was not uploaded).
-- **After**: `proxy/run/*` + `!proxy/run/.gitkeep` (works correctly).
+- **After**: `proxy/run/*` + `!proxy/run/.gitkeep` (works
+  correctly).
 
 **v1.2.0 addition**: New pattern for data-preservation test
 artifacts (`/tmp/dnscrypt-*`, backup staging files, `txn-*/` for
 local testing). See `.gitignore` §[19].
+
+**v1.4.0 addition**: The companion APK is ignored via
+`web/app-debug.apk` (see `.gitignore` §[20]).
 
 **Impact on users**: None (developers only).
 
@@ -1390,29 +1650,40 @@ local testing). See `.gitignore` §[19].
 | #531 | Data Preservation Security Model (10 layers + `backupMu`) |
 | #532 | Recovery Mode Correctness Fix (§[8a] → §[9]) |
 
+**v1.3.0 adds**: no new sections (the DNS auto-start fix and the
+rotation refinements are runtime-only and functional fixes —
+documented in `CHANGELOG.md` §[v1.3.0] and
+`docs/ARCHITECTURE.md` §4.13, not as audit corrections).
+
+**v1.4.0 adds**: no new sections (the CodeQL fix is internal
+hardening).
+
 **See** [`docs/SECURITY.md`](SECURITY.md) for full details.
 
 ### 85. What's new in `.pre-commit-config.yaml`?
 
-**Updated** to support v1.2.0 checks. See the file itself for the exact hook list.
+**Updated** to support v1.2.0 checks. See the file itself for the
+exact hook list.
 
-**Note**: No new hook was added in v1.2.0 — the existing
-`shellcheck-py`, `go-fmt`, and `go-build` hooks already cover the
-data-preservation changes.
+**Note**: No new hook was added in v1.2.0, v1.3.0, or v1.4.0 — the
+existing `shellcheck-py`, `go-fmt`, and `go-build` hooks already
+cover the changes.
 
 ### 86. What's new in the Makefile?
 
-The Makefile gained **3 new targets** in v1.2.0:
+The Makefile gained **5 new targets** since v1.0.0:
 
 ```bash
 make build          # Build all 4 architectures
-make package        # Build + package
+make package        # Build + package (depends on fetch-apk)
 make clean          # Clean outputs
 make version        # Show version
 make help           # Show help
-make check-backup   # Validate backup shell functions (v1.2.0)
-make check-all      # Run all local validations (v1.2.0)
-make diagnose-help  # Show device-side diagnostics (v1.2.0)
+make fetch-apk            # Fetch companion APK into dist/ (v1.4.0)
+make check-app-version    # Validate proxy/app-apk.version (v1.4.0)
+make check-backup         # Validate backup shell functions (v1.2.0)
+make check-all            # Run all local validations (v1.2.0)
+make diagnose-help        # Show device-side diagnostics (v1.2.0)
 ```
 
 ### 87. How do I run all v1.0.0 checks?
@@ -1425,9 +1696,10 @@ Use grep-based verification:
 
 ### 88. What is `runtime_info`?
 
-`runtime_info` is an API endpoint that returns build info + runtime paths + actual ports.
+`runtime_info` is an API endpoint that returns build info + runtime
+paths + actual ports.
 
-**v1.2.0 example**:
+**v1.4.0 example**:
 
 ```bash
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
@@ -1435,10 +1707,10 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
 
 ```json
 {
-  "version": "v1.2.0",
+  "version": "v1.4.0",
   "commit": "a1b2c3d",
-  "build_time": "1726987200",
-  "build_time_human": "2026-09-26T10:00:00Z",
+  "build_time": "1727856000",
+  "build_time_human": "2026-10-02T10:00:00Z",
   "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
   "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
   "status_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status",
@@ -1454,9 +1726,9 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq
     "available": 5,
     "in_flight_txn": 0,
     "orphan_txn": 0,
-    "last_backup": "2026-09-26 15:00:00",
-    "last_backup_name": "20260926-150000-v1.2.0",
-    "last_stable": "20260926-150000-v1.2.0",
+    "last_backup": "2026-10-02 15:00:00",
+    "last_backup_name": "20261002-150000-v1.4.0",
+    "last_stable": "20261002-150000-v1.4.0",
     "path": "/sdcard/dnscrypt-webui-backup"
   }
 }
@@ -1466,7 +1738,8 @@ See [`API.md`](API.md) §6.1.7 for full details.
 
 ### 89. What is the Auth cache?
 
-A 60-second in-memory cache for credentials, reducing file I/O on every HTTP request. See Q59.
+A 60-second in-memory cache for credentials, reducing file I/O on
+every HTTP request. See Q59.
 
 ---
 
@@ -1515,8 +1788,8 @@ debug.SetMemoryLimit(80 * 1024 * 1024)  // ← same for all profiles
 
 **Problem**: The `ultimate` profile has a working set that
 approaches 200 MB. With an 80 MB soft limit, the runtime ran GC
-continuously — a condition called **GC thrashing**. On
-low-RAM devices, this manifested as a frozen or very slow WebUI.
+continuously — a condition called **GC thrashing**. On low-RAM
+devices, this manifested as a frozen or very slow WebUI.
 
 **After v1.1.0**: The limit is computed per profile. No more GC
 thrashing on `ultimate`, no wasted RAM on `light`.
@@ -1824,7 +2097,7 @@ The 10 layers protect the **5 user config files**:
 | 6 | **SELinux context preservation** | `restorecon` (or `chcon` fallback) on every restored file |
 | 7 | **Recovery mode** | A `recovery` trigger file restores the last known-good config on next boot |
 | 8 | **Config migrations** | Version-aware transformations (e.g. `MEMORY_LIMIT_HINT=auto` added for v1.0.0 → v1.2.0) |
-| 9 | **Automation + rotation** | Periodic (24 h) + pre-critical backups; rotation keeps max 21 snapshots |
+| 9 | **Automation + rotation** | Periodic (24 h) + pre-critical backups; rotation keeps max 21 snapshots (**v1.3.0+**: mtime sort + protected targets) |
 | 10 | **Observability** | `.upgrade_history.json` + `status.sh --diagnose` + 7-field `runtime_info.backups` |
 
 **Full details**: [`docs/BACKUP.md`](BACKUP.md) §1.3;
@@ -1839,9 +2112,9 @@ The 10 layers protect the **5 user config files**:
 ```text
 /sdcard/dnscrypt-webui-backup/
 ├── current/                         ← live snapshot, always up to date
-├── 20260926-095826-v1.2.0/          ← historical snapshot
-├── 20260926-140000-auto/            ← periodic snapshot
-├── 20260926-150000-manual/          ← manual or pre-critical snapshot
+├── 20261002-095826-v1.4.0/          ← historical snapshot
+├── 20261002-140000-auto/            ← periodic snapshot
+├── 20261002-150000-manual/          ← manual or pre-critical snapshot
 ├── txn-<timestamp>-<pid>/           ← in-flight transaction
 ├── orphan-txn-<timestamp>-<pid>/    ← preserved interrupted install
 ├── .last_stable                     ← pointer to last known-good
@@ -1889,7 +2162,7 @@ This creates a snapshot at:
 
 **When to take a manual backup**:
 
-- ✅ Before a major upgrade (e.g. v1.2.0 → v1.3.0).
+- ✅ Before a major upgrade (e.g. v1.4.0 → v1.5.0).
 - ✅ Before a factory reset of `/data`.
 - ✅ Before uninstalling the module.
 - ✅ Before any destructive test.
@@ -2001,9 +2274,9 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
   "available": 5,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-v1.2.0",
-  "last_stable": "20260926-150000-v1.2.0",
+  "last_backup": "2026-10-02 15:00:00",
+  "last_backup_name": "20261002-150000-v1.4.0",
+  "last_stable": "20261002-150000-v1.4.0",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
@@ -2012,11 +2285,11 @@ curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 
 | Field | Type | Description |
 |---|---|---|
-| `available` | int | Snapshot count (excludes `current/`, `txn-*`, `orphan-txn-*`) |
+| `available` | int | Snapshot count. **v1.3.0+**: counts a directory iff it contains a `.manifest.json` file (SNAP-MANIFEST) |
 | `in_flight_txn` | int | Number of `txn-*` directories |
 | `orphan_txn` | int | Number of `orphan-txn-*` directories |
 | `last_backup` | string \| null | Timestamp of the newest snapshot |
-| `last_backup_name` | string \| null | Directory name of the newest snapshot |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot. **v1.3.0+**: chosen by mtime sort (SNAP-MTIME) |
 | `last_stable` | string \| null | Content of `.last_stable` pointer |
 | `path` | string | Absolute path of the backup directory |
 
@@ -2147,13 +2420,14 @@ Guardian; [`docs/BACKUP.md`](BACKUP.md) §12.
 - SHA256 verification (advisory).
 - Transactional install with rollback.
 - Recovery mode via trigger file.
-- Rotation (max 21 snapshots).
+- Rotation (max 21 snapshots; **v1.3.0+**: mtime sort + protected
+  targets).
 - Full history log (`.upgrade_history.json`).
 - **Fixed the data-loss bug** via multi-source detection.
 
 **Side-by-side**:
 
-| Aspect | v1.1.0 | v1.2.0 |
+| Aspect | v1.1.0 | v1.2.0 (+ v1.3.0) |
 |---|---|---|
 | Location | `/data/local/tmp/` | `/sdcard/dnscrypt-webui-backup/` |
 | Survives reboot | ❌ | ✅ |
@@ -2163,6 +2437,9 @@ Guardian; [`docs/BACKUP.md`](BACKUP.md) §12.
 | Transactions with rollback | ❌ | ✅ |
 | Recovery mode | ❌ | ✅ |
 | Rotation | ❌ | ✅ (21 snapshots) |
+| Rotation sort | — | **mtime (v1.3.0+)** — was directory name in v1.2.0 |
+| Snapshot detection | — | **`.manifest.json` (v1.3.0+)** — was name pattern in v1.2.0 |
+| Protected targets | — | **`.last_stable` + newest install (v1.3.0+)** |
 | History log | ❌ | ✅ |
 | Multi-source detection | ❌ | ✅ (7 candidates) |
 | Root-solution detection | ❌ | ✅ |
@@ -2176,6 +2453,593 @@ See [`docs/UPGRADE.md`](UPGRADE.md) §3.1.
 
 **Reference**: [`docs/BACKUP.md`](BACKUP.md) §1.1, §1.4;
 [`docs/SECURITY.md`](SECURITY.md) §5.31.1.
+
+---
+
+## v1.3.0 Specific Questions
+
+> **Note**: This section covers the v1.3.0 changes: the PWA
+> install button, the live status LED, the DNS auto-start fix
+> after boot, and the server-side rotation refinements
+> (SNAP-*/ROT-*).
+
+### 131. What is new in v1.3.0?
+
+**v1.3.0 is the Feature Release** — PWA install button + live
+status LED + DNS auto-start fix + server-side rotation
+refinements.
+
+**What it adds**:
+
+1. **PWA install button** — a smart, dynamic install button
+   that is **always visible** in the WebUI (except when the app
+   is already installed or running standalone). Its behavior
+   adapts to the browser:
+   - Chromium-based browsers → native `beforeinstallprompt`
+     dialog.
+   - iOS Safari → "Add to Home Screen" instructions.
+   - Unsupported browsers → friendly modal with supported
+     alternatives (Chrome, Edge, Brave) and Play Store links.
+
+   **⚠️ This button was replaced in v1.4.0** by a direct
+   `<a download>` link. See Q133.
+
+2. **Live status LED** — a 12×12 LED on the "Today" counter
+   that pulses green when the DNS engine is running and turns
+   solid red when the service is stopped.
+
+3. **DNS auto-start after boot** — a **critical fix** in
+   `service.sh` (see Q132).
+
+4. **Server-side rotation refinements** — three new semantics
+   (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST + ROT-MTIME +
+   ROT-PROTECT) that make the backup rotation more robust and
+   close a case where the recovery pointer could be silently
+   evicted. See Q141 (still in the v1.4.0 section? No — the
+   rotation semantics are part of v1.3.0, see Q139 below).
+
+**No breaking changes** — fully compatible with v1.2.0.
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.3.0];
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13.
+
+### 132. What was the DNS auto-start bug?
+
+**Symptom** (before v1.3.0): After a device reboot, the DNS
+engine was not running — even though the user had left the
+service in the ON state before rebooting. The user had to open
+the WebUI manually to trigger DNS start.
+
+**Root cause**:
+
+- `watchdog.sh` waits a fixed 30-second interval before its
+  first API call to `POST /api/ensure_running_service`.
+- By the time it fires, the WebUI may not have finished binding
+  to its port yet.
+- The Watchdog would retry with exponential backoff
+  (30s → 60s → 120s → ...), leaving DNS unavailable for minutes
+  after boot.
+
+**The fix**:
+
+- `service.sh` now performs a direct, bounded wait for the
+  WebUI to become ready (up to 60 seconds, checking for the
+  watchdog token file + the WebUI TCP port).
+- Once ready, `service.sh` calls
+  `POST /api/ensure_running_service` itself.
+- DNS starts within a few seconds of the WebUI coming up.
+
+**Verified on-device**: DNS engine reaches "ON" state within
+5 seconds of `service.sh` startup, with 3 processes running
+(webui + proxy + watchdog).
+
+**The watchdog backoff is unchanged** — it still handles crash
+recovery during normal runtime; only the boot path now takes
+the direct route.
+
+**Reference**: `service.sh` section [19]; `docs/ARCHITECTURE.md`
+§5.2.
+
+### 133. Does the PWA install button still work in v1.4.0?
+
+**No — it was replaced by a direct `<a download>` link.**
+
+**v1.3.0**: The install button used the browser's
+`beforeinstallprompt` event (PWA flow). It adapted its behavior
+per browser.
+
+**v1.4.0**: The button is now a direct
+`<a id="pwaInstallBtn" href="/app-debug.apk" download="DNS-Proxy.apk">`
+link. Clicking it downloads the companion Android app APK
+(see Q142).
+
+**Why the change**:
+
+- The companion app provides a better user experience than a
+  PWA shortcut (native WebView, no browser tab).
+- The `<a download>` link is simpler and works in every browser
+  without `beforeinstallprompt` support.
+- The PWA manifest and Service Worker are unchanged — you can
+  still install the WebUI as a PWA through the browser's menu.
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0];
+`web/index.html` section [13c].
+
+### 134. What is the live status LED?
+
+A small 12×12 colored circle on the "Today" counter in the
+WebUI stats area.
+
+**Behavior**:
+
+- **Green (pulsing)** — DNS engine is running.
+- **Red (solid)** — DNS engine is stopped.
+- **Paused indicator** — when the service is OFF, the label
+  shows "(paused — service stopped)".
+
+**How it works**:
+
+- Pure CSS + JS. No image files.
+- Aligned with the existing `.status-dot` styling.
+- Updated by the `updateStatsDisplay()` handler in
+  `web/index.html`.
+
+**Reference**: `web/index.html` section [13c];
+[CHANGELOG.md](../CHANGELOG.md) §[v1.3.0].
+
+### 135. Which browsers support the PWA install button?
+
+In v1.4.0, the button is a direct `<a download>` link — it works
+in **every browser**, because downloading a file is a universal
+browser feature.
+
+In v1.3.0, the button adapted to the browser:
+
+| Browser | Behavior |
+|---|---|
+| Chrome 90+ | Native install dialog |
+| Edge 90+ | Native install dialog |
+| Brave | Native install dialog |
+| Samsung Internet (recent) | Native install dialog |
+| Firefox | Modal with "Install" instructions |
+| iOS Safari | "Add to Home Screen" instructions |
+| Old browsers | Modal listing supported alternatives |
+
+**v1.4.0 note**: The modal is no longer shown. The button always
+downloads the APK.
+
+### 136. How do I know if the DNS auto-start fix is present?
+
+**On-device check**:
+
+```bash
+# 1. Confirm the module version
+su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
+# Expected: version=v1.4.0 (or v1.3.0+)
+
+# 2. Check for the direct API call in service.sh
+su -c "grep -q 'ensure_running_service' /data/adb/modules/dnscrypt-proxy-webui/service.sh && \
+       echo '✅ Direct API call present'"
+
+# 3. Check for the bounded wait loop
+su -c "grep -q '_wait_webui' /data/adb/modules/dnscrypt-proxy-webui/service.sh && \
+       echo '✅ Bounded wait present'"
+
+# 4. Runtime test
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
+# Expected: DNS=UP within 5-10 seconds
+```
+
+**In the repository**:
+
+```bash
+grep -q 'ensure_running_service' proxy/service.sh && echo "✅ Fix present"
+grep -q '_wait_webui' proxy/service.sh && echo "✅ Bounded wait present"
+```
+
+### 137. Did the WebUI layout change in v1.3.0?
+
+**Yes** — two additions:
+
+1. **PWA install button** — a new button below the WebUI title
+   (in the header).
+2. **Live status LED** — a small circle inside the "Today"
+   counter in the stats area.
+
+**No layout redesigns** — the existing structure is preserved.
+
+**v1.4.0 update**: The PWA install button is now a direct
+`<a download>` link (visual appearance unchanged).
+
+### 138. Is v1.3.0 compatible with v1.2.0 backups?
+
+**Yes, but with one important semantic change** in the rotation
+behavior.
+
+**What is unchanged**:
+
+- The persistent backup directory still lives at
+  `/sdcard/dnscrypt-webui-backup/`.
+- The rotation policy is still 21 snapshots.
+- The `runtime_info.backups` schema is still 7 fields.
+- The `backupMu` serialization guarantee is unchanged.
+
+**What changed (rotation semantics)**:
+
+| Aspect | v1.2.0 | v1.3.0+ |
+|---|---|---|
+| Snapshot detection | Name pattern (`^[0-9]{8}-[0-9]{6}-`) | Presence of a `.manifest.json` file (SNAP-MANIFEST) |
+| Sort key | Lexicographic directory name | **mtime** (numeric, descending — SNAP-MTIME) |
+| Protected targets | None | `.last_stable` + newest install snapshot (ROT-PROTECT) |
+| Custom-named snapshots | Silently skipped | Recognized (via manifest) |
+| Clock drift | Sensitive (relies on name sort) | Robust (mtime-based) |
+
+**Practical impact**: If you have any snapshot directories that
+**lack a `.manifest.json`** file (e.g. created by a very early
+version or by manual copying), they will no longer be counted as
+snapshots by the API or by rotation. They are not deleted, but
+they will not participate in the rotation window.
+
+**No new config migration was added** in v1.3.0. The transition
+is automatic.
+
+**Reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) §4.13;
+[CHANGELOG.md](../CHANGELOG.md) §[v1.3.0].
+
+### 139. What are the rotation refinements (SNAP-*/ROT-*)?
+
+Three new semantics were introduced in v1.3.0 to make the backup
+rotation more robust. They touch **8 files**: `main.go`,
+`functions.sh`, `service.sh`, `watchdog.sh`, `status.sh`,
+`customize.sh`, `action.sh`, and `uninstall.sh`.
+
+**SNAP-MANIFEST** (in `main.go:buildBackupInfo`):
+
+A directory is now recognized as a snapshot **iff** it contains
+a `.manifest.json` file. Previously, snapshots were recognized
+only if their directory name matched the `<YYYYMMDD>-<HHMMSS>-...`
+pattern. Custom-named snapshots (e.g. `pre-v130-manual-...`)
+were silently skipped.
+
+```go
+// v1.3.0 (SNAP-MANIFEST): detect snapshots by manifest presence,
+// not by name pattern.
+manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
+if _, err := os.Stat(manifestPath); err != nil {
+    continue
+}
+```
+
+**SNAP-MTIME** (in `main.go:buildBackupInfo`):
+
+The "newest" snapshot (`last_backup_name`) is now selected by
+**mtime** (descending), not by lexicographic directory name.
+This is robust against clock drift and manual renames.
+
+```go
+// v1.3.0 (SNAP-MTIME): sort by mtime, not by name.
+sort.Slice(snapshots, func(i, j int) bool {
+    fi, _ := snapshots[i].Info()
+    fj, _ := snapshots[j].Info()
+    return fi.ModTime().Before(fj.ModTime())
+})
+```
+
+**ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** (in
+`functions.sh:rotate_backups`):
+
+The rotation logic now uses the same manifest-based detection
+and mtime sort as `buildBackupInfo`, and **preserves two
+additional targets** on top of the 21-newest window:
+
+- The `.last_stable` target (recovery pointer).
+- The newest install snapshot (name matching `-v<digit>`).
+
+```sh
+# v1.3.0 — Professional rotation logic
+#   ROT-MANIFEST: detect by .manifest.json presence.
+#   ROT-MTIME:    order by mtime, descending.
+#   ROT-PROTECT:  preserve .last_stable target + newest install.
+```
+
+**Why this matters**: Without these protections, the 21-newest
+window could silently evict the exact snapshot that recovery
+mode or rollback depends on.
+
+**Full reference**: [`docs/ARCHITECTURE.md`](ARCHITECTURE.md)
+§4.13; on-device verification procedure in
+[`docs/COMPATIBILITY.md`](COMPATIBILITY.md) §10.3.5.
+
+### 140. Can I disable the PWA install button or the status LED?
+
+**Not through the WebUI.** There is no user-facing setting for
+either feature.
+
+**Advanced (not recommended)**: You can hide them via a custom
+CSS override in the browser's DevTools, but the change is not
+persistent.
+
+**v1.4.0 note**: Since the button is now a direct download link,
+users who do not want the companion app can simply ignore it —
+it does not interfere with normal usage.
+
+**v1.3.0 note**: If you are still on v1.3.0 and want to prevent
+the PWA install prompt, you can dismiss it; the modal will not
+reappear in the same session.
+
+---
+
+## v1.4.0 Specific Questions
+
+> **Note**: This section covers the v1.4.0 changes: the companion
+> Android app, the CodeQL hardening, and the iOS PWA removal.
+
+### 141. What is new in v1.4.0?
+
+**v1.4.0 is the Integration Release** — companion Android app +
+CodeQL cleanup.
+
+**What it adds**:
+
+1. **Companion Android app** — a native WebView wrapper (~3 MB)
+   from the sister repository
+   [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
+   is now bundled into the module ZIP as `web/app-debug.apk`
+   (OPTIONAL).
+2. **CodeQL `go/path-injection` fix** in `removeModule`
+   (`main.go`).
+3. **iOS PWA logic removed** — Android-only project.
+
+**No breaking changes** — fully compatible with v1.3.0.
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0].
+
+### 142. What is the companion Android app?
+
+A **native Android app** that loads the WebUI in a WebView
+wrapper.
+
+**Details**:
+
+| Feature | Details |
+|---|---|
+| Size | ~3 MB |
+| Stack | Kotlin + WebView |
+| Min Android | 5.0 (API 21) |
+| Browser required | ❌ No |
+| Telemetry | ❌ None |
+| Source | [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) |
+
+**Useful if you don't want to keep a browser tab open.**
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0];
+[`../README.md`](../README.md) §Optional Android App.
+
+### 143. Is the companion app bundled into the module ZIP?
+
+**Yes, but it is OPTIONAL.**
+
+**Behavior**:
+
+- If the release pipeline stages the APK before packaging, it is
+  bundled into the ZIP at `web/app-debug.apk`.
+- If the APK is missing (e.g. a local developer build without
+  network access), the module ZIP is built without it.
+- The build does not fail if the APK is absent.
+
+**How to check if your module ZIP contains the APK**:
+
+```bash
+unzip -l dnscrypt-webui-1.4.0-module.zip | grep app-debug.apk
+```
+
+**On the device**, after install:
+
+```bash
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk"
+# → Present (v1.4.0 with APK) or "No such file" (v1.4.0 without APK)
+```
+
+**Reference**: `scripts/package_module.sh` §[13], §[16], §[19].
+
+### 144. How do I install the companion app?
+
+**Method 1 — From the WebUI (recommended)**:
+
+1. Open the WebUI at `http://127.0.0.1:9090`.
+2. Click the **Install App** button (the direct
+   `<a download>` link).
+3. The browser downloads `DNS-Proxy.apk`.
+4. Open the downloaded file to install it.
+5. Android may prompt you to allow installation from unknown
+   sources — this is normal for APKs outside the Play Store.
+
+**Method 2 — Direct download URL**:
+
+Open this URL in the browser:
+```text
+http://127.0.0.1:9090/app-debug.apk
+```
+
+**Method 3 — Via ADB** (advanced):
+
+```bash
+# 1. Fetch the APK from the device
+adb shell su -c "cat /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk" > DNS-Proxy.apk
+
+# 2. Install via ADB
+adb install DNS-Proxy.apk
+```
+
+**Reference**: `web/index.html` section [13c];
+`main.go` `serveStaticAssets`.
+
+### 145. Is the companion app verified / signed?
+
+**Yes** — the companion app is built and signed in its own
+repository ([gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)),
+which has its own release process.
+
+**Version tracking**: The module tracks the companion app
+version in `proxy/app-apk.version` (Single Source of Truth).
+For v1.4.0, this file contains `1.0.0`.
+
+**Verification**:
+
+```bash
+# On the device
+su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version"
+# → 1.0.0
+
+# In the repository
+cat proxy/app-apk.version
+# → 1.0.0
+```
+
+**Reference**: `proxy/app-apk.version`;
+`scripts/fetch_app_apk.sh` §[8].
+
+### 146. What is the CodeQL fix in v1.4.0?
+
+**Two CodeQL alerts** were closed in `removeModule` (`main.go`):
+
+- `go/path-injection` alert #1.
+- `go/path-injection` alert #2.
+
+**The vulnerability** (theoretical): The `removeModule` handler
+accepted a caller-provided path and used it directly in
+filesystem operations. A malicious path could potentially
+traverse outside the intended directory.
+
+**The fix**:
+
+```go
+// Extract the module name (last path component) via filepath.Base,
+// which CodeQL recognizes as an effective path-injection sanitizer.
+name := filepath.Base(modulePath)
+if name == "" || name == "." || name == ".." || name == string(filepath.Separator) {
+    return map[string]interface{}{
+        "status":  "error",
+        "message": "Invalid module name",
+    }
+}
+
+// Reconstruct the full path from the trusted base directory and
+// the sanitized name.
+cleanPath := filepath.Join(MODULES_DIR, name)
+```
+
+**Why this is safe**:
+
+- `filepath.Base()` returns only the final path component.
+- `filepath.Join(MODULES_DIR, name)` rebuilds the path from a
+  trusted base directory.
+- No user-controlled data reaches any path expression.
+
+**Defence-in-depth**: A prefix check (`strings.HasPrefix`) is
+kept as a second layer.
+
+**Reference**: `main.go` `removeModule`;
+[CHANGELOG.md](../CHANGELOG.md) §[v1.4.0] → Security.
+
+### 147. Why was iOS PWA logic removed?
+
+**Because the project is Android-only.**
+
+**What was removed from `web/index.html`**:
+
+- `isIOSDevice()` helper.
+- `pwaStepIos1`, `pwaStepIos2`, `pwaStepIos3` translations
+  (English and Arabic).
+- iOS branches in `getBrowserName()`, `isBrowserSupported()`,
+  `getPWAInstallSteps()`, and `showPWAInstructionsModal()`.
+
+**Impact on iOS users**:
+
+- iOS users can still access the WebUI via Safari.
+- The WebUI's bilingual toggle, dashboard, and all other
+  features work normally.
+- The specific "Add to Home Screen" instructions are no longer
+  shown (iOS-specific).
+
+**Why**:
+
+- The project targets Android (Magisk/KernelSU/APatch).
+- iOS-specific logic added complexity with no benefit for the
+  target users.
+- Removed ~35 lines of code.
+
+**Reference**: [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0]
+→ Removed.
+
+### 148. Does the companion app affect the module's security?
+
+**No.** From a security standpoint:
+
+- The APK is a static asset — it is not a running process.
+- It is served at `GET /app-debug.apk` subject to the same
+  authentication as every other protected route.
+- The APK is **NOT** one of the 5 preserved config files, so a
+  compromised APK cannot inject itself into the backup layer.
+- On install, `customize.sh` extracts the APK from the ZIP with
+  the same permissions as other web files (0644).
+
+**The APK is NOT included in the persistent backup**:
+- It is a build artifact of the module ZIP.
+- It is re-extracted on every install.
+- It is removed with the module folder on uninstall.
+
+**Reference**: `docs/BACKUP.md` §12.7.
+
+### 149. What is `proxy/app-apk.version`?
+
+**Single Source of Truth** for the companion Android app version.
+
+**Content**: `1.0.0` (for v1.4.0; no `v` prefix).
+
+**Read by**: `scripts/fetch_app_apk.sh`.
+
+**Update policy**: Manually when the companion app repository
+ships a new release. It is **NOT** updated by the module's
+`release.sh` — the two version schemes are independent.
+
+**Verification**:
+
+```bash
+# In the repository
+cat proxy/app-apk.version
+# → 1.0.0
+
+# Via the Makefile target
+make check-app-version
+# → ✅ proxy/app-apk.version: 1.0.0 (valid)
+```
+
+**Reference**: `proxy/app-apk.version`;
+`scripts/fetch_app_apk.sh` §[8].
+
+### 150. How do I remove the companion app separately?
+
+The companion app is a **standard Android app**. Uninstalling it
+does not affect the module.
+
+**Method 1 — From Android Settings**:
+
+1. Open **Settings → Apps → DNSCrypt Proxy**.
+2. Tap **Uninstall**.
+
+**Method 2 — From ADB**:
+
+```bash
+adb uninstall com.dnscrypt.webview
+```
+
+**Note**: The package name depends on the companion app's
+`AndroidManifest.xml`. Confirm it before uninstalling.
+
+**The module's WebUI and DNS engine are not affected** by the
+companion app's presence or absence.
 
 ---
 
@@ -2214,49 +3078,70 @@ cd proxy && go build -buildvcs=false -trimpath -o /tmp/test-main main.go
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ Fix #12"
 ```
 
-### 93. How do I verify v1.2.0 correctness?
+### 93. How do I verify v1.4.0 correctness?
 
 ```bash
 # v1.0.0 checks (see Q78 for full list)
 grep -q 'func buildDashboardJSON' proxy/main.go && echo "✅ Fix #1 (JSON)"
 grep -q 'func getSystemShell' proxy/main.go && echo "✅ Fix #2 (shell)"
-grep -q 'BACKUP_TMP' proxy/customize.sh && echo "✅ Fix #3 (legacy settings preserved)"
 grep -q 'recordLoginAttempt(ip, false)' proxy/main.go && echo "✅ Fix #8 (Basic Auth rate limit)"
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ Fix #12 (exact matching)"
-grep -q 'hasEndpoint(r.URL.Path, "auth/login")' proxy/main.go && echo "✅ NEW-1 (POST-only)"
-grep -A20 'func readConfPort' proxy/main.go | grep -q 'n < 1\|n > 65535' && echo "✅ NEW-3 (range)"
-grep -A30 'func handleReadyz' proxy/main.go | grep -q 'isLocalRequest(r)' && echo "✅ NEW-4 (localhost)"
-grep -q 'func shellQuote' proxy/main.go && echo "✅ NEW-5 (quote)"
-grep -q 'AUTH_CACHE_TTL' proxy/main.go && echo "✅ NEW-6 (cache)"
 grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
 grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"webui_port"' && echo "✅ PORT-2"
 
 # v1.1.0 checks
 grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1 (function)"
 grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅ MEM-1 (apply)"
-grep -q 'MEMORY_LIMIT_ULTIMATE' proxy/main.go && echo "✅ MEM-1 (constants)"
-! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ MEM-1 (no hardcoded)"
 grep -A5 'func shellQuote' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2 (braces)"
 grep -A5 'func metricsProxyHandler' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
-grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ MEM-1 (field)"
-grep -A30 'func buildRuntimeInfo' proxy/main.go | grep -q '"profile_key"' && echo "✅ MEM-1 (field)"
 
-# v1.2.0 checks (new)
+# v1.2.0 checks
 grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2 (function)"
 grep -q 'backupMu' proxy/main.go && echo "✅ BAK-2 (mutex)"
 grep -q 'func cleanupOldTransactions' proxy/main.go && echo "✅ BAK-3"
 grep -q 'func checkPendingNotifications' proxy/main.go && echo "✅ BAK-4"
-grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1 (in_flight_txn)"
-grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ BAK-1 (orphan_txn)"
+grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ BAK-1"
+
+# v1.3.0 checks — DNS auto-start
+grep -q 'ensure_running_service' proxy/service.sh && echo "✅ v1.3.0 DNS auto-start fix"
+grep -q '_wait_webui' proxy/service.sh && echo "✅ v1.3.0 bounded wait"
+
+# v1.3.0 checks — rotation refinements (SNAP-*/ROT-*)
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' \
+    && echo "✅ v1.3.0 SNAP-MANIFEST (main.go)"
+grep -A40 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime().Before' \
+    && echo "✅ v1.3.0 SNAP-MTIME (main.go)"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q '_d/.manifest.json' \
+    && echo "✅ v1.3.0 ROT-MANIFEST (functions.sh)"
+grep -A60 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' \
+    && echo "✅ v1.3.0 ROT-MTIME (functions.sh)"
+grep -A80 'rotate_backups()' proxy/functions.sh | grep -q '_last_stable\|_protected' \
+    && echo "✅ v1.3.0 ROT-PROTECT (functions.sh)"
+
+# v1.3.0 checks — UI
+grep -q 'led-on' web/index.html && echo "✅ v1.3.0 live status LED"
+
+# v1.4.0 checks
+grep -q 'APK_FILE' proxy/main.go && echo "✅ v1.4.0 APK_FILE constant"
+grep -q 'app-debug.apk' proxy/main.go && echo "✅ v1.4.0 /app-debug.apk route"
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ v1.4.0 CodeQL fix"
+test -f scripts/fetch_app_apk.sh && echo "✅ v1.4.0 APK fetcher"
+test -f proxy/app-apk.version && echo "✅ v1.4.0 version file"
 ```
 
 ### 94. What are the new Make targets?
 
-**3 new targets were added in v1.2.0**:
+**8 new targets have been added since v1.0.0**:
 
-- `make check-backup` — validate the backup shell functions.
-- `make check-all` — run all local validations.
-- `make diagnose-help` — print device-side diagnostic commands.
+- `make check-backup` — validate the backup shell functions
+  (v1.2.0).
+- `make check-all` — run all local validations (v1.2.0).
+- `make diagnose-help` — print device-side diagnostic commands
+  (v1.2.0).
+- `make fetch-apk` — fetch the companion APK into `dist/`
+  (v1.4.0).
+- `make check-app-version` — validate `proxy/app-apk.version`
+  (v1.4.0).
 
 See [`docs/DEVELOPMENT.md`](DEVELOPMENT.md) §9 for details.
 
@@ -2300,7 +3185,7 @@ grep -q 'recordLoginAttempt(ip, false)' proxy/main.go && echo "✅ present"
 
 ```bash
 # 1. Static audit
-grep -qE 'rebuildMu[[:space:]]\+sync\.Mutex' proxy/main.go && echo "✅ declared"
+grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ declared"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'rebuildMu.Lock()' && echo "✅ Lock"
 grep -A5 'func rebuildBlocklist' proxy/main.go | grep -q 'defer rebuildMu.Unlock()' && echo "✅ Unlock"
 
@@ -2380,20 +3265,21 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### 102. How do I report a security vulnerability?
 
-Do not open a public Issue. Use **GitHub Private Vulnerability Reporting**. See [`SECURITY.md`](SECURITY.md).
+Do not open a public Issue. Use **GitHub Private Vulnerability
+Reporting**. See [`SECURITY.md`](SECURITY.md).
 
 ### 103. How do I translate the project?
 
-**v1.2.0 — Global edition (English default + Arabic toggle)**:
+**Global edition (English default + Arabic toggle)**:
 
-- The **WebUI** ships bilingual (English default + Arabic toggle).
-  Adding or changing strings requires updating **both** the `en`
-  and `ar` entries in all three HTML files. See
+- The **WebUI** ships bilingual (English default + Arabic
+  toggle). Adding or changing strings requires updating **both**
+  the `en` and `ar` entries in all three HTML files. See
   [`CONTRIBUTING.md`](CONTRIBUTING.md) §4.6.
 - **Documentation translation is welcome** as separate files
   (`docs/*.<lang>.md`).
 - **Additional WebUI languages** (FR, DE, ES, RU, ZH, ...) are
-  deferred to v1.4.0 — see [`ROADMAP.md`](ROADMAP.md) §6.
+  deferred to a future release — see [`ROADMAP.md`](ROADMAP.md) §6.
 - **Community forks** with additional languages are permitted
   (the MIT license allows this).
 
@@ -2415,10 +3301,12 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 - 🔍 Auditor
 - 🔧 Platform Fixer
 - 📊 Metrics Wizard
-- ⚙️ Concurrency Guardian (now covers `backupMu` too in v1.2.0)
+- ⚙️ Concurrency Guardian (covers `rebuildMu` and `backupMu`)
 - 🔌 Port Architect
 - 🧠 Memory Architect (v1.1.0)
-- 🛡️ **Data Guardian (v1.2.0)** — see Q129
+- 🛡️ Data Guardian (v1.2.0)
+- 🎯 **Rotation Guardian (v1.3.0)** — verify SNAP-*/ROT-* on a real
+  device
 
 ### 105. How do I add a question to the FAQ?
 
@@ -2436,29 +3324,43 @@ Yes! See [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 ### 106. How do I know the next Audit Correction number?
 
 - Last Audit Correction: **#33** (runtime_info ports).
-- Next expected: **#34** (v1.3.x).
+- Next expected: **#34** (v1.5.x).
 
 **Note**:
 - v1.1.0 did not add audit corrections. It introduced three
-  runtime improvements (MEM-1/2/3) documented in SECURITY.md §5.30.
+  runtime improvements (MEM-1/2/3) documented in SECURITY.md
+  §5.30.
 - v1.2.0 did not add audit corrections either. It introduced 10
   data-preservation layers + 4 runtime additions (BAK-1..BAK-4)
   + 2 correctness fixes (FIX-1/2), documented in SECURITY.md
   §5.31 and §5.32.
+- v1.3.0 did not add audit corrections. It introduced one
+  correctness fix in `service.sh` (DNS auto-start after boot),
+  two UI features (PWA install button, live status LED), and the
+  server-side rotation refinements (SNAP-*/ROT-*).
+- v1.4.0 did not add audit corrections. It introduced the
+  companion Android app and two CodeQL `go/path-injection` fixes
+  in `removeModule` (internal hardening).
 
 **See**: [`CHANGELOG.md`](../CHANGELOG.md).
 
 ### 107. How do I add a new verification for a fix?
 
-Use grep-based verification in the CI workflow (`.github/workflows/ci.yml`).
+Use grep-based verification in the CI workflow
+(`.github/workflows/ci.yml`).
 
 **Patterns**:
 - **Static audit** (shell): `grep -q 'pattern' file`
-- **Build verification**: `go build -buildvcs=false -trimpath -o /tmp/main main.go`
+- **Build verification**:
+  `go build -buildvcs=false -trimpath -o /tmp/main main.go`
 - **Runtime check**: `curl -s http://127.0.0.1:9090/api?action=X | jq`
 
 **v1.2.0 note**: The `backup-smoke-test` job in `ci.yml` uses
 the same pattern for the 10 defensive layers.
+
+**v1.4.0 note**: The `Verify companion app metadata` step
+validates `proxy/app-apk.version` format and
+`scripts/fetch_app_apk.sh` presence.
 
 ### 108. How do I add a RACE-1 verification?
 
@@ -2496,9 +3398,17 @@ grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'in_flight_txn' && echo
 grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'orphan_txn' && echo "✅ orphan_txn"
 ```
 
-### 110. What is the difference between "Fix #N", "NEW-N", "MEM-N", "BAK-N", and "FIX-N"?
+**v1.4.0 addition** — for the APK route:
 
-**Fix #N** (N=1..12): v1.0.0 **original** fixes (Dashboard JSON, Shell fallback, Preserve settings, ..., CodeQL config).
+```bash
+grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE constant"
+grep -q 'app-debug.apk' proxy/main.go && echo "✅ /app-debug.apk route"
+```
+
+### 110. What is the difference between "Fix #N", "NEW-N", "MEM-N", "BAK-N", "FIX-N", and "v1.3.0/v1.4.0 fixes"?
+
+**Fix #N** (N=1..12): v1.0.0 **original** fixes (Dashboard JSON,
+Shell fallback, Preserve settings, ..., CodeQL config).
 
 **NEW-N** (N=1..6): **Additional** security fixes discovered later:
 - NEW-1: Login POST-only (CSRF).
@@ -2527,11 +3437,23 @@ corrections):
 
 **FIX-N** (N=1..2): v1.2.0 **correctness fixes** (not audit
 corrections):
-- FIX-1: Recovery-mode reorder.
+- FIX-1: Recovery-mode reorder (snapshot-and-reapply).
 - FIX-2: Service Worker update-banner.
 
+**v1.3.0 fixes** (not audit corrections):
+- DNS auto-start after boot (`service.sh` section [19]).
+- PWA install button (WebUI feature).
+- Live status LED (WebUI feature).
+- Server-side rotation refinements (SNAP-MANIFEST, SNAP-MTIME,
+  ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
+
+**v1.4.0 fixes** (not audit corrections):
+- CodeQL `go/path-injection` in `removeModule` (2 alerts closed).
+- iOS PWA logic removed.
+- Companion APK integration.
+
 **Full numbering**: Fix #1-#12 + NEW-1..NEW-6 + RACE-1 + PORT-2 +
-MEM-1/2/3 + BAK-1..BAK-4 + FIX-1/2.
+MEM-1/2/3 + BAK-1..BAK-4 + FIX-1/2 + v1.3.0 fixes + v1.4.0 fixes.
 
 ---
 
@@ -2540,24 +3462,31 @@ MEM-1/2/3 + BAK-1..BAK-4 + FIX-1/2.
 - [README.md](../README.md) — Overview
 - [docs/INSTALL.md](INSTALL.md) — Installation guide
 - [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) — Troubleshooting
-- [docs/SECURITY.md](SECURITY.md) — Security policy + Audit Corrections (§5.31, §5.32)
-- [docs/BACKUP.md](BACKUP.md) — **Backup system reference (v1.2.0)**
-- [docs/EMERGENCY.md](EMERGENCY.md) — **Emergency recovery (v1.2.0)**
-- [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide (§3.0, §3.1)
-- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — System architecture (§3.10, §4.10)
+- [docs/SECURITY.md](SECURITY.md) — Security policy + Audit
+  Corrections (§5.31, §5.32)
+- [docs/BACKUP.md](BACKUP.md) — Backup system reference (v1.2.0 +
+  v1.3.0 rotation)
+- [docs/EMERGENCY.md](EMERGENCY.md) — Emergency recovery (v1.2.0)
+- [docs/UPGRADE.md](UPGRADE.md) — Version upgrade guide (§3.0,
+  §3.1, §3.2, §3.3)
+- [docs/ARCHITECTURE.md](ARCHITECTURE.md) — System architecture
+  (§3.10, §4.10, §4.13)
 - [docs/API.md](API.md) — HTTP API reference (§6.1.7)
 - [docs/DEVELOPMENT.md](DEVELOPMENT.md) — Developer guide
 - [docs/DNS_BINARIES.md](DNS_BINARIES.md) — DNS binaries management
-- [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix (§5.4, §5.5)
+- [docs/COMPATIBILITY.md](COMPATIBILITY.md) — Compatibility matrix
+  (§10.3.5 SNAP-*/ROT-* verification)
 - [docs/CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guide
 - [docs/GLOSSARY.md](GLOSSARY.md) — Glossary
-- [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Contributors recognition (Data Guardian)
+- [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) — Contributors
+  recognition (Data Guardian, Rotation Guardian)
 - [docs/ROADMAP.md](ROADMAP.md) — Project plan
-- [CHANGELOG.md](../CHANGELOG.md) — Version history (v1.0.0 → v1.2.0)
+- [CHANGELOG.md](../CHANGELOG.md) — Version history (v1.0.0 →
+  v1.4.0)
 - [GitHub Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues)
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
 *Author: gasciljh*

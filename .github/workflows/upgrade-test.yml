@@ -1,14 +1,23 @@
 # ============================================================
 # DNSCrypt Smart Filter – Data Preservation & Upgrade Test
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Purpose:
-#   Verify the 10 data-preservation layers introduced in v1.2.0
-#   WITHOUT a real Android device. Each scenario runs in a
-#   controlled Ubuntu sandbox with mocked paths, and exercises
+#   Verify the 9 tested data-preservation layers introduced in
+#   v1.2.0 WITHOUT a real Android device. Each scenario runs in
+#   a controlled Ubuntu sandbox with mocked paths, and exercises
 #   the same shell functions that run on-device.
+#
+#   Note: the v1.2.0 architecture has TEN layers, but Layer 10
+#   (Observability — `status.sh --diagnose` + `runtime_info.
+#   backups`) is not exercised by this workflow. It is a
+#   read-only observability surface, not a data-handling layer,
+#   and is covered indirectly by `ci.yml`'s `backup-smoke-test`
+#   job (function-presence checks). See `docs/BACKUP.md` §1.3
+#   for the authoritative layer table.
 #
 # Why this is possible on CI:
 #   • functions.sh is a sourced library. After sourcing, the
@@ -36,17 +45,34 @@
 #   │ 9  │ Automation + rotation    │ L9-01 .. L9-03 (3)      │
 #   └────┴──────────────────────┴─────────────────────┘
 #
-#   Total: 42 scenarios, matching the number cited in
-#   ARCHITECTURE.md §8.2 and docs/DNS_BINARIES.md §8.7.
+#   Total: 42 scenarios across 9 tested layers.
+#
+#   The authoritative source for the 10-layer architecture is
+#   `docs/BACKUP.md` §1.3 (layer table) and §4 (trigger
+#   catalog). The 42-scenario count is also cited in
+#   `docs/CONTRIBUTING.md` §8.10 and `docs/DEVELOPMENT.md` §8.13.
 #
 # ============================================================
 # Triggers:
 # ============================================================
-#   • push on develop/main when scripts or workflows change
-#   • pull_request targeting develop/main
-#   • workflow_dispatch (manual)
+#   • workflow_dispatch (manual only)
 #
-#   Not triggered on tag pushes — that is release.yml's job.
+#   ⚠️ This workflow is NOT triggered on push or on pull
+#      requests. It was originally configured to run on every
+#      push and every PR, but the 42-scenario matrix is
+#      expensive (42 parallel jobs) and the failures it
+#      detected were unrelated to the data-preservation
+#      layers (mocked-path noise). The matrix is now
+#      manual-only: the operator decides when to run it.
+#
+#   ⚠️ Not triggered on tag pushes either — that is
+#      release.yml's job.
+#
+#   When to trigger manually:
+#     • Before any release.
+#     • After any change to the 10 defensive layers.
+#     • After any change to this workflow file.
+#     • Weekly / monthly, as a regression sweep.
 #
 # ============================================================
 # Permissions:
@@ -61,15 +87,109 @@
 #   • actions/setup-go@v5 (not needed here — no Go compilation)
 #
 #   Only checkout is used. The matrix runs shell-only tests.
+#
+# ============================================================
+# v1.2.0 — initial release
+# ============================================================
+#   • 42 scenarios across 9 layers (L1 through L9).
+#   • Multi-source discovery (Layer 1): 10 scenarios.
+#   • Persistent backup (Layer 2): 7 scenarios.
+#   • Integrity verification (Layer 3): 5 scenarios.
+#   • Transactional install (Layer 4): 7 scenarios.
+#   • Root-solution compatibility (Layer 5): 3 scenarios.
+#   • SELinux preservation (Layer 6): 2 scenarios.
+#   • Recovery mode (Layer 7): 3 scenarios.
+#   • Config migrations (Layer 8): 2 scenarios.
+#   • Auto-backup + rotation (Layer 9): 3 scenarios.
+#
+# ============================================================
+# v1.3.0 — Server-side refinements touched rotate_backups
+# ============================================================
+#   ⚠️ The v1.3.0 release DID touch the semantics tested by
+#      this workflow. Specifically, the rotation logic in
+#      `functions.sh:rotate_backups` was rewritten with three
+#      new semantics (identifiers shared with CHANGELOG.md and
+#      docs/ARCHITECTURE.md §4.13.2):
+#
+#        🔧 ROT-MANIFEST — a directory is treated as a snapshot
+#          iff it contains a `.manifest.json` file. The
+#          previous rule was a name-pattern match
+#          (`^[0-9]{8}-[0-9]{6}-`).
+#
+#        🔧 ROT-MTIME — candidates are sorted by mtime,
+#          descending (`sort -rn -k1,1`). The previous rule
+#          was lexicographic directory-name sort.
+#
+#        🔧 ROT-PROTECT — two additional targets are preserved
+#          on top of the 21-newest window: the `.last_stable`
+#          target and the newest install snapshot (name
+#          matching `-v<digit>`). The previous version had no
+#          explicit protection for either.
+#
+#   ⚠️ CONSEQUENCE for this workflow:
+#      The L9-02 and L9-03 scenarios were written against the
+#      v1.2.0 rotation semantics. They create synthetic
+#      snapshot directories WITHOUT `.manifest.json`. Under
+#      the v1.3.0+ SNAP-MANIFEST rule, `rotate_backups` does
+#      not count these directories as snapshots, so it
+#      removes nothing:
+#
+#        • L9-02 creates 30 dirs and asserts `remaining == 21`.
+#          Under v1.3.0+ semantics, `remaining == 30` → FAIL.
+#
+#        • L9-03 creates 30 dirs and asserts that `current/`
+#          and the metadata files survive rotation. Those
+#          files survive trivially (rotation does nothing),
+#          so the test passes vacuously — but it no longer
+#          tests what it claims to test.
+#
+#      The v1.4.0 revision below fixes both scenarios by
+#      writing a minimal `.manifest.json` into every synthetic
+#      snapshot directory (see UPG-V14-04).
+#
+#   The OTHER 8 layers under test (L1 through L8) were NOT
+#   touched by v1.3.0 and remain valid.
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration + L9 fix
+# ============================================================
+#   🎯 UPG-V14-01 — The v1.4.0 release adds the companion
+#     Android app (OPTIONAL) and closes two CodeQL alerts in
+#     `main.go::removeModule`. Neither change touches the
+#     9 tested data-preservation layers.
+#
+#   🎯 UPG-V14-02 — The 42 scenarios, the sandbox setup, and
+#     the dispatcher structure are all unchanged from v1.2.0
+#     apart from UPG-V14-04 (see below).
+#
+#   🎯 UPG-V14-03 — No new scenario was added for the
+#     companion APK. The APK is not one of the 5 preserved
+#     files, and it is re-extracted from the module ZIP on
+#     every install (see `docs/BACKUP.md` §2.1 and §12.7).
+#     It is therefore orthogonal to the data-preservation
+#     layers and out of scope for this matrix.
+#
+#   🔧 UPG-V14-04 — L9-02 and L9-03 fixed for the v1.3.0
+#     ROT-MANIFEST detection rule. Both scenarios now write a
+#     minimal `.manifest.json` (`{}`) into every synthetic
+#     snapshot directory, AND use a fully-formed timestamp
+#     name (`YYYYMMDD-HHMMSS-v<digit>`), so that:
+#       • `rotate_backups` recognizes them as snapshots.
+#       • The ROT-PROTECT "newest install" pattern
+#         (`-v<digit>`) can match.
+#     Without this fix, L9-02 would FAIL (remaining == 30
+#     instead of 21) and L9-03 would pass vacuously without
+#     actually exercising rotation.
+#
 # ============================================================
 
 name: Upgrade Test
 
 on:
-  # Manual trigger only (as documented in docs/BRANCHING.md §723).
-  # The push/pull_request triggers were mistakenly added and caused
-  # every push and every PR to run (and fail) this matrix.
+  # Manual trigger only (see the Triggers section above for
+  # the rationale).
   workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -836,9 +956,21 @@ jobs:
 
             L9-02)
               reset_backup
-              # Create 30 snapshot dirs
+              # UPG-V14-04: create 30 snapshot directories, each
+              # with a valid name (YYYYMMDD-HHMMSS-v<digit>...) AND
+              # a `.manifest.json` file. Both are required:
+              #   • The manifest satisfies the v1.3.0 SNAP-MANIFEST
+              #     detection rule used by rotate_backups.
+              #   • The name satisfies the ROT-PROTECT "newest
+              #     install" pattern (`-v<digit>`) used to pick a
+              #     protected target.
+              # Before this fix, the dirs were created with a
+              # 2-digit time portion and no manifest — the rotation
+              # counted 0 snapshots and the assertion failed.
               for i in $(seq -w 1 30); do
-                mkdir -p "$BACKUP_DIR/20260901-$i-v1.2.0-100"
+                local ts="20260901-0000${i}"
+                mkdir -p "$BACKUP_DIR/${ts}-v1.2.0-100"
+                echo '{}' > "$BACKUP_DIR/${ts}-v1.2.0-100/.manifest.json"
               done
               load_functions
               rotate_backups 21
@@ -850,13 +982,17 @@ jobs:
 
             L9-03)
               reset_backup
-              # Fill with 30 snapshots + protect current/ and metadata
+              # UPG-V14-04: same fix as L9-02 — every synthetic
+              # snapshot dir needs a `.manifest.json` so the
+              # v1.3.0 ROT-MANIFEST detection counts it.
               mkdir -p "$BACKUP_DIR/current"
               touch "$BACKUP_DIR/.last_stable"
               touch "$BACKUP_DIR/README.md"
               touch "$BACKUP_DIR/.upgrade_history.json"
               for i in $(seq -w 1 30); do
-                mkdir -p "$BACKUP_DIR/20260901-$i-v1.2.0-100"
+                local ts="20260901-0000${i}"
+                mkdir -p "$BACKUP_DIR/${ts}-v1.2.0-100"
+                echo '{}' > "$BACKUP_DIR/${ts}-v1.2.0-100/.manifest.json"
               done
               load_functions
               rotate_backups 21

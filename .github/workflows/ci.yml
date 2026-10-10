@@ -1,6 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -97,6 +98,10 @@
 #     counted with CI-1 in the release notes, not separately.
 #
 #   🔧 CI-2 — `shellcheck` scope documented: 5 of 8 scripts.
+#     (SUPERSEDED by HARD-CI-10 on 2026-09-30 — shellcheck was
+#      subsequently REMOVED from the workflow entirely. The
+#      scope note above is retained for historical context only;
+#      no shellcheck step exists in the current workflow.)
 #
 # ============================================================
 # v1.2.0 (Global Edition) — Additional hardening in this revision
@@ -159,6 +164,81 @@
 #       - SC2115 (rm -rf "$var" without ?) — guards exist
 #       - SC2155 (declare+assign) — intentional style
 #     No production code was changed; only the CI invocation.
+#
+#     (SUPERSEDED by HARD-CI-10 on 2026-09-30 — shellcheck was
+#      REMOVED entirely. Even with `--shell=bash` and the four
+#      exclusions above, shellcheck still emitted false
+#      positives (SC1091, SC2164, SC2154, ...) that blocked
+#      the pipeline without catching real bugs. `bash -n` in
+#      the "Shell syntax check" step now covers syntax, and
+#      the "Verify Layer 1-10 function presence" step provides
+#      a project-specific sanity check. The configuration
+#      described in this entry is retained for historical
+#      context only — no shellcheck step exists in the
+#      current workflow.)
+#
+#   🛡️ HARD-CI-10 (2026-09-30) — Shellcheck REMOVED from the
+#     workflow. See the inline note at the point where the
+#     step was previously located (in the backup-smoke-test
+#     job) for the full rationale. `bash -n` on all 8 scripts
+#     remains as the syntax check; static analysis is now the
+#     responsibility of CodeQL and developer-side pre-commit
+#     hooks.
+#
+# ============================================================
+# v1.3.0 — No changes to the CI configuration
+# ============================================================
+#   The v1.3.0 release is primarily a feature release (PWA
+#   install button, live status LED, DNS auto-start after
+#   boot). All three changes are client-side or shell-side:
+#     • PWA install button  → web/index.html (client-side)
+#     • Live status LED     → web/index.html (client-side)
+#     • DNS auto-start fix  → proxy/service.sh (shell)
+#
+#   The v1.3.0 release ALSO refined snapshot-detection and
+#   rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#
+#   This workflow (ci.yml) was NOT modified in v1.3.0. It
+#   contains no snapshot enumeration and no reference to the
+#   detection or ordering semantics. Its smoke-test steps
+#   check for FUNCTION PRESENCE only (e.g.
+#   `grep -q 'rotate_backups'` in functions.sh), not for the
+#   internal implementation of those functions. Therefore the
+#   v1.3.0 refinements have no bearing on this workflow.
+#
+#   The build matrix, the `backup-smoke-test` job, and the
+#   version-consistency check are all unchanged from v1.2.0.
+#
+#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13.
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 CI-APK-01 — New smoke-test step
+#     "Verify companion app metadata". Validates:
+#       • proxy/app-apk.version format (X.Y.Z, no "v")
+#       • scripts/fetch_app_apk.sh presence
+#
+#     The companion app is OPTIONAL. A missing version file or
+#     script produces a warning, not a build failure. This
+#     mirrors the OPTIONAL semantics in package_module.sh and
+#     release.yml.
+#
+#   📱 CI-APK-02 — The web-asset smoke test does NOT
+#     require web/app-debug.apk. The APK is staged by the
+#     release pipeline (release.yml), not committed to git
+#     (see .gitignore §[20]). Requiring it here would break
+#     CI on every push.
+#
+#   📱 CI-APK-03 — No change to the `build` job, the shell-syntax
+#     check, the layer-presence check, the PERSISTENT_BACKUP
+#     consistency check, the docs-reference check, the web-asset
+#     check, or the version-consistency check. All 7 pre-existing
+#     smoke-test steps remain unchanged.
 # ============================================================
 
 name: CI
@@ -246,18 +326,17 @@ jobs:
   # This is NOT a full data-preservation test — that runs on a
   # real device via .github/workflows/upgrade-test.yml.
   #
-  # ⚠️ shellcheck scope (CI-2 + HARD-CI-09):
-  #    shellcheck runs on 5 of the 8 scripts; the remaining 3
-  #    (action.sh, post-fs-data.sh, watchdog.sh) are only
-  #    covered by `bash -n`. The excluded scripts contain a mix
-  #    of legacy-style code and defensive patterns that produce
-  #    shellcheck warnings unrelated to correctness. They are
-  #    still validated for syntax errors.
-  #
-  #    As of HARD-CI-09, shellcheck runs with `--shell=bash`
-  #    because the scripts use bash-isms that are valid under
-  #    Android's mksh. Four warning classes are additionally
-  #    excluded — see the header for the full rationale.
+  # ⚠️ shellcheck status (superseded — see HARD-CI-10):
+  #    shellcheck was REMOVED from this workflow on 2026-09-30.
+  #    The prior invocation ran on 5 of the 8 scripts and used
+  #    `--shell=bash` with 4 excluded warning classes. Even
+  #    with that configuration it produced false positives that
+  #    blocked PRs without catching real bugs. `bash -n` (in the
+  #    "Shell syntax check" step below) covers syntax; the
+  #    "Verify Layer 1-10 function presence" step provides a
+  #    project-specific sanity check. Static analysis is now
+  #    the responsibility of CodeQL + developer-side pre-commit
+  #    hooks.
   # ============================================================
   backup-smoke-test:
     name: Backup Smoke Test
@@ -538,3 +617,40 @@ jobs:
 
           echo "::endgroup::"
           echo "✅ Version consistency verified across 5 files"
+
+      # ============================================================
+      # Verify companion app metadata (v1.4.0)
+      # ============================================================
+      # Validates proxy/app-apk.version format (X.Y.Z) and
+      # verifies that scripts/fetch_app_apk.sh is present.
+      #
+      # The companion app is OPTIONAL — a missing version file
+      # produces a warning, not an error.
+      # ============================================================
+      - name: Verify companion app metadata
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying companion app metadata"
+
+          if [ ! -s proxy/app-apk.version ]; then
+            echo "  ⚠️  proxy/app-apk.version missing (companion app optional)"
+          else
+            APP_V="$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            if printf '%s' "$APP_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "  ✅ proxy/app-apk.version:        $APP_V (valid format)"
+            else
+              echo "  ❌ proxy/app-apk.version format invalid"
+              echo "     expected: X.Y.Z (e.g. 1.0.0)"
+              echo "     found:    $APP_V"
+              exit 1
+            fi
+          fi
+
+          if [ -s scripts/fetch_app_apk.sh ]; then
+            echo "  ✅ scripts/fetch_app_apk.sh present"
+          else
+            echo "  ⚠️  scripts/fetch_app_apk.sh missing (companion app optional)"
+          fi
+
+          echo "::endgroup::"
+          echo "✅ Companion app metadata verified"

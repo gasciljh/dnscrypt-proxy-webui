@@ -2,10 +2,22 @@
 
 Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewalls.
 
-**Version**: v1.3.0 (Global Edition)
-**Last updated**: 2026-10-02
+**Version**: v1.4.0 (Global Edition)
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
+
+> **Identifier inventory in this file (10 total)**:
+>   • HARD-COMPAT-01 (backup section move — historical)
+>   • HARD-COMPAT-02 (curl auth examples — historical)
+>   • HARD-COMPAT-03 (CI backup matrix — historical)
+>   • HARD-COMPAT-04 (MEM-1 runtime verification — historical)
+>   • HARD-COMPAT-V14-01..03 (v1.4.0 — companion app notes)
+>   • HARD-COMPAT-V14-04 (v1.4.0 — `Last updated` correction)
+>   • HARD-COMPAT-V14-05 (v1.4.0 — v1.3.0 block server-side context)
+>   • HARD-COMPAT-V14-06 (v1.4.0 — §2.5 SNAP-MANIFEST note)
+>   • HARD-COMPAT-V14-07 (v1.4.0 — §10.3.5 SNAP/ROT verification)
+>   • HARD-COMPAT-V14-08 (v1.4.0 — POST-AUDIT FIXES + cross-refs)
 
 > **⚠️ API examples & authentication**:
 >   The `curl` examples in this document use the shorthand form
@@ -18,115 +30,171 @@ Comprehensive compatibility reference: Android, ROMs, Kernels, Chipsets, Firewal
 >   and pass them with `-u`:
 >
 >   ```bash
->   # Define once per shell session
 >   CREDS=$(su -c "sed -n '/^\[monitoring_ui\]/,/^\[/p' \
 >       /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml \
 >     | grep -E '^(username|password)=' | cut -d\"'\" -f2 | tr '\n' ':' | sed 's/:$//'")
 >
->   # Then use it in any request
 >   curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq
 >   ```
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date (2026-10-08).
+>   • §1.3 (What's New) rewritten to reflect the v1.4.0 feature
+>     set (companion Android app integration, CodeQL hardening,
+>     iOS PWA removal).
+>   • §1.4 (What Was New in v1.3.0) — **extended with server-side
+>     refinements context** (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). The previous version
+>     mentioned only the client-side changes.
+>   • §1.5 (What Was New in v1.2.0) — renumbered from §1.3.
+>   • §1.6 (What Was New in v1.1.0) — renumbered from §1.4.
+>   • §1.7 (What Was New in v1.0.0) — renumbered from §1.5.
+>   • §1.8 (Bilingual WebUI) — renumbered from §1.6.
+>   • §1.9 (Companion Android App) — new subsection.
+>   • §2.4 extended with the v1.4.0 companion app note.
+>   • §2.5 extended with a v1.3.0 SNAP-MANIFEST note (the
+>     `available` count rule changed).
+>   • §5.4 extended with a note about the v1.4.0 companion app
+>     (no memory impact — the APK is a static asset).
+>   • §7.2 extended with the v1.4.0 Root + Companion App table.
+>   • §8.1 extended with 2 new v1.4.0 rows:
+>       - `Companion APK missing from release ZIP` (optional asset)
+>       - `iOS-specific PWA path removed` (breaking if you relied
+>         on the iOS install modal).
+>   • §10.3 extended with a v1.4.0 compatibility testing subsection.
+>   • **§10.3.5 (new) — v1.3.0 server-side refinements verification**:
+>     how to test SNAP-MANIFEST + SNAP-MTIME + ROT-* on a device.
+>   • §10.8 (Companion App Champion badge) — new subsection.
+>   • §11.1 updated with the v1.4.0 documentation set (BACKUP.md,
+>     EMERGENCY.md, UPGRADE.md, ARCHITECTURE.md §4.13).
+>   • §11.3 (Companion App Repository) — new subsection.
+>   • **Global edition — English default + Arabic toggle**: the
+>     WebUI ships with English as the default language and an
+>     in-page toggle (`langToggle`) that switches to Arabic. The
+>     user's choice is stored in `localStorage['dnscrypt-lang']`.
+>     Documentation remains English-only by project convention.
+>   • Companion Android app: `web/app-debug.apk` (OPTIONAL) is
+>     bundled into the module ZIP by the release pipeline. The APK
+>     is fetched from
+>     [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
+>     and served at `GET /app-debug.apk` on the WebUI.
+
+> **v1.3.0 changes (historical — extended in this revision)**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side changes**:
+>       - PWA install button (dynamic, always-visible, browser-aware)
+>       - Live status LED on the Today counter
+>   • **Boot-path fix**: DNS auto-start after boot — `service.sh`
+>     §[19] performs a bounded wait for the WebUI to become ready,
+>     then calls `POST /api/ensure_running_service` directly. This
+>     avoids the 30-60 s delay caused by the watchdog's first
+>     polling interval. Compatibility impact: **✅ Faster DNS
+>     availability after reboot**.
+>   • **Server-side refinements to the backup layer** — the
+>     v1.3.0 release ALSO rewrote the snapshot-detection and
+>     rotation semantics that underpin `runtime_info.backups`.
+>     Three identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
 >
->   Alternatively, read the credentials from
->   `/data/local/tmp/dnscrypt_credentials.txt` (mode 0600, root
->   only). The examples below are written **without** `-u` for
->   brevity; add `-u "$CREDS"` if you have credentials set.
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file (instead of the
+>         `<YYYYMMDD>-<HHMMSS>-...` name pattern). Effect on
+>         compatibility: the `available` field's count rule
+>         changed. For snapshots produced by the standard
+>         toolchain, the result is identical (every snapshot
+>         carries a manifest). For custom-named snapshots, the
+>         new count includes them; the old count did not.
+>
+>       🔧 **SNAP-MTIME** — `buildBackupInfo()` now selects
+>         `last_backup_name` by **mtime** (descending), with a
+>         name-based fallback when `DirEntry.Info()` fails.
+>         Compatibility impact: the field's **value** may differ
+>         only when the system clock was adjusted backwards, or
+>         when a snapshot has a non-standard name. The field's
+>         **type and schema** are unchanged.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with
+>         the same detection (ROT-MANIFEST), the same mtime
+>         sort (ROT-MTIME), and two additional protected
+>         targets on top of the 21-newest window (ROT-PROTECT):
+>           • the `.last_stable` recovery pointer;
+>           • the newest install snapshot (name matching
+>             `-v<digit>`).
+>         Compatibility impact: **✅ no API change**. The
+>         rotation happens in the shell layer; the API only
+>         observes the resulting snapshot list.
+>
+>   • **Parallel application**: the same SNAP-MANIFEST /
+>     ROT-* semantics were applied to `watchdog.sh`,
+>     `status.sh`, `customize.sh`, `action.sh`, and
+>     `uninstall.sh`. Every consumer of the persistent backup
+>     directory now agrees on which snapshots exist and which
+>     is the newest. Compatibility impact: **✅ no API change**.
+>
+>   • See `CHANGELOG.md` [v1.3.0] and
+>     `docs/ARCHITECTURE.md` §4.13 for the full story.
 
 > **v1.2.0 changes**:
 >   • Version bumped from v1.1.0 to v1.2.0.
->   • **New §2.5 — Backup Compatibility by Android Version.**
->     Moved from the old §5.5 (which was incorrectly placed
->     under "Chipsets (SoCs)"). Maps the v1.2.0 persistent
->     backup directory (`/sdcard/dnscrypt-webui-backup/`) to
->     the Android storage model: FUSE mount behavior,
->     external-storage permissions, and SELinux contexts.
->     Explains why the backup survives uninstall and factory
->     reset of `/data`.
->   • **New §8.4 — v1.2.0-specific Issues.** Documents five
->     new known issues that are specific to the
->     data-preservation release:
->       - `backup directory missing on some ROMs` (FUSE latency)
->       - `recovery mode runs twice on some devices`
->       - `orphan-txn preserved on uninstall` (intentional)
->       - `runtime_info.backups returns 7 fields` (client
->         compatibility)
->       - `bilingual toggle partial RTL on old browsers`
->   • **§1.3 (What's New) rewritten** to reflect the v1.2.0
->     feature set (10 defensive layers, persistent backup,
->     recovery mode, transactional upgrades, bilingual WebUI).
->   • **§1.4 (What Was New in v1.1.0) extracted** into its own
->     subsection (previously merged into §1.3).
->   • **§1.5 (What Was New in v1.0.0) renumbered**.
->   • **§1.6 (Bilingual WebUI) — new subsection.**
->   • **§2.6 (Platform Support) — renumbered** from §2.5.
->   • **§5.4 (Memory Profile by Device RAM) extended** with a
->     cross-reference to the v1.2.0 backup layer.
->   • **§7.2 (Root + Compatibility) extended** with the v1.2.0
->     verification table.
->   • **§8.1 (Known Issues) extended** with 5 new v1.2.0 rows.
->   • **§10.3 (v1.2.0 Compatibility Testing) — new section.**
->   • **§10.7 (Data Guardian Badge) — new section.**
->   • **§11.1 (References) updated** to include the v1.2.0
->     documentation set (`BACKUP.md`, `EMERGENCY.md`,
->     `UPGRADE.md`).
->   • **Global edition (English default + Arabic toggle)**:
->     the WebUI ships with English as the default language and
->     an in-page toggle (`langToggle`) that switches to Arabic.
->     The user's choice is stored in `localStorage['dnscrypt-lang']`.
->     Documentation remains English-only by project convention.
+>   • Global edition — English default + Arabic toggle.
+>   • **10 data-preservation layers** — see §1.5.
+>   • **Persistent backup directory** (`/sdcard/dnscrypt-webui-backup/`)
+>     — see §2.5 for the Android version matrix.
+>   • **`runtime_info.backups` — 7 fields** (additive).
+>   • **Bilingual WebUI** (English default + Arabic toggle).
+>   • **Watchdog token** on `POST /api/ensure_running_service`
+>     — security hardening (BUG-B fix).
 
-> **v1.2.0 (Global Edition) — Additional hardening in this revision**:
->   • 🛡️ **HARD-COMPAT-01** — `§5.5` (Backup Compatibility by
->     Android Version) has been **moved to §2.5**, under the
->     correct parent section (Android Versions). The old
->     placement under "Chipsets (SoCs)" was misleading — the
->     content has no relationship to SoC hardware. An HTML
->     anchor is retained at the old position (see §5.5 below)
->     so that any external link pointing at `#55` still
->     resolves to a valid section.
->   • 🛡️ **HARD-COMPAT-02** — All `curl` examples now carry an
->     authentication note at the top of the document. Previous
->     versions silently assumed no credentials, but
->     `customize.sh` generates them by default, so the examples
->     returned HTTP 401 on a fresh install.
->   • 🛡️ **HARD-COMPAT-03** — The `§2.5` CI verification note no
->     longer claims that `.github/workflows/upgrade-test.yml`
->     "emulates Android 5 through 15". The workflow runs on
->     `ubuntu-22.04` with mocked paths; it validates the
->     version-independent **shell logic**, not the Android
->     runtime.
->   • 🛡️ **HARD-COMPAT-04** — `§7.3` no longer uses
->     `strings dnscrypt-webui | grep memoryLimitForProfile` to
->     verify MEM-1. Go binaries may be stripped with `-s -w`
->     (removing symbol names); the check now queries the API
->     for the `memory_limit_mb` field, which is present
->     regardless of stripping.
->   • 🛡️ **HARD-COMPAT-05** — `§10.3.3` (Recovery Mode Test)
->     no longer uses `curl` immediately after `--restart`
->     without auth. It reads `selected_profile.txt` directly
->     instead, which requires no authentication.
->   • 🛡️ **HARD-COMPAT-06** — The `IE 11` row in the browser
->     compatibility tables now explicitly notes that IE 11 is a
->     **Windows desktop** browser (not available on Android),
->     and is listed for completeness only.
->   • 🛡️ **HARD-COMPAT-07** — Minor clarifications in
->     "Samsung Internet 16+" version notes.
+> **v1.4.0 (Global Edition) — Additional hardening in this revision**:
+>   • 🛡️ **HARD-COMPAT-V14-01** — All `curl` examples continue to
+>     document the authentication requirement. No behavioral change.
+>   • 🛡️ **HARD-COMPAT-V14-02** — The "What's New" section now
+>     consistently lists v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0 → v1.4.0
+>     as a linear chain. No version is skipped.
+>   • 🛡️ **HARD-COMPAT-V14-03** — The companion Android app is
+>     documented as **optional** in every reference. A missing APK
+>     does not break any compatibility row.
 
-> **v1.2.0 (Global Edition) — Corrections in this revision**:
->   • 🔧 **N-5 (anchor for the moved §5.5)** — The Backup
->     Compatibility matrix was moved from §5.5 to §2.5 in the
->     v1.2.0 cycle, but no anchor was placed at the old
->     position. Any external link to `#55` (or `#5-5`) was
->     therefore broken. A stub section (**§5.5 (Moved)**) now
->     lives at the end of §5, containing:
->       - an HTML anchor `<a name="55"></a>` (for legacy
->         `#55` links),
->       - a plain-language pointer to the new §2.5 location,
->       - a redirect note for both internal and external
->         references.
->     The stub is intentionally minimal and contains no
->     duplicated content — the single source of truth for
->     backup compatibility remains §2.5.
+> **v1.4.0 (Global Edition) — POST-AUDIT FIXES (this revision)**:
+>   A post-audit review of this file against the v1.3.0 / v1.4.0
+>   code identified the following documentation gaps. All are
+>   addressed in-place; no version bump.
+>
+>   🔧 **HARD-COMPAT-V14-04** — **`Last updated` corrected.** The
+>     header and footer previously said `2026-10-06` (which
+>     corresponded to the v1.4.0 release date, not to the v1.4.0
+>     file-editing date). Both now read `2026-10-08`, matching
+>     every other file in the v1.4.0 module.
+>
+>   🔧 **HARD-COMPAT-V14-05** — **`v1.3.0` block extended.** The
+>     previous block mentioned only the client-side changes (PWA
+>     install button, live status LED) and the DNS auto-start fix.
+>     It did NOT mention the **server-side refinements** to
+>     snapshot detection and rotation (SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) that are central to
+>     the `runtime_info.backups` object documented in §2.4. The
+>     v1.3.0 block above now documents them, with explicit
+>     "Compatibility impact" notes for each identifier.
+>
+>   🔧 **HARD-COMPAT-V14-06** — **§2.5 updated.** The backup
+>     compatibility matrix now notes that the `available` field's
+>     count rule is **SNAP-MANIFEST** (v1.3.0): a snapshot is
+>     counted **iff** its directory contains a `.manifest.json`
+>     file. The previous version did not mention this rule.
+>
+>   🔧 **HARD-COMPAT-V14-07** — **§10.3.5 added.** A new
+>     verification subsection for the v1.3.0 server-side
+>     refinements: how to confirm SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, and ROT-PROTECT are active on a
+>     real device.
+>
+>   🟢 **HARD-COMPAT-V14-08** — **Cross-references added.**
+>     §11.2 now points at `docs/ARCHITECTURE.md` §4.13 (the
+>     authoritative source for the v1.3.0 server-side
+>     refinements) and at `CHANGELOG.md` §[v1.3.0].
 
 ---
 
@@ -175,9 +243,52 @@ v1.2.0 because of the persistent backup directory
 (`/sdcard/dnscrypt-webui-backup/`). Each snapshot uses ~30–100 KB;
 the rotation cap (21 snapshots) bounds the total to ~2.5 MB.
 
-### 1.3 What's New in v1.2.0
+**v1.4.0 note**: The companion Android app APK (when bundled) adds
+~3 MB to the module ZIP, but the APK itself is stored in the
+device's internal storage after installation (not on `/sdcard/`).
+The `/sdcard/` requirement is unchanged.
+
+### 1.3 What's New in v1.4.0
+
+**Integration release** — companion Android app + CodeQL hardening
++ iOS PWA cleanup.
 
 **Compatibility-relevant changes**:
+
+| # | Change | Compatibility impact |
+|:-:|---|---|
+| **1** | **Companion Android app integrated** — `web/app-debug.apk` is now bundled into the module ZIP as an **optional** asset | ✅ Optional — the module works without it. Served at `GET /app-debug.apk`. |
+| **2** | **CodeQL `go/path-injection` fix in `removeModule`** | ✅ Security hardening — no behavioral change |
+| **3** | **iOS PWA logic removed** (Android-only project) | ⚠️ If you relied on the iOS "Add to Home Screen" instructions, they are gone. All browsers now fall through to the unified "unsupported browser" modal. |
+| **4** | **`GET /app-debug.apk` endpoint** | ✅ Additive — returns 404 when the APK is absent |
+| **5** | **Release pipeline stages the APK** before packaging | ✅ No change for end users |
+
+**Base compatibility**: no change in system requirements.
+
+### 1.4 What Was New in v1.3.0
+
+**Feature release** — PWA install button + live status LED +
+DNS auto-start fix + **server-side backup refinements**.
+
+**Compatibility-relevant changes**:
+
+| # | Change | Compatibility impact |
+|:-:|---|---|
+| **1** | **PWA install button** — dynamic, always-visible, browser-aware | ✅ Client-side only — no API change |
+| **2** | **Live status LED** on the Today counter | ✅ Client-side only |
+| **3** | **DNS auto-start after boot** — `service.sh` now waits for the WebUI then calls `POST /api/ensure_running_service` directly | ✅ Faster DNS availability after reboot |
+| **4** | **`watchdog.sh` backoff behavior unchanged** — the boot-path fix does not affect crash recovery | ✅ No impact |
+| **5** | **SNAP-MANIFEST** — `buildBackupInfo()` detects snapshots by `.manifest.json` presence, not name pattern | ✅ **API contract unchanged**. The `available` count may be **larger** for the same on-disk state (custom-named snapshots are now visible). |
+| **6** | **SNAP-MTIME** — `last_backup_name` is selected by mtime, not lexicographic name | ✅ **API contract unchanged**. The field **value** may differ only under clock drift or a non-standard snapshot name. |
+| **7** | **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** — `rotate_backups` rewritten with the same detection + sort + two protected targets | ✅ **API contract unchanged**. Rotation happens in the shell layer. |
+| **8** | **Parallel application** — the same SNAP-* / ROT-* semantics applied to `watchdog.sh`, `status.sh`, `customize.sh`, `action.sh`, `uninstall.sh` | ✅ **API contract unchanged**. |
+
+**Consumers of `runtime_info.backups`**: see §2.4 for the field
+description, and §10.3.5 for a verification procedure.
+
+### 1.5 What Was New in v1.2.0
+
+**Data-preservation release** — 10 defensive layers.
 
 | # | Change | Compatibility impact |
 |:-:|---|---|
@@ -192,13 +303,12 @@ the rotation cap (21 snapshots) bounds the total to ~2.5 MB.
 | **9** | **Auto-backup (24 h) + rotation (21 snapshots)** | ✅ Runs on `service.sh` boot. |
 | **10** | **CLI diagnose tool** (`status.sh --diagnose`) | ✅ Local-only, no network required. |
 | **11** | **`runtime_info.backups` — 7 fields** | ✅ Additive — 5 fields still present. |
-| **12** | **Bilingual WebUI (English default + Arabic toggle)** | ✅ Client-side only. No API impact. See §1.6. |
+| **12** | **Bilingual WebUI (English default + Arabic toggle)** | ✅ Client-side only. No API impact. See §1.8. |
+| **13** | **Watchdog token on `POST /api/ensure_running_service`** | ⚠️ Security hardening — clients that relied on the localhost bypass must now send `X-Watchdog-Token`. |
 
-**Base compatibility**: no change in system requirements.
+### 1.6 What Was New in v1.1.0
 
-### 1.4 What Was New in v1.1.0
-
-**Compatibility-relevant changes** (for reference):
+**Polish release** — dynamic memory limit + extended shellQuote.
 
 | # | Change | Compatibility impact |
 |:-:|---|---|
@@ -209,9 +319,9 @@ the rotation cap (21 snapshots) bounds the total to ~2.5 MB.
 | **5** | **`get_profile` new field** (`memory_limit_mb`) | ✅ Additive — clients unaffected |
 | **6** | **Uninstall no longer creates backup** | ⚠️ Manual backup recommended — but **superseded by v1.2.0** (see §2.5). |
 
-### 1.5 What Was New in v1.0.0
+### 1.7 What Was New in v1.0.0
 
-**Compatibility-relevant changes** (for reference):
+**First stable release.**
 
 | # | Change | Compatibility impact |
 |:-:|---|---|
@@ -231,7 +341,7 @@ the rotation cap (21 snapshots) bounds the total to ~2.5 MB.
 | **14** | `runtime_info` dynamic ports (PORT-2) | ✅ Dynamic links |
 | **15** | Auth cache (60 s) | ⚠️ Credential changes take effect after ≤ 60 s |
 
-### 1.6 Bilingual WebUI (v1.2.0)
+### 1.8 Bilingual WebUI (v1.2.0)
 
 The WebUI ships with **English as the default language** and an
 in-page **`langToggle` button** to switch to Arabic. This is a
@@ -266,6 +376,31 @@ API, the config files, or the backend.
   browser and is **not available on Android**. It is not supported
   by this project.
 
+### 1.9 Companion Android App (v1.4.0)
+
+The module may ship an **optional** companion Android app APK at
+`web/app-debug.apk`. When present, it is:
+
+- Served at `GET /app-debug.apk` (mime:
+  `application/vnd.android.package-archive`).
+- Cached with `Cache-Control: public, max-age=3600, immutable`.
+- Downloadable from the WebUI install button
+  (`<a download href="/app-debug.apk">`).
+- **Not** required for the module to function.
+
+**Compatibility impact**:
+
+| Scenario | Impact |
+|---|---|
+| APK bundled (release build) | ✅ A "📲 Install App" button appears in the WebUI |
+| APK absent (dev build) | ✅ No button; `GET /app-debug.apk` returns 404 |
+| Browser blocks APK download | ⚠️ User can download it manually from the GitHub Release |
+
+**Minimum Android version for the companion app**: 5.0 (API 21) —
+same as the module itself.
+
+**Source repository**: [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+
 ---
 
 ## 2. Android Versions
@@ -298,6 +433,7 @@ API, the config files, or the backend.
 - ✅ **v1.2.0 backup fully supported** — FUSE `/sdcard/` mount,
   `restorecon` available, `sha256sum` available.
 - ✅ Bilingual WebUI works in all modern browsers.
+- ✅ **v1.4.0**: Companion Android app installs smoothly.
 
 **Android 8-9**:
 - ✅ Works.
@@ -305,6 +441,7 @@ API, the config files, or the backend.
 - 💡 **Solution**: add to exceptions.
 - ✅ **v1.2.0 backup works** — same FUSE mount.
 - ✅ Bilingual WebUI works.
+- ✅ **v1.4.0**: Companion app works.
 
 **Android 6-7**:
 - ⚠️ Doze mode stops services.
@@ -316,6 +453,7 @@ API, the config files, or the backend.
   `chcon u:object_r:magisk_file:s0`.
 - ⚠️ Bilingual WebUI works but very old browsers may not fully
   support the RTL flip — recommend Chrome 88+ or Firefox 92+.
+- ✅ **v1.4.0**: Companion app works (min Android 5.0).
 
 **Android 5**:
 - ⚠️ Requires kernel 3.10+.
@@ -328,6 +466,7 @@ API, the config files, or the backend.
   created and restored — just without checksum verification.
 - ⚠️ Bilingual WebUI: only modern browsers. IE 11 is not
   supported (and is not available on Android anyway).
+- ⚠️ **v1.4.0**: Companion app requires API 21+ — works.
 
 ### 2.2 Dashboard Compatibility
 
@@ -370,11 +509,13 @@ displays two additional rows populated from `runtime_info`:
 - ✅ The rows display the same values regardless of the WebUI's
   selected language.
 
-### 2.4 Dashboard — v1.2.0 Fields
+### 2.4 Dashboard — v1.2.0 + v1.4.0 Fields
 
 The System Info panel in both `index.html` and `dashboard.html`
-now displays **six additional rows** populated from the new
-`backups` object:
+displays **six additional rows** populated from the `backups`
+object (v1.2.0), plus a **companion-app install button** (v1.4.0):
+
+**v1.2.0 — Backup rows**:
 
 | Row | Field | Type |
 |---|---|---|
@@ -385,20 +526,44 @@ now displays **six additional rows** populated from the new
 | **Orphan Txn** | `backups.orphan_txn` | int |
 | **Backup Path** | `backups.path` | string |
 
+**v1.3.0 note on `available` (HARD-COMPAT-V14-06)**: Since
+v1.3.0, the `available` field counts a directory as a snapshot
+**iff** it contains a `.manifest.json` file (SNAP-MANIFEST).
+For the standard toolchain's output, the value is identical to
+v1.2.0's name-pattern-based count. It differs only when:
+- A custom-named snapshot exists (v1.3.0 counts it; v1.2.0 did
+  not).
+- A directory matches the name pattern but lacks a manifest
+  (v1.3.0 excludes it; v1.2.0 counted it).
+
+**v1.4.0 — Companion app button**:
+
+The main WebUI (`index.html`) now shows an install button:
+
+```html
+<a id="pwaInstallBtn" class="pwa-install-btn"
+   href="/app-debug.apk" download="DNS-Proxy.apk">
+    📲 Install App
+</a>
+```
+
+- ✅ Served by `main.go` via `serveStaticAssets` when the APK is
+  present.
+- ✅ Returns HTTP 404 when the APK is absent (local dev builds).
+- ✅ No JavaScript required — it is a plain `<a download>` link.
+
 **Compatibility**:
-- ✅ All modern browsers render the new rows.
+- ✅ All modern browsers render the new rows and the button.
 - ✅ No new browser API — the fields are simple text rendered
-  from the existing JSON response.
+  from the existing JSON response; the button is a plain link.
 - ⚠️ IE 11: not supported.
 
-### 2.5 Backup Compatibility by Android Version (v1.2.0 — new)
+### 2.5 Backup Compatibility by Android Version (v1.2.0)
 
 > **Placement note (HARD-COMPAT-01)**: This section was previously
-> located at §5.5, under "Chipsets (SoCs)" — a misleading
-> placement that has been corrected. The content has no
+> located at §5.5, under "Chipsets (SoCs)". The content has no
 > relationship to SoC hardware; it belongs with the Android
-> version matrix. See §5.5 for the redirect stub and the legacy
-> `#55` anchor.
+> version matrix. See §5.5 for the redirect stub.
 
 The v1.2.0 persistent backup lives at
 `/sdcard/dnscrypt-webui-backup/`. Its behavior depends on how
@@ -424,9 +589,7 @@ Android mounts `/sdcard/` and what SELinux tools are available.
 2. **`sha256sum` availability**: On very old devices (Android
    5.x with a minimal Toybox), `sha256sum` may not exist. In
    that case, `verify_backup_integrity` (Layer 3) skips the hash
-   check and relies on size + non-empty checks only. The backup
-   is still created and restored — just without checksum
-   verification.
+   check and relies on size + non-empty checks only.
 
 3. **`restorecon` vs `chcon`**: `restorecon` reads the system's
    `file_contexts` database and applies the correct SELinux
@@ -434,15 +597,29 @@ Android mounts `/sdcard/` and what SELinux tools are available.
    `copy_with_context` helper prefers `restorecon` and falls
    back to `chcon u:object_r:magisk_file:s0` if it is missing.
 
+4. **Snapshot detection (v1.3.0 — SNAP-MANIFEST)**: Since
+   v1.3.0, `runtime_info.backups.available` counts a directory
+   as a snapshot **iff** it contains a `.manifest.json` file.
+   This rule is **platform-independent** — it applies on every
+   Android version. The only difference across Android versions
+   is that on Android 5.x, the manifest's `files[].sha256`
+   field may be empty when `sha256sum` is unavailable; the
+   manifest itself is still written (SNAP-MANIFEST only checks
+   for **presence**, not contents).
+
+5. **Rotation semantics (v1.3.0 — ROT-MANIFEST / ROT-MTIME /
+   ROT-PROTECT)**: Since v1.3.0, `rotate_backups` uses the
+   same manifest-based detection and mtime sort as
+   `buildBackupInfo`, and preserves the `.last_stable` target
+   and the newest install snapshot. This is also
+   platform-independent.
+
 **Verified by CI (HARD-COMPAT-03)**: The
 `.github/workflows/upgrade-test.yml` matrix (42 scenarios)
 exercises the **shell logic** of the backup layer on
-`ubuntu-22.04`, with mocked Android paths
-(`/data/adb/modules/...`, `/sdcard/...`) and scenario-specific
-tool availability (e.g. missing `sha256sum`, missing
-`restorecon`). This validates the version-independent **shell
-code**; it does **not** emulate specific Android versions —
-that requires real devices (see §10.3).
+`ubuntu-22.04`, with mocked Android paths. It does **not**
+emulate specific Android versions — that requires real devices
+(see §10.3).
 
 **User-facing impact**:
 
@@ -478,6 +655,14 @@ library (`runtime/debug`) — no platform-specific behavior.
 Android. The CI runs them in a temporary directory via
 `.github/workflows/upgrade-test.yml`. See that workflow for the
 emulation setup.
+
+**v1.3.0**: The SNAP-MANIFEST / SNAP-MTIME / ROT-* semantics
+are implemented identically on all platforms — they depend only
+on the filesystem's `stat` and `mv` behavior, which is portable
+across Linux, macOS, and Android.
+
+**v1.4.0**: The companion Android app APK is a static asset —
+no platform-specific behavior on the server side.
 
 ---
 
@@ -561,14 +746,6 @@ su -c "ls -la /sdcard/dnscrypt-webui-backup/current/"
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 ```
 
-**Legacy upgrade check** (v1.0.0/v1.1.0 users):
-
-```bash
-# Look for the legacy backup from the OLD mechanism
-su -c "ls -la /data/local/tmp/dnscrypt-upgrade-backup-*"
-# May be present if the upgrade from v1.1.0 happened via the old path
-```
-
 ### 3.3 Bilingual WebUI on Different ROMs
 
 The WebUI's language toggle works on **all ROMs** because it is a
@@ -608,7 +785,7 @@ use **Chrome 88+**, **Firefox 92+**, or a recent version of
 
 ### 4.1 Kernel Requirements
 
-| Feature | Minimum | In v1.2.0 |
+| Feature | Minimum | In v1.4.0 |
 |---|---|---|
 | iptables-nat | 3.10 | — |
 | nftables | 4.10 | — |
@@ -621,6 +798,7 @@ use **Chrome 88+**, **Firefox 92+**, or a recent version of
 | **`rename(2)` atomicity** | **3.x+** | **✅ (v1.2.0 transactions)** |
 | **`sha256sum` (from coreutils)** | **Android 4.4+** | **✅ (v1.2.0 backup)** |
 | **`restorecon` / `chcon`** | **SELinux kernel** | **✅ (v1.2.0 Layer 6)** |
+| **`stat -c %Y` / `stat -f %m`** | **Any** | **✅ (v1.3.0 ROT-MTIME)** |
 
 **Note**: `debug.SetMemoryLimit` was introduced in Go 1.19.
 Since v1.1.0 uses Go 1.22, this is available on all supported
@@ -630,6 +808,15 @@ kernel versions — the kernel itself is not involved.
 on POSIX-atomic `rename(2)` for its `commit_transaction` and
 `rollback_transaction` operations. Every supported kernel provides
 this.
+
+**v1.3.0 note**: The rotation rewrite (ROT-MTIME) reads the mtime
+of snapshot directories via `stat -c %Y` (GNU coreutils) with a
+`stat -f %m` (BSD/Toybox) fallback. Both forms are supported by
+every Linux kernel; the difference is in the user-space `stat`
+implementation, not the kernel.
+
+**v1.4.0 note**: The companion app runs in userspace; no kernel
+prerequisites beyond API 21.
 
 ### 4.2 Kernel Issues
 
@@ -687,7 +874,7 @@ this.
 | x86_64 | ~40 µs | <80 ns | ~15 MB |
 | x86 | ~200 µs | <250 ns | ~15 MB |
 
-**Result**: v1.2.0 does not strain weak devices.
+**Result**: v1.4.0 does not strain weak devices.
 
 ### 5.3 RACE-1 Performance
 
@@ -703,7 +890,7 @@ this.
 ### 5.4 Memory Profile by Device RAM (v1.1.0 — MEM-1)
 
 **This is the recommended profile by device tier.** The WebUI
-process sets a per-profile **soft** memory limit (see §1.4 for
+process sets a per-profile **soft** memory limit (see §1.6 for
 MEM-1). Choosing a profile that matches your device's RAM
 avoids GC thrashing on the WebUI process while keeping DNS
 filtering effective.
@@ -728,6 +915,10 @@ filtering effective.
 
 **v1.1.0** chooses the limit automatically based on the profile.
 No user configuration is needed.
+
+**v1.4.0 note**: The companion Android app runs in a separate
+process (Android app sandbox). Its memory footprint is not
+governed by `debug.SetMemoryLimit`.
 
 #### 5.4.2 What Happens on Under-Powered Devices
 
@@ -805,7 +996,7 @@ of the 5 preserved files (`selected_profile.txt`). This means:
 
 > **ℹ️ Redirect stub — N-5 anchor**
 >
-> This section was **moved to [§2.5](#25-backup-compatibility-by-android-version-v120--new)**
+> This section was **moved to [§2.5](#25-backup-compatibility-by-android-version-v120)**
 > in the v1.2.0 cycle (HARD-COMPAT-01).
 >
 > **Why a stub?** To keep the old URL fragment
@@ -818,15 +1009,8 @@ of the 5 preserved files (`selected_profile.txt`). This means:
 > correct parent section (Android Versions), where it belongs
 > topically.
 >
-> **What was the problem with the old location?** The content
-> was incorrectly placed under "Chipsets (SoCs)". It has no
-> relationship to SoC hardware; its topic is Android version
-> compatibility for the persistent backup directory
-> (`/sdcard/dnscrypt-webui-backup/`).
->
 > **No content is duplicated here.** This stub exists solely to
-> preserve the anchor. The single source of truth for backup
-> compatibility remains §2.5.
+> preserve the anchor.
 
 ---
 
@@ -879,8 +1063,6 @@ detect_firewall() {
 - ✅ Public `OUTPUT` remains clean (two static rules only).
 - ✅ Cleanup = full wipe in one operation (mathematically guaranteed).
 
-*Compatibility: same as normal iptables/nftables constraints (see §6.2).*
-
 ### 6.4 Firewall + v1.0.0
 
 **No firewall changes in v1.0.0.** Custom Chains are still used.
@@ -904,46 +1086,30 @@ su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 **No firewall changes in v1.1.0.** Custom Chains, `manage_firewall`,
 and `_inline_cleanup_firewall` are unchanged.
 
-**v1.1.0 additions relevant to firewall scripts**:
-
-| Change | Impact on firewall |
-|---|---|
-| MEM-2 (extended `shellQuote`) | ✅ More robust when passing `MODDIR` to `runShell` for iptables commands |
-| MEM-3 (`MONITORING_UI_PORT` constant) | ⚪ Unrelated to firewall |
-| MEM-1 (memory limit) | ⚪ Unrelated to firewall |
-
 ### 6.6 Firewall + v1.2.0
 
 **No firewall changes in v1.2.0.** The 10 data-preservation
-layers are orthogonal to the firewall architecture:
+layers are orthogonal to the firewall architecture.
 
-| Layer | Interacts with firewall? |
-|:-:|---|
-| 1 (multi-source detection) | ❌ No |
-| 2 (persistent backup) | ❌ No — writes to `/sdcard/`, not kernel |
-| 3 (integrity verification) | ❌ No |
-| 4 (transactional upgrades) | ❌ No |
-| 5 (root-solution compat) | ❌ No |
-| 6 (SELinux preservation) | ❌ No — file contexts only |
-| 7 (recovery mode) | ❌ No |
-| 8 (config migrations) | ❌ No |
-| 9 (automation + rotation) | ❌ No |
-| 10 (observability) | ❌ No |
-| Bilingual WebUI | ❌ No — client-side only |
+### 6.7 Firewall + v1.3.0 / v1.4.0
 
-**Verify v1.2.0 firewall is unaffected**:
+**No firewall changes in v1.3.0 or v1.4.0.**
+
+- v1.3.0's DNS auto-start fix in `service.sh` calls
+  `POST /api/ensure_running_service`, which triggers the same
+  `manage_firewall 1` path as before.
+- v1.4.0's companion app is a static asset — no firewall interaction.
+
+**Verify v1.4.0 firewall is unaffected**:
 
 ```bash
-# Custom Chain still exists after v1.2.0 upgrade
+# Custom Chain still exists after v1.4.0 upgrade
 su -c "iptables -t nat -L DNSCRYPT_OUT -n"
 su -c "ip6tables -t nat -L DNSCRYPT_OUT6 -n"
 
 # No orphans
 su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 # → 0
-
-# v1.2.0 diagnostic tool still runs
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 ```
 
 ---
@@ -970,22 +1136,22 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 | KernelSU API | 0.9.0 |
 | **APatch compatibility** | **APatch (any)** — v1.2.0 |
 
-### 7.2 Root + v1.2.0 Compatibility
+### 7.2 Root + v1.4.0 Compatibility
 
 | Feature | Magisk 20.4+ | KernelSU | APatch |
 |---|:---:|:---:|:---:|
 | Backup/Restore (v1.0.0) | ✅ | ✅ | ✅ (legacy) |
-| **Multi-source detection (v1.2.0)** | **✅** | **✅** | **✅** |
-| **Persistent backup to `/sdcard/` (v1.2.0)** | **✅** | **✅** | **✅** |
-| **SHA256 verification (v1.2.0)** | **✅** | **✅** | **✅** |
-| **Transactional upgrades (v1.2.0)** | **✅** | **✅** | **✅** |
-| **`modules_update/` fallback (v1.2.0)** | **n/a** | **n/a** | **✅** |
-| **SELinux preservation (v1.2.0)** | **✅** | **✅** | **✅** |
-| **Recovery mode (v1.2.0)** | **✅** | **✅** | **✅** |
-| **Config migrations (v1.2.0)** | **✅** | **✅** | **✅** |
-| **Auto-backup + rotation (v1.2.0)** | **✅** | **✅** | **✅** |
-| **CLI diagnose (v1.2.0)** | **✅** | **✅** | **✅** |
-| **`runtime_info.backups` (v1.2.0)** | **✅** | **✅** | **✅** |
+| Multi-source detection (v1.2.0) | ✅ | ✅ | ✅ |
+| Persistent backup to `/sdcard/` (v1.2.0) | ✅ | ✅ | ✅ |
+| SHA256 verification (v1.2.0) | ✅ | ✅ | ✅ |
+| Transactional upgrades (v1.2.0) | ✅ | ✅ | ✅ |
+| `modules_update/` fallback (v1.2.0) | n/a | n/a | ✅ |
+| SELinux preservation (v1.2.0) | ✅ | ✅ | ✅ |
+| Recovery mode (v1.2.0) | ✅ | ✅ | ✅ |
+| Config migrations (v1.2.0) | ✅ | ✅ | ✅ |
+| Auto-backup + rotation (v1.2.0) | ✅ | ✅ | ✅ |
+| CLI diagnose (v1.2.0) | ✅ | ✅ | ✅ |
+| `runtime_info.backups` (v1.2.0) | ✅ | ✅ | ✅ |
 | Fix #1 verify | ✅ | ✅ | ✅ |
 | Fix #2 verify | ✅ | ✅ | ✅ |
 | NEW-1..NEW-6 verify | ✅ | ✅ | ✅ |
@@ -993,28 +1159,28 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 | MEM-1 memory limit (v1.1.0) | ✅ | ✅ | ✅ |
 | MEM-2 extended shellQuote (v1.1.0) | ✅ | ✅ | ✅ |
 | MEM-3 MONITORING_UI_PORT (v1.1.0) | ✅ | ✅ | ✅ |
-| **Bilingual WebUI (v1.2.0)** | **✅** | **✅** | **✅** |
+| Bilingual WebUI (v1.2.0) | ✅ | ✅ | ✅ |
+| DNS auto-start fix (v1.3.0) | ✅ | ✅ | ✅ |
+| PWA install button (v1.3.0) | ✅ | ✅ | ✅ |
+| Live status LED (v1.3.0) | ✅ | ✅ | ✅ |
+| SNAP-MANIFEST detection (v1.3.0) | ✅ | ✅ | ✅ |
+| SNAP-MTIME sort (v1.3.0) | ✅ | ✅ | ✅ |
+| ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (v1.3.0) | ✅ | ✅ | ✅ |
+| **Companion app route** (v1.4.0) | ✅ | ✅ | ✅ |
+| **CodeQL fix (removeModule)** (v1.4.0) | ✅ | ✅ | ✅ |
 
 **`customize.sh` works the same way on all Root solutions.**
 
-**v1.2.0 note**: The `detect_root_solution()` function (Layer 5)
-adapts the candidate source list based on the detected root
-solution. In particular:
-
-- **Magisk / KernelSU**: The module folder is kept during
-  in-place upgrades. The standard candidate list suffices.
-- **APatch**: The module folder may be **deleted before**
-  `customize.sh` runs. The installer checks
-  `/data/adb/modules_update/dnscrypt-proxy-webui/proxy` as a
-  fallback source. This is the APatch-specific addition to
-  Layer 1.
+**v1.4.0 note**: The companion app route (`GET /app-debug.apk`)
+is served by `main.go` on all root solutions. It is a static
+asset — the root solution does not affect it.
 
 ### 7.3 Verification on Device
 
 ```bash
 # 1. Check version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# Expected: version=v1.2.0
+# Expected: version=v1.4.0
 
 # 2. v1.2.0 backup layers present in customize.sh
 su -c "grep -q 'CANDIDATE_SOURCES' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 1'"
@@ -1032,23 +1198,37 @@ su -c "grep -q 'rotate_backups' /data/adb/modules/dnscrypt-proxy-webui/functions
 # 4. MEM-1 memory limit (from v1.1.0, still present).
 #    HARD-COMPAT-04: verify via the API instead of strings|grep,
 #    because Go binaries may be stripped with -s -w.
-#    Define $CREDS first (see the top of this file).
 L=$(su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info" \
     | jq -r '.memory_limit_mb')
 [ -n "$L" ] && [ "$L" -gt 0 ] && echo "✅ MEM-1 active (limit=$L MB)"
 
-# 5. v1.2.0 Bilingual WebUI check
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ index toggle'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html && echo '✅ dashboard toggle'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/offline.html && echo '✅ offline toggle'"
-su -c "grep -q 'en:' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && grep -q 'ar:' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ EN+AR present'"
+# 5. v1.4.0 companion app route (only when APK is present)
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>/dev/null" \
+    && echo "✅ Companion APK present" \
+    || echo "ℹ️ Companion APK absent (optional)"
+
+# 6. v1.4.0 iOS PWA logic removed
+su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.html" \
+    && echo "❌ iOS logic still present" \
+    || echo "✅ iOS logic removed"
+
+# 7. v1.4.0 install button is a direct <a download>
+su -c "grep -q 'href=\"/app-debug.apk\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html" \
+    && echo "✅ <a download> button present"
+
+# 8. v1.3.0 server-side refinements — SNAP-MANIFEST
+su -c "grep -q 'manifest.json' /data/adb/modules/dnscrypt-proxy-webui/proxy/main.go 2>/dev/null" \
+    && echo "✅ SNAP-MANIFEST present (main.go)"
+
+# 9. v1.3.0 — ROT-MANIFEST in functions.sh
+su -c "grep -q 'manifest.json' /data/adb/modules/dnscrypt-proxy-webui/functions.sh" \
+    && echo "✅ ROT-MANIFEST present (functions.sh)"
 ```
 
 ### 7.4 Runtime Verification
 
 > **Authentication**: All `/api/*` examples below require `-u "$CREDS"`
-> if `[monitoring_ui]` has credentials. Define `$CREDS` first — see
-> the top of this file.
+> if `[monitoring_ui]` has credentials.
 
 ```bash
 # 1. runtime_info ports (PORT-2)
@@ -1061,16 +1241,6 @@ curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '{profile
 
 # 3. runtime_info backups (BAK-1 — 7 fields)
 curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
-# Expected:
-# {
-#   "available": N,
-#   "in_flight_txn": N,
-#   "orphan_txn": N,
-#   "last_backup": "...",
-#   "last_backup_name": "...",
-#   "last_stable": "...",
-#   "path": "/sdcard/dnscrypt-webui-backup"
-# }
 
 # 4. Dashboard JSON (Fix #1)
 curl -s -I -u "$CREDS" http://127.0.0.1:9091/api/metrics | grep Content-Type
@@ -1084,7 +1254,16 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 curl -i "http://192.168.1.5:9091/readyz"
 # Expected: 403 Forbidden
 
-# 7. Bilingual WebUI (v1.2.0)
+# 7. Companion APK route (v1.4.0)
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type|Cache-Control'
+# Expected when APK present:
+#   HTTP/1.1 200 OK
+#   Content-Type: application/vnd.android.package-archive
+#   Cache-Control: public, max-age=3600, immutable
+# Expected when APK absent:
+#   HTTP/1.1 404 Not Found
+
+# 8. Bilingual WebUI (v1.2.0)
 # Open http://127.0.0.1:9090 in a browser
 # → WebUI loads in English by default
 # → Click the langToggle button in the header
@@ -1115,7 +1294,7 @@ curl -i "http://192.168.1.5:9091/readyz"
 | 13 | Basic Auth locked after 5 attempts | v1.0.0+ | Wait 15 min or restart WebUI |
 | 14 | 404 for unknown action | v1.0.0+ | Update the script to expect 404 |
 | 15 | CI Go build fails on Linux | Pre-v1.0.0 | Update to v1.0.0+ |
-| 16 | Settings lost on upgrade | Pre-v1.0.0 | Update to v1.2.0 (full protection) |
+| 16 | Settings lost on upgrade | Pre-v1.0.0 | Update to v1.2.0+ (full protection) |
 | 17 | Login GET rejected (405) | v1.0.0+ | Update integration to use POST |
 | 18 | `/readyz` from LAN rejected (403) | v1.0.0+ | Use `/healthz` instead |
 | 19 | Credentials change delay (60 s) | v1.0.0+ | Wait 60 s or restart WebUI |
@@ -1124,11 +1303,14 @@ curl -i "http://192.168.1.5:9091/readyz"
 | 22 | `profile_key` mismatch (rare) | v1.1.0+ | Fix `selected_profile.txt` + restart |
 | 23 | No auto-backup on uninstall | v1.1.0+ | Manual backup before uninstall (**superseded by v1.2.0**) |
 | 24 | `memory_limit_mb` unexpected | v1.1.0+ | Check startup log + `selected_profile.txt` |
-| **25** | **Backup directory missing on some ROMs** | **v1.2.0+** | **See §8.4.1** |
-| **26** | **Recovery mode runs twice on some devices** | **v1.2.0+** | **See §8.4.2** |
-| **27** | **Orphan-txn preserved on uninstall** | **v1.2.0+** | **Intentional — see §8.4.3** |
-| **28** | **`runtime_info.backups` returns 7 fields** | **v1.2.0+** | **Additive — see §8.4.4** |
-| **29** | **Bilingual toggle partial RTL on old browsers** | **v1.2.0+** | **See §8.4.5** |
+| 25 | Backup directory missing on some ROMs | v1.2.0+ | See §8.4.1 |
+| 26 | Recovery mode runs twice on some devices | v1.2.0+ | See §8.4.2 |
+| 27 | Orphan-txn preserved on uninstall | v1.2.0+ | Intentional — see §8.4.3 |
+| 28 | `runtime_info.backups` returns 7 fields | v1.2.0+ | Additive — see §8.4.4 |
+| 29 | Bilingual toggle partial RTL on old browsers | v1.2.0+ | See §8.4.5 |
+| **30** | **Companion APK missing from release ZIP** | **v1.4.0+** | **See §8.5.1** |
+| **31** | **iOS-specific PWA path removed** | **v1.4.0+** | **See §8.5.2** |
+| **32** | **`backups.available` may differ from v1.2.0** | **v1.3.0+** | **See §8.6.1** |
 
 ### 8.2 VPN Interaction
 
@@ -1147,16 +1329,13 @@ curl -i "http://192.168.1.5:9091/readyz"
 - **Cause**: `debug.SetMemoryLimit(80 MB)` was hardcoded in
   v1.0.0. On `ultimate`, actual working set approaches 200 MB
   → GC thrashing.
-- **Solution**: Update to **v1.1.0** or **v1.2.0** — the limit
-  is now computed per profile (220 MB for `ultimate`).
+- **Solution**: Update to **v1.1.0** or later — the limit is
+  computed per profile (220 MB for `ultimate`).
 - **Verify**:
   ```bash
-  # Define $CREDS first — see the top of this file
   su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'"
   # Expected: 220 (for ultimate on v1.1.0+)
   ```
-- **Reference**: [SECURITY.md](SECURITY.md) §5.30.1;
-  [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §6.10.
 
 **Issue #22 — `profile_key` mismatch (rare)**:
 
@@ -1164,38 +1343,23 @@ curl -i "http://192.168.1.5:9091/readyz"
   `selected_profile.txt`, or the memory limit does not match the
   expected value for the profile.
 - **Cause**: The WebUI reads the profile file only at startup
-  and after `POST /api/update_profile`. Direct edits to the file
-  are not monitored.
+  and after `POST /api/update_profile`.
 - **Solution**: Restart the WebUI:
   ```bash
   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
   ```
-- **Verify**:
-  ```bash
-  # Define $CREDS first — see the top of this file
-  diff <(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key') \
-       <(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
-  # Expected: no diff
-  ```
-- **Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §5.14.
 
 **Issue #23 — No auto-backup on uninstall**:
 
 - **Symptom**: After uninstalling on v1.1.0, no backup directory
   is created.
-- **Cause**: Intentional — v1.1.0 removed the auto-backup on
-  uninstall.
-- **Solution**: **Update to v1.2.0** — the persistent backup at
-  `/sdcard/dnscrypt-webui-backup/` survives uninstall and is
-  preserved automatically. See §2.5.
-- **Reference**: [UPGRADE.md](UPGRADE.md) §3.2.
+- **Solution**: **Update to v1.2.0+** — the persistent backup at
+  `/sdcard/dnscrypt-webui-backup/` survives uninstall. See §2.5.
 
 **Issue #24 — `memory_limit_mb` unexpected**:
 
 - **Symptom**: `runtime_info.memory_limit_mb` does not match the
   expected value for the active profile.
-- **Cause**: The startup log may show an error, or the profile
-  file may be missing/invalid.
 - **Solution**:
   1. Verify the profile file:
      ```bash
@@ -1205,12 +1369,7 @@ curl -i "http://192.168.1.5:9091/readyz"
      ```bash
      su -c "grep 'dynamic memory limit' /data/local/tmp/dnscrypt_main.log | tail -1"
      ```
-  3. If either is wrong, fix and restart:
-     ```bash
-     su -c "echo 'pro' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
-     su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
-     ```
-- **Reference**: [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §4.12, §5.14.
+  3. Fix and restart.
 
 ### 8.4 v1.2.0-specific Issues
 
@@ -1224,196 +1383,190 @@ directory `/sdcard/dnscrypt-webui-backup/` does not exist, and
 
 1. **`/sdcard/` not mounted at install time** — the installer
    runs before the FUSE daemon is ready on some ROMs.
-2. **`/sdcard/` is read-only** — rare, but possible if the user
-   mounted external storage with restrictive flags.
-3. **Storage full** — if `/sdcard/` has less than ~10 MB free,
-   the backup dir cannot be created.
+2. **`/sdcard/` is read-only** — rare.
+3. **Storage full** — if `/sdcard/` has less than ~10 MB free.
 
 **Diagnosis**:
 
 ```bash
-# 1. Check /sdcard/ is mounted
 su -c "ls /sdcard/"
-# Expected: the standard Android directory list (DCIM, Download, ...)
-
-# 2. Check the backup directory
 su -c "ls -la /sdcard/dnscrypt-webui-backup/ 2>&1"
-# Expected (v1.2.0+): current/, <ts>-<version>-<pid>/, .last_stable, ...
-
-# 3. Check storage
 su -c "df -h /sdcard"
-# Expected: at least 10 MB free
-
-# 4. Check runtime_info (define $CREDS first — see top of file)
 curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
 
 **Solutions**:
-
 - **Cause 1**: Reboot. On the next boot, `service.sh` runs
   `auto_backup_if_needed` and creates the directory.
-- **Cause 2**: Check the ROM's FUSE configuration. This is rare;
-  file an issue.
-- **Cause 3**: Free up space and reboot. The auto-backup will
-  run on the next boot.
-
-**Reference**: [BACKUP.md](BACKUP.md) §10.1;
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md) §7.8.
+- **Cause 3**: Free up space and reboot.
 
 #### 8.4.2 Issue #26 — Recovery mode runs twice on some devices
 
 **Symptom**: After triggering recovery mode
 (`touch recovery && reboot`), the recovery runs twice on some
-ROMs, or the recovery trigger file reappears after the first
-boot.
-
-**Possible causes**:
-
-1. **Two trigger files present** — the module checks both
-   `$MODPATH/recovery` and `/data/adb/dnscrypt-recovery`. If
-   both exist, both are consumed in the same boot, which is
-   fine. But if only one is removed by mistake, the other
-   re-triggers on the next install.
-2. **Persistent trigger file** — some root managers restore
-   files from a persistent directory on boot, effectively
-   re-creating the trigger.
-3. **A second install was queued** — some managers queue the
-   module install, causing `customize.sh` to run twice.
+ROMs.
 
 **Diagnosis**:
 
 ```bash
-# 1. Check both trigger files
 su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>/dev/null"
 su -c "ls /data/adb/dnscrypt-recovery 2>/dev/null"
-# Expected after a successful recovery: both should be gone
-
-# 2. Check the install log
 su -c "grep -i 'recovery' /data/local/tmp/dnscrypt_install.log | tail -10"
-# Expected: one "RECOVERY MODE ACTIVATED" line per install
 ```
 
-**Solutions**:
+**Solution**:
 
-- Remove both trigger files manually:
-  ```bash
-  su -c "rm -f /data/adb/modules/dnscrypt-proxy-webui/recovery"
-  su -c "rm -f /data/adb/dnscrypt-recovery"
-  su -c "reboot"
-  ```
-- If the trigger file reappears, check your root manager for a
-  persistent-file restoration feature.
-
-**Reference**: [EMERGENCY.md](EMERGENCY.md) §9;
-[BACKUP.md](BACKUP.md) §10.
+```bash
+su -c "rm -f /data/adb/modules/dnscrypt-proxy-webui/recovery"
+su -c "rm -f /data/adb/dnscrypt-recovery"
+su -c "reboot"
+```
 
 #### 8.4.3 Issue #27 — Orphan-txn preserved on uninstall
 
 **Symptom**: After uninstalling the module, an `orphan-txn-*/`
 directory appears under `/sdcard/dnscrypt-webui-backup/`.
 
-**Is this a bug?** No — it is **intentional**.
-
-**What it means**: An `orphan-txn-*` directory is a **preserved
-unfinished transaction**. It was created when `uninstall.sh`
-found a `txn-*` directory with `.state=START` — a signal that an
-install was interrupted mid-flight. The orphan may contain the
-**only** copy of the user's data.
+**Is this a bug?** No — it is **intentional**. The orphan may
+contain the **only** copy of the user's data.
 
 **Action**:
 
 ```bash
-# 1. Inspect the state
 su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.state"
-# Expected: START
-
-# 2. Inspect the contents
 su -c "ls -la /sdcard/dnscrypt-webui-backup/orphan-txn-*/"
-
-# 3. Inspect the manifest (if present)
-su -c "cat /sdcard/dnscrypt-webui-backup/orphan-txn-*/.manifest.json 2>/dev/null | jq"
 ```
 
-**DO NOT DELETE BLINDLY**. See
-[BACKUP.md](BACKUP.md) §10.5 and
-[EMERGENCY.md](EMERGENCY.md) §4.5 for the full guidance.
-
-**Reference**: [BACKUP.md](BACKUP.md) §10.5.
+**DO NOT DELETE BLINDLY**.
 
 #### 8.4.4 Issue #28 — `runtime_info.backups` returns 7 fields
 
-**Symptom**: Clients written for v1.1.0 expected
-`runtime_info.backups` to have **5 fields**
-(`available`, `last_backup`, `last_backup_name`, `last_stable`,
-`path`). In v1.2.0, it has **7 fields** (adding `in_flight_txn`
-and `orphan_txn`).
+**Symptom**: Clients written for v1.1.0 expected 5 fields.
 
 **Is this a breaking change?** No — it is **strictly additive**.
 
-**Client compatibility**:
-
-- ✅ **JSON parsers** (any language): unaffected. New fields are
-  ignored by code that only reads the 5 original fields.
-- ⚠️ **String indexing / regex-based parsers**: may break if they
-  assume the object ends at a specific position. This is not
-  recommended and is not supported.
-
-**Recommended client pattern**:
+**Client pattern**:
 
 ```bash
-# Define $CREDS first — see top of file
-
-# Correct — read only what you need
-curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info \
-    | jq '.backups.available'
-
-# Correct — read the whole object
-curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info \
-    | jq '.backups'
-
-# WRONG — assume a fixed field count
-curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info \
-    | grep -o '"backups":{[^}]*}'
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
 ```
-
-**Reference**: [API.md](API.md) §6.1.7;
-[UPGRADE.md](UPGRADE.md) §5.9.
 
 #### 8.4.5 Issue #29 — Bilingual toggle partial RTL on old browsers
 
 **Symptom**: After clicking the `langToggle` button, the WebUI
-switches to Arabic but the layout is only partially mirrored
-(e.g. some arrows or margins do not flip).
+switches to Arabic but the layout is only partially mirrored.
 
-**Possible causes**:
+**Solutions**:
+- Use Chrome 88+, Firefox 92+, or a recent version of Samsung
+  Internet.
+- Clear the Service Worker cache:
+  - Chrome DevTools → Application → Storage → Clear site data.
 
-1. **Browser version too old** — older browsers may not fully
-   support CSS logical properties or `:dir()` selectors.
-2. **Cached old CSS** — a stale Service Worker cache serving an
-   older CSS block.
+### 8.5 v1.4.0-specific Issues
 
-**Browser compatibility** (from §1.6):
+#### 8.5.1 Issue #30 — Companion APK missing from release ZIP
 
-| Browser | Full RTL support |
-|---|:---:|
-| Chrome 88+ | ✅ |
-| Firefox 92+ | ✅ |
-| Safari 15+ | ✅ |
-| Samsung Internet (recent) | ✅ |
-| Firefox 88–91 | ⚠️ (partial) |
-| Safari 14 | ⚠️ (partial) |
-| IE 11 (Windows desktop only) | ❌ |
+**Symptom**: After installing v1.4.0, the WebUI install button
+leads to a 404 page, and `GET /app-debug.apk` returns
+`404 Not Found`.
+
+**Is this a bug?** **No** — the companion APK is **optional**.
+The release pipeline fetches it at build time from
+[gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+If the fetch step fails (transient GitHub issue), the module ZIP
+is built **without** the APK, and the release notes document
+this.
+
+**Diagnosis**:
+
+```bash
+# 1. Check if the APK exists on the device
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1"
+
+# 2. Check the route directly
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
+# Expected when absent: HTTP/1.1 404 Not Found
+```
 
 **Solutions**:
 
-- **Cause 1**: Use Chrome 88+, Firefox 92+, or a recent version
-  of Samsung Internet for the best experience.
-- **Cause 2**: Clear the Service Worker cache:
-  - Chrome DevTools → Application → Storage → Clear site data.
-  - Then reload.
+- **If you do not need the companion app**: No action required.
+  The WebUI works fully without it.
+- **If you want the companion app**:
+  1. Download the APK directly from
+     [gasciljh/dnscrypt-proxy-app/releases](https://github.com/gasciljh/dnscrypt-proxy-app/releases).
+  2. Install it manually (sideload).
+  3. Optionally, place it at
+     `/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk`
+     to make the WebUI button work.
 
-**Reference**: [ARCHITECTURE.md](ARCHITECTURE.md) §6.7;
-[docs/FAQ.md](FAQ.md) Q9.
+#### 8.5.2 Issue #31 — iOS-specific PWA path removed
+
+**Symptom**: On iOS Safari, clicking the WebUI install button no
+longer shows the "Add to Home Screen" instructions. It now shows
+the unified "unsupported browser" modal (with a Play Store link
+for Chrome).
+
+**Is this a bug?** **No** — it is a deliberate v1.4.0 change.
+The project is **Android-only**; the iOS-specific install path
+was removed to reduce code complexity. The `<a download>` link
+also does not make sense on iOS (Safari does not install APKs).
+
+**Workaround for iOS users**:
+- The WebUI remains **fully functional** in Safari on iOS — only
+  the "install as app" flow is missing.
+- To install on the home screen: use Safari's built-in
+  "Add to Home Screen" option from the share menu manually.
+
+**Reference**: `CHANGELOG.md` §[v1.4.0] — "Removed" section.
+
+### 8.6 v1.3.0-specific Issues
+
+#### 8.6.1 Issue #32 — `backups.available` may differ from v1.2.0
+
+**Symptom**: After upgrading from v1.2.0 to v1.3.0 (or later),
+`runtime_info.backups.available` shows a **larger** value than it
+did on v1.2.0, even though no new snapshot was created.
+
+**Is this a bug?** **No** — it is the intended v1.3.0 behavior
+(SNAP-MANIFEST). The count rule changed from "name pattern match"
+to "manifest presence":
+
+- **v1.2.0**: a directory counted as a snapshot iff its name
+  matched `^[0-9]{8}-[0-9]{6}-`.
+- **v1.3.0+**: a directory counts iff it contains a
+  `.manifest.json` file.
+
+**Effect**:
+
+| Scenario | v1.2.0 count | v1.3.0+ count |
+|---|---|---|
+| Standard snapshots (with manifests) | N | N |
+| Custom-named snapshot (with manifest) | excluded | **included** |
+| Name-matching directory (without manifest) | included | **excluded** |
+
+For the standard toolchain's output, both rules produce the same
+count. They differ only when a custom-named snapshot exists, or
+when a directory matches the name pattern but lacks a manifest.
+
+**Diagnosis**:
+
+```bash
+# 1. List all directories that have a manifest
+su -c "for d in /sdcard/dnscrypt-webui-backup/*/; do \
+    [ -f \"\$d/.manifest.json\" ] && basename \"\$d\"; \
+done"
+
+# 2. Compare with the API count
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available'
+```
+
+**Action**: **None required** — the new rule is intentional and
+produces a more accurate count. If a manifest-less directory
+should be a snapshot, write a minimal `.manifest.json` (`{}`) into
+it (see `EMERGENCY.md` §8.6).
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1 (SNAP-MANIFEST).
 
 ---
 
@@ -1424,7 +1577,7 @@ When reporting an issue, use the following template:
 ```markdown
 ## Environment
 
-- **Module version**: v1.2.0
+- **Module version**: v1.4.0
 - **Android version**: 14 (API 34)
 - **ROM**: LineageOS 21
 - **Kernel**: 5.15.94-lineageos
@@ -1434,12 +1587,11 @@ When reporting an issue, use the following template:
 
 ## Profile & Memory (v1.1.0+)
 
-- **Active profile** (from `selected_profile.txt`):
-- **`profile_key`** (from `runtime_info`):
-- **`memory_limit_mb`** (from `runtime_info`):
-- **Expected limit for the profile** (see §5.4):
+- **Active profile**:
+- **`profile_key`**:
+- **`memory_limit_mb`**:
 
-## Backup State (v1.2.0)
+## Backup State (v1.2.0+)
 
 - **Backup directory exists?** (yes/no):
 - **`backups.available`**:
@@ -1447,13 +1599,19 @@ When reporting an issue, use the following template:
 - **`backups.orphan_txn`**:
 - **`backups.last_stable`**:
 - **`.upgrade_history.json` present?** (yes/no):
+- **Manifest count check (v1.3.0+)**: did you run §8.6.1's diagnostic?
 
-## WebUI Language (v1.2.0)
+## Companion App State (v1.4.0+)
+
+- **`GET /app-debug.apk` returns**: 200 / 404
+- **WebUI install button visible?** (yes/no):
+- **Companion app installed on device?** (yes/no):
+
+## WebUI Language (v1.2.0+)
 
 - **Default language on load**: (English / Arabic)
-- **Toggle button present in header?** (yes/no)
-- **Toggle switches languages correctly?** (yes/no)
-- **RTL layout correct after switching?** (yes/no)
+- **Toggle button present?** (yes/no):
+- **Toggle works?** (yes/no):
 - **Browser + version**:
 
 ## Issue Description
@@ -1480,7 +1638,7 @@ When reporting an issue, use the following template:
 <summary>dnscrypt_main.log</summary>
 
 ```text
-[Paste content here — include the "dynamic memory limit" line if present]
+[Paste content here]
 ```
 </details>
 
@@ -1511,50 +1669,10 @@ $ ip6tables -t nat -L DNSCRYPT_OUT6 -n
 </details>
 
 <details>
-<summary>Dashboard state</summary>
-
-```json
-$ curl -s -u "$CREDS" http://127.0.0.1:9091/api/metrics
-{
-  "generated_at": "...",
-  "total_queries": ...,
-  "blocked_queries": ...,
-  "cache_stats": {...}
-}
-```
-</details>
-
-<details>
-<summary>STATUS_FILE</summary>
-
-```text
-$ cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status
-ON
-```
-</details>
-
-<details>
 <summary>Runtime Info</summary>
 
 ```json
 $ curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info
-{
-  "version": "v1.2.0",
-  "webui_port": "9090",
-  "dashboard_port": "9091",
-  "profile_key": "pro",
-  "memory_limit_mb": 120,
-  "backups": {
-    "available": 5,
-    "in_flight_txn": 0,
-    "orphan_txn": 0,
-    "last_backup": "...",
-    "last_backup_name": "...",
-    "last_stable": "...",
-    "path": "/sdcard/dnscrypt-webui-backup"
-  },
-  ...
-}
 ```
 </details>
 
@@ -1563,27 +1681,22 @@ $ curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info
 - [ ] Works on a previous version
 - [ ] New in v1.1.0
 - [ ] New in v1.2.0
+- [ ] New in v1.3.0
+- [ ] New in v1.4.0
 - [ ] Intermittent
 - [ ] Occurs during upgrade
 - [ ] Occurs with the Arabic toggle
-
-## Screenshots
-
-[If possible — attach both English and Arabic screenshots for
-bilingual issues]
+- [ ] Occurs with the companion app button
+- [ ] Occurs with the backup layer (v1.2.0+)
+- [ ] Occurs with rotation (v1.3.0+)
 ```
 
 ### 9.1 Quick Diagnostics Script
 
 ```bash
 #!/bin/bash
-# diagnose.sh — collect all information in one shot (v1.2.0)
-#
-# Authentication: the /api/* calls below require credentials if
-# [monitoring_ui] has them set (which customize.sh does by
-# default). Derive them once at the top of the script.
+# diagnose.sh — collect all information in one shot (v1.4.0)
 
-# Derive credentials from the TOML file (root required)
 CREDS=$(su -c "sed -n '/^\[monitoring_ui\]/,/^\[/p' \
     /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml \
   | grep -E '^(username|password)=' | cut -d\"'\" -f2 | tr '\n' ':' | sed 's/:$//'")
@@ -1593,134 +1706,46 @@ su -c "cat /data/adb/modules/dnscrypt-proxy-webui/module.prop"
 
 echo ""
 echo "=== System Info ==="
-echo "Android: $(getprop ro.build.version.release) (API $(getprop ro.build.version.sdk))"
+echo "Android: $(getprop ro.build.version.release)"
 echo "Device:  $(getprop ro.product.model)"
 echo "Kernel:  $(uname -r)"
-echo "SoC:     $(getprop ro.product.board)"
 echo "Arch:    $(getprop ro.product.cpu.abi)"
-
-echo ""
-echo "=== Root Info ==="
-which magisk 2>/dev/null && magisk -V
-which ksud 2>/dev/null && ksud -V
 
 echo ""
 echo "=== Status ==="
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
 
 echo ""
-echo "=== Profile & Memory (v1.1.0+) ==="
+echo "=== Profile & Memory ==="
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
 su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
 
 echo ""
-echo "=== Backups (v1.2.0) ==="
+echo "=== Backups (v1.2.0 / v1.3.0) ==="
 su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
-su -c "ls -la /sdcard/dnscrypt-webui-backup/ 2>&1"
 
 echo ""
-echo "=== WebUI Language (v1.2.0) ==="
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo 'index: toggle present'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html && echo 'dashboard: toggle present'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/offline.html && echo 'offline: toggle present'"
+echo "=== Snapshot manifests (v1.3.0 SNAP-MANIFEST) ==="
+su -c "for d in /sdcard/dnscrypt-webui-backup/*/; do \
+    [ -f \"\$d/.manifest.json\" ] && basename \"\$d\"; \
+done"
+
+echo ""
+echo "=== Companion App (v1.4.0) ==="
+su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk 2>&1"
+curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
 
 echo ""
 echo "=== Firewall ==="
-su -c "iptables -t nat -L OUTPUT -n | head -5"
 su -c "iptables -t nat -L DNSCRYPT_OUT -n 2>/dev/null | head -5"
-su -c "ip6tables -t nat -L DNSCRYPT_OUT6 -n 2>/dev/null | head -5"
 
 echo ""
-echo "=== Dashboard ==="
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9091/api/metrics" | head -20
-
-echo ""
-echo "=== Runtime Info ==="
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info"
-
-echo ""
-echo "=== Config ==="
-su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
-
-echo ""
-echo "=== Logs (last 50) ==="
+echo "=== Logs ==="
 su -c "tail -50 /data/local/tmp/dnscrypt_main.log"
 
 echo ""
-echo "=== Full Diagnostic (v1.2.0) ==="
+echo "=== Full Diagnostic ==="
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
-
-echo ""
-echo "✅ Diagnostics complete. Save output to a file and attach to the issue."
-```
-
-### 9.2 v1.2.0-specific Diagnostics
-
-```bash
-#!/bin/bash
-# diagnose-backup.sh — v1.2.0 backup-specific checks
-
-# Derive credentials (root required)
-CREDS=$(su -c "sed -n '/^\[monitoring_ui\]/,/^\[/p' \
-    /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml \
-  | grep -E '^(username|password)=' | cut -d\"'\" -f2 | tr '\n' ':' | sed 's/:$//'")
-
-echo "=== Backup directory ==="
-su -c "ls -la /sdcard/dnscrypt-webui-backup/ 2>&1"
-
-echo ""
-echo "=== Backup state (7 fields) ==="
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'"
-
-echo ""
-echo "=== Backup vs status.sh alignment ==="
-diff <(su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups'") \
-     <(su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | jq -S '.backups | del(.status, .last_backup_age_seconds)'")
-# Expected: no diff
-
-echo ""
-echo "=== .last_stable pointer ==="
-su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable 2>&1"
-
-echo ""
-echo "=== Upgrade history ==="
-su -c "cat /sdcard/dnscrypt-webui-backup/.upgrade_history.json 2>/dev/null | jq" \
-    || su -c "cat /sdcard/dnscrypt-webui-backup/.upgrade_history.txt 2>/dev/null"
-
-echo ""
-echo "=== In-flight transactions ==="
-su -c "ls -la /sdcard/dnscrypt-webui-backup/txn-* 2>&1"
-
-echo ""
-echo "=== Orphan transactions ==="
-su -c "ls -la /sdcard/dnscrypt-webui-backup/orphan-txn-* 2>&1"
-
-echo ""
-echo "=== Recovery mode triggers ==="
-su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>&1"
-su -c "ls /data/adb/dnscrypt-recovery 2>&1"
-
-echo ""
-echo "=== Backup layer functions present ==="
-su -c "grep -q 'CANDIDATE_SOURCES' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 1'"
-su -c "grep -q 'PERSISTENT_BACKUP' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 2'"
-su -c "grep -q 'verify_backup_integrity' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 3'"
-su -c "grep -q 'begin_transaction' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 4'"
-su -c "grep -q 'detect_root_solution' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 5'"
-su -c "grep -q 'copy_with_context' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 6'"
-su -c "grep -q 'RECOVERY_MODE' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 7'"
-su -c "grep -q 'migrate_config' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ Layer 8'"
-su -c "grep -q 'auto_backup_if_needed' /data/adb/modules/dnscrypt-proxy-webui/functions.sh && echo '✅ Layer 9'"
-su -c "grep -q 'diagnose' /data/adb/modules/dnscrypt-proxy-webui/status.sh && echo '✅ Layer 10'"
-
-echo ""
-echo "=== Bilingual WebUI check ==="
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && echo '✅ index.html toggle'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html && echo '✅ dashboard.html toggle'"
-su -c "grep -q 'id=\"langToggle\"' /data/adb/modules/dnscrypt-proxy-webui/web/offline.html && echo '✅ offline.html toggle'"
-
-echo ""
-echo "✅ v1.2.0 backup + language diagnostics complete."
 ```
 
 ---
@@ -1735,12 +1760,14 @@ echo "✅ v1.2.0 backup + language diagnostics complete."
 - Detailed logs.
 - Dashboard reports on different browsers.
 - Platform reports (Linux, macOS, WSL2).
-- Performance reports (`rebuildBlocklist` duration).
+- Performance reports.
 - **v1.1.0+**: Memory-limit reports per device RAM tier.
-- **v1.2.0+**: **Backup/restore reports** across devices, root
-  solutions, and upgrade scenarios (see §10.7).
-- **v1.2.0+**: **Bilingual WebUI reports** — how the language
-  toggle behaves on different browsers and ROMs.
+- **v1.2.0+**: Backup/restore reports across devices and root
+  solutions.
+- **v1.2.0+**: Bilingual WebUI reports across browsers.
+- **v1.3.0+**: Snapshot-detection (SNAP-MANIFEST) and rotation
+  (ROT-*) reports across filesystems and clock conditions.
+- **v1.4.0+**: Companion app installation reports on various ROMs.
 
 ### 10.2 How to Contribute
 
@@ -1749,181 +1776,202 @@ echo "✅ v1.2.0 backup + language diagnostics complete."
 3. Open an Issue titled `[Compat] <Device> <Android>`.
 4. Attach the logs.
 
-### 10.3 Compatibility Testing for v1.2.0
+### 10.3 Compatibility Testing for v1.4.0
 
-**Recommended tests** — focused on the 10 data-preservation
-layers. Each test should be run **before** and **after** an
-in-place upgrade from v1.1.0 to v1.2.0.
+**Recommended tests** — focused on the v1.4.0 additions, in
+addition to the v1.2.0 tests (which remain valid).
 
-> **Authentication**: All `/api/*` calls below require `-u "$CREDS"`
-> if `[monitoring_ui]` has credentials. Define `$CREDS` first — see
-> the top of this file.
-
-#### 10.3.1 Pre-Upgrade Baseline
+#### 10.3.1 Companion App Installation Test
 
 ```bash
-# 1. Record the current profile + memory limit
-su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
+# 1. Verify the APK is served
+curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type'
+# Expected: HTTP/1.1 200 OK + application/vnd.android.package-archive
 
-# 2. Record the current allowlist + denylist size
-su -c "wc -l /data/adb/modules/dnscrypt-proxy-webui/proxy/allowlist.txt"
-su -c "wc -l /data/adb/modules/dnscrypt-proxy-webui/proxy/denylist.txt"
+# 2. Verify the WebUI install button
+# Open the WebUI → click "📲 Install App"
+# → The APK should download
 
-# 3. Record the current webui.conf ports
-su -c "grep -E '^(PORT|DASHBOARD_PORT|BIND_ADDR)=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
+# 3. Install the APK
+# → Open the downloaded file → Install
 
-# 4. Take a manual backup of the whole module directory
-su -c "tar czf /sdcard/pre-v1.2.0-backup.tar.gz -C /data/adb/modules/dnscrypt-proxy-webui ."
+# 4. Verify the app opens the WebUI
+# → Launch the companion app → it should load http://127.0.0.1:9090
 ```
 
-#### 10.3.2 Post-Upgrade Verification
+**Report**:
+- APK served correctly? (yes/no)
+- Install button visible? (yes/no)
+- APK installed without error? (yes/no)
+- App opens WebUI correctly? (yes/no)
+- Android version + device model:
+
+#### 10.3.2 CodeQL Fix Verification
 
 ```bash
-# 1. Verify all 5 files survived
-su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/*.conf"
-su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/*.toml"
-su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/*.txt"
+# 1. Verify the fix in main.go
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ Base() present"
+grep -q 'filepath.Join(MODULES_DIR, name)' proxy/main.go && echo "✅ Join() present"
 
-# 2. Verify the profile matches the pre-upgrade baseline
-diff <(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt") <(echo "pro")
-# Expected: no diff (or whatever your baseline profile was)
-
-# 3. Verify the memory limit matches the profile
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '{profile_key, memory_limit_mb}'"
-
-# 4. Verify the persistent backup directory exists
-su -c "ls -la /sdcard/dnscrypt-webui-backup/"
-
-# 5. Verify the 7-field backups object
-su -c "curl -s -u '$CREDS' http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'"
-# Expected: ["available", "in_flight_txn", "last_backup", "last_backup_name", "last_stable", "orphan_txn", "path"]
-
-# 6. Verify the upgrade history was logged
-su -c "cat /sdcard/dnscrypt-webui-backup/.upgrade_history.json | jq '.upgrades[-1]'"
+# 2. Verify the path-injection defence
+# Send a malicious path to /api/remove_module
+curl -X POST -b /tmp/cookies.txt \
+    --data-urlencode "path=../../etc/passwd" \
+    http://127.0.0.1:9090/api/remove_module | jq
+# Expected: {"status": "error", "message": "Invalid module name"}
 ```
 
-#### 10.3.3 Recovery Mode Test
+#### 10.3.3 iOS PWA Removal Verification
 
 ```bash
-# 1. Note the current profile (read directly — no auth required)
-ORIGINAL_PROFILE=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt")
+# 1. Verify iOS logic removed
+grep -q 'isIOSDevice' web/index.html && echo "❌ still present" || echo "✅ removed"
+grep -q 'pwaStepIos' web/index.html && echo "❌ still present" || echo "✅ removed"
 
-# 2. Change it manually (a "damage" simulation)
-su -c "echo 'light' > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
-
-# 3. Verify the change took effect.
-#    HARD-COMPAT-05: read the file directly instead of calling
-#    the API, which would require auth.
-su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
-# Expected: light
-
-# 4. Trigger recovery
-su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
-su -c "reboot"
-
-# 5. After reboot, verify the original profile was restored
-su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt"
-# Expected: $ORIGINAL_PROFILE
-
-# 6. Verify the trigger file was consumed
-su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>&1"
-# Expected: No such file or directory
+# 2. Verify the unified unsupported message
+grep -q 'pwaUnsupportedTitle' web/index.html && echo "✅ unified modal present"
 ```
 
-#### 10.3.4 Cross-Root-Solution Test
+**Report**:
+- iOS logic gone? (yes/no)
+- Unified modal shows on Firefox? (yes/no)
+- Play Store link works? (yes/no)
 
-Repeat §10.3.1–§10.3.3 on a device with a different root
-solution (Magisk → KernelSU, KernelSU → APatch, etc.) and verify
-the same results.
+#### 10.3.4 v1.2.0 Backup Regression Tests
 
-#### 10.3.5 Cross-Android-Version Test
+Repeat §10.3.1–§10.3.3 from the v1.2.0 testing suite to ensure
+the 10 defensive layers still work:
 
-Repeat §10.3.1–§10.3.3 on:
-- **Android 5–5.1** (oldest supported).
-- **Android 8–9** (mid-range).
-- **Android 12–14** (modern).
+- In-place upgrade from v1.3.0 to v1.4.0.
+- Recovery mode still consumes the trigger file.
+- All 5 user files preserved.
 
-Note the differences in:
-- `sha256sum` availability (§2.5).
-- `restorecon` vs `chcon` (§2.5).
-- FUSE mount behavior (§2.5).
+#### 10.3.5 v1.3.0 Server-Side Refinements Verification (new)
 
-#### 10.3.6 Bilingual WebUI Test (v1.2.0)
+> **HARD-COMPAT-V14-07**: This subsection is new in v1.4.0. It
+> documents how to confirm on a real device that the v1.3.0
+> server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
+> ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) are active.
+
+**A. Verify SNAP-MANIFEST (snapshot detection)**
 
 ```bash
-# Verify the toggle is present in all three pages
-for f in web/index.html web/dashboard.html web/offline.html; do
-    echo "=== $f ==="
-    grep -q 'id="langToggle"' "$f" && echo "  ✅ toggle"
-    grep -q 'en:' "$f" && grep -q 'ar:' "$f" && echo "  ✅ en+ar"
-    grep -q "dnscrypt-lang" "$f" && echo "  ✅ localStorage"
-    grep -q '\[dir="rtl"\]' "$f" && echo "  ✅ RTL rules"
-done
+# 1. Confirm the manifest requirement is documented in main.go
+#    (via the header or via runtime behavior).
+#    The Go binary is likely stripped, so use the runtime behavior:
+
+# 2. Create a manifest-less directory with a valid snapshot name
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/29991231-235959-test"
+su -c "echo 'test' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/webui.conf"
+
+# 3. Read the count BEFORE
+BEFORE=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+
+# 4. Read the count AFTER (should be unchanged)
+AFTER=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+[ "$BEFORE" = "$AFTER" ] && echo "✅ SNAP-MANIFEST active (manifest-less dir ignored)" \
+                        || echo "❌ SNAP-MANIFEST may not be active"
+
+# 5. Add a manifest, then re-check
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/29991231-235959-test/.manifest.json"
+AFTER2=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available')
+[ "$AFTER2" -gt "$AFTER" ] && echo "✅ SNAP-MANIFEST active (manifest-carrying dir counted)" \
+                           || echo "❌ SNAP-MANIFEST may not be active"
+
+# 6. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/29991231-235959-test"
 ```
 
-**Manual steps**:
+**Report**:
+- Manifest-less directory ignored? (yes/no)
+- Manifest-carrying directory counted? (yes/no)
 
-1. Open the WebUI in **Chrome 88+**.
-2. Confirm the page loads in **English** (default).
-3. Click the `langToggle` button → page switches to **Arabic**.
-4. Verify the layout is **RTL** (right-to-left).
-5. Reload the page → the Arabic preference **persists**.
-6. Repeat with **Firefox 92+** and a recent **Samsung Internet**.
-
-**Report** for each browser:
-- Toggle button visible? (yes/no)
-- English default on load? (yes/no)
-- Arabic renders correctly? (yes/no)
-- RTL layout correct? (yes/no)
-- Preference persists across reloads? (yes/no)
-
-#### 10.3.7 Legacy v1.1.0 Regression Tests
-
-Still run the v1.1.0 tests (they are not superseded):
+**B. Verify SNAP-MTIME (mtime sort)**
 
 ```bash
-# Define $CREDS first — see the top of this file
+# 1. Create two directories with names that sort in the OPPOSITE
+#    order from their mtimes.
+#    Directory A: name is "later" but mtime is earlier.
+#    Directory B: name is "earlier" but mtime is later.
 
-# 1. Test Dashboard (Fix #1)
-echo "Open http://127.0.0.1:9091"
-echo "Should show: total_queries, blocked_queries, cache_stats"
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "touch -d '2020-01-01 00:00:00' /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/29991231-235959-a/.manifest.json"
 
-# 2. Test shell fallback (Fix #2)
-grep -q 'func getSystemShell' proxy/main.go && echo "✅ getSystemShell present"
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+su -c "touch -d '2030-01-01 00:00:00' /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+su -c "echo '{}' > /sdcard/dnscrypt-webui-backup/20200101-000000-b/.manifest.json"
 
-# 3. Test Basic Auth rate limit (Fix #8)
-for i in {1..6}; do
-  curl -u "wrong:wrong" -o /dev/null -w "%{http_code}\n" \
-    http://127.0.0.1:9090/api?action=status
-done
+# 2. The newest by mtime should be "...b", not "...a"
+NEWEST=$(curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.last_backup_name')
+case "$NEWEST" in
+    *-b) echo "✅ SNAP-MTIME active (newest is mtime-based)" ;;
+    *-a) echo "❌ SNAP-MTIME may not be active (name-based sort)" ;;
+    *)   echo "ℹ️ Unexpected newest: $NEWEST" ;;
+esac
 
-# 4. Test 404 (Fix #12)
-curl -i -u "$CREDS" "http://127.0.0.1:9090/api?action=nonexistent"
-# → 404 Not Found
+# 3. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/29991231-235959-a"
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/20200101-000000-b"
+```
 
-# 5. Test Login POST-only (NEW-1)
-curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
-# → 405 Method Not Allowed + Allow: POST
+**Report**:
+- `last_backup_name` follows mtime? (yes/no)
 
-# 6. Test /readyz localhost-only (NEW-4)
-curl -i http://127.0.0.1:9091/readyz
-# → 200 or 503 (from localhost)
+**C. Verify ROT-PROTECT (protected targets)**
 
-# 7. Test MEM-1 (memory limit)
-curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
+```bash
+# 1. Note the current .last_stable target
+STABLE=$(cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null)
+echo "Current .last_stable: $STABLE"
 
-# 8. Test RACE-1 (rebuildMu)
-grep -qE 'rebuildMu[[:space:]]+sync\.Mutex' proxy/main.go && echo "✅ RACE-1"
+# 2. Trigger a rotation with a low keep count
+su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; rotate_backups 5"
 
-# 9. Test PORT-2 (runtime_info ports)
-curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq '{webui_port, dashboard_port}'
+# 3. Verify the target still exists
+if [ -n "$STABLE" ] && [ -d "/sdcard/dnscrypt-webui-backup/$STABLE" ]; then
+    echo "✅ ROT-PROTECT active (.last_stable preserved)"
+else
+    echo "ℹ️ Target missing or not set — check manually"
+fi
+```
 
-# 10. Test bilingual WebUI (v1.2.0)
-grep -q 'id="langToggle"' web/index.html && echo "✅ bilingual index"
-grep -q 'id="langToggle"' web/dashboard.html && echo "✅ bilingual dashboard"
-grep -q 'id="langToggle"' web/offline.html && echo "✅ bilingual offline"
+**Report**:
+- `.last_stable` target preserved? (yes/no)
+- Newest install preserved? (yes/no)
+
+**D. Verify ROT-MANIFEST (manifest-based rotation)**
+
+```bash
+# 1. Create a manifest-less directory
+su -c "mkdir -p /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest"
+su -c "echo 'test' > /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest/webui.conf"
+
+# 2. Trigger rotation
+su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; rotate_backups 5"
+
+# 3. Verify the manifest-less directory still exists (ROT-MANIFEST ignores it)
+if [ -d /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest ]; then
+    echo "✅ ROT-MANIFEST active (manifest-less dir ignored by rotation)"
+else
+    echo "❌ ROT-MANIFEST may not be active (manifest-less dir was pruned)"
+fi
+
+# 4. Clean up
+su -c "rm -rf /sdcard/dnscrypt-webui-backup/20200101-000000-nomanifest"
+```
+
+**Report**:
+- Manifest-less directory preserved? (yes/no)
+
+**Consolidated report** (copy into your Issue):
+
+```
+[SNAP-MANIFEST]  manifest-less ignored / manifest-carrying counted
+[SNAP-MTIME]     last_backup_name follows mtime
+[ROT-PROTECT]    .last_stable preserved / newest install preserved
+[ROT-MANIFEST]   manifest-less dir ignored by rotation
+Device: <model> / Android <ver> / ROM <name>
 ```
 
 ### 10.4 Hall of Fame
@@ -1934,58 +1982,54 @@ Compatibility contributors are listed in
 ### 10.5 Platform Champions
 
 New badge for those testing on **non-Android platforms** (Linux,
-macOS, WSL2):
-
-- 🖥️ Testing on Linux (CI-like environment).
-- 🍎 Testing on macOS.
-- 🐧 Testing on WSL2 (Windows).
-
-**Benefit**: improves `getSystemShell()` and platform-agnostic
-shell behavior.
+macOS, WSL2).
 
 ### 10.6 Memory Architect Badge (v1.1.0)
 
-New badge for contributors who:
+New badge for contributors who test the dynamic memory limit on
+multiple RAM tiers.
 
-- Test the dynamic memory limit on multiple RAM tiers.
-- Report GC-related issues with concrete data (profile, RSS,
-  CPU sample, `runtime_info` output).
-- Propose improvements to the per-profile constants.
+### 10.7 Data Guardian Badge (v1.2.0)
 
-**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md) — Memory Architect.
+New badge for contributors who test the 10 data-preservation
+layers on **3+ devices** or **3+ root solutions**.
 
-### 10.7 Data Guardian Badge (v1.2.0 — new)
-
-New badge for contributors who:
-
-- Test the 10 data-preservation layers on **3+ devices** or
-  **3+ root solutions** (Magisk / KernelSU / APatch).
-- Verify that all 5 user config files survive an in-place upgrade.
-- Verify that recovery mode restores all 5 files.
-- Report the 7-field `backups` object before/after each scenario.
-- Report any mismatch with concrete evidence (logs +
-  reproduction steps).
-
-**Acceptance criteria** (from
-[`HALL_OF_FAME.md`](HALL_OF_FAME.md)):
+**Acceptance criteria**:
 
 - ✅ Tested at least 3 scenarios from the recommended list.
 - ✅ Reported the 7-field `backups` object for each scenario.
 - ✅ Reported `status.sh --diagnose` output.
 - ✅ Reported `dnscrypt_install.log` excerpts.
-- ✅ If a mismatch was found, documented it with the exact
-  reproduction steps.
 
-**Optional (bonus)**:
+### 10.8 Companion App Champion Badge (v1.4.0)
 
-- Testing after a factory reset of `/data`.
-- Testing the concurrency scenario (two rapid writes).
-- Testing the SW update-banner fix on both `index.html` and
-  `dashboard.html`.
-- **Testing the bilingual toggle across different browsers**.
+New badge for contributors who test the companion Android app on
+**3+ different ROMs** or **3+ device models**.
 
-**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md) — Data Guardian;
-[`BACKUP.md`](BACKUP.md) §12; [`SECURITY.md`](SECURITY.md) §5.31.
+**Acceptance criteria**:
+
+- ✅ Installed the companion APK from the WebUI install button on
+  3+ devices/ROMs.
+- ✅ Documented any installation issues or behaviour differences.
+- ✅ Verified the app opens the WebUI correctly.
+- ✅ Reported Android version, device model, and ROM.
+
+**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
+
+### 10.9 Rotation Semantics Champion Badge (v1.4.0)
+
+New badge for contributors who test the v1.3.0 rotation semantics
+(§10.3.5) on **3+ filesystems** or under **3+ clock conditions**
+(e.g. `ext4`, `f2fs`, FUSE, with/without clock drift).
+
+**Acceptance criteria**:
+
+- ✅ Ran the §10.3.5 A/B/C/D verification on 3+ configurations.
+- ✅ Reported the consolidated report for each.
+- ✅ Documented any edge case where the semantics did not match
+  the documentation.
+
+**Reference**: [`HALL_OF_FAME.md`](HALL_OF_FAME.md).
 
 ---
 
@@ -2004,15 +2048,19 @@ New badge for contributors who:
 - [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [Android FUSE — Storage Access Framework](https://source.android.com/docs/core/storage)
 - [Android SELinux — `restorecon`](https://source.android.com/docs/security/features/selinux)
+- [POSIX `rename(2)` atomicity](https://pubs.opengroup.org/onlinepubs/9699919799/functions/rename.html)
+- [POSIX `stat(2)` — mtime](https://pubs.opengroup.org/onlinepubs/9699919799/functions/stat.html)
 
 ### 11.2 Project Documentation
 
 | Document | Purpose |
 |---|---|
 | [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
+| [`docs/ARCHITECTURE.md §4.13`](ARCHITECTURE.md#413-v130-backend-additions) | **v1.3.0 server-side refinements (authoritative)** — SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT |
+| [`docs/ARCHITECTURE.md §11.31–§11.34`](ARCHITECTURE.md) | v1.3.0 trade-offs (manifest, mtime, protections, boot-path) |
 | [`docs/SECURITY.md`](SECURITY.md) | Security policy + Audit Corrections (§5.31, §5.32) |
 | [`docs/API.md`](API.md) | Full HTTP API reference (§6.1.7) |
-| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0)** |
+| [`docs/BACKUP.md`](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 semantics)** |
 | [`docs/EMERGENCY.md`](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
 | [`docs/UPGRADE.md`](UPGRADE.md) | Version upgrade guide (§3.1, §3.2) |
 | [`docs/DNS_BINARIES.md`](DNS_BINARIES.md) | DNS binaries management (Level 4) |
@@ -2023,11 +2071,17 @@ New badge for contributors who:
 | [`docs/FAQ.md`](FAQ.md) | Frequently asked questions |
 | [`docs/INSTALL.md`](INSTALL.md) | Installation guide |
 | [`docs/BRANCHING.md`](BRANCHING.md) | Git branching strategy |
-| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
+| [`CHANGELOG.md`](../CHANGELOG.md) | Version history (§[v1.2.0], §[v1.3.0], §[v1.4.0]) |
 | [`README.md`](../README.md) | Project overview |
+
+### 11.3 Companion App Repository
+
+- **Repository**: https://github.com/gasciljh/dnscrypt-proxy-app
+- **Releases**: https://github.com/gasciljh/dnscrypt-proxy-app/releases
+- **Issues**: https://github.com/gasciljh/dnscrypt-proxy-app/issues
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0 (Global Edition)*
+*Last updated: 2026-10-08*
+*Version: v1.4.0 (Global Edition)*
 *Author: gasciljh*

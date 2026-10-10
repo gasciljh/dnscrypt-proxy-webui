@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – action.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -55,99 +57,52 @@
 #     `source`, `version`, and `root_solution` fields via a
 #     shared `_act_json_escape` helper. Parity with
 #     HARD-CS-05 (customize.sh) and HARD-FSH-01 (functions.sh).
-#     Without escaping, a path containing a quote or backslash
-#     would produce an invalid manifest that any consumer
-#     (customize.sh:read_source_version, verify_backup_integrity,
-#     jq-based tooling) would silently mis-parse.
 #
 #   🛡️ HARD-ACT-02 — `_inline_backup_summary` declares `local
-#     age` at the top of the function. Previously it declared
-#     `local age` inside a nested `if` block, which works in
-#     mksh/busybox but is fragile and confusing. The variable
-#     is now declared with the other locals.
+#     age` at the top of the function.
 #
 #   🛡️ HARD-ACT-03 — `_inline_backup_now` had a no-op line:
 #       `[ "$ver_for_manifest" = "unknown" ] && ver_for_manifest="unknown"`
-#     Removed. It was a tautology and could confuse shellcheck.
+#     Removed.
 #
 #   🛡️ HARD-ACT-04 — The `--backup` mode now prints a
 #     normalized success line REGARDLESS of which backend was
-#     used. Previously, when `functions.sh:backup_user_files`
-#     handled the backup, it logged to the log file only and
-#     produced NO stdout output, so the user saw nothing
-#     between "Source: ..." and "Current backup state: ...".
-#     The fallback path printed a "✅ Backup created" line, so
-#     the two paths were visually inconsistent. Both paths now
-#     produce the same user-facing confirmation.
+#     used.
 #
-#   🛡️ HARD-ACT-05 — Section [18] "Try 5" used the unusual
-#     form `if timeout 5 am start ... & then`. In POSIX sh the
-#     `&` in a condition part always makes the `if` succeed,
-#     which happened to work but was confusing. Rewritten as an
-#     explicit fire-and-forget with a clear comment so the
-#     intent (best-effort, no exit-code check) is obvious.
+#   🛡️ HARD-ACT-05 — Section [18] "Try 5" rewritten as an
+#     explicit fire-and-forget with a clear comment.
 #
 #   🛡️ HARD-ACT-06 — `_inline_read_port` now performs the
 #     numeric range check with a leading-zero-safe comparison.
-#     Previously, a value like "090" would be interpreted as
-#     octal by `[ "$val" -ge 1 ]` in some shells, and the
-#     resulting value would be wrong. The check now strips
-#     leading zeros before the arithmetic comparison.
 #
 #   🛡️ HARD-ACT-07 — `_inline_backup_summary` now returns a
-#     distinct, unambiguous string for each state so callers
-#     can rely on the text:
-#       • "not initialized"  — backup dir missing
-#       • "no snapshots yet" — dir exists, no snapshots
-#       • "<N> snapshot(s), latest <age>" — snapshots exist
-#     The old code had a branch where the age could be missing
-#     and the string would end in "latest " with a trailing
-#     space. Fixed.
+#     distinct, unambiguous string for each state.
 #
 #   🛡️ HARD-ACT-08 — `_inline_backup_now` now writes the
 #     manifest ONLY after confirming that at least one file was
-#     copied. Combined with the existing failure path (rm -rf
-#     the target on 0 files), this guarantees that any snapshot
-#     directory that survives on disk has a manifest with
-#     `files_count > 0`.
+#     copied.
 #
 # ============================================================
 # v1.2.0 (Global Edition) — New post-audit fixes
 # ============================================================
 #   🛡️ ACT-M1 — `_inline_is_port_open` now includes a
-#     `netstat` fallback (parity with service.sh HARD-SVC-03,
-#     watchdog.sh HARD-WD-02, and functions.sh).
-#
+#     `netstat` fallback.
 #   🛡️ ACT-M2 — `_inline_read_port` leading-zero handling is
-#     now documented as the canonical implementation and will
-#     be mirrored into functions.sh so that all consumers
-#     (status.sh, main.go) benefit from the same fix.
-#
+#     now documented as the canonical implementation.
 #   🛡️ ACT-M3 — Snapshot naming convention is now explicitly
-#     documented: shell uses `<ts>-manual-<pid>`, main.go uses
-#     `<ts>-manual-<pid>-<rand4>`. No conflict because main.go
-#     passes an explicit `dst_dir` to `backup_user_files`.
-#
+#     documented.
 #   🛡️ ACT-L1 — `local_pid` / `local_i` renamed to `_act_pid`
-#     and `_act_i` to make it clear they are global variables
-#     in the top-level scope (no `local` keyword available).
-#
+#     and `_act_i`.
 #   🛡️ ACT-L2 — `_txn_count` and `_orphan_count` now go
-#     through a numeric-validation guard before being printed,
-#     matching the pattern used in status.sh.
-#
+#     through a numeric-validation guard.
 #   🛡️ ACT-L3 — `--check` prefers `is_dnscrypt_running` when
-#     available (already implemented in the code, but the
-#     fallback path is now clearly documented).
-#
+#     available.
 #   🛡️ ACT-L4 — `--help` now mentions that `--check` always
 #     returns 0 (informational only).
-#
 #   🛡️ ACT-L5 — Removed the unexplained `sleep 1` after the
 #     fire-and-forget browser launch in Try 5.
-#
 #   🛡️ ACT-L6 — `_inline_rotate_backups` now emits a log line
-#     on success, matching the canonical `functions.sh` version.
+#     on success.
 #
 # Coordination with main.go:
 #   • The constant _MONITORING_UI_PORT below MUST stay in sync
@@ -155,6 +110,132 @@
 #   • The memory hint is DISPLAY-ONLY. main.go remains the
 #     authority for the actual debug.SetMemoryLimit() value.
 #   • Backup directory is /sdcard/dnscrypt-webui-backup/ (v1.2.0).
+#
+# ============================================================
+# v1.3.0 — Server-side refinement: _inline_rotate_backups()
+# ============================================================
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   However, the fallback rotation logic in this script's
+#   `_inline_rotate_backups()` was ALSO refined in v1.3.0 to
+#   match the canonical implementation in `functions.sh`.
+#   Earlier revisions of this header did not document this
+#   change at all (there was no v1.3.0 block), and TWO other
+#   call sites in this file were NOT updated in step — they
+#   kept using the v1.2.0 name-pattern detection:
+#
+#     • `_inline_backup_summary()` — used by --backup and by
+#       --check to report the snapshot count and the age of
+#       the newest snapshot.
+#     • The `_snap_count` block inside §[14] --check.
+#
+#   The v1.4.0 revision below (ACT-V14-03) brings those two
+#   call sites into sync with `_inline_rotate_backups` and
+#   with every other consumer in the module.
+#
+#   The v1.3.0 rotation refinement is documented under three
+#   identifiers (also used in CHANGELOG.md and in
+#   docs/ARCHITECTURE.md §4.13.2):
+#
+#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
+#     A directory is treated as a snapshot iff it contains a
+#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
+#     and `orphan-txn-*/`.
+#
+#     Before v1.3.0: only directories whose name matched the
+#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
+#     custom-named snapshots were silently skipped.
+#
+#   🔧 ROT-MTIME — mtime sort.
+#     Candidates are ordered by mtime (numeric, descending,
+#     `sort -rn -k1,1`), not by lexicographic directory name.
+#     Robust against clock drift and manual renames. Aligns
+#     `_inline_rotate_backups` with the `runtime_info.backups`
+#     API (which uses the same mtime sort since v1.3.0 — see
+#     SNAP-MTIME in proxy/main.go).
+#
+#   🔧 ROT-PROTECT — protected rotation targets.
+#     Two additional snapshots are preserved on top of the
+#     21-newest window:
+#       • The `.last_stable` target (recovery pointer).
+#       • The newest install snapshot (name matching
+#         `-v<digit>`).
+#     Without these protections, the 21-newest window could
+#     silently evict the exact snapshot that recovery mode
+#     or rollback depends on.
+#
+#   See CHANGELOG.md v1.3.0 section, and
+#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 ACT-APK-01 — No behavior change. The module may now
+#     ship `web/app-debug.apk` (companion Android app). It is
+#     served by main.go at `/app-debug.apk` and installed by
+#     the user from the WebUI install button.
+#
+#     `action.sh` does not touch the APK. Its install/runtime
+#     lifecycle is orthogonal to the DNS engine and WebUI.
+#
+#     Relevant mode for the user:
+#       • None — the APK is a one-shot download; once installed,
+#         the companion app opens http://127.0.0.1:9090 like any
+#         browser.
+#
+#   📱 ACT-APK-02 — Version bump v1.3.0 → v1.4.0.
+#     `--version` now reports v1.4.0. No behavior changes to
+#     any mode (--restart, --status, --check, --diagnose,
+#     --backup, --help).
+#
+#   📚 ACT-V14-03 — Cross-file parity correction for v1.3.0.
+#     Two call sites in this file were left behind when
+#     `_inline_rotate_backups()` was upgraded to v1.3.0
+#     rotation semantics:
+#
+#       1. `_inline_backup_summary()` — used by --backup and
+#          by --check to report the snapshot count and the age
+#          of the newest snapshot. It still used the v1.2.0
+#          name-pattern detection
+#          (`grep -E '^[0-9]{8}-[0-9]{6}-'`) and lexicographic
+#          `sort -r` for the "newest" lookup. Result: for a
+#          snapshot whose name did not sort the same way as
+#          its mtime (e.g. a custom-named snapshot or a
+#          snapshot whose PID suffix inverted the lexical
+#          order), the summary disagreed with the actual
+#          rotation result.
+#
+#       2. §[14] --check's `_snap_count` block — same issue,
+#          same detection rule, same disagreement with the
+#          `_inline_rotate_backups` count.
+#
+#     Fix: both call sites now use the same manifest-based
+#     detection (SNAP-MANIFEST) and mtime-descending sort
+#     (SNAP-MTIME) as `_inline_rotate_backups`, the canonical
+#     `functions.sh:rotate_backups`, and every other consumer
+#     in the module (main.go, service.sh, watchdog.sh,
+#     status.sh, customize.sh).
+#
+#     This is the SAME cross-file parity fix that was applied
+#     to watchdog.sh (WD-V14-03), status.sh (STS-V14-03),
+#     customize.sh (CSH-19), and service.sh (SVC-V14-03) in
+#     the v1.4.0 release.
+#
+#     No CLI behavior changes; only the numbers displayed by
+#     --backup and --check are now consistent with the actual
+#     on-disk state.
+#
+#   📚 ACT-V14-04 — `_inline_rotate_backups()` doc-block
+#     expanded to name the three ROT-* identifiers explicitly.
+#     Previously the doc-block said only "Matches the canonical
+#     version" without specifying which semantic version of
+#     the canonical implementation. The inline comment inside
+#     the function body already said `# v1.3.0 — Professional
+#     rotation (parity with functions.sh)`, so the top-of-file
+#     doc-block and the inline comment were out of sync.
 #
 # ============================================================
 # POSIX note on `local`:
@@ -176,7 +257,7 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # v1.2.0: --version flag (checked before any argument parsing)
 case "${1:-}" in
 	--version)
-		echo "$0: v1.3.0"
+		echo "$0: v1.4.0"
 		exit 0
 		;;
 esac
@@ -430,7 +511,48 @@ _inline_get_profile_memory_hint() {
 }
 
 # ------------------------------------------------------------
-# _inline_backup_summary (v1.2.0)
+# _inline_list_snapshots (ACT-V14-03 helper)
+# ------------------------------------------------------------
+# Prints one snapshot directory name per line, newest first.
+#
+# v1.3.0 semantics (parity with functions.sh:rotate_backups,
+# main.go:buildBackupInfo, service.sh:_inline_rotate_backups,
+# watchdog.sh §[5b], status.sh:_list_snapshots, and
+# customize.sh:rotate_backups):
+#   • SNAP-MANIFEST: a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file.
+#   • SNAP-MTIME:    ordered by mtime, descending
+#     (`sort -rn -k1,1`), not by lexicographic directory name.
+#
+# Excludes: current/, txn-*, orphan-txn-* (by name).
+#
+# Introduced in ACT-V14-03 to eliminate the duplication
+# between `_inline_backup_summary` and §[14] --check's
+# `_snap_count` block.
+# ------------------------------------------------------------
+_inline_list_snapshots() {
+    [ -d "$PERSISTENT_BACKUP" ] || return 0
+
+    (
+        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
+        for _d in */; do
+            _d="${_d%/}"
+            [ -d "$_d" ] || continue
+            case "$_d" in
+                current|txn-*|orphan-txn-*) continue ;;
+            esac
+            [ -f "$_d/.manifest.json" ] || continue
+            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
+                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
+                || _mt=0
+            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
+            printf '%s %s\n' "$_mt" "$_d"
+        done | sort -rn -k1,1 | awk '{print $2}'
+    )
+}
+
+# ------------------------------------------------------------
+# _inline_backup_summary (v1.2.0, corrected in v1.4.0)
 # ------------------------------------------------------------
 # Returns a one-line summary of the backup state:
 #   "5 snapshot(s), latest 2h ago"      — backups exist
@@ -440,6 +562,15 @@ _inline_get_profile_memory_hint() {
 # HARD-ACT-02: `local age` is declared with the other locals.
 # HARD-ACT-07: the returned string is unambiguous; no trailing
 #              space when the age cannot be computed.
+#
+# ACT-V14-03 (v1.4.0): detection and ordering now delegate to
+# the shared `_inline_list_snapshots` helper, which uses the
+# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
+# sort (SNAP-MTIME). Before this fix, the summary used the
+# v1.2.0 name-pattern detection (`^[0-9]{8}-[0-9]{6}-`) and
+# lexicographic `sort -r` for the "newest" lookup, producing
+# a count and an age that could disagree with the actual
+# rotation result computed by `_inline_rotate_backups`.
 # ------------------------------------------------------------
 _inline_backup_summary() {
     [ -d "$PERSISTENT_BACKUP" ] || {
@@ -447,26 +578,20 @@ _inline_backup_summary() {
         return
     }
 
-    local count
-    count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        wc -l | tr -d ' ')
+    # ACT-V14-03: use the shared helper for count + newest.
+    local _list
+    _list=$(_inline_list_snapshots)
 
-    if [ -z "$count" ] || [ "$count" -eq 0 ]; then
+    if [ -z "$_list" ]; then
         printf "no snapshots yet"
         return
     fi
 
-    # Newest snapshot name (sorted by directory name)
+    local count
+    count=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
+
     local newest
-    newest=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d */ 2>/dev/null | \
-        sed 's:/$::' | \
-        grep -E '^[0-9]{8}-[0-9]{6}-' | \
-        sort -r | \
-        head -n1)
+    newest=$(printf '%s\n' "$_list" | head -n1)
 
     # Age of newest
     local epoch age now age_str
@@ -622,13 +747,39 @@ EOF
 }
 
 # ------------------------------------------------------------
-# _inline_rotate_backups (v1.2.0)
+# _inline_rotate_backups (v1.2.0, refined in v1.3.0)
 # ------------------------------------------------------------
 # Fallback used by --backup if functions.sh does not provide
-# rotate_backups. Matches the canonical version.
+# rotate_backups.
 #
-# ACT-L6: now emits a log line on success, matching
+# v1.3.0 REFINEMENT (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT):
+#   • ROT-MANIFEST — a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file. Excludes
+#     `current/`, `txn-*/`, and `orphan-txn-*/` by name.
+#   • ROT-MTIME — candidates are sorted by mtime (numeric,
+#     descending, `sort -rn -k1,1`), not by lexicographic
+#     directory name. Robust against clock drift and manual
+#     renames.
+#   • ROT-PROTECT — two targets are preserved on top of the
+#     21-newest window:
+#       - the `.last_stable` target (recovery pointer);
+#       - the newest install snapshot (name matching
+#         `-v<digit>`, used by rollback).
+#
+#   These three semantics match the canonical
+#   `functions.sh:rotate_backups`. See CHANGELOG.md [v1.3.0]
+#   and docs/ARCHITECTURE.md §4.13.2.
+#
+# ACT-L6: emits a log line on success, matching
 # functions.sh:rotate_backups.
+#
+# ACT-V14-04 (v1.4.0): this doc-block was expanded to name the
+# three ROT-* identifiers explicitly. Previously it said only
+# "Matches the canonical version" without specifying which
+# semantic version of the canonical implementation, while the
+# inline comment inside the function body already said
+# `# v1.3.0 — Professional rotation (parity with functions.sh)`.
+# The doc-block and the inline comment are now consistent.
 # ------------------------------------------------------------
 _inline_rotate_backups() {
     local keep="${1:-21}"
@@ -641,6 +792,9 @@ _inline_rotate_backups() {
     [ -r "$PERSISTENT_BACKUP" ] || return 0
 
     # v1.3.0 — Professional rotation (parity with functions.sh)
+    #   ROT-MANIFEST: detect by .manifest.json presence.
+    #   ROT-MTIME:    order by mtime, descending.
+    #   ROT-PROTECT:  preserve .last_stable target + newest install.
     local _protected=""
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
         _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
@@ -687,7 +841,7 @@ _inline_rotate_backups() {
         [ -z "$_name" ] && continue
         [ "$_name" = "$_protected" ] && continue
         [ "$_name" = "$_newest_install" ] && continue
-        rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null
+        rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null
     done <<EOF
 $(printf '%s\n' "$_list" | tail -n "$to_remove")
 EOF
@@ -769,6 +923,8 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
         do_rotate_backups() { _inline_rotate_backups "${1:-21}"; }
     fi
 
+    # ACT-V14-03: always use the inline summary — it now uses
+    # the same v1.3.0 detection as the rotation function.
     backup_summary()     { _inline_backup_summary; }
 else
     _FB_RUN_DIR=$(_fallback_get_run_dir)
@@ -816,6 +972,7 @@ done
 BIN_DIR="$MODDIR/proxy"
 WEBUI="$BIN_DIR/dnscrypt-webui"
 CONF_FILE="$BIN_DIR/webui.conf"
+# shellcheck disable=SC2034
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 
 PORT=$(get_port "$CONF_FILE" 2>/dev/null)
@@ -902,7 +1059,6 @@ if [ "$BACKUP_MODE" = "1" ]; then
         # HARD-ACT-04: print the confirmation explicitly so the
         # user sees the same message whether the fallback path
         # or functions.sh:backup_user_files handled the backup.
-        # (The functions.sh path logs to the log file only.)
         echo ""
         echo "  ✅ Backup completed successfully."
         echo ""
@@ -941,6 +1097,14 @@ fi
 #         numeric-validation guard before being printed.
 # ACT-L3: `--check` prefers `is_dnscrypt_running` when
 #         available (already implemented, fallback documented).
+#
+# ACT-V14-03 (v1.4.0): the `_snap_count` computation now uses
+# the shared `_inline_list_snapshots` helper, which uses the
+# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
+# sort (SNAP-MTIME). Before this fix, the block used the
+# v1.2.0 name-pattern detection (`^[0-9]{8}-[0-9]{6}-`),
+# disagreeing with `_inline_rotate_backups` and with
+# `_inline_backup_summary` for custom-named snapshots.
 # ============================================================
 if [ "$CHECK_MODE" = "1" ]; then
     echo ""
@@ -1056,14 +1220,10 @@ if [ "$CHECK_MODE" = "1" ]; then
     # --- Section 5: Backup & Recovery (v1.2.0) ---
     echo "─── Backup & Recovery ──────────────────────"
 
-    # Snapshot count (excluding current/, txn-*, orphan-txn-*)
+    # ACT-V14-03: snapshot count via the shared v1.3.0 helper.
     _snap_count=0
     if [ -d "$PERSISTENT_BACKUP" ]; then
-        _snap_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d */ 2>/dev/null | \
-            sed 's:/$::' | \
-            grep -E '^[0-9]{8}-[0-9]{6}-' | \
-            wc -l | tr -d ' ')
+        _snap_count=$(_inline_list_snapshots | wc -l | tr -d ' ')
         [ -z "$_snap_count" ] && _snap_count=0
     fi
 

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.3.0 (Global Edition)
+     Version: v1.4.0 (Global Edition)
+     Last updated: 2026-10-08
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -18,8 +19,38 @@
        • PWA support (installable, offline-capable)
        • Smart Edit Mode with draft auto-save and rollback
        • Service Worker update banner
+       • Companion Android app (direct <a download> link)
 
-     v1.3.0 fixes (original):
+     v1.4.0 — Companion Android app integration:
+       • The install button is now a direct <a download> link
+         pointing at /app-debug.apk. No JavaScript prompt logic,
+         no beforeinstallprompt dependency, no modal.
+       • All iOS-specific PWA logic was removed (Android-only
+         project): isIOSDevice(), pwaStepIos1/2/3 translations,
+         and the iOS branches in getBrowserName() /
+         isBrowserSupported() / getPWAInstallSteps() /
+         showPWAInstructionsModal().
+       • The beforeinstallprompt listener chain and all related
+         state variables (deferredInstallPrompt, pwaInstalled,
+         pwaCapable) were removed — the button does not need them.
+       • The install button is always visible (no more dynamic
+         visibility based on standalone detection).
+
+     v1.4.0 — frontend audit clarifications (kept):
+       • IDX-A1 — the install button's aria-label is now i18n
+         driven (translation key `pwaInstallAriaLabel`), matching
+         the visible label's language.
+       • IDX-A2 — removed the redundant inline `display:inline-flex`
+         from the anchor element; the rule already lives in the
+         `.pwa-install-btn` CSS class.
+       • IDX-A3 — documented that `/app-debug.apk` is bypassed by
+         the Service Worker (see `web/sw.js` `shouldBypass()`
+         rule 9), so the browser's HTTP cache — with the
+         `Cache-Control: public, max-age=3600, immutable` header
+         set by `main.go` — is the primary and only storage layer
+         for the ~3 MB download.
+
+     v1.3.0 fixes (kept):
        • Service Worker update banner loop fixed:
            [Reload] now sends SKIP_WAITING to
            swRegistration.waiting (the NEW worker), and reloads
@@ -29,134 +60,29 @@
        • Language toggle restored (EN ↔ AR), preference
          persisted in localStorage under 'dnscrypt-lang'.
 
-     ============================================================
-     v1.3.0 — POST-AUDIT FIXES (this file, still v1.3.0)
-     ============================================================
-     A pre-release audit of this file identified the following
-     issues. All of them are addressed in-place; no version bump.
-
-       🔧 IDX-1 (critical) — The System Info panel did NOT
-         display the `backups` object that v1.3.0's main.go
-         exposes via `runtime_info`. Six new rows are now
-         rendered: Snapshots, Latest Backup, Latest Date,
-         Last Stable, In-Flight Txn, Orphan Txn, Backup Path.
-
-       🔧 IDX-2 — The class `card` was used on
-         `#runtimeInfoCard` and `#diagFilesCard` but never
-         defined in the stylesheet. Added an explicit base rule.
-
-       🔧 IDX-3 — `countChanges()` could report zero changes
-         even when the raw text differed (whitespace-only
-         difference). Fixed by returning at least 1 whenever
-         the raw content differs from the stored original.
-
-       🔧 IDX-4 — The `<html>` tag shipped with static
-         `lang="en" dir="ltr"`. A small inline script in
-         `<head>` now sets the correct lang/dir BEFORE the
-         first paint for Arabic-preferring users.
-
-       🔧 IDX-5 — `formatBytes()` did not handle sizes in
-         the GB range. Added a GB branch.
-
-       🔧 IDX-6 — NOT a separate fix in this file. The audit
-         originally reserved slot 6 for a fix that, on
-         inspection, was already covered by IDX-1 (the
-         backup rows already carry `.ri-warn` styling when
-         a counter is 0 or a timestamp is missing). The
-         slot is kept as a no-op so historical references
-         remain stable; it does NOT correspond to any code
-         change in this revision.
-
-       🔧 IDX-7 — When the user clicked [Reload] on the SW
-         update banner, `swUpdateCheckInterval` was not cleared
-         before `location.reload()`. Now cleared explicitly
-         in the `controllerchange` handler.
-
-       🛡️ IDX-8 — The System Info panel now renders the
-         `backups.last_backup` timestamp (the 7th field of the
-         backups object) as a dedicated "Latest Date" row.
-         Previously, only the directory name (last_backup_name)
-         was shown.
-
-       🛡️ IDX-9 — `enterEditMode()` refuses to enter edit mode
-         when the server content and hashes have not yet been
-         loaded. Prevents saving with an empty expected_hash,
-         which would bypass the conflict check in main.go.
-
-       🛡️ IDX-10 — `handleSessionExpired()` now resets the
-         verify/sse backoff counters. Ensures the next login
-         starts from a fast polling interval instead of an
-         accumulated long backoff.
-
-       🛡️ IDX-11 — `bindSWUpdateButtons()` installs a 3-second
-         fallback that reloads the page if `controllerchange`
-         never fires (e.g. misbehaving or terminated SW).
-         Without this, `pendingReload` could stay true forever.
-
-       🛡️ IDX-12 — Section header `[13.b]` renamed to `[13b]`
-         for consistency with the rest of the file.
-
-       🛡️ IDX-13 — `formatBytes()` now returns "0 B" for
-         negative input, instead of the nonsensical "<negative> B".
-
-     ============================================================
-     v1.3.0 (Global Edition) — Additional hardening, second pass
-     ============================================================
-     A second review pass identified the following issues.
-     All of them are addressed in-place; no version bump.
-
-       🛡️ IDX-14 — `dashboardLink` fallback timeout. The
-         "loading" class on the Dashboard link is now removed
-         after 8 seconds regardless of whether the runtime_info
-         fetch succeeded. Before this, a failed fetch could
-         leave the link in a permanent `loading` state.
-
-       🛡️ IDX-15 — `setNetworkDownUI(false)` now restores the
-         diagnostics text. Previously the method only cleared
-         the border color, so the "Server unreachable" text
-         could remain visible after recovery. The
-         `networkDownText` flag tracks the original state.
-
-       🛡️ IDX-16 — `showMsg()` sets `role="status"` and
-         `aria-live="polite"` on the toast element so screen
-         readers announce the message. The toast is removed
-         from the DOM after its lifetime.
-
-       🛡️ IDX-17 — `showConfirmModal()` now supports an
-         optional custom primary action via
-         `options.primaryText` and `options.primaryCallback`.
-         This is used by `handleSessionExpired()` and mirrors
-         the same extension in dashboard.html (DASH-12).
-
-       🛡️ IDX-18 — `handleSessionExpired()` now tears down
-         the progress poller (`window.progressPoller`) in
-         addition to the intervals already cleared. Without
-         this, a session expiry during a blocklist update
-         could leave the poller running indefinitely.
-
-       🛡️ IDX-19 — `stopPolling()` (added for the WebUI as a
-         thin alias to the existing beforeunload cleanup)
-         clears `dashboardLinkFallbackTimer` when the page
-         is being unloaded. Prevents the timer from firing
-         after the page is gone.
-
-       🛡️ IDX-20 — The `verifyBackoff` reset in
-         `handleSessionExpired` now also resets
-         `verifyFailures`. This aligns the WebUI with the
-         dashboard's behaviour and avoids a spurious extra
-         retry after re-login.
-
-       🛡️ IDX-21 — `<meta http-equiv="Pragma">` and
-         `<meta http-equiv="Expires">` have been added for
-         legacy proxy compatibility. CSP and Cache-Control
-         are still set by main.go; this is belt-and-braces.
-
-       🛡️ IDX-22 — `setNetworkDownUI()` was previously only
-         called from `verifyAuth()`'s error branch. It is now
-         also called from the SSE `onerror` path, so a network
-         loss that kills SSE but does not affect HTTP polling
-         still surfaces a visible warning.
-
+     v1.3.0 — POST-AUDIT FIXES (kept):
+       • IDX-1 — System Info panel renders the 7-field backups
+         object exposed by v1.3.0's main.go.
+       • IDX-2 — `.card` base rule added (was undefined).
+       • IDX-3 — countChanges() returns ≥ 1 when raw differs.
+       • IDX-4 — lang/dir set before first paint.
+       • IDX-5 — formatBytes() handles GB range.
+       • IDX-7 — swUpdateCheckInterval cleared before reload.
+       • IDX-8 — "Latest Date" row added.
+       • IDX-9 — enterEditMode() refuses without server hash.
+       • IDX-10 — handleSessionExpired() resets backoffs.
+       • IDX-11 — 3s fallback reload for SW controllerchange.
+       • IDX-12 — section header renamed [13.b] → [13b].
+       • IDX-13 — formatBytes() guards negative input.
+       • IDX-14 — dashboardLink fallback timer (8s).
+       • IDX-15 — setNetworkDownUI(false) restores text.
+       • IDX-16 — toast role="status" aria-live="polite".
+       • IDX-17 — custom modal primary action.
+       • IDX-18 — handleSessionExpired tears down progressPoller.
+       • IDX-19 — stopPolling clears dashboard fallback timer.
+       • IDX-20 — verifyFailures reset on session expiry.
+       • IDX-21 — Pragma + Expires meta added.
+       • IDX-22 — setNetworkDownUI(true) on SSE error.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -173,13 +99,8 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.3.0</title>
+    <title>DNSCrypt Proxy v1.4.0</title>
 
-    <!-- IDX-4 fix: apply lang/dir from localStorage BEFORE the
-         first paint. Without this, an Arabic-preferring user
-         sees a flash of LTR layout for ~100 ms before boot()
-         corrects it. The try/catch guards against browsers
-         where localStorage is disabled or throws. -->
     <script>
       (function(){
         try {
@@ -374,8 +295,6 @@
         .stats-area { align-items:flex-start; }
         .stats-area > span { flex:1 1 0; min-width:0; }
         #blockedToday { transition:opacity .3s ease; }
-        /* LED = exact copy of .status-dot style + pulsing glow */
-        /* LED — guaranteed 12x12 circle, unaffected by outer CSS rules */
         #blockedToday .led {
             display: inline-block !important;
             width: 12px !important;
@@ -402,10 +321,6 @@
         .runtime-info .ri-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px; }
         .runtime-info .ri-item:last-child { border-bottom:none; }
         .runtime-info .ri-label { color:var(--text-muted); flex-shrink:0; font-weight:600; }
-        /* IDX-1 fix: .ri-warn highlights values that likely need
-           attention (0 snapshots, in-flight > 0, orphan > 0, or
-           missing fields). It applies to the label so the row
-           stays readable on both LTR and RTL. */
         .runtime-info .ri-label.ri-warn { color: var(--warning); }
         .runtime-info .ri-label.ri-warn::before { content: '⚠️ '; font-size: 10px; }
         .runtime-info .ri-value { font-family:'JetBrains Mono',monospace; color:var(--text); font-size:11px; word-break:break-all; text-align:left; direction:ltr; max-width:65%; line-height:1.5; }
@@ -470,40 +385,17 @@
         .card-header .arrow { transition: transform 0.3s ease; font-size: 12px; color: var(--primary); }
         .card.open .card-header .arrow { transform: rotate(180deg); }
         .runtime-info, .diag-files { padding: 0 !important; }
-        /* IDX-2 fix: `card` is used on #runtimeInfoCard and
-           #diagFilesCard as a base container class. It was never
-           defined — the collapse behavior worked only through
-           `.card.open .card-body-wrapper`. Added an explicit
-           base rule so future selectors that target `.card`
-           find something to match. */
         .card { display: block; }
         button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
 
-        /* ===== v1.3.0 PWA Install Button ===== */
-        .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; }
+        /* ===== v1.4.0 PWA Install Button (direct download) ===== */
+        .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; text-decoration:none; }
         .pwa-install-btn:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(88,166,255,.4); }
         .pwa-install-btn:active { transform:translateY(0); }
-        .pwa-install-btn:disabled { opacity:.6; cursor:not-allowed; transform:none; }
         .pwa-install-btn .pwa-install-icon { font-size:16px; line-height:1; }
         .pwa-install-btn .pwa-install-text { white-space:nowrap; }
-        .pwa-install-btn.pwa-installed { background:rgba(63,185,80,.15); color:var(--success); border:1px solid rgba(63,185,80,.35); box-shadow:none; cursor:default; }
         @keyframes pwaFade { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
-        .pwa-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:6000; justify-content:center; align-items:center; padding:16px; }
-        .pwa-modal.open { display:flex; }
-        .pwa-modal-box { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:26px 22px 20px; width:100%; max-width:400px; box-shadow:0 30px 80px rgba(0,0,0,.8); text-align:center; animation:modalIn .25s ease-out; position:relative; }
-        .pwa-modal-close { position:absolute; top:8px; inset-inline-end:10px; background:transparent; border:none; color:var(--text-muted); font-size:22px; line-height:1; cursor:pointer; padding:4px 10px; border-radius:8px; font-family:inherit; transition:.15s; }
-        .pwa-modal-close:hover { background:rgba(255,255,255,.08); color:var(--text); }
-        .pwa-modal-icon { font-size:44px; line-height:1; margin-bottom:8px; display:block; }
-        .pwa-modal-title { font-size:16px; color:var(--text); margin-bottom:14px; font-weight:700; }
-        .pwa-modal-body { color:var(--text-muted); font-size:13px; line-height:1.6; text-align:start; }
-        .pwa-modal-body .pwa-step { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.04); }
-        .pwa-modal-body .pwa-step:last-child { border-bottom:none; }
-        .pwa-modal-body .pwa-step-num { flex-shrink:0; width:22px; height:22px; border-radius:50%; background:rgba(88,166,255,.15); color:var(--primary); font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
-        .pwa-modal-body .pwa-step-text { flex:1; color:var(--text); font-size:13px; }
-        .pwa-modal-actions { margin-top:16px; display:flex; gap:8px; justify-content:center; }
-        .pwa-modal-actions button { padding:10px 22px; border:none; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; background:var(--primary); color:#fff; transition:.2s; }
-        .pwa-modal-actions button:hover { opacity:.88; }
 
     </style>
 </head>
@@ -516,18 +408,6 @@
         <div class="custom-modal-actions">
             <button class="modal-cancel" id="modalCancelBtn">Cancel</button>
             <button class="modal-confirm" id="modalConfirmBtn">Confirm</button>
-        </div>
-    </div>
-</div>
-
-<div id="pwaInstallModal" class="pwa-modal" role="dialog" aria-modal="true" aria-labelledby="pwaModalTitle">
-    <div class="pwa-modal-box">
-        <button class="pwa-modal-close" id="pwaModalClose" type="button" aria-label="Close">×</button>
-        <span class="pwa-modal-icon" id="pwaModalIcon">📲</span>
-        <h3 class="pwa-modal-title" id="pwaModalTitle">Install App</h3>
-        <div class="pwa-modal-body" id="pwaModalBody"></div>
-        <div class="pwa-modal-actions">
-            <button id="pwaModalOk" type="button">Got it</button>
         </div>
     </div>
 </div>
@@ -562,15 +442,17 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.3.0</span>
+                <span class="badge" id="versionBadge">v1.4.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
-            <button id="pwaInstallBtn" class="pwa-install-btn" type="button" style="display:none;" aria-label="Install">
+            <a id="pwaInstallBtn" class="pwa-install-btn"
+               href="/app-debug.apk" download="DNS-Proxy.apk"
+               aria-label="Download companion Android app">
                 <span class="pwa-install-icon">📲</span>
                 <span class="pwa-install-text" id="pwaInstallText">Install App</span>
-            </button>
+            </a>
         </div>
 
         <div class="status-area" id="statusArea">
@@ -700,7 +582,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.3.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.4.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -738,7 +620,7 @@
     // ============================================================
     // [1] Initial settings
     // ============================================================
-    var VERSION = 'v1.3.0';
+    var VERSION = 'v1.4.0';
 
     var PORTS = {
         webui:     '9090',
@@ -748,7 +630,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.3.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.4.0',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -807,9 +689,6 @@
             riPidFile: 'PID File', riProgressFile: 'Progress File', riLogFile: 'Log File',
             riWebuiPort: 'WebUI Port', riDashboardPort: 'Dashboard Port',
             riProfile: 'Profile', riMemoryLimit: 'Memory Limit',
-            // IDX-1 + IDX-8 fix: backup-related labels for the
-            // System Info panel. `riBackupDate` (the 7th field of
-            // the backups object) was added in this revision.
             riBackupCount: 'Snapshots',
             riBackupLatest: 'Latest Backup',
             riBackupDate: 'Latest Date',
@@ -839,27 +718,12 @@
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
             pwaInstallBtn: 'Install App',
-            pwaInstalledBadge: '✓ Installed',
-            pwaModalTitle: 'Install as App',
-            pwaInstallSuccess: '✓ Installed successfully',
-            pwaModalOk: 'Got it',
-            pwaStepIos1: 'Tap the Share button ⬆️ at the bottom of Safari',
-            pwaStepIos2: 'Scroll and tap "Add to Home Screen" ➕',
-            pwaStepIos3: 'Tap "Add" to confirm',
-            pwaStepFirefox1: 'Tap the menu ☰ in Firefox',
-            pwaStepFirefox2: 'Select "Install" or "Add to Home screen"',
-            pwaStepGeneric1: 'Open your browser menu',
-            pwaStepGeneric2: 'Look for "Install" or "Add to Home Screen"',
-            pwaStepNoteLite: 'Note: this browser may not support full offline mode after installation.',
-            pwaUnsupportedTitle: 'Browser Not Supported',
-            pwaUnsupportedMsg: 'Your current browser does not support creating an app shortcut or installing this WebUI as an app.',
-            pwaSupportedList: 'Supported browsers:',
-            // IDX-9 fix: waiting-for-content message
+            pwaInstallAriaLabel: 'Download companion Android app',
             waitForContent: '⏳ Please wait for the content to load from the server'
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.3.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.4.0',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -884,7 +748,7 @@
             conflictDetected: '⚠️ تم التعديل من جلسة أخرى. جاري إعادة التحميل...',
             statusChecking: 'جاري التحقق...', statusOn: '🟢 النظام نشط', statusOff: '🔴 النظام متوقف',
             blockedTodayLabel: '🚫 اليوم:', ramUsageLabel: '💾 الذاكرة:',
-            statsRunningBefore: '(الخدمة',
+            statsRunningBefore: '(الخدمة قيد التشغيل ←',
             statsRunningAfter: 'إحصائية اليوم)',
             statsPausedBefore: '(مُتوقّف مؤقتاً',
             statsPausedAfter: 'بسبب إيقاف الخدمة)',
@@ -918,9 +782,6 @@
             riPidFile: 'ملف PID', riProgressFile: 'ملف التقدم', riLogFile: 'ملف السجل',
             riWebuiPort: 'منفذ WebUI', riDashboardPort: 'منفذ Dashboard',
             riProfile: 'البروفايل', riMemoryLimit: 'حد الذاكرة',
-            // IDX-1 + IDX-8 fix: backup-related labels for the
-            // System Info panel. `riBackupDate` (the 7th field of
-            // the backups object) was added in this revision.
             riBackupCount: 'النسخ الاحتياطية',
             riBackupLatest: 'آخر نسخة',
             riBackupDate: 'تاريخ آخر نسخة',
@@ -950,22 +811,7 @@
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
             pwaInstallBtn: 'ثبّت التطبيق',
-            pwaInstalledBadge: '✓ مثبّت',
-            pwaModalTitle: 'تثبيت كتطبيق',
-            pwaInstallSuccess: '✓ تم التثبيت بنجاح',
-            pwaModalOk: 'فهمت',
-            pwaStepIos1: 'اضغط زر المشاركة ⬆️ أسفل Safari',
-            pwaStepIos2: 'اسحب ثم اضغط "إضافة إلى الشاشة الرئيسية" ➕',
-            pwaStepIos3: 'اضغط "إضافة" للتأكيد',
-            pwaStepFirefox1: 'اضغط القائمة ☰ في Firefox',
-            pwaStepFirefox2: 'اختر "تثبيت" أو "إضافة إلى الشاشة الرئيسية"',
-            pwaStepGeneric1: 'افتح قائمة المتصفح',
-            pwaStepGeneric2: 'ابحث عن "تثبيت" أو "إضافة إلى الشاشة الرئيسية"',
-            pwaStepNoteLite: 'ملاحطة: قد لا يدعم هذا المتصفح العمل دون اتصال بعد التثبيت.',
-            pwaUnsupportedTitle: 'المتصفح غير مدعوم',
-            pwaUnsupportedMsg: 'متصفحك الحالي لا يدعم إنشاء اختصار أو تثبيت هذا WebUI كتطبيق.',
-            pwaSupportedList: 'المتصفحات المدعومة:',
-            // IDX-9 fix: waiting-for-content message
+            pwaInstallAriaLabel: 'تحميل تطبيق أندرويد المرافق',
             waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم'
         }
     };
@@ -1004,14 +850,7 @@
     var controllerChangeHandlerInstalled = false;
     var swUpdateCheckInterval = null;
 
-    // IDX-14 fix: fallback timer that removes the `loading` class
-    // from the Dashboard link if the runtime_info fetch never
-    // resolves. Prevents the link from staying disabled forever.
     var dashboardLinkFallbackTimer = null;
-
-    // IDX-15 fix: tracks whether the network-down UI is currently
-    // active, so `setNetworkDownUI(false)` can restore the
-    // original diagnostic text instead of leaving it stuck.
     var networkDownActive = false;
 
     var $ = function(id) { return document.getElementById(id); };
@@ -1099,11 +938,6 @@
     // ============================================================
     // [5] countChanges
     // ============================================================
-    // IDX-3 fix: if raw content differs but the SET-based diff
-    // reports 0 (whitespace-only difference on an existing line,
-    // e.g. trailing spaces added), return at least 1. Without
-    // this, hasUnsavedChanges() returned false and the user could
-    // silently lose the whitespace edit.
     function countChanges(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var original = originalValues[listType] || '';
@@ -1215,10 +1049,6 @@
     function enterEditMode(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
 
-        // IDX-9 fix: refuse to enter edit mode if the server
-        // hasn't populated the content yet. Otherwise, saving
-        // could send an empty expected_hash, bypassing the
-        // conflict check in main.go.
         var serverHash = listType === 'allow'
             ? rulesState.serverAllowHash
             : rulesState.serverDenyHash;
@@ -1391,10 +1221,6 @@
     // ============================================================
     // [12] Modal
     // ============================================================
-    // IDX-17 fix: supports an optional custom primary button via
-    // options.primaryText + options.primaryCallback. Mirrors the
-    // dashboard.html extension (DASH-12). Used by
-    // handleSessionExpired().
     function showConfirmModal(message, callback, options) {
         options = options || {};
         $('modalMessage').textContent = message;
@@ -1437,9 +1263,6 @@
         if (b) b.style.display = 'none';
     }
 
-    // IDX-15 fix: restore the diagnostics text on recovery.
-    // Previously this only cleared the border color, so the
-    // "Server unreachable" text could remain visible.
     function setNetworkDownUI(isDown) {
         var area = $('statusArea'), txt = $('statusText');
         if (!area || !txt) return;
@@ -1449,9 +1272,6 @@
             networkDownActive = true;
         } else {
             area.style.borderColor = '';
-            // Only restore the text if we had previously set it.
-            // This avoids clobbering the normal status updates
-            // that come from SSE / fetchStatus.
             if (networkDownActive) {
                 if (currentStatus === 'ON') {
                     txt.textContent = t('statusOn');
@@ -1494,10 +1314,6 @@
     // ============================================================
     // [13b] SW Update handlers
     // ============================================================
-    // IDX-12 fix: the previous section header used the form
-    // `[13.b]`, which was inconsistent with the numeric
-    // convention used throughout this file. Renamed to `[13b]`.
-    // ============================================================
     function showSWUpdateBanner() {
         var banner = $('swUpdateBanner');
         var txt = $('swUpdateText');
@@ -1518,8 +1334,6 @@
         navigator.serviceWorker.addEventListener('controllerchange', function() {
             if (!pendingReload) return;
             pendingReload = false;
-            // IDX-7 fix: clear the periodic update-check interval
-            // BEFORE reloading.
             if (swUpdateCheckInterval) {
                 clearInterval(swUpdateCheckInterval);
                 swUpdateCheckInterval = null;
@@ -1588,11 +1402,6 @@
                     return;
                 }
 
-                // IDX-11 fix: fallback reload if 'controllerchange'
-                // does not fire within 3 seconds (e.g. a
-                // misbehaving or terminated SW). Without this,
-                // pendingReload could stay true forever and the
-                // page would never reload.
                 setTimeout(function() {
                     if (pendingReload) {
                         pendingReload = false;
@@ -1611,249 +1420,33 @@
         }
     }
 
-
     // ============================================================
-    // [13c] PWA Install Button (v1.3.0) — smart & dynamic
+    // [13c] PWA Install Button (v1.4.0) — direct download
     // ============================================================
-    var deferredInstallPrompt = null;
-    var pwaInstalled = false;
-    var pwaCapable = false;
-
-    // ---- Dynamic browser name detection (NO hardcoded names) ----
-    // Layer 1: User-Agent Client Hints (W3C) — Chrome 90+, Edge 90+, Opera 76+
-    // Layer 2: generic UA parse — last "Name/Version" after skipping engines
-    // Layer 3: empty string → generic instructions
-    function getBrowserName() {
-        try {
-            if (navigator.userAgentData && navigator.userAgentData.brands) {
-                var brands = navigator.userAgentData.brands;
-                for (var i = 0; i < brands.length; i++) {
-                    var b = brands[i].brand || '';
-                    if (b && b.indexOf('Not') === -1 && b !== 'Chromium') {
-                        return b;
-                    }
-                }
-            }
-        } catch(e) {}
-
-        // UA parsing on modern browsers is unreliable: every
-        // Chromium variant (Chrome, Edge, Samsung, Via, Brave, ...)
-        // claims to be "Chrome" and ends with a legacy "Safari"
-        // token. We therefore DO NOT guess from the UA string when
-        // userAgentData is unavailable — we return an empty
-        // name and the modal shows a generic title. Only iOS
-        // Safari is identified from the UA, because its UA is
-        // unambiguous.
-        if (isIOSDevice()) return 'Safari';
-
-        return '';
-    }
-
-    function isIOSDevice() {
-        var ua = navigator.userAgent || '';
-        if (/iPhone|iPad|iPod/.test(ua)) return true;
-        if (/Macintosh/.test(ua) && 'ontouchend' in document) return true;
-        return false;
-    }
-
-    // Does the browser support creating a shortcut / install?
-    // Unified logic:
-    //   - iOS Safari: yes (Add to Home Screen)
-    //   - any browser that fired beforeinstallprompt: yes (pwaCapable=true)
-    //   - everything else: no (show the unified message)
-    function isBrowserSupported() {
-        if (isIOSDevice()) return true;
-        return pwaCapable === true;
-    }
-
-    function isPWAStandalone() {
-        try {
-            if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
-            if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
-        } catch(e) {}
-        if (navigator.standalone === true) return true;
-        return false;
-    }
-
-    function getPWAInstallSteps() {
-        var ua = navigator.userAgent || '';
-        if (isIOSDevice()) {
-            return [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
-        }
-        if (/Firefox/.test(ua) && /Android/.test(ua)) {
-            return [t('pwaStepFirefox1'), t('pwaStepFirefox2')];
-        }
-        var steps = [t('pwaStepGeneric1'), t('pwaStepGeneric2')];
-        if (!getBrowserName()) steps.push(t('pwaStepNoteLite'));
-        return steps;
-    }
-
-    // Supported browsers with Play Store links
-    // Package com.android.vending = Google Play Store app
-    function buildSupportedBrowsersHtml() {
-        var list = [
-            { name: 'Google Chrome',  pkg: 'com.android.chrome' },
-            { name: 'Microsoft Edge', pkg: 'com.microsoft.emmx' },
-            { name: 'Brave',          pkg: 'com.brave.browser' }
-        ];
-        var html = '';
-        for (var i = 0; i < list.length; i++) {
-            var pkg = list[i].pkg;
-            // market:// -> opens Play Store directly
-            // play.google.com -> professional fallback
-            var marketUrl = 'market://details?id=' + pkg;
-            var webUrl    = 'https://play.google.com/store/apps/details?id=' + pkg;
-            html +=
-                '<a href="' + marketUrl + '" data-pkg="' + pkg + '" data-web="' + webUrl + '" ' +
-                'data-action="open-store" ' +
-                'style="display:flex;align-items:center;justify-content:space-between;' +
-                'padding:10px 12px;margin-bottom:6px;background:rgba(255,255,255,0.03);' +
-                'border:1px solid rgba(255,255,255,0.08);border-radius:9px;' +
-                'color:var(--text);text-decoration:none;font-size:12.5px;font-weight:600;' +
-                'transition:background .2s,border-color .2s;cursor:pointer;">' +
-                '<span>' + escapeHtml(list[i].name) + '</span>' +
-                '<span style="color:var(--primary);font-size:14px;font-weight:700;opacity:.85;">\u2197</span>' +
-                '</a>';
-        }
-        return html;
-    }
-
-    function showPWAInstructionsModal() {
-        var modal = $('pwaInstallModal');
-        var body = $('pwaModalBody');
-        var title = $('pwaModalTitle');
-        var icon = $('pwaModalIcon');
-        if (!modal || !body) return;
-
-        // iOS Safari: dedicated steps
-        if (isIOSDevice()) {
-            if (icon) icon.textContent = '\uD83E\uDDED';
-            if (title) title.textContent = t('pwaModalTitle');
-            var steps = [t('pwaStepIos1'), t('pwaStepIos2'), t('pwaStepIos3')];
-            var html = '';
-            for (var i = 0; i < steps.length; i++) {
-                html += '<div class="pwa-step"><span class="pwa-step-num">' + (i + 1) +
-                        '</span><span class="pwa-step-text">' + escapeHtml(steps[i]) + '</span></div>';
-            }
-            body.innerHTML = html;
-            modal.classList.add('open');
-            return;
-        }
-
-        // All other browsers: unified message
-        if (icon) icon.textContent = '\u26A0\uFE0F';
-        if (title) title.textContent = t('pwaUnsupportedTitle');
-
-        var htmlUnsupported =
-            '<div style="text-align:center;padding:4px 0;">' +
-                '<div style="color:var(--warning);font-weight:600;font-size:13px;margin-bottom:14px;line-height:1.6;">' +
-                    escapeHtml(t('pwaUnsupportedMsg')) +
-                '</div>' +
-                '<div style="background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.25);border-radius:12px;padding:14px 16px;text-align:start;">' +
-                    '<div style="color:var(--primary);font-weight:700;font-size:12.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;">' +
-                        '<span style="font-size:14px;">\u2705</span>' +
-                        '<span>' + escapeHtml(t('pwaSupportedList')) + '</span>' +
-                    '</div>' +
-                    buildSupportedBrowsersHtml() +
-                '</div>' +
-            '</div>';
-
-        body.innerHTML = htmlUnsupported;
-        modal.classList.add('open');
-
-        // Bind Play Store open events
-        var links = body.querySelectorAll('[data-action="open-store"]');
-        for (var li = 0; li < links.length; li++) {
-            (function(link) {
-                link.addEventListener('click', function(ev) {
-                    var pkg = this.getAttribute('data-pkg');
-                    var web = this.getAttribute('data-web');
-                    var t0 = Date.now();
-                    try {
-                        window.location.href = 'market://details?id=' + pkg;
-                        setTimeout(function() {
-                            if (!document.hidden && Date.now() - t0 < 2200) {
-                                try { window.open(web, '_blank', 'noopener'); } catch(e) {}
-                            }
-                        }, 1200);
-                    } catch (e) {
-                        window.open(web, '_blank', 'noopener');
-                    }
-                    ev.preventDefault();
-                    return false;
-                });
-            })(links[li]);
-        }
-    }
-
-    function closePWAInstructionsModal() {
-        var m = $('pwaInstallModal');
-        if (m) m.classList.remove('open');
-    }
-
-    function markPWAInstalled() {
-        pwaInstalled = true;
-        var btn = $('pwaInstallBtn');
-        if (!btn) return;
-        btn.classList.add('pwa-installed');
-        btn.disabled = true;
-        var txt = $('pwaInstallText');
-        if (txt) txt.textContent = t('pwaInstalledBadge');
-        var icon = btn.querySelector('.pwa-install-icon');
-        if (icon) icon.textContent = '\u2713';
-        setTimeout(function() { btn.style.display = 'none'; }, 4000);
-    }
-
-    function updatePWAInstallButtonVisibility() {
-        var btn = $('pwaInstallBtn');
-        if (!btn) return;
-        if (pwaInstalled || isPWAStandalone()) { btn.style.display = 'none'; return; }
-        btn.style.display = 'inline-flex';
-    }
-
-    function onPWAInstallBtnClick() {
-        if (pwaInstalled) return;
-        if (deferredInstallPrompt) {
-            var p = deferredInstallPrompt;
-            deferredInstallPrompt = null;
-            try {
-                p.prompt();
-                p.userChoice.then(function(choice) {
-                    if (choice && choice.outcome === 'accepted') {
-                        markPWAInstalled();
-                        showMsg(t('pwaInstallSuccess'), 'success', 3000);
-                    } else {
-                        var b = $('pwaInstallBtn');
-                        if (b) b.disabled = true;
-                        setTimeout(function() { if (b) b.disabled = false; }, 60000);
-                    }
-                }).catch(function() { showPWAInstructionsModal(); });
-            } catch(e) { showPWAInstructionsModal(); }
-            return;
-        }
-        showPWAInstructionsModal();
-    }
-
-    function initPWABeforeInstallPrompt() {
-        window.addEventListener('beforeinstallprompt', function(e) {
-            e.preventDefault();
-            deferredInstallPrompt = e;
-            pwaCapable = true;
-            updatePWAInstallButtonVisibility();
-        });
-        window.addEventListener('appinstalled', function() {
-            deferredInstallPrompt = null;
-            markPWAInstalled();
-            showMsg(t('pwaInstallSuccess'), 'success', 3000);
-        });
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                try { if (isPWAStandalone()) pwaInstalled = true; } catch(e) {}
-                updatePWAInstallButtonVisibility();
-            }
-        });
-        updatePWAInstallButtonVisibility();
-    }
+    // The install button is a plain <a download> link pointing at
+    // /app-debug.apk. No JavaScript prompt logic, no
+    // beforeinstallprompt dependency, no modal, no standalone
+    // detection. This removes the entire "smart & dynamic" code
+    // path introduced in v1.3.0.
+    //
+    // iOS-specific branches were removed in v1.4.0 (Android-only
+    // project). Browsers that do not support downloading the APK
+    // will show the standard browser "file not found" behavior
+    // if the asset is absent from the module ZIP.
+    //
+    // Caching note (IDX-A3):
+    //   The `/app-debug.apk` path is bypassed by the Service
+    //   Worker (see `web/sw.js` `shouldBypass()` rule 9). The
+    //   browser's own HTTP cache — driven by the
+    //   `Cache-Control: public, max-age=3600, immutable` header
+    //   set by `main.go` — is the primary and only storage layer
+    //   for the ~3 MB download. The SW does not cache the APK.
+    //
+    // Localization note (IDX-A1):
+    //   Both the visible label (`pwaInstallText`) and the
+    //   `aria-label` attribute are i18n-driven. See
+    //   `updateUIStrings()` below.
+    // ============================================================
 
     // ============================================================
     // [14] Runtime Info
@@ -1905,14 +1498,6 @@
                 memDisplay = String(data.memory_limit_mb) + ' MB';
             }
 
-            // IDX-1 + IDX-8 fix: read the `backups` object that
-            // v1.3.0's main.go exposes via runtime_info. All SEVEN
-            // fields are now rendered, including `last_backup`
-            // (the raw timestamp — IDX-8). Rows that indicate a
-            // problem (0 snapshots, in-flight > 0, orphan > 0, or
-            // a missing latest/last-stable/date) get the
-            // `.ri-warn` class so the user notices them at a
-            // glance.
             var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
             var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
             var bkLatest    = bk.last_backup_name || t('riBackupNone');
@@ -1937,7 +1522,6 @@
                 { label: t('riPidFile'), value: data.pid_file || 'unknown' },
                 { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
                 { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                // --- Backup layer (v1.3.0 — IDX-1, IDX-8) ---
                 { label: t('riBackupCount'), value: bkAvailable,
                   warn: bkAvailable === '0' },
                 { label: t('riBackupLatest'), value: bkLatest,
@@ -2014,11 +1598,6 @@
     // ============================================================
     // [15] Log files
     // ============================================================
-    // IDX-5 fix: extended formatBytes to handle GB range. Large
-    // rotated logs (or the emergency 50 MB rotation) would
-    // otherwise display as "2048.0 MB".
-    //
-    // IDX-13 fix: guard against negative input by returning "0 B".
     function formatBytes(bytes) {
         if (!bytes || bytes < 0) return '0 B';
         if (bytes < 1024) return bytes + ' B';
@@ -2276,9 +1855,9 @@
         $('restartBtn').title = t('restartBtn');
         $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
         var pwaTxt = $('pwaInstallText');
-        if (pwaTxt && !pwaInstalled) pwaTxt.textContent = t('pwaInstallBtn');
-        var pwaOk = $('pwaModalOk');
-        if (pwaOk) pwaOk.textContent = t('pwaModalOk');
+        if (pwaTxt) pwaTxt.textContent = t('pwaInstallBtn');
+        var pwaLink = $('pwaInstallBtn');
+        if (pwaLink) pwaLink.setAttribute('aria-label', t('pwaInstallAriaLabel'));
         updateStatsDisplay();
         var ab = $('authBadge');
         if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
@@ -2465,10 +2044,6 @@
         appInitialized = false;
         clearStoredToken();
 
-        // IDX-10 + IDX-20 fix: reset backoff states so the next
-        // login starts from a fast polling interval instead of an
-        // accumulated long backoff. Also reset `verifyFailures`
-        // so a spurious retry is not scheduled.
         verifyFailures = 0;
         verifyBackoff = 3000;
         sseBackoff = 5000;
@@ -2478,9 +2053,6 @@
         if (sse) { sse.close(); sse = null; }
         if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        // IDX-18 fix: also tear down the progress poller. Without
-        // this, a session expiry during a blocklist update could
-        // leave the poller running indefinitely.
         if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
         if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
         showLoginScreen();
@@ -2570,17 +2142,12 @@
     // ============================================================
     // [20] SSE with backoff
     // ============================================================
-    // IDX-22 fix: call setNetworkDownUI(true) from the SSE
-    // onerror path so a network loss that kills SSE but not HTTP
-    // polling still surfaces a visible warning.
     function initSSE() {
         if (sse) { sse.close(); sse = null; }
         try {
-            sse = new EventSource('/events?t=' + Date.now());
+            sse = new EventSource('/events');
             sse.addEventListener('open', function() {
                 sseBackoff = 5000;
-                // IDX-22 fix: restore the network-down UI on a
-                // successful SSE connection.
                 setNetworkDownUI(false);
             });
             sse.addEventListener('progress', function(e) {
@@ -2651,7 +2218,6 @@
             });
             sse.onerror = function() {
                 if (sse) { sse.close(); sse = null; }
-                // IDX-22 fix: surface network-down state.
                 setNetworkDownUI(true);
                 if (!sessionExpiredShown) {
                     setTimeout(initSSE, sseBackoff);
@@ -3083,8 +2649,6 @@
         if (window.progressPoller) clearInterval(window.progressPoller);
         if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        // IDX-19 fix: clear the dashboard-link fallback timer so
-        // it does not fire after the page is gone.
         if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
     });
 
@@ -3156,13 +2720,6 @@
         $('customModal').addEventListener('click', function(e) {
             if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
         });
-
-        $('pwaInstallBtn').addEventListener('click', onPWAInstallBtnClick);
-        $('pwaModalClose').addEventListener('click', closePWAInstructionsModal);
-        $('pwaModalOk').addEventListener('click', closePWAInstructionsModal);
-        $('pwaInstallModal').addEventListener('click', function(e) {
-            if (e.target === this) closePWAInstructionsModal();
-        });
     }
 
     // ============================================================
@@ -3178,13 +2735,11 @@
         bindEvents();
         bindSWUpdateButtons();
 
-        // v1.3.0 — PWA install button init
-        initPWABeforeInstallPrompt();
+        // v1.4.0 — install button is a direct <a download> link
+        // pointing at /app-debug.apk. No JavaScript logic needed.
+        // The anchor's `aria-label` is set from translations in
+        // updateUIStrings() (IDX-A1).
 
-        // IDX-14 fix: fallback timer that removes the `loading`
-        // class from the Dashboard link if runtime_info never
-        // resolves or fails. Prevents a permanent "loading"
-        // state that would make the link look disabled.
         var dashLink = $('dashboardLink');
         if (dashLink) {
             dashboardLinkFallbackTimer = setTimeout(function() {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – package_module.sh
-# Version: v1.2.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -14,15 +15,19 @@
 #     • 2 configuration files (webui.conf, dnscrypt-proxy.toml)
 #     • 4 WebUI binaries (arm64, arm, amd64, 386)
 #     • 4 DNS binaries  (arm64, arm, x86_64, x86)
-#     • 13 web/PWA files (HTML + icons + manifest + SW + offline)
+#     • 14 web/PWA files (HTML + icons + manifest + SW + offline
+#       + optional companion APK)
 #     • module.prop
 #
-#   Total: 32 required files, verified after packaging.
+#   Total: 33 entries (32 required + 1 optional APK), verified
+#   after packaging.
 #
-# Web file list (13 files) vs SW precache (11 files):
-#   The ZIP ships 13 web files. The Service Worker precaches 11
-#   of these (sw.js itself is never cached, and index.html /
-#   dashboard.html are served network-first as navigations).
+# Web file list (14 files) vs SW precache (11 files):
+#   The ZIP ships 14 web files (13 required + 1 optional APK).
+#   The Service Worker precaches 11 of these (sw.js itself is
+#   never cached, and index.html / dashboard.html are served
+#   network-first as navigations). The optional app-debug.apk
+#   is neither precached nor served by the SW.
 #   See web/sw.js §[2] for the exact PRECACHE_ASSETS list.
 #
 # Icon source mapping (verified against generate-icons.sh):
@@ -156,6 +161,85 @@
 #     trailing slashes, not just one.
 #
 # ============================================================
+# v1.3.0 — No changes to the packaging pipeline
+# ============================================================
+#   The v1.3.0 release (PWA install button, live status LED,
+#   DNS auto-start fix) does NOT modify the packaging pipeline.
+#   The files bundled into the module ZIP (shell scripts, Go
+#   binaries, web assets, configs) are assembled by this
+#   script, but this script does NOT inspect the internal
+#   semantics of any of them. Therefore the v1.3.0 server-side
+#   refinements — SNAP-MANIFEST + SNAP-MTIME in main.go,
+#   ROT-MANIFEST + ROT-MTIME + ROT-PROTECT in functions.sh,
+#   and the boot-path DNS auto-start in service.sh — have no
+#   bearing on this script.
+#
+#   Client-side changes (web/index.html):
+#     • Smart dynamic PWA install button.
+#     • Live status LED on the Today counter.
+#     → covered by the existing WEB_FILES_REQUIRED list; no
+#       new file was added to the ZIP.
+#
+#   Server-side refinements (touched only .go and .sh files):
+#     • main.go:buildBackupInfo() — SNAP-MANIFEST + SNAP-MTIME.
+#     • functions.sh:rotate_backups() — ROT-MANIFEST +
+#       ROT-MTIME + ROT-PROTECT.
+#     • service.sh — boot-path DNS auto-start.
+#     → all files are already in the ZIP; no new file or
+#       counter change was required.
+#
+#   The same refinements were applied in parallel to
+#   watchdog.sh, status.sh, customize.sh, action.sh,
+#   uninstall.sh, module.prop, and update.json.
+#
+#   Therefore no code or counter change was required by v1.3.0.
+#   See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
+#   for the full v1.3.0 delta.
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   🆕 APK-01 — The companion Android app APK
+#     (web/app-debug.apk) is now bundled into the module ZIP
+#     as an OPTIONAL entry. The file is staged by release.yml
+#     (via scripts/fetch_app_apk.sh) before this script runs.
+#
+#     Behaviour:
+#       • If present and non-empty → bundled into web/.
+#       • If absent → a warning is logged and packaging
+#         continues. Local developer builds therefore work
+#         without requiring a network fetch.
+#
+#     Affected sites (all handled):
+#       [13] Web file check      → skip+warn on missing APK
+#       [16] Staging copy        → skip+warn on missing APK
+#       [19] ZIP structure check → skip+warn on missing APK
+#
+#   🆕 APK-02 — WEB_FILES_REQUIRED and REQUIRED_IN_ZIP now
+#     include "app-debug.apk" / "web/app-debug.apk" so that a
+#     properly staged release ZIP ships the companion app
+#     while still allowing APK-less local builds to succeed.
+#
+#   🆕 APK-03 — Header counters corrected. The web file list
+#     is 14 files (13 required + 1 optional APK), not 13. The
+#     SW precache still references 11 files — the APK is
+#     deliberately NOT precached and is served by main.go via
+#     the /app-debug.apk route.
+#
+# Cross-references:
+#   • proxy/dnscrypt-proxy.version   — DNS engine version (SSOT)
+#   • proxy/app-apk.version          — companion app version (SSOT)
+#   • VERSION                        — module version (SSOT)
+#   • module.prop                    — Magisk definition (read for verify)
+#   • update.json                    — auto-update metadata (read for verify)
+#   • scripts/fetch_dns_binaries.sh  — DNS binaries fetcher
+#   • scripts/fetch_app_apk.sh       — companion APK fetcher
+#   • docs/BACKUP.md                 — backup system reference (v1.2.0)
+#   • docs/EMERGENCY.md              — emergency recovery (v1.2.0)
+#   • docs/UPGRADE.md                — version upgrade guide
+#   • docs/DNS_BINARIES.md           — DNS binaries management (Level 4)
+#   • CHANGELOG.md                   — version history (v1.0.0 → v1.4.0)
+# ============================================================
 # Reproducibility:
 #   • SOURCE_DATE_EPOCH is applied via `touch -d "@N"` to every
 #     file in staging before ZIP creation. If `touch -d` is not
@@ -199,10 +283,10 @@ FETCH_SCRIPT="$SCRIPT_DIR/fetch_dns_binaries.sh"
 # [3] Colors
 # ------------------------------------------------------------
 if [ -t 1 ]; then
-    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+	RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+	CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 else
-    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
+	RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 # log_info and log_ok intentionally write to stdout: they are
@@ -222,18 +306,18 @@ log_debug() { [ "$VERBOSE" = "1" ] && echo -e "  ${DIM}·${NC} $1" >&2 || true; 
 # before using it in an arithmetic context.
 # ------------------------------------------------------------
 file_size() {
-    local out
-    out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-    out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-    return 1
+	local out
+	out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+	out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+	return 1
 }
 
 # is_numeric — true iff the argument is one or more digits.
 is_numeric() {
-    case "${1:-}" in
-        ''|*[!0-9]*) return 1 ;;
-        *) return 0 ;;
-    esac
+	case "${1:-}" in
+		''|*[!0-9]*) return 1 ;;
+		*) return 0 ;;
+	esac
 }
 
 # count_matches — count matching lines in a stream, exactly one
@@ -242,21 +326,21 @@ is_numeric() {
 # "0\n0" on zero matches.
 # ------------------------------------------------------------
 count_matches() {
-    local pattern="$1"
-    local n
-    n=$(grep -cE "$pattern" 2>/dev/null) || true
-    [ -z "$n" ] && n=0
-    printf '%s' "$n"
+	local pattern="$1"
+	local n
+	n=$(grep -cE "$pattern" 2>/dev/null) || true
+	[ -z "$n" ] && n=0
+	printf '%s' "$n"
 }
 
 sha256_compat() {
-    if command -v sha256sum >/dev/null 2>&1; then
-        sha256sum "$@"
-    elif command -v shasum >/dev/null 2>&1; then
-        shasum -a 256 "$@"
-    else
-        return 1
-    fi
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum "$@"
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 "$@"
+	else
+		return 1
+	fi
 }
 
 # calc_version_code — canonical versionCode from a SemVer string.
@@ -272,19 +356,19 @@ sha256_compat() {
 # a value like "01" does not trigger bash's octal error.
 # ------------------------------------------------------------
 calc_version_code() {
-    local v="${1#v}"
-    local core="${v%%-*}"
-    local major minor patch
+	local v="${1#v}"
+	local core="${v%%-*}"
+	local major minor patch
 
-    major=$(echo "$core" | cut -d. -f1 | sed 's/^0*//')
-    minor=$(echo "$core" | cut -d. -f2 | sed 's/^0*//')
-    patch=$(echo "$core" | cut -d. -f3 | sed 's/^0*//')
+	major=$(echo "$core" | cut -d. -f1 | sed 's/^0*//')
+	minor=$(echo "$core" | cut -d. -f2 | sed 's/^0*//')
+	patch=$(echo "$core" | cut -d. -f3 | sed 's/^0*//')
 
-    [ -z "$major" ] && major=0
-    [ -z "$minor" ] && minor=0
-    [ -z "$patch" ] && patch=0
+	[ -z "$major" ] && major=0
+	[ -z "$minor" ] && minor=0
+	[ -z "$patch" ] && patch=0
 
-    echo $((major * 1000000 + minor * 10000 + patch * 100))
+	echo $((major * 1000000 + minor * 10000 + patch * 100))
 }
 
 # ------------------------------------------------------------
@@ -292,28 +376,28 @@ calc_version_code() {
 # ------------------------------------------------------------
 # PM-3 fix: each value-taking flag now requires a value.
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --version)
-            [ -n "${2:-}" ] || { log_error "--version requires a value"; exit 2; }
-            VERSION="$2"; shift 2
-            ;;
-        --build-dir)
-            [ -n "${2:-}" ] || { log_error "--build-dir requires a value"; exit 2; }
-            BUILD_DIR="$2"; shift 2
-            ;;
-        --output-dir)
-            [ -n "${2:-}" ] || { log_error "--output-dir requires a value"; exit 2; }
-            OUTPUT_DIR="$2"; shift 2
-            ;;
-        --dns-cache-dir)
-            [ -n "${2:-}" ] || { log_error "--dns-cache-dir requires a value"; exit 2; }
-            DNS_CACHE_DIR="$2"; shift 2
-            ;;
-        --skip-dns-fetch)  SKIP_DNS_FETCH=1; shift ;;
-        --keep-staging)    KEEP_STAGING=1; shift ;;
-        --verbose|-v)      VERBOSE=1; shift ;;
-        --help|-h)
-            cat << 'HELP_EOF'
+	case "$1" in
+		--version)
+			[ -n "${2:-}" ] || { log_error "--version requires a value"; exit 2; }
+			VERSION="$2"; shift 2
+			;;
+		--build-dir)
+			[ -n "${2:-}" ] || { log_error "--build-dir requires a value"; exit 2; }
+			BUILD_DIR="$2"; shift 2
+			;;
+		--output-dir)
+			[ -n "${2:-}" ] || { log_error "--output-dir requires a value"; exit 2; }
+			OUTPUT_DIR="$2"; shift 2
+			;;
+		--dns-cache-dir)
+			[ -n "${2:-}" ] || { log_error "--dns-cache-dir requires a value"; exit 2; }
+			DNS_CACHE_DIR="$2"; shift 2
+			;;
+		--skip-dns-fetch)  SKIP_DNS_FETCH=1; shift ;;
+		--keep-staging)    KEEP_STAGING=1; shift ;;
+		--verbose|-v)      VERBOSE=1; shift ;;
+		--help|-h)
+			cat << 'HELP_EOF'
 DNSCrypt Smart Filter – package_module.sh
 
 Usage:
@@ -332,42 +416,42 @@ Options:
   --help, -h             Show this help
 
 Examples:
-  ./scripts/package_module.sh --version v1.2.0
-  ./scripts/package_module.sh --version v1.2.0 --skip-dns-fetch
-  ./scripts/package_module.sh --version v1.2.0 --output-dir /tmp/out
+  ./scripts/package_module.sh --version v1.4.0
+  ./scripts/package_module.sh --version v1.4.0 --skip-dns-fetch
+  ./scripts/package_module.sh --version v1.4.0 --output-dir /tmp/out
 
 References:
   docs/BACKUP.md         Backup system reference (v1.2.0)
   docs/EMERGENCY.md      Emergency recovery guide (v1.2.0)
   docs/UPGRADE.md §3.1   v1.1.0 → v1.2.0 upgrade path
 HELP_EOF
-            exit 0
-            ;;
-        *)
-            log_error "Unknown option: $1"
-            exit 2
-            ;;
-    esac
+			exit 0
+			;;
+		*)
+			log_error "Unknown option: $1"
+			exit 2
+			;;
+	esac
 done
 
 # ------------------------------------------------------------
 # [6] Read VERSION
 # ------------------------------------------------------------
 if [ -z "$VERSION" ]; then
-    if [ -f VERSION ]; then
-        VERSION=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-    else
-        log_error "VERSION not specified and VERSION file missing"
-        exit 2
-    fi
+	if [ -f VERSION ]; then
+		VERSION=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+	else
+		log_error "VERSION not specified and VERSION file missing"
+		exit 2
+	fi
 fi
 
 # L-2 fix: accept optional SemVer build metadata (`+...`) in
 # addition to the existing optional prerelease suffix.
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$'; then
-    log_error "Invalid version: '$VERSION'"
-    log_info "Required format: v<major>.<minor>.<patch>[-prerelease][+build]"
-    exit 2
+	log_error "Invalid version: '$VERSION'"
+	log_info "Required format: v<major>.<minor>.<patch>[-prerelease][+build]"
+	exit 2
 fi
 
 VERSION_NO_V="${VERSION#v}"
@@ -376,39 +460,39 @@ VERSION_NO_V="${VERSION#v}"
 # [6b] PM-1 fix: verify module.prop matches $VERSION
 # ------------------------------------------------------------
 if [ ! -f "$REPO_ROOT/module.prop" ]; then
-    log_error "Missing: module.prop"
-    exit 2
+	log_error "Missing: module.prop"
+	exit 2
 fi
 
 MODPROP_VERSION=$(grep '^version=' "$REPO_ROOT/module.prop" | head -n1 | cut -d= -f2- | tr -d '\r ')
 MODPROP_VC=$(grep '^versionCode=' "$REPO_ROOT/module.prop" | head -n1 | cut -d= -f2- | tr -d '\r ')
 
 if [ -z "$MODPROP_VERSION" ]; then
-    log_error "module.prop has no 'version=' line"
-    exit 2
+	log_error "module.prop has no 'version=' line"
+	exit 2
 fi
 
 if [ "$MODPROP_VERSION" != "$VERSION" ]; then
-    log_error "Version mismatch between --version and module.prop"
-    log_info "  --version:   $VERSION"
-    log_info "  module.prop: $MODPROP_VERSION"
-    log_info "Run 'scripts/release.sh' to update both consistently,"
-    log_info "or pass --version '$MODPROP_VERSION' to package the current tree."
-    exit 2
+	log_error "Version mismatch between --version and module.prop"
+	log_info "  --version:   $VERSION"
+	log_info "  module.prop: $MODPROP_VERSION"
+	log_info "Run 'scripts/release.sh' to update both consistently,"
+	log_info "or pass --version '$MODPROP_VERSION' to package the current tree."
+	exit 2
 fi
 
 EXPECTED_VC=$(calc_version_code "$VERSION")
 if [ -z "$MODPROP_VC" ]; then
-    log_warn "module.prop has no 'versionCode=' line"
+	log_warn "module.prop has no 'versionCode=' line"
 elif ! is_numeric "$MODPROP_VC"; then
-    # L-3 fix: non-numeric versionCode deserves its own message.
-    log_warn "module.prop versionCode is not numeric: '$MODPROP_VC'"
-    log_warn "  expected: $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
+	# L-3 fix: non-numeric versionCode deserves its own message.
+	log_warn "module.prop versionCode is not numeric: '$MODPROP_VC'"
+	log_warn "  expected: $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
 elif [ "$MODPROP_VC" != "$EXPECTED_VC" ]; then
-    log_warn "versionCode does not match the canonical formula"
-    log_warn "  module.prop: $MODPROP_VC"
-    log_warn "  expected:    $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
-    log_warn "This is a warning only — release.sh should keep these in sync."
+	log_warn "versionCode does not match the canonical formula"
+	log_warn "  module.prop: $MODPROP_VC"
+	log_warn "  expected:    $EXPECTED_VC (MAJOR*1M + MINOR*10K + PATCH*100)"
+	log_warn "This is a warning only — release.sh should keep these in sync."
 fi
 
 # ------------------------------------------------------------
@@ -425,37 +509,37 @@ fi
 # ------------------------------------------------------------
 UPDATE_JSON="$REPO_ROOT/update.json"
 if [ -f "$UPDATE_JSON" ]; then
-    UPDATE_JSON_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
-        | head -n1 \
-        | sed -E 's/.*"([^"]*)"$/\1/')
+	UPDATE_JSON_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
+		| head -n1 \
+		| sed -E 's/.*"([^"]*)"$/\1/') || UPDATE_JSON_VERSION=""
 
-    if [ -z "$UPDATE_JSON_VERSION" ]; then
-        log_warn "update.json has no parseable 'version' field"
-    elif [ "$UPDATE_JSON_VERSION" != "$VERSION" ]; then
-        log_warn "update.json version does not match --version"
-        log_warn "  update.json: $UPDATE_JSON_VERSION"
-        log_warn "  --version:   $VERSION"
-        log_warn "Users who already installed the module will NOT see the update"
-        log_warn "until update.json is regenerated by scripts/release.sh."
-    fi
+	if [ -z "$UPDATE_JSON_VERSION" ]; then
+		log_warn "update.json has no parseable 'version' field"
+	elif [ "$UPDATE_JSON_VERSION" != "$VERSION" ]; then
+		log_warn "update.json version does not match --version"
+		log_warn "  update.json: $UPDATE_JSON_VERSION"
+		log_warn "  --version:   $VERSION"
+		log_warn "Users who already installed the module will NOT see the update"
+		log_warn "until update.json is regenerated by scripts/release.sh."
+	fi
 
-    # Also check the zipUrl filename.
-    UPDATE_JSON_URL=$(grep -oE '"zipUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
-        | head -n1 \
-        | sed -E 's/.*"([^"]*)"$/\1/')
-    if [ -n "$UPDATE_JSON_URL" ]; then
-        EXPECTED_URL_SUFFIX="dnscrypt-webui-${VERSION_NO_V}-module.zip"
-        case "$UPDATE_JSON_URL" in
-            *"$EXPECTED_URL_SUFFIX") : ;;
-            *)
-                log_warn "update.json zipUrl filename does not match the ZIP we are building"
-                log_warn "  zipUrl:   $UPDATE_JSON_URL"
-                log_warn "  expected: .../$EXPECTED_URL_SUFFIX"
-                ;;
-        esac
-    fi
+	# Also check the zipUrl filename.
+	UPDATE_JSON_URL=$(grep -oE '"zipUrl"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
+		| head -n1 \
+		| sed -E 's/.*"([^"]*)"$/\1/') || UPDATE_JSON_URL=""
+	if [ -n "$UPDATE_JSON_URL" ]; then
+		EXPECTED_URL_SUFFIX="dnscrypt-webui-${VERSION_NO_V}-module.zip"
+		case "$UPDATE_JSON_URL" in
+			*"$EXPECTED_URL_SUFFIX") : ;;
+			*)
+				log_warn "update.json zipUrl filename does not match the ZIP we are building"
+				log_warn "  zipUrl:   $UPDATE_JSON_URL"
+				log_warn "  expected: .../$EXPECTED_URL_SUFFIX"
+				;;
+		esac
+	fi
 else
-    log_warn "update.json not found — skipping consistency check"
+	log_warn "update.json not found — skipping consistency check"
 fi
 
 # ------------------------------------------------------------
@@ -467,14 +551,14 @@ fi
 # directory was created / checked.
 # ------------------------------------------------------------
 if ! mkdir -p "$OUTPUT_DIR" 2>/dev/null; then
-    log_error "Cannot create OUTPUT_DIR: $OUTPUT_DIR"
-    exit 2
+	log_error "Cannot create OUTPUT_DIR: $OUTPUT_DIR"
+	exit 2
 fi
 OUTPUT_DIR_ABS="$(cd "$OUTPUT_DIR" && pwd)"
 
 if [ ! -w "$OUTPUT_DIR_ABS" ]; then
-    log_error "OUTPUT_DIR is not writable: $OUTPUT_DIR_ABS"
-    exit 2
+	log_error "OUTPUT_DIR is not writable: $OUTPUT_DIR_ABS"
+	exit 2
 fi
 
 log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
@@ -483,30 +567,30 @@ log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
 # [7] Read DNS version
 # ------------------------------------------------------------
 if [ ! -f "$DNS_VERSION_FILE" ]; then
-    log_error "Missing: $DNS_VERSION_FILE"
-    log_info "Create it with: echo '2.1.18' > $DNS_VERSION_FILE"
-    exit 2
+	log_error "Missing: $DNS_VERSION_FILE"
+	log_info "Create it with: echo '2.1.18' > $DNS_VERSION_FILE"
+	exit 2
 fi
 
 DNS_VERSION=$(tr -d '\r\n' < "$DNS_VERSION_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
 if ! echo "$DNS_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-    log_error "Invalid DNS version: '$DNS_VERSION'"
-    exit 2
+	log_error "Invalid DNS version: '$DNS_VERSION'"
+	exit 2
 fi
 
 # ------------------------------------------------------------
 # [8] Auto-detect BUILD_DIR
 # ------------------------------------------------------------
 if [ -z "$BUILD_DIR" ]; then
-    for candidate in "$REPO_ROOT/proxy/build" "$REPO_ROOT/build"; do
-        if [ -d "$candidate" ] && \
-           find "$candidate" -name "dnscrypt-webui-*" -type f 2>/dev/null | grep -q .; then
-            BUILD_DIR="$candidate"
-            break
-        fi
-    done
-    [ -z "$BUILD_DIR" ] && BUILD_DIR="$REPO_ROOT/proxy/build"
+	for candidate in "$REPO_ROOT/proxy/build" "$REPO_ROOT/build"; do
+		if [ -d "$candidate" ] && \
+		   find "$candidate" -name "dnscrypt-webui-*" -type f 2>/dev/null | grep -q .; then
+			BUILD_DIR="$candidate"
+			break
+		fi
+	done
+	[ -z "$BUILD_DIR" ] && BUILD_DIR="$REPO_ROOT/proxy/build"
 fi
 
 # ------------------------------------------------------------
@@ -520,16 +604,16 @@ fi
 # honor the requested epoch must not pretend to be reproducible.
 # ------------------------------------------------------------
 if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
-    if git rev-parse --git-dir >/dev/null 2>&1; then
-        SOURCE_DATE_EPOCH=$(git log -1 --format=%ct 2>/dev/null || echo 0)
-    else
-        SOURCE_DATE_EPOCH=0
-    fi
+	if git rev-parse --git-dir >/dev/null 2>&1; then
+		SOURCE_DATE_EPOCH=$(git log -1 --format=%ct 2>/dev/null || echo 0)
+	else
+		SOURCE_DATE_EPOCH=0
+	fi
 fi
 # Numeric guard.
 if ! is_numeric "$SOURCE_DATE_EPOCH"; then
-    log_warn "SOURCE_DATE_EPOCH is not numeric ('$SOURCE_DATE_EPOCH'); using 0"
-    SOURCE_DATE_EPOCH=0
+	log_warn "SOURCE_DATE_EPOCH is not numeric ('$SOURCE_DATE_EPOCH'); using 0"
+	SOURCE_DATE_EPOCH=0
 fi
 export SOURCE_DATE_EPOCH
 
@@ -557,19 +641,19 @@ echo ""
 # ------------------------------------------------------------
 MISSING=""
 for tool in zip unzip cp find sort mktemp du; do
-    command -v "$tool" >/dev/null 2>&1 || MISSING="$MISSING $tool"
+	command -v "$tool" >/dev/null 2>&1 || MISSING="$MISSING $tool"
 done
 
 if [ -n "$MISSING" ]; then
-    log_error "Missing tools:$MISSING"
-    exit 2
+	log_error "Missing tools:$MISSING"
+	exit 2
 fi
 
 # L-4 fix: prefer `command -v` over piping /dev/null through the
 # hashing tool for the availability check.
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
-    log_error "Neither sha256sum nor shasum available"
-    exit 2
+	log_error "Neither sha256sum nor shasum available"
+	exit 2
 fi
 
 log_ok "Required tools available"
@@ -581,26 +665,28 @@ log_ok "Required tools available"
 [ -d "$REPO_ROOT/web" ]   || { log_error "web/ directory missing"; exit 2; }
 
 # ------------------------------------------------------------
-# [13] Check web files (13 files)
+# [13] Check web files (14 files — 13 required + 1 optional APK)
 # ------------------------------------------------------------
 # HARD-PM-05: checks for non-empty size, not just existence.
 # HARD-PM-10: remediation hint is tailored to the type of file.
 # L-1 fix: favicon.ico is explicitly included in the icon set.
+# APK-01: app-debug.apk is optional (skipped with a warning).
 # ============================================================
 WEB_FILES_REQUIRED=(
-    "index.html"
-    "dashboard.html"
-    "manifest.json"
-    "sw.js"
-    "icon-192.svg"
-    "icon-512.svg"
-    "icon-192.png"
-    "icon-512.png"
-    "apple-touch-icon.png"
-    "favicon-32x32.png"
-    "favicon-16x16.png"
-    "favicon.ico"
-    "offline.html"
+	"index.html"
+	"dashboard.html"
+	"manifest.json"
+	"sw.js"
+	"icon-192.svg"
+	"icon-512.svg"
+	"icon-192.png"
+	"icon-512.png"
+	"apple-touch-icon.png"
+	"favicon-32x32.png"
+	"favicon-16x16.png"
+	"favicon.ico"
+	"app-debug.apk"
+	"offline.html"
 )
 
 WEB_MISSING=0
@@ -608,39 +694,48 @@ WEB_MISSING_ICONS=0
 WEB_MISSING_HTML=0
 
 for f in "${WEB_FILES_REQUIRED[@]}"; do
-    if [ ! -s "$REPO_ROOT/web/$f" ]; then
-        if [ -f "$REPO_ROOT/web/$f" ]; then
-            log_error "Empty: web/$f"
-        else
-            log_error "Missing: web/$f"
-        fi
-        WEB_MISSING=$((WEB_MISSING + 1))
-        # L-1: include favicon.ico explicitly — `favicon-*` alone
-        # does not match it because of the dash.
-        case "$f" in
-            icon-*.svg|icon-*.png|apple-touch-icon.png|favicon-*|favicon.ico)
-                WEB_MISSING_ICONS=$((WEB_MISSING_ICONS + 1))
-                ;;
-            *.html)
-                WEB_MISSING_HTML=$((WEB_MISSING_HTML + 1))
-                ;;
-        esac
-    fi
+	if [ ! -s "$REPO_ROOT/web/$f" ]; then
+		# v1.4.0: web/app-debug.apk is OPTIONAL. It is staged by
+		# release.yml (via fetch_app_apk.sh) before this script
+		# runs. A local developer build without the APK still
+		# succeeds.
+		if [ "$f" = "app-debug.apk" ]; then
+			log_warn "Optional web file missing: web/$f (skipping)"
+			continue
+		fi
+
+		if [ -f "$REPO_ROOT/web/$f" ]; then
+			log_error "Empty: web/$f"
+		else
+			log_error "Missing: web/$f"
+		fi
+		WEB_MISSING=$((WEB_MISSING + 1))
+		# L-1: include favicon.ico explicitly — `favicon-*` alone
+		# does not match it because of the dash.
+		case "$f" in
+			icon-*.svg|icon-*.png|apple-touch-icon.png|favicon-*|favicon.ico)
+				WEB_MISSING_ICONS=$((WEB_MISSING_ICONS + 1))
+				;;
+			*.html)
+				WEB_MISSING_HTML=$((WEB_MISSING_HTML + 1))
+				;;
+		esac
+	fi
 done
 
 if [ "$WEB_MISSING" -gt 0 ]; then
-    log_error "$WEB_MISSING web file(s) missing or empty"
-    if [ "$WEB_MISSING_ICONS" -gt 0 ]; then
-        log_info "Regenerate icons with: ./scripts/generate-icons.sh"
-    fi
-    if [ "$WEB_MISSING_HTML" -gt 0 ]; then
-        log_info "HTML files are tracked in git; verify your checkout."
-        log_info "  git status web/"
-    fi
-    exit 1
+	log_error "$WEB_MISSING web file(s) missing or empty"
+	if [ "$WEB_MISSING_ICONS" -gt 0 ]; then
+		log_info "Regenerate icons with: ./scripts/generate-icons.sh"
+	fi
+	if [ "$WEB_MISSING_HTML" -gt 0 ]; then
+		log_info "HTML files are tracked in git; verify your checkout."
+		log_info "  git status web/"
+	fi
+	exit 1
 fi
 
-log_ok "All web files present and non-empty (${#WEB_FILES_REQUIRED[@]} files)"
+log_ok "All web files present (13 required + 1 optional APK)"
 
 # ------------------------------------------------------------
 # [14] Check WebUI binaries (4 architectures)
@@ -648,13 +743,13 @@ log_ok "All web files present and non-empty (${#WEB_FILES_REQUIRED[@]} files)"
 WEBUI_ARCHS="arm64 arm amd64 386"
 
 for arch in $WEBUI_ARCHS; do
-    bin="$BUILD_DIR/dnscrypt-webui-$arch"
-    if [ ! -f "$bin" ]; then
-        log_error "Missing: $bin"
-        log_info "Run first: ./proxy/build.sh --clean --parallel"
-        exit 1
-    fi
-    [ -x "$bin" ] || chmod 0755 "$bin"
+	bin="$BUILD_DIR/dnscrypt-webui-$arch"
+	if [ ! -f "$bin" ]; then
+		log_error "Missing: $bin"
+		log_info "Run first: ./proxy/build.sh --clean --parallel"
+		exit 1
+	fi
+	[ -x "$bin" ] || chmod 0755 "$bin"
 done
 
 log_ok "4 WebUI binaries present in $BUILD_DIR"
@@ -663,97 +758,97 @@ log_ok "4 WebUI binaries present in $BUILD_DIR"
 # [15] Prepare DNS binaries
 # ------------------------------------------------------------
 DNS_BINARIES_REQUIRED=(
-    "dnscrypt-proxy-arm64"
-    "dnscrypt-proxy-arm"
-    "dnscrypt-proxy-x86_64"
-    "dnscrypt-proxy-x86"
+	"dnscrypt-proxy-arm64"
+	"dnscrypt-proxy-arm"
+	"dnscrypt-proxy-x86_64"
+	"dnscrypt-proxy-x86"
 )
 
 map_to_cache_name() {
-    case "$1" in
-        dnscrypt-proxy-x86)    echo "dnscrypt-proxy-i386" ;;
-        dnscrypt-proxy-x86_64) echo "dnscrypt-proxy-x86_64" ;;
-        dnscrypt-proxy-arm64)  echo "dnscrypt-proxy-arm64" ;;
-        dnscrypt-proxy-arm)    echo "dnscrypt-proxy-arm" ;;
-        *) echo "$1" ;;
-    esac
+	case "$1" in
+		dnscrypt-proxy-x86)    echo "dnscrypt-proxy-i386" ;;
+		dnscrypt-proxy-x86_64) echo "dnscrypt-proxy-x86_64" ;;
+		dnscrypt-proxy-arm64)  echo "dnscrypt-proxy-arm64" ;;
+		dnscrypt-proxy-arm)    echo "dnscrypt-proxy-arm" ;;
+		*) echo "$1" ;;
+	esac
 }
 
 check_cache_complete() {
-    local missing=0
-    for name in "${DNS_BINARIES_REQUIRED[@]}"; do
-        local cache_name
-        cache_name=$(map_to_cache_name "$name")
-        local f="$DNS_CACHE_DIR/$cache_name"
-        if [ ! -f "$f" ] || [ ! -s "$f" ]; then
-            log_debug "cache miss: $cache_name"
-            missing=$((missing + 1))
-        fi
-    done
-    [ "$missing" -eq 0 ]
+	local missing=0
+	for name in "${DNS_BINARIES_REQUIRED[@]}"; do
+		local cache_name
+		cache_name=$(map_to_cache_name "$name")
+		local f="$DNS_CACHE_DIR/$cache_name"
+		if [ ! -f "$f" ] || [ ! -s "$f" ]; then
+			log_debug "cache miss: $cache_name"
+			missing=$((missing + 1))
+		fi
+	done
+	[ "$missing" -eq 0 ]
 }
 
 mkdir -p "$DNS_CACHE_DIR"
 
 if check_cache_complete; then
-    log_ok "All DNS binaries present in cache"
+	log_ok "All DNS binaries present in cache"
 else
-    log_info "Some DNS binaries are missing from cache"
+	log_info "Some DNS binaries are missing from cache"
 
-    if [ "$SKIP_DNS_FETCH" = "1" ]; then
-        log_error "Cannot fetch binaries (--skip-dns-fetch)"
-        log_info "Add binaries manually to: $DNS_CACHE_DIR"
-        log_info "Or run: ./scripts/fetch_dns_binaries.sh"
-        exit 1
-    fi
+	if [ "$SKIP_DNS_FETCH" = "1" ]; then
+		log_error "Cannot fetch binaries (--skip-dns-fetch)"
+		log_info "Add binaries manually to: $DNS_CACHE_DIR"
+		log_info "Or run: ./scripts/fetch_dns_binaries.sh"
+		exit 1
+	fi
 
-    if [ ! -f "$FETCH_SCRIPT" ]; then
-        log_error "Missing: $FETCH_SCRIPT"
-        exit 1
-    fi
+	if [ ! -f "$FETCH_SCRIPT" ]; then
+		log_error "Missing: $FETCH_SCRIPT"
+		exit 1
+	fi
 
-    [ -x "$FETCH_SCRIPT" ] || chmod +x "$FETCH_SCRIPT"
+	[ -x "$FETCH_SCRIPT" ] || chmod +x "$FETCH_SCRIPT"
 
-    log_info "Invoking: scripts/fetch_dns_binaries.sh"
-    echo ""
+	log_info "Invoking: scripts/fetch_dns_binaries.sh"
+	echo ""
 
-    FETCH_ARGS=(
-        "--cache-dir" "$DNS_CACHE_DIR"
-        "--version" "$DNS_VERSION"
-    )
-    [ "$VERBOSE" = "1" ] && FETCH_ARGS+=("--verbose")
+	FETCH_ARGS=(
+		"--cache-dir" "$DNS_CACHE_DIR"
+		"--version" "$DNS_VERSION"
+	)
+	[ "$VERBOSE" = "1" ] && FETCH_ARGS+=("--verbose")
 
-    if ! "$FETCH_SCRIPT" "${FETCH_ARGS[@]}"; then
-        log_error "fetch_dns_binaries.sh failed"
-        exit 1
-    fi
+	if ! "$FETCH_SCRIPT" "${FETCH_ARGS[@]}"; then
+		log_error "fetch_dns_binaries.sh failed"
+		exit 1
+	fi
 
-    echo ""
-    log_ok "fetch_dns_binaries.sh succeeded"
+	echo ""
+	log_ok "fetch_dns_binaries.sh succeeded"
 fi
 
 # Check reasonable size (>= 3 MB)
 # HARD-PM-04: validate that file_size returned a number before
 # using it in arithmetic.
 for name in "${DNS_BINARIES_REQUIRED[@]}"; do
-    cache_name=$(map_to_cache_name "$name")
-    f="$DNS_CACHE_DIR/$cache_name"
-    if [ ! -f "$f" ]; then
-        log_error "Missing after fetch: $cache_name"
-        exit 1
-    fi
-    size=$(file_size "$f" || true)
-    if ! is_numeric "$size"; then
-        log_error "Cannot stat size of $cache_name (stat failed)"
-        exit 1
-    fi
-    if [ "$size" -lt 3145728 ]; then
-        log_error "$cache_name is too small ($size bytes)"
-        log_info "The file may be corrupt — re-download with:"
-        log_info "  ./scripts/fetch_dns_binaries.sh --force"
-        exit 1
-    fi
-    log_debug "$cache_name: $size bytes"
+	cache_name=$(map_to_cache_name "$name")
+	f="$DNS_CACHE_DIR/$cache_name"
+	if [ ! -f "$f" ]; then
+		log_error "Missing after fetch: $cache_name"
+		exit 1
+	fi
+	size=$(file_size "$f" || true)
+	if ! is_numeric "$size"; then
+		log_error "Cannot stat size of $cache_name (stat failed)"
+		exit 1
+	fi
+	if [ "$size" -lt 3145728 ]; then
+		log_error "$cache_name is too small ($size bytes)"
+		log_info "The file may be corrupt — re-download with:"
+		log_info "  ./scripts/fetch_dns_binaries.sh --force"
+		exit 1
+	fi
+	log_debug "$cache_name: $size bytes"
 done
 
 log_ok "4 DNS binaries ready"
@@ -765,7 +860,7 @@ log_ok "4 DNS binaries ready"
 # not just one, so a value like "/tmp///" normalizes cleanly.
 _TMPDIR_CLEAN="${TMPDIR:-/tmp}"
 while [ "${_TMPDIR_CLEAN%/}" != "$_TMPDIR_CLEAN" ]; do
-    _TMPDIR_CLEAN="${_TMPDIR_CLEAN%/}"
+	_TMPDIR_CLEAN="${_TMPDIR_CLEAN%/}"
 done
 [ -z "$_TMPDIR_CLEAN" ] && _TMPDIR_CLEAN="/tmp"
 
@@ -783,41 +878,55 @@ cp "$REPO_ROOT/module.prop" "$STAGING/module.prop"
 
 # --- Shell scripts (8) ---
 for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh watchdog.sh; do
-    src="$REPO_ROOT/proxy/$s"
-    [ -f "$src" ] || { log_error "Missing: proxy/$s"; exit 1; }
-    cp "$src" "$STAGING/$s"
-    chmod 0755 "$STAGING/$s"
+	src="$REPO_ROOT/proxy/$s"
+	[ -f "$src" ] || { log_error "Missing: proxy/$s"; exit 1; }
+	cp "$src" "$STAGING/$s"
+	chmod 0755 "$STAGING/$s"
 done
 
 # --- Config (2) ---
 for f in dnscrypt-proxy.toml webui.conf; do
-    src="$REPO_ROOT/proxy/$f"
-    [ -f "$src" ] || { log_error "Missing: proxy/$f"; exit 1; }
-    cp "$src" "$STAGING/proxy/$f"
-    chmod 0600 "$STAGING/proxy/$f"
+	src="$REPO_ROOT/proxy/$f"
+	[ -f "$src" ] || { log_error "Missing: proxy/$f"; exit 1; }
+	cp "$src" "$STAGING/proxy/$f"
+	chmod 0600 "$STAGING/proxy/$f"
 done
 
 # --- WebUI binaries (4) ---
 for arch in $WEBUI_ARCHS; do
-    cp "$BUILD_DIR/dnscrypt-webui-$arch" "$STAGING/proxy/"
-    chmod 0755 "$STAGING/proxy/dnscrypt-webui-$arch"
+	cp "$BUILD_DIR/dnscrypt-webui-$arch" "$STAGING/proxy/"
+	chmod 0755 "$STAGING/proxy/dnscrypt-webui-$arch"
 done
 
 # --- DNS binaries (4) ---
 for name in "${DNS_BINARIES_REQUIRED[@]}"; do
-    cache_name=$(map_to_cache_name "$name")
-    src="$DNS_CACHE_DIR/$cache_name"
-    [ -f "$src" ] || { log_error "Missing: $src"; exit 1; }
-    cp "$src" "$STAGING/proxy/$name"
-    chmod 0755 "$STAGING/proxy/$name"
+	cache_name=$(map_to_cache_name "$name")
+	src="$DNS_CACHE_DIR/$cache_name"
+	[ -f "$src" ] || { log_error "Missing: $src"; exit 1; }
+	cp "$src" "$STAGING/proxy/$name"
+	chmod 0755 "$STAGING/proxy/$name"
 done
 
-# --- Web files (13) ---
+# --- Web files (14 — 13 required + 1 optional APK) ---
+# v1.4.0: web/app-debug.apk is OPTIONAL. It is staged by
+# release.yml (via fetch_app_apk.sh) before this script runs.
+# A local developer build without the APK still succeeds.
 for f in "${WEB_FILES_REQUIRED[@]}"; do
-    src="$REPO_ROOT/web/$f"
-    [ -f "$src" ] || { log_error "Missing: web/$f"; exit 1; }
-    cp "$src" "$STAGING/web/$f"
-    chmod 0644 "$STAGING/web/$f"
+	src="$REPO_ROOT/web/$f"
+	if [ ! -f "$src" ]; then
+		case "$f" in
+			app-debug.apk)
+				log_warn "Optional file missing: web/$f (skipping)"
+				continue
+				;;
+			*)
+				log_error "Missing: web/$f"
+				exit 1
+				;;
+		esac
+	fi
+	cp "$src" "$STAGING/web/$f"
+	chmod 0644 "$STAGING/web/$f"
 done
 
 staging_size=$(du -sh "$STAGING" 2>/dev/null | cut -f1 || echo "?")
@@ -833,11 +942,11 @@ log_ok "staging ready (${staging_size})"
 # different date would defeat that.
 # ------------------------------------------------------------
 if ! find "$STAGING" -exec touch -d "@${SOURCE_DATE_EPOCH}" {} + 2>/dev/null; then
-    log_error "Failed to apply SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} to staging files"
-    log_info "This platform's 'touch' does not support -d @N."
-    log_info "Refusing to continue: reproducibility would be broken."
-    log_info "Install GNU coreutils, or run the packaging step on Linux."
-    exit 1
+	log_error "Failed to apply SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH} to staging files"
+	log_info "This platform's 'touch' does not support -d @N."
+	log_info "Refusing to continue: reproducibility would be broken."
+	log_info "Install GNU coreutils, or run the packaging step on Linux."
+	exit 1
 fi
 
 log_ok "timestamps set"
@@ -854,35 +963,35 @@ FILELIST="$STAGING/.filelist.txt"
 (cd "$STAGING" && find . -type f -not -name ".filelist.txt" | LC_ALL=C sort > "$FILELIST")
 
 if [ ! -s "$FILELIST" ]; then
-    log_error "File list is empty"
-    exit 1
+	log_error "File list is empty"
+	exit 1
 fi
 
 FILE_COUNT=$(wc -l < "$FILELIST")
 log_info "File count: $FILE_COUNT"
 
 if ! (cd "$STAGING" && zip -X -q "$OUTPUT_PATH" -@ < "$FILELIST"); then
-    log_error "Failed to create ZIP"
-    exit 1
+	log_error "Failed to create ZIP"
+	exit 1
 fi
 
 rm -f "$FILELIST"
 
 if [ ! -f "$OUTPUT_PATH" ]; then
-    log_error "ZIP was not created"
-    exit 1
+	log_error "ZIP was not created"
+	exit 1
 fi
 
 # M-1 fix: same guarded pattern as §[15] — validate that
 # file_size produced a numeric value before using it below.
 if zip_size=$(file_size "$OUTPUT_PATH"); then
-    if ! is_numeric "$zip_size"; then
-        log_warn "file_size returned a non-numeric value: '$zip_size'"
-        zip_size="?"
-    fi
+	if ! is_numeric "$zip_size"; then
+		log_warn "file_size returned a non-numeric value: '$zip_size'"
+		zip_size="?"
+	fi
 else
-    log_warn "Cannot determine ZIP size (stat failed)"
-    zip_size="?"
+	log_warn "Cannot determine ZIP size (stat failed)"
+	zip_size="?"
 fi
 
 # L-5 fix: fall back to "?" if du fails, instead of emitting an
@@ -893,64 +1002,72 @@ zip_size_human=$(du -h "$OUTPUT_PATH" 2>/dev/null | cut -f1 || true)
 log_ok "ZIP: $OUTPUT_NAME ($zip_size_human)"
 
 # ------------------------------------------------------------
-# [19] Verify ZIP structure (32 required files)
+# [19] Verify ZIP structure (33 entries — 32 required + 1 optional APK)
 # ------------------------------------------------------------
 REQUIRED_IN_ZIP=(
-    "module.prop"
+	"module.prop"
 
-    "customize.sh"
-    "service.sh"
-    "post-fs-data.sh"
-    "action.sh"
-    "status.sh"
-    "uninstall.sh"
-    "functions.sh"
-    "watchdog.sh"
+	"customize.sh"
+	"service.sh"
+	"post-fs-data.sh"
+	"action.sh"
+	"status.sh"
+	"uninstall.sh"
+	"functions.sh"
+	"watchdog.sh"
 
-    "proxy/dnscrypt-proxy.toml"
-    "proxy/webui.conf"
+	"proxy/dnscrypt-proxy.toml"
+	"proxy/webui.conf"
 
-    "proxy/dnscrypt-proxy-arm64"
-    "proxy/dnscrypt-proxy-arm"
-    "proxy/dnscrypt-proxy-x86_64"
-    "proxy/dnscrypt-proxy-x86"
+	"proxy/dnscrypt-proxy-arm64"
+	"proxy/dnscrypt-proxy-arm"
+	"proxy/dnscrypt-proxy-x86_64"
+	"proxy/dnscrypt-proxy-x86"
 
-    "proxy/dnscrypt-webui-arm64"
-    "proxy/dnscrypt-webui-arm"
-    "proxy/dnscrypt-webui-amd64"
-    "proxy/dnscrypt-webui-386"
+	"proxy/dnscrypt-webui-arm64"
+	"proxy/dnscrypt-webui-arm"
+	"proxy/dnscrypt-webui-amd64"
+	"proxy/dnscrypt-webui-386"
 
-    "web/index.html"
-    "web/dashboard.html"
-    "web/manifest.json"
-    "web/sw.js"
-    "web/icon-192.svg"
-    "web/icon-512.svg"
-    "web/icon-192.png"
-    "web/icon-512.png"
-    "web/apple-touch-icon.png"
-    "web/favicon-32x32.png"
-    "web/favicon-16x16.png"
-    "web/favicon.ico"
-    "web/offline.html"
+	"web/index.html"
+	"web/dashboard.html"
+	"web/manifest.json"
+	"web/sw.js"
+	"web/icon-192.svg"
+	"web/icon-512.svg"
+	"web/icon-192.png"
+	"web/icon-512.png"
+	"web/apple-touch-icon.png"
+	"web/favicon-32x32.png"
+	"web/favicon-16x16.png"
+	"web/favicon.ico"
+	"web/app-debug.apk"
+	"web/offline.html"
 )
 
 ZIP_CONTENTS=$(unzip -l "$OUTPUT_PATH" 2>/dev/null | awk '{print $4}')
 
 MISSING_IN_ZIP=0
 for item in "${REQUIRED_IN_ZIP[@]}"; do
-    if ! echo "$ZIP_CONTENTS" | grep -qFx "$item"; then
-        log_error "ZIP missing: $item"
-        MISSING_IN_ZIP=$((MISSING_IN_ZIP + 1))
-    fi
+	if ! echo "$ZIP_CONTENTS" | grep -qFx "$item"; then
+		case "$item" in
+			web/app-debug.apk)
+				log_warn "Optional file not in ZIP: $item"
+				;;
+			*)
+				log_error "ZIP missing: $item"
+				MISSING_IN_ZIP=$((MISSING_IN_ZIP + 1))
+				;;
+		esac
+	fi
 done
 
 if [ "$MISSING_IN_ZIP" -gt 0 ]; then
-    log_error "ZIP incomplete: $MISSING_IN_ZIP file(s)"
-    exit 1
+	log_error "ZIP incomplete: $MISSING_IN_ZIP file(s)"
+	exit 1
 fi
 
-log_ok "ZIP structure valid (${#REQUIRED_IN_ZIP[@]} files)"
+log_ok "ZIP structure valid (${#REQUIRED_IN_ZIP[@]} entries, APK optional)"
 
 # Additional stats.
 # HARD-PM-02: use count_matches instead of `grep -c ... || echo 0`.
@@ -967,8 +1084,8 @@ CHECKSUM_FILE="$OUTPUT_DIR_ABS/${OUTPUT_NAME}.sha256"
 (cd "$OUTPUT_DIR_ABS" && sha256_compat "$OUTPUT_NAME" > "${OUTPUT_NAME}.sha256")
 
 if [ ! -f "$CHECKSUM_FILE" ]; then
-    log_error "Failed to create checksum"
-    exit 1
+	log_error "Failed to create checksum"
+	exit 1
 fi
 
 SHA256_HASH=$(awk '{print $1}' "$CHECKSUM_FILE")
@@ -998,6 +1115,7 @@ echo -e "    ${DIM}• SW:${NC}         1 file"
 echo -e "    ${DIM}• SVG:${NC}        ${SVG_COUNT} file(s) — icon-192, icon-512"
 echo -e "    ${DIM}• PNG:${NC}        ${PNG_COUNT} file(s)"
 echo -e "    ${DIM}• ICO:${NC}        ${ICO_COUNT} file(s)"
+echo -e "    ${DIM}• APK:${NC}        1 file (companion Android app — optional)"
 echo -e "    ${DIM}• Offline:${NC}    1 file"
 echo ""
 echo -e "  ${BOLD}v1.2.0 data preservation:${NC}"
@@ -1012,9 +1130,9 @@ echo -e "    ${DIM}• docs/UPGRADE.md     — v1.1.0 → v1.2.0 upgrade path${N
 echo ""
 
 if [ "$VERBOSE" = "1" ]; then
-    echo -e "${BOLD}ZIP contents:${NC}"
-    unzip -l "$OUTPUT_PATH" | tail -n +4 | head -n -2
-    echo ""
+	echo -e "${BOLD}ZIP contents:${NC}"
+	unzip -l "$OUTPUT_PATH" | tail -n +4 | head -n -2
+	echo ""
 fi
 
 exit 0

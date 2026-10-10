@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – post-fs-data.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -39,7 +41,7 @@
 # ============================================================
 # This file carries two identifier families. The inventory
 # below is the AUTHORITATIVE list of identifiers actually
-# present in this file. It was verified during the v1.2.0
+# present in this file. It was verified during the v1.4.0
 # release audit.
 #
 # Identifier inventory in THIS file (10 total):
@@ -48,7 +50,7 @@
 #       — original post-audit corrections
 #
 #   • PFD-3, PFD-4, PFD-5                          (3)
-#       — NEW corrections in this revision:
+#       — corrections added in the v1.2.0 revision:
 #         PFD-3 → `log_msg` short-circuit via a
 #                  `_LOG_DISABLED` flag once a write has
 #                  failed, to prevent repeated futile
@@ -127,7 +129,7 @@
 #     has.
 #
 # ------------------------------------------------------------
-# NEW corrections in this revision (PFD-3, PFD-4, PFD-5):
+# Corrections added in the v1.2.0 revision (PFD-3..PFD-5):
 # ------------------------------------------------------------
 #
 #   🔧 PFD-3 — `log_msg` now installs a `_LOG_DISABLED` flag
@@ -265,6 +267,51 @@
 #   customize.sh at install time. The layer table describes
 #   WHO implements each layer, not WHERE in this file.
 # ============================================================
+# v1.3.0 — No changes to the early-boot cleanup
+# ============================================================
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   The v1.3.0 release ALSO refined the snapshot-detection
+#   and rotation semantics shared by every consumer of the
+#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
+#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
+#   touched main.go, functions.sh, service.sh, watchdog.sh,
+#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#
+#   This file (post-fs-data.sh) was NOT modified in v1.3.0.
+#   It contains no snapshot enumeration, no rotation, no
+#   backup handling, and no reference to the persistent
+#   backup directory. Its sole concern is early-boot cleanup
+#   (firewall, processes, PID files, STATUS_FILE). Therefore
+#   the v1.3.0 refinements have no bearing on this file.
+#
+#   All v1.2.0 emergency-cleanup logic remains byte-for-byte
+#   identical between v1.2.0 and v1.3.0.
+#
+#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
+#   docs/ARCHITECTURE.md §4.13.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 PFD-V14-01 — No behavior change. The companion
+#     Android app APK (web/app-debug.apk) is NOT part of the
+#     post-fs-data lifecycle. It is extracted by customize.sh
+#     and served by main.go; neither phase overlaps with this
+#     script.
+#
+#     The APK is a one-shot user download; it does not affect
+#     boot cleanup, firewall state, or process lifecycle.
+#
+#   📱 PFD-V14-02 — Version bump v1.3.0 → v1.4.0.
+#     Documentation only. No changes to the emergency cleanup
+#     path, the Custom Chain teardown, or the STATUS_FILE
+#     semantics.
+#
+# ============================================================
 # POSIX note on `local`:
 #   This script uses `local` inside the inline_firewall_cleanup
 #   function. The `local` keyword is supported by:
@@ -319,6 +366,7 @@ fi
 # emit a single warning if neither location is usable.
 RUN_DIR_USABLE=0
 if [ -d "$RUN_DIR" ] && [ -w "$RUN_DIR" ]; then
+    # shellcheck disable=SC2034
     RUN_DIR_USABLE=1
     STATUS_FILE="$RUN_DIR/dnscrypt.status"
     PID_FILE="$RUN_DIR/dnscrypt.pid"
@@ -326,8 +374,11 @@ if [ -d "$RUN_DIR" ] && [ -w "$RUN_DIR" ]; then
     WATCHDOG_PID_FILE="$RUN_DIR/watchdog.pid"
 else
     STATUS_FILE="/data/local/tmp/dnscrypt.status"
+    # shellcheck disable=SC2034
     PID_FILE="/data/local/tmp/dnscrypt.pid"
+    # shellcheck disable=SC2034
     WEBUI_PID_FILE="/data/local/tmp/webui.pid"
+    # shellcheck disable=SC2034
     WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
 
     # HARD-PFD-05: if the fallback is not writable either, log
@@ -386,7 +437,8 @@ log_msg() {
         local _size
         _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
         if [ -n "$_size" ] && [ "$_size" -gt 52428800 ]; then
-            local _emg="${LOG_FILE}.emergency.$(date +%s)"
+            local _emg
+            _emg="${LOG_FILE}.emergency.$(date +%s)"
             mv -f "$LOG_FILE" "$_emg" 2>/dev/null
             : > "$LOG_FILE" 2>/dev/null
         fi

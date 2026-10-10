@@ -3,13 +3,72 @@
 > Comprehensive reference for all terms and abbreviations used
 > in DNSCrypt Smart Filter.
 
-**Version**: v1.3.0
-**Last updated**: 2026-10-02
+**Version**: v1.4.0
+**Last updated**: 2026-10-08
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.2.0 changes**:
->   • Version bumped from v1.1.0 to v1.2.0.
+> **Identifier inventory in this file (10 total)**:
+>   • HARD-GLO-01 (`Last updated` correction — v1.4.0)
+>   • HARD-GLO-02 (v1.3.0 block extended with server-side
+>     rotation refinements — v1.4.0)
+>   • HARD-GLO-03 (§5 Persistent Backup rotation description
+>     corrected — v1.4.0)
+>   • HARD-GLO-04 (§5 BAK-1 + runtime_info.backups extended with
+>     v1.3.0 SNAP-*/ROT-* semantics — v1.4.0)
+>   • HARD-GLO-05 (New §5 entries: SNAP-MANIFEST, SNAP-MTIME,
+>     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT — v1.4.0)
+>   • HARD-GLO-06 (§11 Fixes Index extended with v1.3.0 rotation
+>     refinements — v1.4.0)
+>   • HARD-GLO-07 (§11 10 Defensive Layers table — Layer 9
+>     updated — v1.4.0)
+>   • HARD-GLO-08 (§5 Rotation Guardian badge reference added —
+>     v1.4.0)
+>   • HARD-GLO-09 (§12 References extended with §4.13 and
+>     §10.3.5 — v1.4.0)
+>   • HARD-GLO-10 (header + footer `Last updated` sync —
+>     v1.4.0)
+>
+> **Cross-references**:
+>   • [docs/ARCHITECTURE.md §4.13](ARCHITECTURE.md) — v1.3.0
+>     server-side refinements (authoritative)
+>   • [docs/COMPATIBILITY.md §10.3.5](COMPATIBILITY.md) — on-device
+>     SNAP-*/ROT-* verification
+>   • [docs/BACKUP.md](BACKUP.md) — backup system reference
+>   • [docs/SECURITY.md](SECURITY.md) — Audit Corrections
+>   • [docs/API.md](API.md) — HTTP API reference
+>   • [docs/DNS_BINARIES.md](DNS_BINARIES.md) — DNS binaries (Level 4)
+>   • [docs/FAQ.md](FAQ.md) — FAQ (Q131–Q140 for v1.3.0, Q141–Q150
+>     for v1.4.0)
+>   • [CHANGELOG.md](../CHANGELOG.md) — version history
+
+> **v1.4.0 changes**:
+>   • Version bumped from v1.3.0 to v1.4.0.
+>   • `Last updated` reflects the v1.4.0 file-editing date
+>     (2026-10-08).
+>   • **Companion Android app integration** — new terms added:
+>       - Companion Android App
+>       - `app-apk.version`
+>       - `APK_FILE`
+>       - `/app-debug.apk` route
+>   • **CodeQL path-injection fix** — new terms added:
+>       - CodeQL Path-Injection Fix
+>       - `removeModule` hardening
+>       - `filepath.Base()` sanitization
+>       - `sanitizeLogFileName`
+>   • **iOS PWA logic removal** — new term added:
+>       - iOS PWA Logic Removal
+>   • **v1.3.0 additions** (previously undocumented in this
+>     glossary):
+>       - PWA Install Button
+>       - Live Status LED
+>       - DNS Auto-Start After Boot
+>       - **Server-side rotation refinements (SNAP-MANIFEST,
+>         SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT)**
+>   • §11 (Fixes Index) — added the v1.3.0 features section and
+>     the v1.4.0 integration section.
+>   • §12 (References) — updated `CHANGELOG.md` reference to
+>     `§[v1.4.0]` and added §4.13 / §10.3.5.
 >   • **Global edition — English default + Arabic toggle**: the
 >     WebUI ships with English as the default language and an
 >     in-page toggle (`langToggle`) that switches to Arabic. The
@@ -17,67 +76,100 @@
 >     `localStorage['dnscrypt-lang']` and is never transmitted to
 >     the server. Documentation remains English-only by project
 >     convention.
->   • §5 Project-Specific Terms gained **20+ new entries** for
->     the v1.2.0 data-preservation release:
->       - Persistent Backup (v1.2.0)
->       - Transactional Upgrade (v1.2.0)
->       - `txn-*` directory (v1.2.0)
->       - `orphan-txn-*` directory (v1.2.0)
->       - `.last_stable` pointer (v1.2.0)
->       - `.last_backup` marker (v1.2.0)
->       - `.upgrade_history.json` (v1.2.0)
->       - `.pending_notification` (v1.2.0)
->       - Multi-Source Detection (v1.2.0)
->       - Recovery Mode Trigger (v1.2.0)
->       - `runtime_info.backups` (v1.2.0)
->       - `backupMu` (v1.2.0)
->       - `createAutoBackup` (v1.2.0)
->       - `cleanupOldTransactions` (v1.2.0)
->       - `checkPendingNotifications` (v1.2.0)
->       - `copy_with_context` (v1.2.0)
->       - `write_manifest` (v1.2.0)
->       - `verify_backup_integrity` (v1.2.0)
->       - Data Guardian (v1.2.0)
->       - Root-Solution Detection (v1.2.0)
->   • §6 Go & Shell Terms gained **4 new entries**:
->       - `sync.Mutex` (`backupMu`)
->       - `runShellWithTimeout`
->       - `AUTO_BACKUP_TIMEOUT`
->       - `META-INF/update-binary`
->   • §8 Metrics & Abstraction Terms gained a v1.2.0 note
->     about the 7-field `runtime_info.backups` object.
->   • §9 Advanced Security Terms gained **4 new entries**:
->       - 7-field Backups Schema
->       - Recovery Mode Correctness Fix
->       - Service Worker Update-Banner Fix
->       - Language Toggle (client-side only)
->   • §10 Common Abbreviations gained **4 new entries**:
->     FBE, MTP, FUSE, OTA.
->   • §11 Fixes Index gained a new section for the v1.2.0
->     Data-Preservation additions (BAK-1 / BAK-2 / BAK-3 / BAK-4)
->     and correctness fixes (FIX-1 / FIX-2), **plus** a new
->     note on the `HARD-*` file-scoped identifier family
->     (see §11 "Note on HARD-* identifiers").
->   • The Audit Corrections Registry remains at #33 — v1.2.0
->     does not extend it (see `docs/SECURITY.md` §17).
->   • §12 References updated with v1.2.0 additions
->     (`BACKUP.md`, `EMERGENCY.md`, `UPGRADE.md`).
 
-> **v1.2.0 (Global Edition) — Corrections in this revision**:
+> **v1.3.0 changes**:
+>   • Version bumped from v1.2.0 to v1.3.0.
+>   • **Client-side additions**:
+>       - PWA install button added (dynamic, browser-aware;
+>         later **replaced in v1.4.0** by a direct
+>         `<a download>` link).
+>       - Live status LED added on the Today counter.
+>   • **Boot-path correctness fix**: DNS engine now starts
+>     automatically after boot (via a direct API call from
+>     `service.sh` §[19]).
+>   • **Server-side rotation refinements** — the v1.3.0 release
+>     ALSO refined the snapshot-detection and rotation semantics
+>     that underpin the persistent backup directory. Three
+>     identifiers document the change (also used in
+>     `CHANGELOG.md` [v1.3.0] and `docs/ARCHITECTURE.md` §4.13):
+>
+>       🔧 **SNAP-MANIFEST** — `main.go:buildBackupInfo()` now
+>         detects a snapshot by the presence of a
+>         `.manifest.json` file, not by the v1.2.0 name pattern
+>         (`^[0-9]{8}-[0-9]{6}-`).
+>
+>       🔧 **SNAP-MTIME** — `last_backup_name` is now selected
+>         by **mtime** (descending). This supersedes the v1.2.0
+>         BUG-3 lexicographic-name rule.
+>
+>       🔧 **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** —
+>         `functions.sh:rotate_backups()` was rewritten with the
+>         same manifest-based detection, the same mtime sort, and
+>         two additional protected targets: the `.last_stable`
+>         recovery pointer and the newest install snapshot.
+>
+>     The same SNAP-*/ROT-* semantics were mirrored in 5 shell
+>     scripts (`service.sh`, `watchdog.sh`, `status.sh`,
+>     `customize.sh`, `action.sh`) and in `uninstall.sh`.
+
+> **v1.2.0 changes (historical)**:
+>   • Version bumped from v1.1.0 to v1.2.0.
+>   • Added 20+ new entries for the data-preservation release
+>     (persistent backup, transactional upgrades, recovery mode,
+>     `runtime_info.backups`, `backupMu`, etc.).
+>   • Added 4 new entries to §6 (Go & Shell Terms): `sync.Mutex`
+>     (`backupMu`), `runShellWithTimeout`, `AUTO_BACKUP_TIMEOUT`,
+>     `META-INF/update-binary`.
+>   • Added 4 new entries to §10 (Common Abbreviations): FBE,
+>     MTP, FUSE, OTA.
+>   • §11 (Fixes Index) — added the v1.2.0 data-preservation
+>     section (BAK-1..BAK-4, FIX-1, FIX-2).
+
+> **v1.2.0 (Global Edition) — Corrections in this revision
+> (historical)**:
 >   • 🔧 **FIX-1 description** — §5 "Recovery Mode Trigger" and
 >     §9 "Recovery Mode Correctness Fix" previously described
 >     FIX-1 as a "reorder + exclude" strategy. The actual
 >     implementation in `customize.sh` uses a
 >     **snapshot-and-reapply** strategy (`§[8a]` + `§[9]` +
->     `§[9b2]`), which keeps the extraction logic of `§[9]`
->     untouched. The descriptions have been corrected to match
->     the shipped code.
+>     `§[9b2]`).
 >   • 🔧 **Reason string** — §5 "`createAutoBackup`" previously
 >     listed `pre-append-denylist` for the `appendDenylist` call
->     site. The actual reason string recorded by `main.go` is
->     `pre-denylist-save`, because `appendDenylist` delegates to
->     `saveDenylist` (which is where the pre-critical backup is
->     triggered). The entry has been corrected.
+>     site. The actual reason string is `pre-denylist-save`.
+
+> **v1.4.0 — Corrections in this revision**:
+>   • 🔧 **HARD-GLO-01 + HARD-GLO-10** — `Last updated`
+>     corrected in both the header metadata block and the
+>     trailing footer. Both now read `2026-10-08`, matching
+>     every other file in the v1.4.0 module.
+>   • 🔧 **HARD-GLO-02** — The v1.3.0 block in the header
+>     previously listed only the client-side changes and the
+>     boot-path fix, but **omitted** the server-side rotation
+>     refinements (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
+>     ROT-MTIME, ROT-PROTECT) that touched 8 files in v1.3.0.
+>   • 🔧 **HARD-GLO-03** — §5 "Persistent Backup" described the
+>     rotation as "sorted by directory name". This was the
+>     v1.2.0 behavior and was **reversed in v1.3.0** in favour
+>     of mtime sort. The entry now reads "sorted by mtime
+>     descending (v1.3.0+)".
+>   • 🟡 **HARD-GLO-04** — §5 "`runtime_info.backups`" and §5
+>     "BAK-1" extended with the v1.3.0 SNAP-MANIFEST /
+>     SNAP-MTIME semantics for `available` and
+>     `last_backup_name`.
+>   • 🟢 **HARD-GLO-05** — Added five new §5 entries:
+>     `SNAP-MANIFEST`, `SNAP-MTIME`, `ROT-MANIFEST`,
+>     `ROT-MTIME`, `ROT-PROTECT`.
+>   • 🟡 **HARD-GLO-06** — §11 (Fixes Index) extended with the
+>     v1.3.0 rotation refinements under the v1.3.0 section.
+>   • 🟡 **HARD-GLO-07** — §11 "10 Defensive Layers" table —
+>     Layer 9 note updated to mention v1.3.0 mtime sort +
+>     protected targets.
+>   • 🟢 **HARD-GLO-08** — §5 "Data Guardian" badge entry —
+>     added a cross-reference to the new "Rotation Guardian"
+>     badge (v1.3.0).
+>   • 🟢 **HARD-GLO-09** — §12 References extended with
+>     `docs/ARCHITECTURE.md §4.13` and
+>     `docs/COMPATIBILITY.md §10.3.5`.
 
 ---
 
@@ -94,6 +186,7 @@
 9. [Advanced Security Terms](#9-advanced-security-terms)
 10. [Common Abbreviations](#10-common-abbreviations)
 11. [Fixes Index](#11-fixes-index)
+12. [References](#12-references)
 
 ---
 
@@ -218,7 +311,7 @@ using the ISP's DNS).
 **Managed by**: `main.go` via `startService()` / `stopService()`.
 
 **⚠️ v1.2.0 note**: The DNS version (2.1.18) is **separate** from the
-module version (v1.2.0). See §5 "DNS Version vs Module Version" for
+module version (v1.4.0). See §5 "DNS Version vs Module Version" for
 the distinction.
 
 ---
@@ -408,6 +501,14 @@ func rebuildBlocklist() error {
 **v1.2.0 note**: `manifest.json` `lang` defaults to `en` and `dir`
 to `ltr`. The in-page toggle updates both at runtime.
 
+**v1.3.0 note**: The install button is now dynamic — see §5
+"PWA Install Button".
+
+**v1.4.0 note**: The install button was converted from a
+`beforeinstallprompt`-based JavaScript flow to a direct
+`<a download>` link pointing at `/app-debug.apk`. See §5
+"Companion Android App" and "iOS PWA Logic Removal".
+
 ---
 
 ### ⚙️ Service Worker (SW)
@@ -457,8 +558,8 @@ Images).
 Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'
 ```
 
-**⚠️ Note**: `'unsafe-inline'` is currently present (TODO v1.2: remove
-it).
+**⚠️ Note**: `'unsafe-inline'` is currently present (planned for
+removal in v1.5.0).
 
 **v1.1.0 note**: `web/offline.html` **no longer has a CSP meta**. The
 previous `default-src 'none'` silently blocked the page's own scripts.
@@ -605,6 +706,10 @@ user into clicking.
 **Bootstrap**: `META-INF/com/google/android/update-binary` — the root
 manager's entry point. See §6.
 
+**v1.4.0 note**: The module ZIP may also contain an OPTIONAL
+`web/app-debug.apk` (companion Android app). See §5
+"Companion Android App".
+
 ---
 
 ### 💿 ROM
@@ -700,7 +805,13 @@ backoff.
 **v1.2.0**: Sends `X-Watchdog-Token` header to
 `/api/ensure_running_service`. Reads the token from
 `$RUN_DIR/.watchdog_token` on every call (no cache). Read-only with
-respect to the backup directory.
+respect to the backup directory. Uses SNAP-MANIFEST detection for its
+§[5b] snapshot counter (WD-V14-03).
+
+**v1.3.0**: The Watchdog is complemented by a direct
+`service.sh` API call after boot (see §5 "DNS Auto-Start After
+Boot"). The Watchdog's backoff behavior is left intact for crash
+recovery during normal runtime.
 
 ---
 
@@ -734,6 +845,20 @@ respect to the backup directory.
 "BAK-4" and §5 "FIX-1 / FIX-2" for v1.2.0 runtime additions and
 correctness fixes. The registry remains at #33.
 
+**v1.3.0 does NOT add audit corrections.** The PWA install button,
+live status LED, DNS auto-start-after-boot, and the rotation
+refinements (SNAP-*/ROT-*) are functional changes, not security
+fixes.
+
+**v1.4.0 does NOT add audit corrections.** The CodeQL
+path-injection fix in `removeModule` closes two static-analysis
+alerts (see §9 "CodeQL Path-Injection Fix"), but the underlying
+code was already guarded by a defensive prefix check. The fix is
+a **hardening**, not a correction of a known exploitable
+vulnerability. The registry remains at #33.
+
+**Next expected**: #34 (v1.5.x or later).
+
 ---
 
 ### 🩹 Hotfix
@@ -742,7 +867,7 @@ correctness fixes. The registry remains at #33.
 
 **Format**: `vX.Y.Z-hotfixN` (major.minor.patch-hotfixN).
 
-**In v1.2.0 context**: A hotfix from `v1.2.0` would be `v1.2.1`
+**In v1.4.0 context**: A hotfix from `v1.4.0` would be `v1.4.1`
 (PATCH release via `scripts/release-patch.sh`).
 
 ---
@@ -893,6 +1018,7 @@ pre-critical backup. The `appendDenylist` endpoint now requires a
 **v1.1.0**: Also returns `profile_key` and `memory_limit_mb`.
 **v1.2.0**: Also returns `backups` (7 fields). See §5
 "`runtime_info.backups`".
+**v1.3.0/v1.4.0**: No structural change.
 
 ---
 
@@ -924,8 +1050,9 @@ architecture. See §5 "Persistent Backup" and "Multi-Source Detection".
 **Architectural concept** — one source of truth.
 
 **In the project**:
-- `VERSION` — module version (v1.2.0).
+- `VERSION` — module version (v1.4.0).
 - `proxy/dnscrypt-proxy.version` — DNS version (2.1.18).
+- `proxy/app-apk.version` — companion app version (1.0.0, v1.4.0).
 - `MONITORING_UI_PORT` — reserved port (8080).
 
 **⚠️ Level 4.**
@@ -1086,19 +1213,23 @@ light profiles or starves the heavy ones.
 
 ### 🆕 DNS Version vs Module Version (v1.1.0)
 
-**Two independent versions** coexist in the project:
+**Three independent versions** coexist in the project:
 
-| Version | Source file | v1.2.0 value |
+| Version | Source file | v1.4.0 value |
 |---|---|:---:|
 | **DNS version** (upstream) | `proxy/dnscrypt-proxy.version` | `2.1.18` |
-| **Module version** (this project) | `VERSION` | `v1.2.0` |
+| **Module version** (this project) | `VERSION` | `v1.4.0` |
+| **Companion app version** (v1.4.0) | `proxy/app-apk.version` | `1.0.0` |
 
 - The **DNS version** changes only when upstream ships a new
   `dnscrypt-proxy` release.
 - The **module version** changes with each project release.
-- The two are **independent**. v1.2.0 did **not** bump the DNS version.
+- The **companion app version** changes only when the companion app
+  ships a new release (separate repository).
+- All three are **independent**. v1.3.0 and v1.4.0 did **not** bump
+  the DNS version.
 
-**Common confusion**: Both are called "version" in the codebase.
+**Common confusion**: All three are called "version" in the codebase.
 
 **Reference**: `docs/DNS_BINARIES.md` §1.1.
 
@@ -1115,9 +1246,22 @@ snapshotted to `/sdcard/dnscrypt-webui-backup/`.
 - ✅ Survives factory reset of `/data`.
 - ✅ Visible from any file manager + over USB (MTP).
 
-**Rotation**: Keep the 21 newest snapshots, sorted by directory name.
+**Rotation**:
+- **v1.2.0**: Keep the 21 newest snapshots, sorted by **directory
+  name**.
+- **v1.3.0+**: Keep the 21 newest snapshots, sorted by **mtime
+  descending** (`SNAP-MTIME` / `ROT-MTIME`), with two additional
+  protected targets — the `.last_stable` recovery pointer and the
+  newest install snapshot (`ROT-PROTECT`). See §5 "SNAP-MANIFEST",
+  "SNAP-MTIME", "ROT-MANIFEST", "ROT-MTIME", "ROT-PROTECT".
 
-**Reference**: `docs/BACKUP.md` §1.3, §3.
+**Snapshot detection**:
+- **v1.2.0**: Name pattern (`^[0-9]{8}-[0-9]{6}-`).
+- **v1.3.0+**: Presence of a `.manifest.json` file
+  (`SNAP-MANIFEST` / `ROT-MANIFEST`). See §5 "SNAP-MANIFEST".
+
+**Reference**: `docs/BACKUP.md` §1.3, §3; `docs/ARCHITECTURE.md`
+§4.13.2.
 
 ---
 
@@ -1195,7 +1339,13 @@ verification passes.
 (`main.go`, `service.sh`, `action.sh`). Only install-time
 snapshots update `.last_stable`.
 
-**Reference**: `docs/BACKUP.md` §5.2.
+**v1.3.0+ — ROT-PROTECT**: `rotate_backups` **always preserves** the
+`.last_stable` target even when it falls outside the 21-newest
+window. This prevents recovery mode from being silently broken by
+rotation.
+
+**Reference**: `docs/BACKUP.md` §5.2; `docs/ARCHITECTURE.md`
+§4.13.2.
 
 ---
 
@@ -1231,9 +1381,9 @@ immediately.
 {
   "upgrades": [
     {
-      "from": "v1.1.0",
-      "to": "v1.2.0",
-      "date": "2026-09-29T10:30:00Z",
+      "from": "v1.3.0",
+      "to": "v1.4.0",
+      "date": "2026-10-06T10:30:00Z",
       "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
       "root": "magisk",
       "files": 5
@@ -1335,18 +1485,30 @@ full analysis and `docs/ARCHITECTURE.md` §3.10 for the flow diagram.
 **7-field JSON object** in `runtime_info` describing the backup
 state.
 
-**Schema**:
+**Schema (v1.4.0 example)**:
 ```json
 {
   "available": 5,
   "in_flight_txn": 0,
   "orphan_txn": 0,
-  "last_backup": "2026-09-29 15:00:00",
-  "last_backup_name": "20260929-150000-v1.2.0",
-  "last_stable": "20260929-095826-v1.2.0",
+  "last_backup": "2026-10-06 15:00:00",
+  "last_backup_name": "20261006-150000-v1.4.0-12345",
+  "last_stable": "20261006-095826-v1.4.0-12345",
   "path": "/sdcard/dnscrypt-webui-backup"
 }
 ```
+
+**Field semantics**:
+
+| Field | v1.2.0 | v1.3.0+ |
+|---|---|---|
+| `available` | Count of snapshot dirs (excluding `current/`, `txn-*`, `orphan-txn-*`) | Count of dirs containing a `.manifest.json` file (SNAP-MANIFEST) |
+| `in_flight_txn` | Count of `txn-*` dirs | Unchanged |
+| `orphan_txn` | Count of `orphan-txn-*` dirs | Unchanged |
+| `last_backup` | mtime of the newest snapshot | Unchanged |
+| `last_backup_name` | Newest by **lexicographic directory name** | Newest by **mtime** descending (SNAP-MTIME) |
+| `last_stable` | Content of `.last_stable` | Unchanged |
+| `path` | `$PERSISTENT_BACKUP` | Unchanged |
 
 **Purpose**: Observability + System Info panel display + API
 verification.
@@ -1355,7 +1517,8 @@ verification.
 fields (`status`, `last_backup_age_seconds`) that are not part of
 the API surface.
 
-**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1;
+`docs/ARCHITECTURE.md` §4.13.1.
 
 ---
 
@@ -1392,7 +1555,7 @@ strings** (because `appendDenylist` delegates to `saveDenylist`):
 | `POST /api/save_custom_rules` | `"pre-custom-rules-save"` |
 | `POST /api/append_denylist` | (no own reason — delegates to `saveDenylist`, which uses `"pre-denylist-save"`) |
 
-**Corrected in this revision**: The `appendDenylist` entry
+**Corrected in v1.2.0 revision**: The `appendDenylist` entry
 previously listed `pre-append-denylist` — that string does **not**
 exist in the code. `appendDenylist` delegates to `saveDenylist`, so
 the recorded reason is `pre-denylist-save`.
@@ -1403,7 +1566,9 @@ the recorded reason is `pre-denylist-save`.
 - **Delegated** to `functions.sh:backup_user_files` via
   `runShellWithTimeout`.
 - **Rotation**: after success, `rotate_backups 21` is invoked in
-  the same shell call.
+  the same shell call. With v1.3.0+ `ROT-PROTECT`, this call
+  preserves `.last_stable` and the newest install snapshot even
+  if they fall outside the 21-newest window.
 
 **Reference**: `docs/ARCHITECTURE.md` §4.10.2; `docs/BACKUP.md` §4.3.
 
@@ -1455,7 +1620,7 @@ SELinux context and mode preserved.
 **Behavior**:
 1. Copy the file.
 2. Restore SELinux context via `restorecon` (preferred) or
-   `chcon u:object_r:magisk_file:s0` (fallback).
+  `chcon u:object_r:magisk_file:s0` (fallback).
 3. Set mode `0600`.
 
 **Usage**: Any restore operation on a user file. Do **not** use a
@@ -1480,6 +1645,11 @@ with per-file SHA256 hashes.
 - `files[]` — `{name, sha256}`.
 
 **Advisory**: Missing or invalid manifests do not block a restore.
+
+**v1.3.0+**: The **presence** of `.manifest.json` is used as the
+snapshot detection rule (`SNAP-MANIFEST` / `ROT-MANIFEST`). Any
+snapshot dir must therefore contain a manifest to be visible to
+the API and to rotation. See §5 "SNAP-MANIFEST".
 
 **Reference**: `docs/BACKUP.md` §5.1.
 
@@ -1520,6 +1690,28 @@ devices, root solutions, and upgrade scenarios.
 
 ---
 
+### 🆕 Rotation Guardian (v1.3.0)
+
+**Contributor badge** for verifying the v1.3.0 rotation
+refinements (`SNAP-MANIFEST`, `SNAP-MTIME`, `ROT-MANIFEST`,
+`ROT-MTIME`, `ROT-PROTECT`) on a real device.
+
+**Acceptance criteria** (see `docs/HALL_OF_FAME.md` for the full
+list):
+- ✅ Test snapshot detection by `.manifest.json` presence on a real
+  device.
+- ✅ Verify that rotation sorts by mtime, not by directory name.
+- ✅ Verify that `.last_stable` and the newest install snapshot are
+  never pruned by rotation.
+- ✅ Report any mismatch with concrete evidence (logs + reproduction
+  steps).
+
+**Verification procedure**: `docs/COMPATIBILITY.md` §10.3.5.
+
+**Reference**: `docs/HALL_OF_FAME.md`; `docs/CONTRIBUTING.md` §12.2.
+
+---
+
 ### 🆕 Root-Solution Detection (v1.2.0)
 
 **Layer 5** of the 10 defensive layers. Detects the active root
@@ -1544,13 +1736,13 @@ data-preservation release:
 
 | ID | Change | Reference |
 |:-:|---|---|
-| **BAK-1** | `runtime_info.backups` returns 7 fields | §5 "`runtime_info.backups`" |
-| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | §5 "`createAutoBackup`", "`backupMu`" |
+| **BAK-1** | `runtime_info.backups` returns 7 fields. **v1.3.0+**: `available` and `last_backup_name` are now computed by SNAP-MANIFEST + SNAP-MTIME | §5 "`runtime_info.backups`" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation (`.last_stable` and newest install preserved by v1.3.0+ ROT-PROTECT) | §5 "`createAutoBackup`", "`backupMu`" |
 | **BAK-3** | `cleanupOldTransactions` | §5 "`cleanupOldTransactions`" |
 | **BAK-4** | `checkPendingNotifications` | §5 "`checkPendingNotifications`" |
 
 **Reference**: `docs/SECURITY.md` §5.31; `docs/ARCHITECTURE.md`
-§4.10.
+§4.10, §4.13.
 
 ---
 
@@ -1582,6 +1774,293 @@ switches to Arabic.
 - **Service Worker cache** stays neutral (HTML cached once).
 
 **Reference**: `docs/ARCHITECTURE.md` §6.7; `docs/API.md` §10.8.
+
+---
+
+### 🆕 PWA Install Button (v1.3.0 — v1.4.0 update)
+
+**WebUI feature** — a smart, dynamic install button that is always
+visible (except when the app is already installed or running
+standalone).
+
+**v1.3.0 behavior** (browser-adaptive):
+- **Chromium-based browsers** (Chrome, Edge, Brave, Samsung
+  Internet) — clicking opens the native
+  `beforeinstallprompt` dialog.
+- **iOS Safari** — clicking shows step-by-step "Add to Home
+  Screen" instructions.
+- **Unsupported browsers** (Firefox, Opera Mini, older browsers) —
+  clicking shows a friendly modal stating the browser is not
+  supported, listing supported alternatives (Chrome, Edge, Brave)
+  with Play Store links.
+
+**v1.4.0 change**: The install button was converted to a **direct
+`<a download>` link** pointing at `/app-debug.apk` (the companion
+Android app). The `beforeinstallprompt`-based flow and the iOS
+branch were removed (see §5 "Companion Android App" and
+"iOS PWA Logic Removal").
+
+**Reference**: `docs/ARCHITECTURE.md` §6.7; `CHANGELOG.md`
+§[v1.3.0] and §[v1.4.0].
+
+---
+
+### 🆕 Live Status LED (v1.3.0)
+
+**WebUI feature** — the "Today" stat now carries a 12×12 LED that
+pulses green when the DNS engine is running and turns solid red
+when the service is stopped.
+
+**Implementation**: Pure CSS + JS, aligned with the existing
+`.status-dot` styling and the `updateStatsDisplay()` handler in
+`web/index.html`.
+
+**Reference**: `CHANGELOG.md` §[v1.3.0].
+
+---
+
+### 🆕 DNS Auto-Start After Boot (v1.3.0)
+
+**Critical fix** in `service.sh` (v1.3.0).
+
+**Problem**: The DNS engine was not starting automatically after a
+device reboot when the user had previously left the service in
+the ON state. Root cause: `watchdog.sh` waits a fixed 30-second
+interval before its first API call, and by the time it fires
+`POST /api/ensure_running_service`, the WebUI may not have
+finished binding to its port. The watchdog would retry with
+exponential backoff (30s → 60s → 120s → ...), leaving DNS
+unavailable for minutes after boot.
+
+**Fix**: `service.sh` now performs a **direct, bounded wait** for
+the WebUI to become ready (up to 60 seconds, checking for the
+watchdog token file + the WebUI TCP port), then calls
+`POST /api/ensure_running_service` itself.
+
+**Result**: DNS engine reaches the "ON" state within ~5 seconds of
+`service.sh` startup. The `watchdog.sh` backoff behavior is left
+intact for crash recovery during normal runtime.
+
+**Reference**: `CHANGELOG.md` §[v1.3.0]; `proxy/service.sh`
+§[19].
+
+---
+
+### 🆕 SNAP-MANIFEST (v1.3.0)
+
+**Snapshot-detection rule** introduced in v1.3.0.
+
+**Definition**: A directory in `$PERSISTENT_BACKUP` is treated as a
+snapshot **iff** it contains a `.manifest.json` file (and is not
+named `current`, `txn-*`, or `orphan-txn-*`).
+
+**Implemented in**:
+- `main.go:buildBackupInfo()` (SNAP-MANIFEST).
+- `functions.sh:rotate_backups()` (ROT-MANIFEST).
+- `service.sh` (`_inline_rotate_backups`).
+- `watchdog.sh` (§[5b] snapshot counter, WD-V14-03).
+- `status.sh` (`_list_snapshots`).
+- `customize.sh` (`rotate_backups`).
+- `action.sh` (`_inline_list_snapshots` +
+  `_inline_rotate_backups`).
+- `uninstall.sh` (§[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
+
+**Effect**: Custom-named snapshots (e.g. `pre-v130-manual-...`)
+are now visible to the API and to rotation. Previously they were
+silently skipped.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 SNAP-MTIME (v1.3.0)
+
+**Sort-key rule** introduced in v1.3.0 for the
+`last_backup_name` field of `runtime_info.backups`.
+
+**Definition**: The "newest" snapshot is selected by **mtime**
+(descending), not by lexicographic directory name.
+
+**Rationale**: Robust against clock drift and manual renames.
+Aligns the API with the shell-side `status.sh --json` object.
+
+**Reverses**: The v1.2.0 BUG-3 decision, which had aligned
+`buildBackupInfo` with lexicographic sorting.
+
+**Implemented in**:
+- `main.go:buildBackupInfo()`.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.1; `CHANGELOG.md`
+§[v1.3.0] → Reversed Decisions.
+
+---
+
+### 🆕 ROT-MANIFEST (v1.3.0)
+
+**Rotation detection rule** introduced in v1.3.0.
+
+**Definition**: In `functions.sh:rotate_backups()` (and its
+mirrored implementations), a directory is a rotation candidate
+**iff** it contains a `.manifest.json` file.
+
+**Equivalent to**: SNAP-MANIFEST, but applied during rotation
+rather than during API enumeration.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 ROT-MTIME (v1.3.0)
+
+**Rotation sort-key rule** introduced in v1.3.0.
+
+**Definition**: Rotation candidates are ordered by **mtime**
+(numeric, descending — `sort -rn -k1,1`), not by lexicographic
+directory name.
+
+**Equivalent to**: SNAP-MTIME, but applied during rotation rather
+than during API enumeration.
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 ROT-PROTECT (v1.3.0)
+
+**Rotation protection rule** introduced in v1.3.0.
+
+**Definition**: `rotate_backups` preserves two additional targets
+on top of the 21-newest window:
+
+- The `.last_stable` target (recovery pointer).
+- The newest install snapshot (name matching `-v<digit>`).
+
+**Rationale**: Without these protections, the 21-newest window
+could silently evict the exact snapshot that recovery mode or
+rollback depends on.
+
+**Implemented in**:
+- `functions.sh:rotate_backups()` (canonical).
+- `service.sh` (`_inline_rotate_backups`).
+- `action.sh` (`_inline_rotate_backups`).
+- `customize.sh` (`rotate_backups`).
+
+**Reference**: `docs/ARCHITECTURE.md` §4.13.2; `CHANGELOG.md`
+§[v1.3.0].
+
+---
+
+### 🆕 Companion Android App (v1.4.0)
+
+**Optional asset** — a native Android WebView wrapper (~3 MB) that
+loads the WebUI at `127.0.0.1:9090`.
+
+**Source repository**:
+[gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+
+**Integration points**:
+- `proxy/app-apk.version` — Single Source of Truth for the app
+  version.
+- `scripts/fetch_app_apk.sh` — fetcher (cache, download, SHA256,
+  `.manifest.json`, JSON output, offline mode).
+- `web/app-debug.apk` — the APK bundled into the module ZIP as an
+  OPTIONAL asset.
+- `GET /app-debug.apk` — static route in `proxy/main.go`.
+- `web/index.html` — install button is a direct
+  `<a download>` link to `/app-debug.apk`.
+
+**Optional by design**:
+- `release.yml` fetches the APK into `dist/` (best-effort).
+- `release.yml` stages it at `web/app-debug.apk` (best-effort).
+- `package_module.sh` bundles it only if present (warning
+  otherwise).
+- `proxy/main.go` returns 404 if the file is absent.
+
+**Reference**: `CHANGELOG.md` §[v1.4.0]; `docs/API.md` §6.1.7;
+`docs/ARCHITECTURE.md`.
+
+---
+
+### 🆕 `app-apk.version` (v1.4.0)
+
+**Single Source of Truth** for the companion app version.
+
+**Path**: `proxy/app-apk.version`.
+
+**Format**: `X.Y.Z` (no `v` prefix), e.g. `1.0.0`.
+
+**Read by**: `scripts/fetch_app_apk.sh`.
+
+**Updated when**: The companion app (a separate repository) ships a
+new release.
+
+**Not** the module version — see §5 "DNS Version vs Module
+Version".
+
+**Reference**: `docs/DNS_BINARIES.md` (comparison); `CHANGELOG.md`
+§[v1.4.0].
+
+---
+
+### 🆕 `APK_FILE` (v1.4.0)
+
+**Go constant** in `proxy/main.go` that resolves the companion app
+APK path.
+
+**Value**: `filepath.Join(WEB_DIR, "app-debug.apk")`.
+
+**Used by**: `serveStaticAssets()` — registers the
+`/app-debug.apk` route with mime
+`application/vnd.android.package-archive`.
+
+**Behavior when file is absent**: Returns 404.
+
+**Reference**: `proxy/main.go` §[2].
+
+---
+
+### 🆕 `/app-debug.apk` route (v1.4.0)
+
+**New static route** registered in `serveStaticAssets()`.
+
+**Path**: `GET /app-debug.apk`.
+
+**Auth**: None (public, like other static assets).
+
+**Content-Type**: `application/vnd.android.package-archive`.
+
+**Cache-Control**: `public, max-age=3600, immutable` (per-extension
+cache rule in `serveFile()`).
+
+**Behavior**: Returns 404 if `web/app-debug.apk` is absent.
+
+**Reference**: `docs/API.md` §1.3; `proxy/main.go` §[35].
+
+---
+
+### 🆕 iOS PWA Logic Removal (v1.4.0)
+
+**Cleanup** — Android-only project.
+
+**Removed from `web/index.html`** (~35 lines):
+- `isIOSDevice()` helper.
+- `pwaStepIos1/2/3` translations (EN + AR).
+- iOS branches in `getBrowserName()`, `isBrowserSupported()`,
+  `getPWAInstallSteps()`, `showPWAInstructionsModal()`.
+
+**Rationale**: The project supports Android only (Magisk / KernelSU
+/ APatch module). The iOS-specific code paths were dead code on
+all supported platforms.
+
+**Consequence**: Browsers that never fire `beforeinstallprompt`
+(Firefox, Samsung Internet legacy builds) now fall through to the
+unified "unsupported" message that lists supported alternatives
+(Chrome / Edge / Brave) with Play Store links.
+
+**Reference**: `CHANGELOG.md` §[v1.4.0].
 
 ---
 
@@ -1946,6 +2425,63 @@ not visible to `update-binary` — they live entirely in
 
 ---
 
+### 🎯 `removeModule` (v1.4.0 — hardened)
+
+**Go function** in `main.go` that removes an old module folder.
+
+**v1.4.0 hardening** — closes two CodeQL
+`go/path-injection` alerts:
+
+1. The caller-provided path is passed through `filepath.Base()` to
+   extract the module name (last path component).
+2. The final path is rebuilt from the trusted `MODULES_DIR` constant
+   + the sanitized basename:
+   ```go
+   name := filepath.Base(modulePath)
+   // ...
+   cleanPath := filepath.Join(MODULES_DIR, name)
+   ```
+3. A defence-in-depth prefix check is kept as a second layer:
+   ```go
+   expectedPrefix := MODULES_DIR + string(filepath.Separator)
+   if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
+       return error("Invalid path")
+   }
+   ```
+
+**Effect**: No user-controlled data reaches any path expression after
+the sanitization step.
+
+**Reference**: `docs/SECURITY.md`; `CHANGELOG.md` §[v1.4.0];
+`proxy/main.go` §[29].
+
+---
+
+### 🎯 `sanitizeLogFileName` (v1.4.0)
+
+**Go function** in `main.go` that validates a client-provided log
+file name.
+
+**Guarantees on success**:
+- The returned string is a single path component (no separators,
+  no `..`, no NUL).
+- The name starts with `dnscrypt`.
+- The name ends with `.log`, `.gz`, `.old`, `.txt`, or contains
+  `.emergency.`.
+
+**CodeQL recognition**: The function routes the tainted input
+through `filepath.Base()`, which CodeQL recognizes as an effective
+path-injection sanitizer.
+
+**Used by**:
+- `readLogFile`.
+- `clearLogFile`.
+- `handleDownloadLog`.
+
+**Reference**: `proxy/main.go` §[30].
+
+---
+
 ## 7. CI/CD & Release Terms
 
 ### 🔄 CI — Continuous Integration
@@ -1958,6 +2494,11 @@ not visible to `update-binary` — they live entirely in
 data-preservation layers (syntax + function presence + path
 consistency + docs references).
 
+**v1.4.0 addition**: A `Verify companion app metadata` step that
+validates `proxy/app-apk.version` (format `X.Y.Z`) and confirms
+`scripts/fetch_app_apk.sh` is present. **Non-blocking** — the
+companion app is OPTIONAL.
+
 ---
 
 ### 🚀 CD — Continuous Deployment
@@ -1965,6 +2506,11 @@ consistency + docs references).
 **Continuous deployment** — automatic release when changes are merged.
 
 **In the project**: `.github/workflows/release.yml` (on tag push).
+
+**v1.4.0 additions to `release.yml`**:
+- Fetch companion APK into `dist/` (best-effort).
+- Stage APK at `web/app-debug.apk` before packaging (best-effort).
+- Attach `dist/DNS-Proxy-v*.apk` + `.sha256` to the GitHub Release.
 
 ---
 
@@ -1976,7 +2522,7 @@ consistency + docs references).
 - **MINOR**: New feature (compatible).
 - **PATCH**: Bug fix.
 
-**Example**: `v1.2.0`.
+**Example**: `v1.4.0`.
 
 ---
 
@@ -1996,6 +2542,9 @@ consistency + docs references).
 | v1.1.1 | 1010001 |
 | v1.2.0 | 1020000 |
 | v1.2.1 | 1020001 |
+| v1.3.0 | 1030000 |
+| v1.4.0 | 1040000 |
+| v1.4.1 | 1040001 |
 | v2.0.0 | 2000000 |
 
 **⚠️ Constraint**: `hotfix` ≤ 99.
@@ -2050,24 +2599,29 @@ release.
 security(iptables): implement Custom Chains to prevent orphan rules
 ```
 
+**v1.4.0 example**:
+```bash
+feat(app): integrate companion Android app as optional asset
+```
+
 ---
 
-### 🧪 `upgrade-test.yml` (v1.2.0)
+### 🧪 `upgrade-test.yml` (v1.2.0+)
 
-**GitHub Actions workflow** that runs a **42-scenario matrix** (3
-root solutions × 2 source versions × 7 scenarios).
+**GitHub Actions workflow** that runs a **42-scenario matrix** across
+9 tested layers (Layer 10 is not exercised by this workflow).
 
-**Trigger**: manual (`workflow_dispatch`) + weekly schedule.
+**Trigger**: manual (`workflow_dispatch`) **only**.
 
 **Purpose**: Validate the 10 data-preservation layers across the
 combinations that matter most.
 
-**Runs in**: ~10 minutes.
-
-**Not part of the release pipeline** — it is a QA tool.
+**v1.4.0 note (UPG-V14-04)**: L9-02 and L9-03 now write a
+`.manifest.json` into each synthetic snapshot directory, so the
+v1.3.0 SNAP-MANIFEST detection rule can see them.
 
 **Reference**: `docs/CONTRIBUTING.md` §8.10; `docs/DEVELOPMENT.md`
-§7.4.
+§7.4; `docs/DNS_BINARIES.md` §8.1.
 
 ---
 
@@ -2269,6 +2823,8 @@ string `"8080"`. Behavior is unchanged.
 **v1.2.0 note**: The Dashboard's System Info panel also displays the
 **7-field `backups` object** from `runtime_info`. See §5
 "`runtime_info.backups`".
+
+**v1.3.0/v1.4.0**: No changes to the metrics pipeline.
 
 ---
 
@@ -2495,6 +3051,12 @@ fields describing the backup layer's state.
 **Fields**: `available`, `in_flight_txn`, `orphan_txn`,
 `last_backup`, `last_backup_name`, `last_stable`, `path`.
 
+**v1.3.0+ semantics** (see §5 SNAP-MANIFEST and SNAP-MTIME):
+- `available` counts a directory only if it contains a
+  `.manifest.json` file.
+- `last_backup_name` is chosen by mtime sort, not lexicographic
+  name.
+
 **Why this is a security-adjacent addition**: A non-zero
 `in_flight_txn` or `orphan_txn` signals a degraded backup layer that
 may need manual inspection. Exposing these fields allows scripts and
@@ -2502,7 +3064,8 @@ users to detect this condition early.
 
 **⚠️ v1.2.0 — BAK-1 (not an audit correction).**
 
-**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1.
+**Reference**: `docs/API.md` §6.1.7; `docs/BACKUP.md` §8.1;
+`docs/ARCHITECTURE.md` §4.13.1.
 
 ---
 
@@ -2581,7 +3144,7 @@ release completes the fix in `dashboard.html` as well.
 
 ---
 
-### 🆕 Language Toggle (client-side only) (v1.2.0)
+### 🆕 Language Toggle (client-side only) (v1.2.0+)
 
 **Security concept** — the WebUI's bilingual toggle (English default
 + Arabic) is a **client-side only** concern.
@@ -2607,6 +3170,50 @@ release completes the fix in `dashboard.html` as well.
 
 ---
 
+### 🆕 CodeQL Path-Injection Fix (v1.4.0)
+
+**Hardening** in `proxy/main.go:removeModule`.
+
+**Context**: CodeQL (GitHub's static-analysis tool) flagged two
+`go/path-injection` alerts on `removeModule`. The endpoint accepted a
+caller-provided path and used it in file operations after a
+string-prefix check — but CodeQL does not recognize string-prefix
+checks as path sanitizers, so the alerts persisted.
+
+**The fix**:
+
+1. Extract the module name via `filepath.Base()`, which CodeQL
+   recognizes as an effective path-injection sanitizer:
+   ```go
+   name := filepath.Base(modulePath)
+   ```
+2. Rebuild the final path from the trusted `MODULES_DIR` constant +
+   the sanitized basename:
+   ```go
+   cleanPath := filepath.Join(MODULES_DIR, name)
+   ```
+3. Keep the prefix check as defence-in-depth (does not participate
+   in path construction).
+
+**Effect**:
+- Both CodeQL alerts are closed.
+- The behaviour of the endpoint is unchanged for valid inputs.
+- The sanitization is enforced at the point of path construction, so
+  no user-controlled data reaches any path expression.
+
+**Was this exploitable?** The original code was already guarded by a
+prefix check that rejected any path outside `MODULES_DIR`. In
+practice, the endpoint could not be exploited to escape the module
+directory. The fix is a **hardening** that aligns the code with
+CodeQL's recognized sanitization pattern — it also removes a class
+of future regression risk.
+
+**⚠️ v1.4.0 — not an audit correction.**
+
+**Reference**: `CHANGELOG.md` §[v1.4.0]; `proxy/main.go` §[29].
+
+---
+
 ## 10. Common Abbreviations
 
 | Abbreviation | Meaning | Full Form |
@@ -2614,6 +3221,7 @@ release completes the fix in `dashboard.html` as well.
 | **ABI** | Application Binary Interface | Application Binary Interface |
 | **ACL** | Access Control List | Access Control List |
 | **API** | Application Programming Interface | Application Programming Interface |
+| **APK** | Android Package Kit | Android Package Kit |
 | **CI/CD** | Continuous Integration / Deployment | Continuous Integration / Deployment |
 | **CORS** | Cross-Origin Resource Sharing | Cross-Origin Resource Sharing |
 | **COOP** | Cross-Origin-Opener-Policy | Cross-Origin-Opener-Policy |
@@ -2681,6 +3289,16 @@ release completes the fix in `dashboard.html` as well.
 | **MTP** | Media Transfer Protocol | Media Transfer Protocol |
 | **FUSE** | Filesystem in Userspace | Filesystem in Userspace (`/sdcard/` mount) |
 | **OTA** | Over-The-Air | Over-The-Air update |
+
+**v1.3.0 / v1.4.0 Abbreviations**:
+
+| Abbreviation | Meaning | Full Form |
+|:---:|---|---|
+| **CodeQL** | CodeQL | GitHub's static-analysis engine |
+| **LED** | Light-Emitting Diode | Used metaphorically for the status indicator |
+| **WebView** | WebView | Android's embedded browser component (used by the companion app) |
+| **SNAP** | Snapshot detection | Snapshot-detection rule family (SNAP-MANIFEST, SNAP-MTIME) |
+| **ROT** | Rotation | Rotation-rule family (ROT-MANIFEST, ROT-MTIME, ROT-PROTECT) |
 
 ---
 
@@ -2756,8 +3374,8 @@ release completes the fix in `dashboard.html` as well.
 
 | ID | Change | Reference |
 |:-:|---|---|
-| **BAK-1** | 7-field `runtime_info.backups` | `runtime_info.backups` (§5) + §9 "7-field Backups Schema" |
-| **BAK-2** | `createAutoBackup` + `backupMu` + rotation | `createAutoBackup`, `backupMu` (§5) + §6 `backupMu` |
+| **BAK-1** | 7-field `runtime_info.backups` (with v1.3.0 SNAP-MANIFEST + SNAP-MTIME semantics) | `runtime_info.backups` (§5) + §9 "7-field Backups Schema" |
+| **BAK-2** | `createAutoBackup` + `backupMu` + rotation (with v1.3.0 ROT-PROTECT) | `createAutoBackup`, `backupMu` (§5) + §6 `backupMu` |
 | **BAK-3** | `cleanupOldTransactions` | `cleanupOldTransactions` (§5) |
 | **BAK-4** | `checkPendingNotifications` | `checkPendingNotifications` (§5) |
 
@@ -2780,8 +3398,42 @@ release completes the fix in `dashboard.html` as well.
 | 6 | SELinux Preservation | `copy_with_context` (§5) |
 | 7 | Recovery Mode | `Recovery Mode Trigger` (§5) |
 | 8 | Config Migrations | (see `docs/BACKUP.md` §11) |
-| 9 | Automation + Rotation | (see `docs/BACKUP.md` §6) |
+| 9 | Automation + Rotation (**v1.3.0+**: mtime sort + protected targets) | (see `docs/BACKUP.md` §6; `docs/ARCHITECTURE.md` §4.13.2) |
 | 10 | Observability | `runtime_info.backups` (§5) |
+
+### 🆕 v1.3.0 — Feature Release (Not an Audit Correction)
+
+**No audit corrections added.**
+
+| Feature | Reference |
+|---|---|
+| PWA Install Button | `PWA Install Button` (§5) |
+| Live Status LED | `Live Status LED` (§5) |
+| DNS Auto-Start After Boot | `DNS Auto-Start After Boot` (§5) |
+| **SNAP-MANIFEST** | `SNAP-MANIFEST` (§5) |
+| **SNAP-MTIME** | `SNAP-MTIME` (§5) |
+| **ROT-MANIFEST** | `ROT-MANIFEST` (§5) |
+| **ROT-MTIME** | `ROT-MTIME` (§5) |
+| **ROT-PROTECT** | `ROT-PROTECT` (§5) |
+| **Rotation Guardian** badge | `Rotation Guardian` (§5) |
+
+**The Audit Corrections Registry remains at #33.**
+
+### 🆕 v1.4.0 — Integration Release (Not an Audit Correction)
+
+**No audit corrections added.**
+
+| Change | Reference |
+|---|---|
+| Companion Android App | `Companion Android App` (§5) |
+| `app-apk.version` | `app-apk.version` (§5) |
+| `APK_FILE` constant | `APK_FILE` (§5) |
+| `/app-debug.apk` route | `/app-debug.apk route` (§5) |
+| iOS PWA Logic Removal | `iOS PWA Logic Removal` (§5) |
+| CodeQL Path-Injection Fix | `CodeQL Path-Injection Fix` (§9) + `removeModule` (§6) |
+| `sanitizeLogFileName` | `sanitizeLogFileName` (§6) |
+
+**The Audit Corrections Registry remains at #33.**
 
 ### 📁 File-Scoped Identifier Families (HARD-*)
 
@@ -2796,14 +3448,19 @@ release completes the fix in `dashboard.html` as well.
 >
 > | Prefix | Owning file | Range | Purpose |
 > |---|---|---|---|
-> | `HARD-CS-*` | `proxy/customize.sh` | 01..10 | Installer hardening (10 defensive layers) |
+> | `HARD-CS-*` | `proxy/customize.sh` | 01..19 | Installer hardening (10 defensive layers + v1.3.0/v1.4.0 sync) |
 > | `HARD-FSH-*` | `proxy/functions.sh` | 01..11 | Backup helpers + `get_watchdog_token` (FSH-11) |
-> | `HARD-BK-*` | `docs/BACKUP.md` | 01..19 (with gaps) | Backup system reference hardening (see `docs/BACKUP.md` header for the exact list) |
+> | `HARD-BK-*` | `docs/BACKUP.md` | 01..19 (with gaps) | Backup system reference hardening |
 > | `HARD-COMPAT-*` | `docs/COMPATIBILITY.md` | 01..07 | Device compatibility hardening |
 > | `HARD-MK-*` | `Makefile` | 01..09 | Build-target hardening |
 > | `HARD-PM-*` | `scripts/package_module.sh` | 01..10 | Module packaging hardening |
 > | `BLD-*` | `proxy/build.sh` | 1..8 | Cross-compilation hardening |
-> | `ACT-*` | `proxy/action.sh` | 1..N | Magisk Action button hardening (e.g. ACT-5) |
+> | `ACT-*` | `proxy/action.sh` | 1..N | Magisk Action button hardening |
+> | `HARD-BRN-*` | `docs/BRANCHING.md` | 01..05 | v1.4.0 documentation-sync corrections |
+> | `HARD-CON-*` | `docs/CONTRIBUTING.md` | 01..07 | v1.4.0 documentation-sync corrections |
+> | `HARD-DEV-*` | `docs/DEVELOPMENT.md` | 01..11 | v1.4.0 documentation-sync corrections |
+> | `HARD-FAQ-*` | `docs/FAQ.md` | 01..08 | v1.4.0 documentation-sync corrections |
+> | `HARD-GLO-*` | `docs/GLOSSARY.md` (this file) | 01..10 | v1.4.0 documentation-sync corrections |
 >
 > **Why these are file-scoped, not project-wide**:
 >
@@ -2812,7 +3469,7 @@ release completes the fix in `dashboard.html` as well.
 >   context after a copy"). It is not a project-level decision that
 >   would justify an ADR.
 > - Renumbering a `HARD-*` identifier in one file has no effect on
->   any other file. The family prefix (`CS`, `FSH`, `BK`, ...)
+>   any other file. The family prefix (`CS`, `FSH`, `BRN`, ...)
 >   already encodes the owning file, so central numbering would add
 >   coordination cost without any benefit.
 > - If a `HARD-*` rule ever becomes a project-wide concern, it is
@@ -2824,10 +3481,14 @@ release completes the fix in `dashboard.html` as well.
 >
 > - The **Audit Corrections Registry** lives in
 >   `docs/SECURITY.md` §17 (currently at **#33**; next expected
->   **#34** in v1.3.x).
+>   **#34** in v1.5.x or later).
 > - The **v1.2.0 runtime additions** (BAK-1..BAK-4, FIX-1, FIX-2,
 >   WD-TOKEN) are also listed in `docs/SECURITY.md` §17.2 — they
 >   are deliberately **not** audit correction numbers.
+> - The **v1.3.0 features** (including SNAP-*/ROT-* rotation
+>   refinements) and **v1.4.0 integration** are documented in
+>   `CHANGELOG.md` §[v1.3.0] and §[v1.4.0] — they are not audit
+>   corrections either.
 > - The **10 defensive layers** correspond to the `HARD-CS-*` and
 >   `HARD-FSH-*` families. See `docs/BACKUP.md` §1.3 for the layer
 >   → file mapping.
@@ -2837,7 +3498,8 @@ release completes the fix in `dashboard.html` as well.
 The last audit correction is **#33** (v1.0.0). See
 `docs/SECURITY.md` §17 for the full registry.
 
-**Next expected**: #34 (v1.3.x).
+**Registry status as of v1.4.0**: unchanged at #33.
+**Next expected**: #34 (v1.5.x or later).
 
 ---
 
@@ -2862,25 +3524,26 @@ The last audit correction is **#33** (v1.0.0). See
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
 - [Exponential Backoff (AWS)](https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/)
 - [Go runtime/debug — SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
+- [CodeQL — Go queries](https://codeql.github.com/codeql-query-help/go/)
 
 ### Internal Documentation
 
 | Document | Purpose |
 |---|---|
-| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10) |
+| [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture (§3.10, §4.10, **§4.13 — v1.3.0 rotation refinements**) |
 | [docs/SECURITY.md](SECURITY.md) | Security + Audit Corrections (§5.31, §5.32) |
 | [docs/API.md](API.md) | HTTP API Reference (§6.1.7) |
 | [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting |
-| [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix |
+| [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix (**§10.3.5 — on-device SNAP-*/ROT-* verification**) |
 | [docs/DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries management (Level 4) |
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
-| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1) |
-| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
-| [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q121–Q130) |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.2.0) |
+| [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide (§3.0, §3.1, §3.2) |
+| [docs/BACKUP.md](BACKUP.md) | **Backup system reference (v1.2.0 + v1.3.0 rotation)** |
+| [docs/EMERGENCY.md](EMERGENCY.md) | **Emergency recovery (v1.2.0+)** |
+| [docs/FAQ.md](FAQ.md) | Frequently asked questions (Q131–Q140 for v1.3.0, Q141–Q150 for v1.4.0) |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history (v1.0.0 → v1.4.0) |
 
 ---
 
@@ -2895,8 +3558,8 @@ Found a missing term? Or an unclear definition?
 
 ---
 
-*Last updated: 2026-10-02*
-*Version: v1.3.0*
+*Last updated: 2026-10-08*
+*Version: v1.4.0*
 *Author: gasciljh*
 
 ---

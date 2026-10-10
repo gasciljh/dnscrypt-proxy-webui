@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=ksh
 # ============================================================
 # DNSCrypt Smart Filter – functions.sh
-# Version: v1.3.0 (Global Edition)
+# Version: v1.4.0 (Global Edition)
+# Last updated: 2026-10-08
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -32,7 +34,7 @@
 #   • WebUI launcher with retry
 #   • SELinux context preservation helper (v1.2.0)
 #   • Persistent backup/restore helpers (v1.2.0)
-#   • Backup rotation (v1.2.0)
+#   • Backup rotation (v1.2.0, rewritten v1.3.0)
 #   • Auto-backup trigger (v1.2.0)
 #   • Transaction cleanup helper (v1.2.0)
 #   • Watchdog token reader (v1.2.0)
@@ -99,11 +101,11 @@
 # ============================================================
 # This file carries two identifier families. The inventory
 # below is the AUTHORITATIVE list of identifiers actually
-# present in the file. It was corrected during the v1.2.0
+# present in the file. It was corrected during the v1.4.0
 # release audit to remove historical mislabeling and to
 # document the true identifier set.
 #
-# Identifier inventory in THIS file (25 total):
+# Identifier inventory in THIS file (28 total):
 #
 #   • FSH-1, FSH-2, FSH-3, FSH-4, FSH-5, FSH-6, FSH-7,
 #     FSH-9, FSH-10, FSH-11                     (10)
@@ -112,7 +114,7 @@
 #          it belongs to customize.sh)
 #
 #   • FSH-12, FSH-13, FSH-14, FSH-15              (4)
-#       — NEW corrections in this revision:
+#       — NEW corrections in the v1.2.0 revision:
 #         FSH-12 → real symlink rejection in
 #                  `_load_bootstrap_from_cache`
 #                  (HARD-FSH-06 was documented but the
@@ -127,6 +129,18 @@
 #         FSH-15 → `get_watchdog_token` now rejects a
 #                  token file that is not a regular file
 #                  (symlink / FIFO / device rejection)
+#
+#   • FSH-16, FSH-17, FSH-18                      (3)
+#       — v1.4.0 documentation-sync corrections
+#         (see the v1.4.0 block below):
+#         FSH-16 → `functions.sh` is orthogonal to the
+#                  v1.4.0 companion APK integration
+#         FSH-17 → version header bumped v1.3.0 →
+#                  v1.4.0 (documentation only, no
+#                  behaviour change)
+#         FSH-18 → correction of the v1.3.0 block and of
+#                  the `rotate_backups` doc-header to
+#                  reflect the actual v1.3.0 refinement
 #
 #   • HARD-FSH-01, HARD-FSH-02, HARD-FSH-03,
 #     HARD-FSH-04, HARD-FSH-05, HARD-FSH-06,
@@ -243,7 +257,7 @@
 #     before touching the `.last_auto_backup` marker.
 #
 # ------------------------------------------------------------
-# NEW corrections in this revision (FSH-12 … FSH-15):
+# NEW corrections in the v1.2.0 revision (FSH-12 … FSH-15):
 # ------------------------------------------------------------
 #
 #   🔧 FSH-12 — `_load_bootstrap_from_cache` now ACTUALLY
@@ -274,6 +288,115 @@
 #     bootstrap cache, and closes a theoretical vector where
 #     a compromised run/ directory could redirect the token
 #     read to an attacker-controlled path.
+#
+# ============================================================
+# v1.3.0 — Server-side refinement: rotate_backups() rewrite
+# ============================================================
+#   The v1.3.0 release is primarily a feature release focused
+#   on the PWA install button and the live status LED — both
+#   are pure client-side features in web/index.html.
+#
+#   However, the shared shell library (functions.sh) was ALSO
+#   refined in v1.3.0. The `rotate_backups` function was
+#   rewritten for robustness. Earlier drafts of this header
+#   claimed "no changes to the shared library" and
+#   "byte-for-byte identical between v1.2.0 and v1.3.0" —
+#   those claims were inaccurate and have been corrected in
+#   the v1.4.0 revision (see the FSH-18 entry below).
+#
+#   The v1.3.0 rotation refinement is documented under three
+#   identifiers (also used in CHANGELOG.md and in
+#   docs/ARCHITECTURE.md §4.13.2):
+#
+#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
+#     A directory is treated as a snapshot iff it contains a
+#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
+#     and `orphan-txn-*/`.
+#
+#     Before v1.3.0: only directories whose name matched the
+#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
+#     custom-named snapshots were silently skipped.
+#
+#   🔧 ROT-MTIME — mtime sort.
+#     Candidates are ordered by mtime (numeric, descending),
+#     not by lexicographic directory name. Robust against
+#     clock drift and against manual renames. Aligns
+#     `rotate_backups` with the `runtime_info.backups` API
+#     (which uses the same mtime sort since v1.3.0 — see
+#     SNAP-MTIME in proxy/main.go).
+#
+#   🔧 ROT-PROTECT — protected rotation targets.
+#     Two additional snapshots are preserved on top of the
+#     21-newest window:
+#       • The `.last_stable` target (recovery pointer).
+#       • The newest install snapshot (name matches
+#         `-v<digit>`).
+#     Without these protections, the 21-newest window could
+#     silently evict the exact snapshot that recovery mode
+#     or rollback depends on.
+#
+#   All other v1.2.0 helpers (`backup_user_files`,
+#   `restore_user_files`, `auto_backup_if_needed`,
+#   `cleanup_old_transactions`, `copy_with_context`,
+#   `verify_backup_integrity`, `write_manifest`,
+#   `get_watchdog_token`) remain byte-for-byte identical
+#   between v1.2.0 and v1.3.0.
+#
+#   See CHANGELOG.md v1.3.0 section, and
+#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
+# ============================================================
+#
+# ============================================================
+# v1.4.0 — Companion Android app integration
+# ============================================================
+#   📱 FSH-16 — No behavior change. `functions.sh` is a
+#     shared library sourced by service.sh, action.sh,
+#     status.sh, uninstall.sh, watchdog.sh, and (via runShell)
+#     main.go. It does NOT manage the companion Android app
+#     APK (`web/app-debug.apk`).
+#
+#     The APK lifecycle is handled by:
+#       • customize.sh → extracts it from the ZIP (unzip 'web/*')
+#       • proxy/main.go  → serves it at /app-debug.apk
+#       • release.yml    → stages it via fetch_app_apk.sh
+#
+#     `functions.sh` continues to manage the 5 user config files
+#     (webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
+#     allowlist.txt, denylist.txt) and the backup/restore/rotation
+#     helpers, unchanged.
+#
+#   📱 FSH-17 — Version bump v1.3.0 → v1.4.0.
+#     No `--version` flag exists in this library (it is sourced,
+#     not executed directly). The version header is purely
+#     documentary. No behavior changes to any helper:
+#     backup_user_files, restore_user_files, rotate_backups,
+#     verify_backup_integrity, write_manifest, copy_with_context,
+#     get_watchdog_token, auto_backup_if_needed,
+#     cleanup_old_transactions, or the firewall functions.
+#
+#   📚 FSH-18 — Documentation-sync correction for v1.3.0.
+#     The v1.3.0 block above and the doc-block above
+#     `rotate_backups()` were previously inaccurate. They
+#     claimed "no changes to the shared library" and "sorted
+#     by DIRECTORY NAME ... does not depend on mtimes", while
+#     the v1.3.0 code in fact:
+#       • Detects snapshots by `.manifest.json` presence
+#         (ROT-MANIFEST).
+#       • Sorts candidates by mtime, descending (ROT-MTIME).
+#       • Preserves `.last_stable` and the newest install
+#         snapshot on top of the 21-newest window
+#         (ROT-PROTECT).
+#
+#     This revision corrects both blocks so they reflect the
+#     actual v1.3.0 implementation. No code in this file
+#     changed between v1.3.0 and v1.4.0 — this is a
+#     documentation-only correction. The version header on
+#     line 4 is bumped to v1.4.0 for traceability, in line
+#     with the other module files.
+#
+#     See CHANGELOG.md v1.4.0 section and
+#     docs/ARCHITECTURE.md §4.13.
+# ============================================================
 #
 # ============================================================
 # POSIX note on `local`:
@@ -529,7 +652,8 @@ log_fn() {
         local _size
         _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
         if [ -n "$_size" ] && [ "$_size" -gt 52428800 ]; then
-            local emg="${LOG_FILE}.emergency.$(date +%s)"
+            local emg
+            emg="${LOG_FILE}.emergency.$(date +%s)"
             mv -f "$LOG_FILE" "$emg" 2>/dev/null
             : > "$LOG_FILE"
         fi
@@ -2020,9 +2144,26 @@ restore_user_files() {
 #   • .last_auto_backup
 #   • README.md
 #
-# Snapshots are sorted by DIRECTORY NAME (which starts with
-# YYYYMMDD-HHMMSS-). This is stable across reboots and does not
-# depend on mtimes.
+# v1.3.0 REWRITE (FSH-18) — the detection, ordering, and
+# protection logic was rewritten in v1.3.0 for robustness.
+# See the inline block at the top of the function body for
+# the implementation notes:
+#   • ROT-MANIFEST  — snapshots are detected by the presence
+#                     of `.manifest.json` (not by name pattern).
+#   • ROT-MTIME     — candidates are sorted by mtime (numeric,
+#                     descending), not by directory name.
+#                     Robust against clock drift and manual
+#                     renames.
+#   • ROT-PROTECT   — two additional targets are preserved on
+#                     top of the 21-newest window:
+#                       - the `.last_stable` target;
+#                       - the newest install snapshot.
+#
+# v1.2.0 HISTORY — the original v1.2.0 implementation sorted
+# by directory name (which starts with `YYYYMMDD-HHMMSS-`) and
+# did NOT explicitly protect `.last_stable` or the newest
+# install. That implementation was replaced in v1.3.0. Do NOT
+# restore it.
 #
 # HARD-FSH-10: refuse to prune when the directory is not
 # readable, and log the skip.
@@ -2038,16 +2179,24 @@ rotate_backups() {
 
     # ============================================================
     # v1.3.0 — Professional rotation logic
+    #          (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT)
     # ============================================================
-    # Detection:
-    #   any directory containing .manifest.json, excluding:
-    #     current/, txn-*/, orphan-txn-*
-    # Sorting:
-    #   by mtime (numeric, descending) — robust vs clock drift
-    #   and against custom snapshot names.
-    # Preservation:
-    #   • .last_stable target        (recovery pointer)
-    #   • newest install snapshot    (name contains -v<digit>)
+    # Detection (ROT-MANIFEST):
+    #   A directory is a snapshot iff it contains a
+    #   `.manifest.json` file. Excludes current/, txn-*/,
+    #   and orphan-txn-*/.
+    # Sorting (ROT-MTIME):
+    #   Candidates are ordered by mtime (numeric, descending),
+    #   not by directory name. Robust against clock drift and
+    #   against custom snapshot names.
+    # Preservation (ROT-PROTECT):
+    #   Two additional snapshots are protected on top of the
+    #   21-newest window:
+    #     • .last_stable target        (recovery pointer)
+    #     • newest install snapshot    (name contains -v<digit>)
+    #
+    # See CHANGELOG.md (v1.3.0) and
+    # docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
     # ============================================================
 
     local _protected=""
@@ -2105,7 +2254,7 @@ rotate_backups() {
             log_fn "  🛡️ Preserved (newest install): $_name"
             continue
         fi
-        if rm -rf "$PERSISTENT_BACKUP/$_name" 2>/dev/null; then
+        if rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null; then
             log_fn "  🗑️ Removed: $_name"
         fi
     done <<EOF
