@@ -504,6 +504,7 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+	securejoin "github.com/cyphar/filepath-securejoin"
 )
 
 // ============================================================
@@ -3131,7 +3132,13 @@ func removeModule(modulePath string) map[string]interface{} {
 	// Reconstruct the full path from the trusted base directory
 	// and the sanitized name. No user-controlled data reaches
 	// any path expression from this point onwards.
-	cleanPath := filepath.Join(MODULES_DIR, name)
+	cleanPath, err := securejoin.SecureJoin(MODULES_DIR, name)
+        if err != nil {
+                return map[string]interface{}{
+                        "status":  "error",
+                        "message": "Invalid path",
+                }
+        }
 
 	if cleanPath == MODDIR {
 		return map[string]interface{}{

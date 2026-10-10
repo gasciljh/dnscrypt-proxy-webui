@@ -12,10 +12,11 @@
 //   • Module path: dnscrypt-webui
 //   • Go version: 1.22 (matches the toolchain in devcontainer,
 //     CI, and release workflows)
-//   • No external dependencies — the project uses only the Go
-//     standard library (crypto, net/http, os, sync, ...).
-//   • `go.sum` is intentionally absent because there are no
-//     dependencies to verify.
+//   • Historically dependency-free. As of v1.4.1, exactly ONE
+//     external dependency is allowed: filepath-securejoin
+//     (see ADR-0007). All other code remains stdlib-only.
+//   • `go.sum` was intentionally absent before v1.4.1. It now
+//     pins github.com/cyphar/filepath-securejoin v0.7.0 (ADR-0007).
 //
 // ============================================================
 // Cross-references:
@@ -106,6 +107,18 @@
 //   • See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
 //     for the full v1.3.0 delta.
 //
+// v1.4.1 notes:
+//   • First and only external dependency added:
+//       github.com/cyphar/filepath-securejoin v0.7.0
+//   • Rationale: CodeQL does not recognize filepath.Base() as a
+//     sanitizer for go/path-injection in the removeModule data
+//     flow. SecureJoin is the official CodeQL-recommended fix.
+//     See ADR-0007 for the full decision record.
+//   • Scope: ONLY proxy/main.go:removeModule. All other code
+//     remains standard-library-only.
+//   • This supersedes the "no external dependencies" clause of
+//     docs/ARCHITECTURE.md §1.2 — for this case only.
+//
 // v1.4.0 notes:
 //   • Version bumped from v1.3.0 to v1.4.0 (documentation only —
 //     no behavioral changes to the Go module itself).
@@ -136,10 +149,9 @@
 //     • -buildid=        → deterministic build ID
 //     • -mod=readonly    → fail if go.mod needs changes
 //
-// ⚠️ Do NOT add external dependencies without an ADR. The
-//    dependency-free policy is one of the project's core
-//    architectural principles (see docs/ARCHITECTURE.md §1.2
-//    and docs/adr/README.md §3).
+// ⚠️ Do NOT add external dependencies without an ADR.
+//    ADR-0007 authorizes exactly ONE: filepath-securejoin.
+//    Any future external dependency MUST have its own ADR.
 //
 // ⚠️ If you change the `go` directive below (currently 1.22),
 //    you MUST also update:
@@ -153,3 +165,5 @@
 module dnscrypt-webui
 
 go 1.22
+
+require github.com/cyphar/filepath-securejoin v0.7.0

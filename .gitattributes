@@ -335,7 +335,7 @@ proxy/run/.bootstrap_cache binary
 *.go          diff=golang
 *.sh          diff=shell
 
-go.sum        -diff
+go.sum        text eol=lf
 checksums.txt -diff
 
 # ============================================================

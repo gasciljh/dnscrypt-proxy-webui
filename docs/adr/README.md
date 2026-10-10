@@ -25,6 +25,7 @@
 >   • [ADR-0004](0004-unified-pr-template.md) — superseded
 >   • [ADR-0005](0005-release-specific-pr-template.md) — active
 >   • [ADR-0006](0006-rename-hotfix-to-release-patch.md) — active
+>   • [ADR-0007](0007-external-dependency-securejoin.md) — external dependency (securejoin)
 >   • [../ARCHITECTURE.md §4.13](../ARCHITECTURE.md) — v1.3.0 server-side refinements
 >   • [../ARCHITECTURE.md §4.1, §11.37](../ARCHITECTURE.md) — MAIN-01 (v1.4.0)
 >   • [../SECURITY.md §5.31–§5.35](../SECURITY.md) — data-preservation + hardening
@@ -592,7 +593,8 @@ docs/adr/
 ├── 0003-post-release-sync.md
 ├── 0004-unified-pr-template.md
 ├── 0005-release-specific-pr-template.md
-└── 0006-rename-hotfix-to-release-patch.md
+├── 0006-rename-hotfix-to-release-patch.md
+└── 0007-external-dependency-securejoin.md
 ```
 
 ### 5.4 Numbering Rules
@@ -615,6 +617,7 @@ docs/adr/
 | [0004](0004-unified-pr-template.md) | Unified PR template | ⚠️ Superseded | 2026-09-24 |
 | [0005](0005-release-specific-pr-template.md) | Release-specific PR template | ✅ Accepted | 2026-09-24 |
 | [0006](0006-rename-hotfix-to-release-patch.md) | Rename `hotfix.sh` → `release-patch.sh` | ✅ Accepted | 2026-09-24 |
+| [0007](0007-external-dependency-securejoin.md) | External dependency — `filepath-securejoin` | ✅ Accepted | 2026-10-10 |
 
 ### 6.2 Superseded / Deprecated
 
@@ -681,7 +684,8 @@ v1.0.0 cycle (2026-09-24):
   ├── ADR-0003  Post-release sync
   ├── ADR-0004  Unified PR template           (superseded)
   ├── ADR-0005  Release-specific PR template  (supersedes 0004)
-  └── ADR-0006  Rename hotfix.sh → release-patch.sh
+  ├── ADR-0006  Rename hotfix.sh → release-patch.sh
+  └── ADR-0007  External dependency — filepath-securejoin
 
 v1.1.0 cycle (2026-09-26):
   └── (no new ADRs — polish release)
@@ -1074,6 +1078,7 @@ The six ADRs added in the v1.0.0 cycle:
 | 0004 | v1.0.0 | Unified PR template (superseded) |
 | 0005 | v1.0.0 | Release-specific PR template |
 | 0006 | v1.0.0 | Rename hotfix.sh → release-patch.sh |
+| 0007 | v1.4.1 | External dependency — filepath-securejoin |
 
 ### 10.4 v1.1.0 – v1.4.0 Cycle References
 
