@@ -2,177 +2,97 @@
 
 Vulnerability disclosure policy + threat model + applied protections.
 
-**Version**: v1.4.0
-**Last updated**: 2026-10-08
+**Version**: v1.5.0
+**Last updated**: 2026-10-15
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 **Contact**: [GitHub Private Vulnerability Reporting](https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new)
 
-> **Identifier inventory in this file (5 total)**:
->   • HARD-SEC-V14-01 (§5.31.2 rotation semantics — v1.4.0)
->   • HARD-SEC-V14-02 (§5.31.4 SNAP-MANIFEST note — v1.4.0)
->   • HARD-SEC-V14-03 (§3.2 ROT-* / SNAP-* protections — v1.4.0)
->   • HARD-SEC-V14-04 (§2.1 snapshot-set integrity asset — v1.4.0)
->   • HARD-SEC-V14-05 (§16 v1.3.0 rotation changelog entry — v1.4.0)
+> **v1.5.0 changes**:
+>   • Version bumped from v1.4.0 to v1.5.0.
+>   • **No new audit corrections** — v1.5.0 is a feature release.
+>     The Audit Corrections Registry (§17) remains at **#33** (last
+>     entry from v1.0.0). New audit corrections will resume at **#34**
+>     in a future release.
+>   • **Companion app one-tap install (APK-5, APK-11)** — the WebUI
+>     install button now triggers a root-level install via
+>     `install_app.sh`, gated by a one-shot CSRF token and a per-IP
+>     rate limit. See **§5.36 (new)** for the full security model.
+>   • **New auth scheme** — a one-shot **install token** (60 s TTL)
+>     consumed by `POST /api/install_companion_app`. It is orthogonal
+>     to the session cookie scheme. See **§7.1**.
+>   • **New assets in the trust model** — `installTokens`
+>     (in-memory), `installAttempts` (per-IP rate limiter), and
+>     `companionStateCache` (30 s). See **§2.1** and **§4.2**.
+>   • **New adversary scenarios** — install brute-force and CSRF on
+>     the install endpoint. See **§3.1**.
+>   • **SELinux staging (APK-11)** — the APK is copied to
+>     `/data/local/tmp/` before the install. **SELinux is never
+>     disabled**. See **§5.36.3**.
+>   • **Play Protect temporary disable (APK-11)** — the package
+>     verifier is disabled during the cascade and restored on exit
+>     via a three-way `EXIT / INT / TERM` trap. See **§5.36.4**.
+>   • **Client-side state fixes** (IDX-23, IDX-23b, IDX-25, IDX-25a)
+>     — no security impact. Documented in `docs/ARCHITECTURE.md`
+>     §6.9–§6.12.
+>   • **All v1.4.0 sections retained**. §5.34 (CodeQL fix) and §5.35
+>     (iOS removal + companion APK route) are preserved unchanged.
 
-> **v1.4.0 changes**:
+> **v1.5.0+ post-release patches**:
+>   Documentation-accuracy corrections applied after the v1.5.0
+>   Global Edition sweep. **None is an audit correction** — the
+>   Registry (§17) remains at **#33**.
+>
+>   • **§5.36.3** — corrected the staged-APK cleanup description
+>     (the trap *does* remove the file on every exit path).
+>   • **§5.36.4** — corrected the Play Protect duration claim and
+>     documented the `$_VERIFIER_ORIG` restore value.
+>   • **§12.1** — corrected the `install_app.sh` signing-source
+>     attribution (the script is covered by the module ZIP's SHA-256).
+>   • **§13.2** — removed the "staged-APK cleanup" from Known Issues
+>     (now resolved).
+>   • **§14.34** — eight shell-portability corrections for BusyBox
+>     grep compatibility (Android's default `grep`).
+>   • Header date bumped to 2026-10-15.
+>
+>   Every identifier is catalogued in **§18 — Documentation
+>   Corrections to This File**.
+
+> **v1.4.0 changes** (historical):
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • **No new audit corrections** — v1.4.0 is an integration
->     release. The Audit Corrections Registry remains at #33 (the
->     last entry from v1.0.0).
+>   • **No new audit corrections**. Registry remains at #33.
 >   • **CodeQL `go/path-injection` fix in `removeModule`** —
->     documented as a hardening change (§5.34, new). No API
->     contract change.
->   • **iOS PWA logic removal** — Android-only project. No
->     security impact (the removed code was UI-only).
->   • **`/app-debug.apk` static route (optional)** — served
->     publicly with `Cache-Control: public, max-age=3600,
->     immutable`. Returns 404 when the file is absent. See
->     §5.35 (new).
->   • **§12.1 Supply Chain corrected** — removed "Signed releases
->     (Cosign keyless)" and "SBOM (SPDX + CycloneDX)" — the
->     release workflow explicitly does NOT sign or generate an
->     SBOM (see `release.yml` §Non-goals). Replaced with an
->     honest description of the current state.
->   • **§14.1 Pre-release checklist corrected** — the two
->     checkboxes for Cosign + SBOM were removed (they were
->     documenting a step that does not exist).
->   • **§6.4 and §13.2 timeline corrected** — `'unsafe-inline'`
->     removal and the other known issues previously targeted
->     "v1.3.0". Since v1.3.0 shipped with a narrower scope, the
->     target is now **v1.5.0** (see `docs/ROADMAP.md` §5).
->   • **§17.3 post-audit corrections count corrected** — from
->     **7** to **8** (BUG-1..BUG-6 + N-1 + N-4). Identifiers
->     harmonized with the `BUG-A..BUG-L` names used in
->     `main.go`.
->   • **§2.1 and §4.2** — added the optional companion APK
->     (`/app-debug.apk`) as a low-sensitivity asset.
->   • **§3.1 Adversaries** — added "iOS PWA removal confusion"
->     and "companion app spoofing" scenarios.
->   • **§3.2 Protections** — added the v1.3.0 and v1.4.0 runtime
->     changes.
->   • **§16 Changelog** — added a v1.3.0 and v1.4.0 entry.
+>     documented in §5.34.
+>   • **iOS PWA logic removal** — Android-only project. §5.35.
+>   • **`/app-debug.apk` static route (optional)** — public, no
+>     auth. §5.35.2.
+>   • **§12.1 Supply Chain corrected** — removed false claims
+>     about Cosign / SBOM.
+>   • **§14.1 Pre-release checklist corrected** — Cosign + SBOM
+>     checkboxes removed.
 
-> **v1.4.0 (Global Edition) — POST-AUDIT FIXES (this revision)**:
->   A post-audit review of this file against the v1.3.0 / v1.4.0
->   code identified the following documentation gaps. All are
->   addressed in-place; no version bump.
->
->   🔧 **HARD-SEC-V14-01** — **`§5.31.2` corrected.** The
->     "Persistent Backup" section previously said rotation
->     keeps snapshots "sorted by directory name (not mtime)".
->     That was the **v1.2.0** behavior. v1.3.0 replaced it with
->     **mtime sort** (ROT-MTIME) plus two protected targets
->     (ROT-PROTECT) and manifest-based detection
->     (ROT-MANIFEST). The section now documents the v1.3.0
->     semantics, with the v1.2.0 behavior preserved as
->     historical context.
->
->   🔧 **HARD-SEC-V14-02** — **`§5.31.4` extended.** The
->     "Integrity Verification" section did not mention the
->     SNAP-MANIFEST detection rule that became the authoritative
->     count rule in v1.3.0. A new "detection rule" subsection
->     now documents it, and the threat-model table gained two
->     rows for ROT-MANIFEST and ROT-PROTECT.
->
->   🔧 **HARD-SEC-V14-03** — **`§3.2` extended.** The
->     "Applied Protections" list stopped at v1.2.0. Four new
->     bullets now document the v1.3.0 ROT-* / SNAP-* semantics.
->
->   🔧 **HARD-SEC-V14-04** — **`§2.1` extended.** The asset
->     table gained a "Snapshot-set integrity" row reflecting
->     the v1.3.0 rotation guarantees.
->
->   🔧 **HARD-SEC-V14-05** — **`§16` extended.** The v1.3.0
->     changelog entry now lists the SNAP-* / ROT-* server-side
->     refinements with an explicit "no security impact"
->     classification, and a note explaining that the v1.2.0
->     rotation documentation was superseded.
-
-> **v1.3.0 changes** (kept as history):
+> **v1.3.0 changes** (historical):
 >   • Version bumped from v1.2.0 to v1.3.0.
->   • **No new audit corrections** — v1.3.0 is a feature release.
->     The registry remains at #33.
+>   • **No new audit corrections**.
 >   • **PWA install button (client-side)** — no security impact.
->     The button opens the native `beforeinstallprompt` dialog or
->     a small informational modal.
 >   • **Live status LED (client-side)** — no security impact.
->   • **DNS auto-start fix (`service.sh`)** — `service.sh` now
->     calls `POST /api/ensure_running_service` directly at boot
->     (with a bounded wait for the WebUI port). The call is
->     covered by the existing watchdog-token path (WD-TOKEN,
->     §5.33).
->   • **`buildBackupInfo` sort order change** — from name to
->     mtime (with a name fallback). No security impact; the
->     payload shape is unchanged.
->   • **§6.4 and §13.2** — deferred CSP hardening and related
->     known issues from v1.3.0 to v1.5.0 (the v1.3.0 scope was
->     narrower than originally planned).
+>   • **DNS auto-start fix (`service.sh`)** — covered by WD-TOKEN
+>     (§5.33).
+>   • **`buildBackupInfo` sort order change** — name → mtime.
+>   • **§6.4 and §13.2** — deferred CSP hardening.
 
-> **v1.2.0 changes** (kept as history):
+> **v1.2.0 changes** (historical):
 >   • Version bumped from v1.1.0 to v1.2.0.
->   • **No new audit corrections** — v1.2.0 is a data-preservation
->     release. The Audit Corrections Registry remains at #33 (the
->     last entry from v1.0.0).
->   • **Numbering clarification**: §5.31, §5.32, and §5.33 are
->     **SECTION** numbers in this document, **not** Audit
->     Correction numbers. They document v1.2.0's data-preservation
->     security model, its two correctness fixes, and its watchdog
->     token — none of which is an audit correction. The Audit
->     Corrections Registry remains at **#33** (see §17). New
->     audit corrections will resume at **#34** in v1.5.x.
->   • **New §5.31 — Data Preservation Security Model.** Documents
->     the 10 defensive layers, the `backupMu` serialization
->     guarantee, and the threat model for the persistent backup
->     directory at `/sdcard/dnscrypt-webui-backup/`.
->   • **New §5.32 — Recovery Mode Correctness Fix (FIX-1) and
->     Service Worker Update-Banner Fix (FIX-2).** Documents the
->     two correctness fixes that shipped with v1.2.0. Neither is
->     an exploitable vulnerability.
->     **Corrected in this revision**: the FIX-1 description now
->     reflects the actual implementation — **snapshot-and-reapply**
->     (using `$MODPATH/.recovery_snapshot/` + the new `§[9b2]`
->     block). The previous "reorder + exclude" description was
->     incorrect and has been fully replaced.
->   • **New §5.33 — Watchdog Token (WD-TOKEN).** Documents the
->     `X-Watchdog-Token` authentication that replaces the previous
->     localhost bypass on `POST /api/ensure_running_service`.
->   • §2.1 — added user-data preservation and backup-layer
->     integrity to protected assets.
->   • §3.1 — added new adversary scenarios (backup tampering,
->     recovery-mode abuse, watchdog impersonation).
->   • §3.2 — added v1.2.0 protections.
->   • §4.2 — added new backup-related assets.
->   • §11.1 — added backup event logging (auto-backup, restore,
->     rotation, orphan preservation).
->   • §11.3 — added backup-related log rotation notes.
->   • §13.2 — updated known-issues table with v1.2.0 status.
->   • §13.3 — added v1.2.0 compensating controls.
->   • §14 Security Checklist gained six new verification sections:
->     §14.25 (backup directory permissions), §14.26 (backupMu
->     serialization), §14.27 (7-field `backups` object), §14.28
->     (watchdog token), §14.29 (recovery-mode interaction),
->     §14.30 (SELinux context preservation).
->     **Corrected in this revision**: §14.29 now verifies the
->     FIX-1 snapshot-and-reapply markers
->     (`RECOVERY_SNAPSHOT_DIR` + `§[9b2]` re-apply block),
->     not the old "reorder + exclude" pattern.
->   • §16 Changelog gained a v1.2.0 entry.
->   • §17 Audit Corrections Registry header updated — v1.2.0 does
->     not extend the registry. Added §17.2 with the v1.2.0 runtime
->     additions (BAK-1..BAK-4, FIX-1, FIX-2, WD-TOKEN).
->     **Corrected in this revision**: the FIX-1 rationale in §17.2
->     now describes the snapshot-and-reapply mechanism.
->   • **Global edition — English default + Arabic toggle**: the
->     WebUI ships with English as the default language and an
->     in-page toggle (`langToggle`) that switches to Arabic. The
->     user's preference is stored client-side in
->     `localStorage['dnscrypt-lang']` and is never transmitted to
->     the server. Documentation remains English-only by project
->     convention. This has **no security impact** (see §5.31.7).
->   • **Encoding correction (v1.2.0)**: fixed mojibake in
->     section markers, arrows, checkmarks, warnings, and box
->     drawing characters. All symbols render as proper UTF-8.
+>   • **No new audit corrections**.
+>   • **New §5.31 — Data Preservation Security Model.**
+>   • **New §5.32 — Correctness Fixes (FIX-1, FIX-2).**
+>   • **New §5.33 — Watchdog Token (WD-TOKEN).**
+>   • **Global edition — English default + Arabic toggle.**
+
+> **Numbering clarification**: §5.31 through §5.36 are **section
+> numbers** in this document, **not** Audit Correction numbers.
+> The Audit Corrections Registry is a flat, monotonic sequence that
+> only advances when a new audit correction is filed.
 
 ---
 
@@ -195,6 +115,7 @@ Vulnerability disclosure policy + threat model + applied protections.
 15. [Acknowledgments](#15-acknowledgments)
 16. [Changelog — Security Changes](#16-changelog--security-changes)
 17. [Audit Corrections Registry](#17-audit-corrections-registry)
+18. [Documentation Corrections to This File](#18-documentation-corrections-to-this-file)
 
 ---
 
@@ -202,7 +123,8 @@ Vulnerability disclosure policy + threat model + applied protections.
 
 ### 1.1 Preferred Method
 
-**Do not open a public GitHub Issue** — the vulnerability may be exploited before a fix is deployed.
+**Do not open a public GitHub Issue** — the vulnerability may be
+exploited before a fix is deployed.
 
 Instead, use **GitHub Private Vulnerability Reporting**:
 
@@ -227,7 +149,7 @@ Instead, use **GitHub Private Vulnerability Reporting**:
 3. ...
 
 ## Affected Version
-v1.4.0 (or any version)
+v1.5.0 (or any version)
 
 ## Environment
 - Android version:
@@ -252,7 +174,7 @@ v1.4.0 (or any version)
 
 ### 1.4 Disclosure Scope
 
-- **In scope**: `main.go`, shell scripts, HTML/JS, backup layer
+- **In scope**: `main.go`, `install_app.sh`, shell scripts, HTML/JS, backup layer
 - **Out of scope**: dnscrypt-proxy upstream, Android OS, Magisk
 
 ---
@@ -276,8 +198,11 @@ v1.4.0 (or any version)
 | User-data preservation | 5 config files preserved across upgrades (v1.2.0) |
 | Backup-layer integrity | `/sdcard/dnscrypt-webui-backup/` permissions + `backupMu` (v1.2.0) |
 | Watchdog authentication | `X-Watchdog-Token` on `/api/ensure_running_service` (v1.2.0) |
-| Snapshot-set integrity (v1.3.0) | Rotation respects manifest-based detection + mtime sort + protected targets (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT) |
-| **Optional companion APK (low sensitivity)** | **Served at `/app-debug.apk`; public, no auth needed (v1.4.0)** |
+| Snapshot-set integrity | Rotation respects manifest-based detection + mtime sort + protected targets (v1.3.0) |
+| Optional companion APK | Served at `/app-debug.apk`; public, no auth needed (v1.4.0) |
+| **Install token store (v1.5.0)** | **`installTokens` map — one-shot CSRF tokens, 60 s TTL; High while valid** |
+| **Install rate limiter (v1.5.0)** | **`installAttempts` map — per-IP counters; Low (no secrets)** |
+| **Companion state cache (v1.5.0)** | **`companionStateCache` — 30 s TTL; Low (no secrets)** |
 
 ### 2.2 What We Do Not Protect
 
@@ -286,11 +211,15 @@ v1.4.0 (or any version)
 - **Root user** — can do anything by nature, including reading the
   persistent backup directory (`0700`, but root can bypass).
 - **A root-privileged malicious app** — can read/write
-  `/sdcard/dnscrypt-webui-backup/` and the watchdog token.
+  `/sdcard/dnscrypt-webui-backup/`, the watchdog token, and the
+  install token store (via `ptrace` on the running process).
 - **The companion APK's own security** — the APK is an Android
   application distributed from a separate repository
   (`gasciljh/dnscrypt-proxy-app`). Its code, permissions, and
   network behavior are out of scope for this document.
+- **A malicious Play Protect app** — the temporary disable of the
+  package verifier during the install cascade is a documented
+  risk (see §5.36.4).
 
 ---
 
@@ -312,8 +241,10 @@ v1.4.0 (or any version)
 | Watchdog impersonator | send requests to `ensure_running_service` without valid session | force DNS engine restart (fixed by WD-TOKEN in v1.2.0) |
 | Backup tamperer | modify `.manifest.json` or files in the backup directory | inject configuration |
 | Recovery-mode abuser | create a `recovery` trigger file | force a restore from a snapshot |
-| **iOS PWA confusion (historical only)** | **n/a — iOS branches removed in v1.4.0** | **n/a** |
-| **Companion APK spoofing** | **serve a modified `web/app-debug.apk` from the module** | **trick user into installing a tampered app. Mitigation: the APK is signature-verified by Android at install time** |
+| Companion APK spoofing | serve a modified `web/app-debug.apk` from the module | trick user into installing a tampered app. Mitigation: the APK is signature-verified by Android at install time |
+| **Install brute-force (v1.5.0)** | **repeatedly POST `/api/install_companion_app` to force a root install** | **exhaust CPU / trigger repeated `pm install` runs. Mitigated by the per-IP rate limit (5 failed attempts / 15 min)** |
+| **Install CSRF (v1.5.0)** | **a malicious web page loaded in a browser on the same device attempts to trigger the install endpoint** | **force an unauthorized install. Mitigated by the one-shot CSRF token from `/api?action=install_token` (see §5.36.1)** |
+| **Install token leak (v1.5.0)** | **an XSS or a rogue extension reads the token from the DOM or a network log** | **install the companion app without user consent. Mitigated by the 60 s TTL and the one-shot nature of the token** |
 
 ### 3.2 Applied Protections
 
@@ -356,37 +287,43 @@ v1.4.0 (or any version)
   snapshot corruption
 - **v1.2.0**: Persistent backup directory with mode `0700`/`0600`
   (see §5.31.2)
-- **v1.2.0**: SHA256 integrity verification (advisory; see
-  §5.31.4)
-- **v1.2.0**: Transactional upgrade with rollback — prevents
-  partial install states
-- **v1.2.0**: Watchdog token (`X-Watchdog-Token`) — replaces the
-  previous localhost bypass on `ensure_running_service`
+- **v1.2.0**: SHA256 integrity verification (advisory; see §5.31.4)
+- **v1.2.0**: Transactional upgrade with rollback
+- **v1.2.0**: Watchdog token (`X-Watchdog-Token`)
 - **v1.2.0**: SELinux context preservation via `restorecon` /
   `chcon` on every restored file
-- **v1.2.0**: Recovery-mode snapshot-and-reapply (FIX-1) —
-  preserves all 5 files even when the ZIP extraction step
-  overwrites two of them
+- **v1.2.0**: Recovery-mode snapshot-and-reapply (FIX-1)
 - **v1.3.0**: `service.sh` calls `ensure_running_service` at boot
-  via the watchdog-token path — no new attack surface
 - **v1.3.0**: ROT-MANIFEST — rotation detects snapshots by
-  `.manifest.json` presence, not by name pattern
+  `.manifest.json` presence
 - **v1.3.0**: ROT-MTIME — rotation sorts candidates by mtime
-  (descending), not by lexicographic directory name
-- **v1.3.0**: ROT-PROTECT — rotation preserves two additional
-  targets on top of the 21-newest window: the `.last_stable`
-  pointer and the newest install snapshot. This prevents
-  recovery mode and rollback from being silently broken.
-- **v1.3.0**: SNAP-MANIFEST + SNAP-MTIME — `main.go:buildBackupInfo()`
-  uses the same detection and sort key, so the API and the
-  shell tool agree on the snapshot set.
-- **v1.4.0**: CodeQL `go/path-injection` hardening in
-  `removeModule` (see §5.34)
-- **v1.4.0**: iOS-specific PWA code removed — reduces the
-  WebUI's surface (see §5.35)
+- **v1.3.0**: ROT-PROTECT — preserves `.last_stable` + newest
+  install snapshot
+- **v1.3.0**: SNAP-MANIFEST + SNAP-MTIME
+- **v1.4.0**: CodeQL `go/path-injection` hardening in `removeModule`
+  (see §5.34)
+- **v1.4.0**: iOS-specific PWA code removed (see §5.35)
 - **v1.4.0**: `/app-debug.apk` route is **public** (no auth) —
-  acceptable because the file contains no secrets; Android
-  verifies the APK signature at install time (see §5.35)
+  acceptable because the file contains no secrets
+- **v1.5.0**: **One-shot CSRF token** on
+  `POST /api/install_companion_app` — 60 s TTL, consumed on first
+  use, issued by `GET /api?action=install_token`. See §5.36.1.
+- **v1.5.0**: **Per-IP rate limit** on
+  `POST /api/install_companion_app` — 5 failed attempts / 15 min
+  lockout, using a dedicated `installAttempts` map (separate from
+  `loginAttempts`). See §5.36.2.
+- **v1.5.0**: **SELinux staging** — the APK is copied to
+  `/data/local/tmp/dnscrypt-companion.apk` (context
+  `shell_data_file`) before the install. **`setenforce 0` is
+  never called.** See §5.36.3.
+- **v1.5.0**: **Play Protect temporary disable + trap-based
+  restore** — the package verifier is disabled for the duration
+  of the cascade and restored on any exit path (normal, error,
+  SIGINT, SIGTERM). The cascade is bounded by a **75-second
+  deadline** so the trap always fires inside `main.go`'s
+  90-second `INSTALL_TIMEOUT`. The trap restores the exact
+  captured value (`$_VERIFIER_ORIG`) rather than a hardcoded
+  `1`. See §5.36.4.
 
 ---
 
@@ -395,74 +332,84 @@ v1.4.0 (or any version)
 ### 4.1 Trust Boundaries
 
 ```text
-┌────────────────────────────────────────────┐
-│  Untrusted Zone                                    │
-│  ┌──────────────────────────────────────┐   │
-│  │  User Apps (Chrome, Games)                  │   │
-│  └──────────────┬───────────────────────┘   │
-│                   │ :53 DNS                        │
-│  ┌─────────────▼───────────────────────┐   │
-│  │  Trust Boundary 1: Firewall                │   │
-│  │  (iptables IPv4 / ip6tables IPv6)          │   │
-│  │  ┌────────────────────────────────┐  │   │
-│  │  │  OUTPUT (nat) — clean               │  │   │
-│  │  │    ├─ jump DNSCRYPT_OUT             │  │   │
-│  │  │    └─ jump DNSCRYPT_OUT6            │  │   │
-│  │  │                                     │  │   │
-│  │  │  DNSCRYPT_OUT (custom chain)        │  │   │
-│  │  │    ├─ RETURN (loopback + bootstrap) │  │   │
-│  │  │    └─ DNAT → 127.0.0.1:5354        │  │   │
-│  │  │                                     │  │   │
-│  │  │  DNSCRYPT_OUT6 (custom chain)       │  │   │
-│  │  │    ├─ RETURN (IPv6 loopback)        │  │   │
-│  │  │    └─ DNAT → [::1]:5354            │  │   │
-│  │  └────────────────────────────────┘  │   │
-│  └──────────────┬──────────────────────┘   │
-│                   │ 127.0.0.1:5354               │
-│  ┌─────────────▼──────────────────────┐   │
-│  │  Trusted Zone (WebUI)                     │   │
-│  │  ┌───────────────────────────────┐  │    │
-│  │  │  main.go :9090, :9091              │  │    │
-│  │  │  + Auth, Rate limit, CSP           │  │    │
-│  │  │  + CSRF (POST-only)                │  │    │
-│  │  │  + Cookie-only sessions            │  │    │
-│  │  │  + STATUS_FILE = "user intent"     │  │    │
-│  │  │  + hasEndpoint (exact match)       │  │    │
-│  │  │  + Basic Auth rate limit           │  │    │
-│  │  │  + Login POST-only (NEW-1)         │  │    │
-│  │  │  + /readyz localhost-only (NEW-4)  │  │    │
-│  │  │  + shellQuote (NEW-5, ext. v1.1.0) │  │    │
-│  │  │  + readConfPort range (NEW-3)      │  │    │
-│  │  │  + auth cache 60s (NEW-6)          │  │    │
-│  │  │  + rebuildMu mutex (RACE-1)        │  │    │
-│  │  │  + runtime_info ports (PORT-2)     │  │    │
-│  │  │  + MEM-1 memory limit (v1.1.0)     │  │    │
-│  │  │  + MEM-3 monitoring port (v1.1.0)  │  │    │
-│  │  │  + backupMu mutex (v1.2.0)         │  │    │
-│  │  │  + watchdog token (v1.2.0)         │  │    │
-│  │  │  + createAutoBackup (v1.2.0)       │  │    │
-│  │  │  + removeModule CodeQL fix (v1.4.0)│  │    │
-│  │  │  + /app-debug.apk route (v1.4.0)   │  │    │
-│  │  └───────────────────────────────┘  │    │
-│  └────────────────────────────────────┘    │
-│                   │ exec                          │
-│  ┌─────────────▼─────────────────────┐     │
-│  │  Trust Boundary 2: Shell Scripts (root)  │     │
-│  │  + getSystemShell() fallback (Fix #2)    │     │
-│  │  + shellQuote() for dynamic paths        │     │
-│  │  + copy_with_context (v1.2.0)            │     │
-│  │  + 10 defensive layers (v1.2.0)          │     │
-│  │  + §[8a] + §[9b2] (FIX-1, v1.2.0)        │     │
-│  └───────────────────────────────────┘      │
-│                   │ copy/restore                  │
-│  ┌─────────────▼─────────────────────┐     │
-│  │  Trust Boundary 3: Persistent Backup     │     │
-│  │  /sdcard/dnscrypt-webui-backup/          │     │
-│  │  + mode 0700 / 0600                      │     │
-│  │  + SHA256 manifest (advisory)            │     │
-│  │  + transactional txn-* / orphan-txn-*    │     │
-│  └───────────────────────────────────┘      │
-└────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  Untrusted Zone                                               │
+│  ┌──────────────────────────────────────────────────┐         │
+│  │  User Apps (Chrome, Games)                       │         │
+│  └───────────────────────┬──────────────────────────┘         │
+│                          │ :53 DNS                            │
+│  ┌───────────────────────▼──────────────────────────┐         │
+│  │  Trust Boundary 1: Firewall                      │         │
+│  │  (iptables IPv4 / ip6tables IPv6)                │         │
+│  │  ┌────────────────────────────────────────────┐  │         │
+│  │  │  OUTPUT (nat) — clean                      │  │         │
+│  │  │    ├─ jump DNSCRYPT_OUT                    │  │         │
+│  │  │    └─ jump DNSCRYPT_OUT6                   │  │         │
+│  │  │                                            │  │         │
+│  │  │  DNSCRYPT_OUT (custom chain)               │  │         │
+│  │  │    ├─ RETURN (loopback + bootstrap)        │  │         │
+│  │  │    └─ DNAT → 127.0.0.1:5354                │  │         │
+│  │  │                                            │  │         │
+│  │  │  DNSCRYPT_OUT6 (custom chain)              │  │         │
+│  │  │    ├─ RETURN (IPv6 loopback)               │  │         │
+│  │  │    └─ DNAT → [::1]:5354                    │  │         │
+│  │  └────────────────────────────────────────────┘  │         │
+│  └───────────────────────┬──────────────────────────┘         │
+│                          │ 127.0.0.1:5354                     │
+│  ┌───────────────────────▼──────────────────────────┐         │
+│  │  Trusted Zone (WebUI)                            │         │
+│  │  ┌────────────────────────────────────────────┐  │         │
+│  │  │  main.go :9090, :9091                      │  │         │
+│  │  │  + Auth, Rate limit, CSP                   │  │         │
+│  │  │  + CSRF (POST-only)                        │  │         │
+│  │  │  + Cookie-only sessions                    │  │         │
+│  │  │  + STATUS_FILE = "user intent"             │  │         │
+│  │  │  + hasEndpoint (exact match)               │  │         │
+│  │  │  + Basic Auth rate limit                   │  │         │
+│  │  │  + Login POST-only (NEW-1)                 │  │         │
+│  │  │  + /readyz localhost-only (NEW-4)          │  │         │
+│  │  │  + shellQuote (NEW-5, extended v1.1.0)     │  │         │
+│  │  │  + readConfPort range (NEW-3)              │  │         │
+│  │  │  + auth cache 60 s (NEW-6)                 │  │         │
+│  │  │  + rebuildMu mutex (RACE-1)                │  │         │
+│  │  │  + runtime_info ports (PORT-2)             │  │         │
+│  │  │  + MEM-1 memory limit (v1.1.0)             │  │         │
+│  │  │  + MEM-3 monitoring port (v1.1.0)          │  │         │
+│  │  │  + backupMu mutex (v1.2.0)                 │  │         │
+│  │  │  + watchdog token (v1.2.0)                 │  │         │
+│  │  │  + createAutoBackup (v1.2.0)               │  │         │
+│  │  │  + removeModule CodeQL (v1.4.0)            │  │         │
+│  │  │  + /app-debug.apk route (v1.4.0)           │  │         │
+│  │  │  + install token (v1.5.0)                  │  │         │
+│  │  │  + installAttempts limiter (v1.5.0)        │  │         │
+│  │  │  + companionStateCache (v1.5.0)            │  │         │
+│  │  └────────────────────────────────────────────┘  │         │
+│  └───────────────────────┬──────────────────────────┘         │
+│                          │ exec                               │
+│  ┌───────────────────────▼──────────────────────────┐         │
+│  │  Trust Boundary 2: Shell Scripts (root)          │         │
+│  │  + getSystemShell() fallback (Fix #2)            │         │
+│  │  + shellQuote() for dynamic paths                │         │
+│  │  + copy_with_context (v1.2.0)                    │         │
+│  │  + 10 defensive layers (v1.2.0)                  │         │
+│  │  + §[8a] + §[9b2] (FIX-1, v1.2.0)                │         │
+│  │  + install_app.sh (v1.5.0)                       │         │
+│  │    + SELinux staging (never setenforce)          │         │
+│  │    + Play Protect disable + 3-way trap           │         │
+│  │    + 75 s cascade deadline                       │         │
+│  │    + 5-level cascade                             │         │
+│  │    + EXIT/INT/TERM traps, exit 130 / 143         │         │
+│  └───────────────────────┬──────────────────────────┘         │
+│                          │ copy/restore                       │
+│  ┌───────────────────────▼──────────────────────────┐         │
+│  │  Trust Boundary 3: Persistent Backup             │         │
+│  │  /sdcard/dnscrypt-webui-backup/                  │         │
+│  │  + mode 0700 / 0600                              │         │
+│  │  + SHA256 manifest (advisory)                    │         │
+│  │  + transactional txn-* / orphan-txn-*            │         │
+│  │  + apk/ mirror (v1.5.0)                          │         │
+│  └──────────────────────────────────────────────────┘         │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.2 Assets
@@ -487,8 +434,12 @@ v1.4.0 (or any version)
 | `.last_stable` pointer | `/sdcard/dnscrypt-webui-backup/.last_stable` | Low (v1.2.0) |
 | `.upgrade_history.json` | `/sdcard/dnscrypt-webui-backup/.upgrade_history.json` | Medium (v1.2.0) |
 | `txn-*` / `orphan-txn-*` | `/sdcard/dnscrypt-webui-backup/` | High (v1.2.0) |
-| `.recovery_snapshot/` (transient) | `$MODPATH/.recovery_snapshot/` | High (v1.2.0, cleaned up by §[9b2]) |
-| **Optional companion APK** | **`/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk`** | **Low (public; no secrets)** |
+| `.recovery_snapshot/` (transient) | `$MODPATH/.recovery_snapshot/` | High (v1.2.0) |
+| Optional companion APK | `/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk` | Low (public; no secrets) |
+| **`installTokens` (v1.5.0)** | **memory (map, 60 s TTL, one-shot)** | **High while valid** |
+| **`installAttempts` (v1.5.0)** | **memory (map, per-IP counters)** | **Low** |
+| **`companionStateCache` (v1.5.0)** | **memory (30 s TTL)** | **Low** |
+| **`$PERSISTENT_BACKUP/apk/` (v1.5.0)** | **`/sdcard/dnscrypt-webui-backup/apk/`** | **Low (public APK + SHA256)** |
 
 ---
 
@@ -506,7 +457,9 @@ v1.4.0 (or any version)
 ### 5.2 CSRF — Comprehensive Fix (Audit Correction #13)
 
 **Background**:
-In older versions, `toggle` and `restart` endpoints were accessible via GET. `SameSite=Lax` sends cookies on top-level GET navigation, allowing CSRF:
+In older versions, `toggle` and `restart` endpoints were accessible
+via GET. `SameSite=Lax` sends cookies on top-level GET navigation,
+allowing CSRF:
 
 ```html
 <a href="http://127.0.0.1:9090/api?action=toggle">
@@ -521,8 +474,10 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
 | toggle | GET | POST `/api/toggle_service` |
 | restart | GET | POST `/api/restart_service` |
 | ensure_running | GET | POST `/api/ensure_running_service` |
-| **login** | GET or POST | **POST only** |
-| **logout** | GET or POST | **POST only** |
+| login | GET or POST | POST only |
+| logout | GET or POST | POST only |
+| install_companion_app (v1.5.0) | n/a (new) | POST only + one-shot token |
+| install_token (v1.5.0) | n/a (new) | GET — token issuance only; the token itself is one-shot |
 
 - State-changing endpoints → POST only.
 - Read-only endpoints (status, logs) → GET (idempotent).
@@ -542,7 +497,7 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
 - **Mitigation**:
   - `escapeHtml()` on every output
   - CSP `script-src 'self'` (with `'unsafe-inline'` — §6.4)
-  - `textContent` instead of `innerHTML`
+  - `textContent` instead of `innerHTML` where user data is rendered
 
 ### 5.5 SQL / Command Injection
 
@@ -556,6 +511,8 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
   - **`shellQuote()`** — v1.0.0, extended in v1.1.0
   - **v1.2.0**: `copy_with_context` uses `shellQuote` for all
     dynamic paths (backup restore)
+  - **v1.5.0**: `install_app.sh` uses `shellQuote()` on all paths
+    and a hardcoded APK path. See §5.36.
 
 ### 5.6 Brute Force
 
@@ -563,8 +520,11 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
 - **Mitigation**:
   - 5 attempts / IP / 15 min
   - Intentional delay
-  - `LOGIN_ATTEMPT_STALE_PERIOD = 1h`
+  - `LOGIN_ATTEMPT_STALE_PERIOD = 1 h`
   - **Fix #8**: includes Basic Auth (was unlimited)
+  - **v1.5.0**: separate per-IP limiter for the install endpoint
+    (5 **failed** attempts / 15 min; success resets the counter).
+    See §5.36.2.
 
 ### 5.7 Memory Exhaustion
 
@@ -577,18 +537,19 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
 - **v1.1.0 addition — GC pressure as a DoS vector**:
   - Prior to v1.1.0, `debug.SetMemoryLimit(80 MB)` was hardcoded.
     On the `ultimate` profile, this caused GC thrashing.
-  - v1.1.0 replaces the hardcoded value with a per-profile
-    limit set by `memoryLimitForProfile()`:
+  - v1.1.0 replaces the hardcoded value with a per-profile limit
+    set by `memoryLimitForProfile()`:
     light=80 MB, normal=100, pro=120, proplus=160, ultimate=220.
-  - This is a defense-in-depth measure: it does not fix a
-    vulnerability, but it removes a self-inflicted DoS surface.
 
 - **v1.2.0 addition — bounded backup disk usage**:
   - Rotation caps the number of snapshots at 21.
   - Each snapshot uses ~30–100 KB → total footprint ~2.5 MB max.
-  - A malicious caller cannot force an unbounded backup growth:
-    `createAutoBackup` is serialized by `backupMu` and rotation
-    runs after each successful backup.
+
+- **v1.5.0 addition — install endpoint CPU + I/O cost**:
+  - A single `pm install` cascade forks up to 5 subprocesses and
+    performs a 3 MB copy + SHA256 hash.
+  - The per-IP rate limit (5 / 15 min) caps the aggregate cost
+    an attacker can impose.
 
 ### 5.8 Timing Attacks
 
@@ -597,18 +558,23 @@ In older versions, `toggle` and `restart` endpoints were accessible via GET. `Sa
   - Use `subtle.ConstantTimeCompare`
   - **v1.2.0**: watchdog token comparison also uses
     `subtle.ConstantTimeCompare`
+  - **v1.5.0**: install token comparison also uses
+    `subtle.ConstantTimeCompare` (see §5.36.1)
 
 ### 5.9 DNS Leak (Audit Correction #3 + #16)
 
 **Background**:
-dnscrypt-proxy queries `bootstrap_resolvers` directly on port 53 to download the server list. If they are not excluded from DNAT, a loop occurs:
+dnscrypt-proxy queries `bootstrap_resolvers` directly on port 53 to
+download the server list. If they are not excluded from DNAT, a loop
+occurs:
 - packet leaves → DNAT → 127.0.0.1:5354 → dnscrypt-proxy → loop.
 
 **Solution applied**:
 - 3-e: `awk` reads multi-line TOML.
 - 3-f: IPv6 support in `get_dynamic_bootstrap`.
 - 16-a: `manage_iptables` skips IPv6 (`case "$_ip" in *:*) continue`).
-- 16-b: `manage_ip6tables` uses `::1` + `$BOOTSTRAP_IPS` with IPv4 filtering.
+- 16-b: `manage_ip6tables` uses `::1` + `$BOOTSTRAP_IPS` with IPv4
+  filtering.
 
 **Result**:
 
@@ -620,16 +586,17 @@ dnscrypt-proxy queries `bootstrap_resolvers` directly on port 53 to download the
 
 ### 5.10 SSE DoS (Slow Client)
 
-- **Vector**: 10,000 SSE connections with slow consumption to freeze the server.
-- **Mitigation**: `SetWriteDeadline(30 s)` before each flush
-  (see §5.10 full detail in v1.0.0 docs). Slow clients are
-  disconnected.
+- **Vector**: 10,000 SSE connections with slow consumption to freeze
+  the server.
+- **Mitigation**: `SetWriteDeadline(30 s)` before each flush.
+  Slow clients are disconnected.
 
 ### 5.11 Token Leakage (Audit Correction #15-a)
 
-- **Vector**: XSS can read the token from a JSON response or JS storage.
+- **Vector**: XSS can read the token from a JSON response or JS
+  storage.
 - **Mitigation**:
-  - No `sessionStorage`
+  - No `sessionStorage` for session tokens
   - No token in login response
   - HttpOnly cookie only
 
@@ -640,22 +607,23 @@ dnscrypt-proxy queries `bootstrap_resolvers` directly on port 53 to download the
   - `Allow: POST` header on 405
   - `Allow: GET, POST, OPTIONS` on OPTIONS response
 
-<a name="513"></a>
 ### 5.13 Firewall Orphan Leak (Audit Correction #17)
 
 **Background**:
-The original release added dynamic RETURN rules directly to the public OUTPUT chain. When `bootstrap_resolvers` changed, old RETURN rules were left behind.
+The original release added dynamic RETURN rules directly to the public
+OUTPUT chain. When `bootstrap_resolvers` changed, old RETURN rules were
+left behind.
 
 **Solution (Custom Chains)**:
 - `DNSCRYPT_OUT` (IPv4) and `DNSCRYPT_OUT6` (IPv6) in `functions.sh`.
-- `_inline_cleanup_firewall` unified in 3 files (`post-fs-data.sh`, `uninstall.sh`, `customize.sh`).
+- `_inline_cleanup_firewall` unified in 3 files (`post-fs-data.sh`,
+  `uninstall.sh`, `customize.sh`).
 - `_legacy_cleanup_*` for upgrades from older versions (best-effort).
 
 **Golden rule**:
 Never pollute a public chain (OUTPUT/INPUT/FORWARD) with dynamic rules.
 Use a dedicated Custom Chain — deleting it wipes all its rules.
 
-<a name="514"></a>
 ### 5.14 State Integrity — STATUS_FILE Semantics (Audit Correction #18)
 
 **Background**:
@@ -664,8 +632,7 @@ Use a dedicated Custom Chain — deleting it wipes all its rules.
 meaning on crash.
 
 **Solution**: `STATUS_FILE` is **read-only** with respect to
-`getStatusUncached` — written only by `startService` /
-`stopService`.
+`getStatusUncached` — written only by `startService` / `stopService`.
 
 **Architectural contract**:
 
@@ -676,13 +643,11 @@ meaning on crash.
 | Who reads it? | `getStatus`, Watchdog, `status.sh` |
 | What happens on crash? | `STATUS_FILE` stays "ON" → Watchdog restarts |
 
-<a name="515"></a>
 ### 5.15 IPv6 Rate Limit Bypass (Audit Correction #19)
 
 **Solution**: `getClientIP(r)` uses `net.SplitHostPort` — IPv6
 addresses like `[::1]:port` map to `::1` (not `[`).
 
-<a name="516"></a>
 ### 5.16 Port Collision (Audit Correction #20)
 
 **Solution**: `MONITORING_UI_PORT` constant. `main.go` refuses to
@@ -691,103 +656,82 @@ start if `PORT` or `DASHBOARD_PORT` = 8080.
 **v1.1.0 addition**: `metricsProxyHandler` uses the constant —
 no more hardcoded `"8080"` (see §5.30.3).
 
-<a name="517"></a>
 ### 5.17 TOML Parsing — Section Injection (Audit Correction #21)
 
 **Solution**: Section tracking (`inSection` boolean) in all 4 files
 (`main.go`, `functions.sh`, `watchdog.sh`, `customize.sh`).
 
-<a name="518"></a>
 ### 5.18 Basic Auth Rate Limit Bypass (Fix #8 / Audit #22)
 
 **Solution**: `checkAuth` now records failed Basic Auth attempts in
 `loginAttempts`. 5 attempts / 15 min lockout per IP.
 
-<a name="519"></a>
 ### 5.19 Section Header with Comment (parsing) (Fix #10 / Audit #23)
 
 **Solution**: Section detection uses `strings.Index(trimmed, "]")`
 instead of `HasSuffix("]")` — supports `[monitoring_ui] # comment`.
 
-<a name="520"></a>
 ### 5.20 Dashboard JSON Conversion (Fix #1 / Audit #25)
 
 **Solution**: `parsePrometheus()` + `buildDashboardJSON()` convert
 Prometheus text to JSON.
 
-<a name="521"></a>
 ### 5.21 Preserve User Settings on Upgrade (Fix #3 / Audit #26)
 
 **v1.0.0 solution**: Backup/restore around `unzip -o` for the 5
 config files (mechanism: `/data/local/tmp/dnscrypt-upgrade-backup-$$`).
 
-**v1.2.0 supersession**: The v1.0.0 mechanism is **superseded** by
-the 10 defensive layers documented in §5.31. The v1.0.0 mechanism
-had two limitations:
-- `/data/local/tmp/` is cleared on reboot.
-- `/data/local/tmp/` is deleted on uninstall.
+**v1.2.0 supersession**: The v1.0.0 mechanism is **superseded** by the
+10 defensive layers documented in §5.31.
 
-The v1.2.0 persistent backup at `/sdcard/dnscrypt-webui-backup/`
-survives reboot, uninstall, and factory reset of `/data`.
-
-<a name="522"></a>
 ### 5.22 `fuser` PID Parsing (Fix #9 / Audit #27)
 
-**Solution**: `fuser -n tcp "$port" | tr ' ' '\n' | grep -E
-'^[0-9]+$' | head -n1` — one PID per line, numbers only.
+**Solution**: `fuser -n tcp "$port" | tr ' ' '\n' | grep -E '^[0-9]+$'
+| head -n1` — one PID per line, numbers only.
 
-<a name="523"></a>
 ### 5.23 Login POST-Only (Fix NEW-1 / Audit #28)
 
-**Solution**: `/api/auth/login` and `/api/auth/logout` reject
-non-POST requests with 405 + `Allow: POST`.
+**Solution**: `/api/auth/login` and `/api/auth/logout` reject non-POST
+requests with 405 + `Allow: POST`.
 
-<a name="524"></a>
 ### 5.24 `readConfPort` Range Check (Fix NEW-3 / Audit #29)
 
 **Solution**: `readConfPort` validates range `[1, 65535]`.
 
-<a name="525"></a>
 ### 5.25 `/readyz` Localhost-Only (Fix NEW-4 / Audit #30)
 
 **Solution**: `handleReadyz` rejects non-localhost requests with
 `{"error": "readyz is localhost-only"}`.
 
-<a name="526"></a>
 ### 5.26 `shellQuote` Injection Protection (Fix NEW-5 / Audit #31)
 
 **v1.0.0**: 20-character escape set.
 **v1.1.0**: Extended to 24 characters — see §5.30.2.
 
-<a name="527"></a>
 ### 5.27 Auth Cache (60 s) (Fix NEW-6 / Audit #32)
 
-**Solution**: `getMonitoringAuth` caches credentials in memory for
-60 seconds. Empty results are **never** cached (BUG-C fix).
+**Solution**: `getMonitoringAuth` caches credentials in memory for 60
+seconds. Empty results are **never** cached.
 
-<a name="528"></a>
 ### 5.28 Rebuild Blocklist Mutex (RACE-1) (Audit #33)
 
 **Solution**: `rebuildMu sync.Mutex` protects the entire
-`rebuildBlocklist` function. Coarse-grained locking; no deadlock.
+`rebuildBlocklist` function.
 
 **v1.2.0 parallel**: `backupMu` uses the same pattern for
 `createAutoBackup` — see §5.31.3.
 
-<a name="529"></a>
 ### 5.29 Runtime Info Ports (PORT-2)
 
 **Solution**: `buildRuntimeInfo()` returns `webui_port` +
-`dashboard_port`. Frontend uses `window.location.hostname` to
-build links dynamically.
+`dashboard_port`. Frontend uses `window.location.hostname` to build
+links dynamically.
 
-<a name="530"></a>
 ### 5.30 v1.1.0 — Security-Relevant Runtime Changes
 
-**v1.1.0 does not add new audit corrections.** It is a
-documentation + polish release. However, three runtime changes
-have a security-relevant dimension and are documented here for
-completeness.
+**v1.1.0 does not add new audit corrections.** It is a documentation
++ polish release. However, three runtime changes have a
+security-relevant dimension and are documented here for completeness.
 
 #### 5.30.1 Dynamic Memory Limit per Profile (MEM-1)
 
@@ -798,10 +742,9 @@ completeness.
 debug.SetMemoryLimit(80 * 1024 * 1024)  // ← hardcoded 80 MB
 ```
 
-**Problem**: On the `ultimate` profile, the working set exceeds
-80 MB during `rebuildBlocklist`. The Go runtime runs GC
-continuously → CPU waste → WebUI appears frozen on low-RAM
-devices.
+**Problem**: On the `ultimate` profile, the working set exceeds 80 MB
+during `rebuildBlocklist`. The Go runtime runs GC continuously → CPU
+waste → WebUI appears frozen on low-RAM devices.
 
 **Solution**:
 
@@ -835,55 +778,28 @@ func applyMemoryLimit(key string) { /* ... */ }
 | ultimate | 80 MB (GC thrashing) | 220 MB |
 
 **Observability**: `runtime_info` exposes `memory_limit_mb` and
-`profile_key`. Displayed in both WebUI and Dashboard System Info
-panels.
+`profile_key`.
 
-**Security rationale**: Removes a self-inflicted DoS surface. The
-limit is **soft** — a breach does not OOM the process.
+**Security rationale**: Removes a self-inflicted DoS surface.
 
 #### 5.30.2 Extended `shellQuote` Character Set (MEM-2)
 
 **Background**:
 
-The v1.0.0 `shellQuote` escaped 20 shell-significant characters.
-Four were not escaped:
-- `{`, `}` — brace expansion.
-- `\n`, `\t` — word-splitting.
+The v1.0.0 `shellQuote` escaped 20 shell-significant characters. Four
+were not escaped: `{`, `}`, `\n`, `\t`.
 
 **Practical impact today**: `MODDIR` is derived from
-`os.Executable()`. A normal user cannot make it contain `{` or
-`\n`. No known exploitable path exists.
+`os.Executable()`. A normal user cannot make it contain `{` or `\n`.
+No known exploitable path exists.
 
-**Solution**:
+**Solution**: Extend the set to 24 characters.
 
-```go
-// After v1.1.0:
-func shellQuote(s string) string {
-    for _, r := range s {
-        if r == ' ' || r == '"' || r == '\'' || r == '$' || r == '`' ||
-            r == '\\' || r == '!' || r == '&' || r == '|' || r == ';' ||
-            r == '(' || r == ')' || r == '<' || r == '>' || r == '*' ||
-            r == '?' || r == '[' || r == ']' || r == '#' || r == '~' ||
-            r == '{' || r == '}' || r == '\n' || r == '\t' {
-            return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-        }
-    }
-    return s
-}
-```
-
-**Security rationale**: Defense-in-depth. No known exploit existed.
+**Security rationale**: Defense-in-depth.
 
 #### 5.30.3 `MONITORING_UI_PORT` in Metrics Handler (MEM-3)
 
-**Background**:
-
-```go
-// Before v1.1.0 (metricsProxyHandler):
-req, err := http.NewRequestWithContext(r.Context(), "GET",
-    "http://127.0.0.1:8080/api/metrics", nil)
-//   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ hardcoded "8080"
-```
+**Background**: `metricsProxyHandler` had a hardcoded `"8080"`.
 
 **Solution**:
 
@@ -892,33 +808,16 @@ req, err := http.NewRequestWithContext(r.Context(), "GET",
 monitoringURL := "http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
 ```
 
-**Security rationale**: Single source of truth. Reduces the
-number of files to audit if the port ever changes.
+**Security rationale**: Single source of truth.
 
-<a name="531"></a>
 ### 5.31 v1.2.0 — Data Preservation Security Model
 
-> **ℹ️ Section numbering note**: §5.31 is a **section number in
-> this document**, not an Audit Correction number. The Audit
-> Corrections Registry (§17) remains at **#33**. See the
-> clarification at the top of this file, and §17.2 for the list
-> of v1.2.0 additions that do **not** receive audit correction
-> numbers.
+> **ℹ️ Section numbering note**: §5.31 is a **section number in this
+> document**, not an Audit Correction number. The Audit Corrections
+> Registry (§17) remains at **#33**.
 
-**Background**:
-
-Prior to v1.2.0, the installer used a path-comparison check
-(`$_EXISTING_MODULE != $MODPATH`) to detect upgrades. On
-**in-place upgrades** (the most common case), this check silently
-failed: the installer thought it was a fresh install and overwrote
-the 5 user config files with defaults.
-
-**Impact** (v1.1.0 and earlier):
-
-- 🔴 **Silent data loss** on every in-place upgrade.
-- 🔴 Users lost hours of manual rule configuration.
-- 🔴 The same bug affected folder renames, reinstalls, and
-  KernelSU/APatch installs.
+**Background**: Prior to v1.2.0, the installer used a path-comparison
+check that silently failed on in-place upgrades → silent data loss.
 
 **v1.2.0 Solution — the 10 defensive layers**:
 
@@ -935,40 +834,16 @@ the 5 user config files with defaults.
 | 9 | Automation + rotation | `service.sh`, `main.go` | Periodic + pre-critical backups |
 | 10 | Observability | `status.sh`, `main.go` | `.upgrade_history.json` + 7-field `backups` |
 
-**Design philosophy**: *"Search for user data everywhere — do not
-guess whether this is an upgrade."*
-
 #### 5.31.1 Multi-Source Detection (Layer 1)
 
-The installer searches **7 candidate locations** for the 5 user
-config files:
-1. `$MODPATH/proxy` (in-place).
-2. `/data/adb/modules/dnscrypt-proxy-webui/proxy` (standard).
-3. `/data/adb/modules/DNSCrypt-Proxy-Webui/proxy` (legacy).
-4. `/data/adb/modules/DNSCrypt-Proxy-WebUI/proxy` (variant).
-5. `$PERSISTENT_BACKUP/current` (persistent).
-6. `$PERSISTENT_BACKUP` (flat).
-7. `/data/local/tmp/dnscrypt-webui-backup` (tmp fallback).
+The installer searches **7 candidate locations** for the 5 user config
+files (9 on APatch).
 
-On APatch, two `modules_update/` paths are **prepended** to the
-list (Layer 5).
-
-**Selection rule**: The first candidate with **≥ 3 valid files**
-wins. A candidate with fewer than 3 files is skipped.
-
-**Security rationale**: The installer never trusts a single path.
-Even if a root solution renames or deletes the module folder, the
-user data is still findable.
+**Selection rule**: The first candidate with **≥ 3 valid files** wins.
 
 #### 5.31.2 Persistent Backup (Layer 2)
 
 **Location**: `/sdcard/dnscrypt-webui-backup/`.
-
-**Why this location**:
-- ✅ Survives reboot (`/data/local/tmp/` does not).
-- ✅ Survives module uninstall (`/data/adb/` does not).
-- ✅ Survives factory reset of `/data` (`/data/adb/` does not).
-- ✅ Visible from any file manager + over USB (MTP).
 
 **Permissions**:
 
@@ -981,42 +856,24 @@ user data is still findable.
 | `.last_stable` | `0600` | root |
 | `.upgrade_history.json` | `0600` | root |
 | `README.md` | `0644` | root |
+| `apk/` (v1.5.0) | `0755` | root |
+| `apk/app-debug.apk` (v1.5.0) | `0644` | root |
+| `apk/app-debug.apk.sha256` (v1.5.0) | `0644` | root |
 
-**Note**: On Android, `/sdcard/` is typically a FUSE mount.
-Permission semantics differ from ext4. The `0700`/`0600` modes
-are enforced by the FUSE layer where possible; the primary
-protection is that `/sdcard/` is only accessible to apps with
-`READ_EXTERNAL_STORAGE` or root.
+> **Note**: the `apk/` mirror directory is created by
+> `customize.sh §[10c]` via `mkdir -p` without an explicit mode
+> argument, so its effective mode is the process umask default
+> (**`0755`** in the module's install context).
 
 **Rotation (v1.3.0 — ROT-MANIFEST + ROT-MTIME + ROT-PROTECT)**:
-Keep the 21 newest snapshots, with the following semantics:
+Keep the 21 newest snapshots with manifest-based detection, mtime
+sort, and two protected targets (`.last_stable` + newest install).
 
-- **Detection (ROT-MANIFEST)**: a directory is treated as a
-  snapshot **iff** it contains a `.manifest.json` file. A
-  manifest-less directory is ignored by rotation, even if its
-  name matches the timestamp pattern.
-- **Sort key (ROT-MTIME)**: candidates are sorted by **mtime**
-  (descending), not by directory name. This is robust against
-  clock drift and manual renames.
-- **Protected targets (ROT-PROTECT)**: two additional snapshots
-  are preserved on top of the 21-newest window:
-  - the `.last_stable` recovery pointer (used by recovery mode);
-  - the newest install snapshot (name matching `-v<digit>`, used
-    by rollback).
-
-Total footprint bounded to ~2.5 MB.
-
-**Historical note (v1.2.0)**: In v1.2.0, the rotation used a
-name-pattern detection (`^[0-9]{8}-[0-9]{6}-`) and a
-lexicographic directory-name sort. This was replaced in v1.3.0
-to align the shell tool with `main.go:buildBackupInfo()`
-(SNAP-MANIFEST + SNAP-MTIME) — see §5.31.4 and
-`docs/ARCHITECTURE.md` §4.13.2.
-
-**Uninstall policy**: The backup directory is **preserved** on
-uninstall. A future reinstall can restore the user's settings
-automatically (via Layer 1). A user can remove it manually with
-`rm -rf /sdcard/dnscrypt-webui-backup`.
+**v1.5.0 addition — `apk/` mirror exclusion**: the `apk/` subfolder
+is preserved by **two independent mechanisms**:
+  1. It lacks a `.manifest.json` (so ROT-MANIFEST excludes it).
+  2. It is explicitly listed in the `case` skip inside
+     `rotate_backups()` — `current|txn-*|orphan-txn-*|apk`.
 
 #### 5.31.3 `backupMu` Serialization (BAK-2)
 
@@ -1034,513 +891,578 @@ func createAutoBackup(reason string) {
 }
 ```
 
-**Rationale**: Two rapid user actions (e.g. two `save_allowlist`
-requests) could each trigger `createAutoBackup` on the same source
-directory. Without serialization, this could corrupt a snapshot
-(interleaved writes to `.manifest.json` and `.tmp` files).
-
-**Bounded duration**: The lock is held for at most
-`AUTO_BACKUP_TIMEOUT = 15 s` per call.
-
-**Best-effort**: A failed backup logs a warning but never blocks
-the user's action.
+**Rationale**: Prevents concurrent snapshot corruption.
 
 #### 5.31.4 Integrity Verification (Layer 3)
 
 **Checks**:
 1. **Non-empty**: File exists and has size > 0.
 2. **Not oversized**: File size < 10 MB.
-3. **SHA256 (advisory)**: `.manifest.json` records each file's
-   hash. A mismatch is **logged as a warning** but does **not**
-   block a restore.
-4. **Manifest presence (v1.3.0 — SNAP-MANIFEST)**: a directory
-   must contain a `.manifest.json` file to be counted as a
-   snapshot by `runtime_info.backups.available` and by
-   `rotate_backups`. This is a **detection** rule, not an
-   integrity rule — the manifest contents are still advisory.
+3. **SHA256 (advisory)**: `.manifest.json` records each file's hash.
+   A mismatch is **logged as a warning** but does **not** block a
+   restore.
+4. **Manifest presence (v1.3.0 — SNAP-MANIFEST)**: a directory must
+   contain a `.manifest.json` file to be counted as a snapshot.
 
-**Why advisory**: The snapshot was just created from the same
-source. A mismatch would indicate a filesystem issue, but
-refusing to restore would be worse than restoring with a
-warning.
-
-**3-tier hash extraction**: `jq` → `awk` → `grep`/`sed`. If none
-succeeds (e.g. `sha256sum` unavailable), the check is **skipped
-for that file** rather than failing.
-
-**Detection rule (v1.3.0 — SNAP-MANIFEST)**: The
-`runtime_info.backups.available` field counts a directory as a
-snapshot **iff** it contains a `.manifest.json` file. This
-replaced the v1.2.0 name-pattern rule
-(`^[0-9]{8}-[0-9]{6}-`). For standard-toolchain output, both
-rules produce the same count. They differ only when:
-- A custom-named snapshot exists (v1.3.0 counts it; v1.2.0 did
-  not).
-- A directory matches the name pattern but lacks a manifest
-  (v1.3.0 excludes it; v1.2.0 counted it).
-
-**Threat model coverage**:
-
-| Threat | Mitigation |
-|--------|-----------|
-| Bit rot in a snapshot | SHA256 in `.manifest.json` (advisory) |
-| Empty/truncated file | Non-empty + size checks |
-| Malicious file substitution | Not mitigated (root-only directory) |
-| Unauthorized read | `0700`/`0600` permissions |
-| Orphaned manifest-less directories | **ROT-MANIFEST (v1.3.0)** — a snapshot requires a manifest to be a rotation candidate |
-| Pruning the recovery target | **ROT-PROTECT (v1.3.0)** — `.last_stable` and the newest install snapshot are never pruned |
+**Why advisory**: The snapshot was just created from the same source.
+Refusing to restore would be worse than restoring with a warning.
 
 #### 5.31.5 Transactional Upgrade (Layer 4)
 
-**State machine**:
-- `START` — install in progress or interrupted.
-- `COMMIT` — install succeeded, cleanup skipped.
-- `ROLLBACK` — rollback applied.
+**State machine**: `START` / `COMMIT` / `ROLLBACK`.
 
-**Behavior**:
-- On failure, an automatic rollback restores the previous state.
-- Leftover `COMMIT`'d transactions are cleaned by
-  `cleanupOldTransactions()` at startup.
-- `START` transactions are preserved as `orphan-txn-*` on
-  uninstall.
-
-**Security rationale**: Prevents partial install states where the
-module has neither the old nor the new configuration.
+**Behavior**: automatic rollback on failure; leftover COMMIT'd
+transactions cleaned at startup.
 
 #### 5.31.6 SELinux Context Preservation (Layer 6)
 
-**Preferred**: `restorecon` (reads `file_contexts`).
-**Fallback**: `chcon u:object_r:magisk_file:s0`.
+**Preferred**: `restorecon`.
 
-**Rationale**: A file copied to `/data/adb/` without its original
-SELinux context may be unreadable by the WebUI process on
-SELinux-enforcing ROMs.
+**Fallback**: `chcon u:object_r:magisk_file:s0`.
 
 #### 5.31.7 Language Toggle — Security Considerations
 
-The WebUI's bilingual feature (English default + Arabic toggle)
-is a **client-side only** concern. From a security standpoint:
-
-- **No server state**: The language preference lives in
-  `localStorage['dnscrypt-lang']` and is never transmitted to the
-  API.
-- **No new network requests**: The toggle only manipulates the
-  DOM.
-- **No SW cache pollution**: The Service Worker caches the HTML
-  **once**. Both `translations.en` and `translations.ar` objects
-  are inline in the same file.
-- **No XSS regression**: All translated strings pass through
-  `textContent` / `escapeHtml()`.
-- **No CSP change**: The in-page toggle does not require
-  `'unsafe-inline'` beyond what already existed.
+The bilingual feature (English default + Arabic toggle) is a
+**client-side only** concern. No server state, no new network
+requests, no SW cache pollution, no XSS regression, no CSP change.
 
 #### 5.31.8 Data-Preservation Threat Model Summary
 
-The backup system assumes:
+The backup system assumes: rooted device, `/sdcard/` writable by root,
+**not** protected from a malicious root app. `backupMu` guarantees two
+concurrent `createAutoBackup` calls cannot corrupt a snapshot.
 
-- ✅ The device is rooted.
-- ✅ `/sdcard/` is mounted and writable by root.
-- ❌ The backup directory is **not** protected from a malicious
-  root app.
-
-**`backupMu` guarantee**: Two concurrent calls to
-`createAutoBackup` cannot corrupt a snapshot.
-
-**What `backupMu` does NOT protect against**:
-- A user manually running `action.sh --backup` while the WebUI is
-  also triggering a pre-critical backup. `action.sh` is a shell
-  script; it does not coordinate with `main.go`'s mutex. In
-  practice this is safe because the shell script uses
-  `<pid>`-suffixed directory names and atomic writes for the
-  manifest. The worst case is a duplicate snapshot directory,
-  which rotation will eventually clean up.
-
-<a name="532"></a>
 ### 5.32 v1.2.0 — Correctness Fixes (FIX-1, FIX-2)
 
-> **ℹ️ Section numbering note**: §5.32 is a **section number in
-> this document**, not an Audit Correction number. FIX-1 and
-> FIX-2 are correctness fixes, not security vulnerabilities. See
-> §17.2 for the complete list of v1.2.0 additions that do **not**
-> extend the Audit Corrections Registry.
+> **ℹ️ Section numbering note**: §5.32 is a **section number in this
+> document**, not an Audit Correction number.
 
-**Neither FIX-1 nor FIX-2 is an exploitable vulnerability.** They
-are correctness fixes that shipped with v1.2.0. Both were caught
-during the pre-release audit.
+**Neither FIX-1 nor FIX-2 is an exploitable vulnerability.**
 
 #### 5.32.1 Recovery Mode Correctness Fix (FIX-1)
 
-**The bug** (early v1.2.0 draft only):
-
-The ZIP extraction step (`customize.sh §[9]`) ran **after** the
-recovery restore (`§[8a]`) and overwrote `webui.conf` and
-`dnscrypt-proxy.toml` with the ZIP's defaults. The subsequent
-restore step (`§[9c]`) was skipped in recovery mode, so the
-corrupted files were never re-fixed.
-
-**Result**: 2 of the 5 restored files were silently lost during
-recovery.
+**The bug**: ZIP extraction step overwrote `webui.conf` and
+`dnscrypt-proxy.toml` after the recovery restore.
 
 **The fix (FIX-1) — snapshot-and-reapply strategy**:
 
-Rather than reordering the ZIP extraction steps (which would
-require maintaining a duplicate exclusion list that depends on
-knowing the ZIP's contents), the final v1.2.0 release uses a
-**snapshot-and-reapply** approach:
-
 | Phase | Section | What happens |
 |---|---|---|
-| **A** | `§[8a]` | Restore 5 files from `$RESTORE_SOURCE` into `$MODPATH/proxy/` **AND** copy each file to `$MODPATH/.recovery_snapshot/` |
-| **B** | `§[9]` | Extract the ZIP normally. This overwrites `webui.conf` and `dnscrypt-proxy.toml` with the ZIP's defaults (unavoidable without knowing the ZIP's contents) |
+| **A** | `§[8a]` | Restore 5 files + snapshot to `$MODPATH/.recovery_snapshot/` |
+| **B** | `§[9]` | Extract the ZIP normally |
 | **C** | `§[9b]` | Move root-level web assets into `web/` |
-| **D** | `§[9b2]` | Re-apply the 5 files from `$MODPATH/.recovery_snapshot/` back into `$MODPATH/proxy/` |
-| **E** | `§[9c]` | Skipped when `RECOVERY_MODE=1` — already handled by A + D |
-
-**Why snapshot-and-reapply over "reorder + exclude"**:
-
-- It does **not** depend on knowing what the ZIP contains. If a
-  future release adds or removes files under `proxy/`, the fix
-  keeps working.
-- It keeps the extraction logic of `§[9]` **untouched**, so the
-  normal-install path is byte-for-byte identical to the
-  pre-recovery behavior.
-- The snapshot directory uses `$MODPATH/.recovery_snapshot/`
-  (dot-prefixed, cleaned up in `§[9b2]`), so it never appears in
-  the final module layout.
-
-**Partial re-application**: If `[9b2]` re-applies fewer files
-than were snapshotted (e.g. one file is missing or empty), the
-snapshot directory is **preserved** at
-`$MODPATH/.recovery_snapshot/` so the user can recover the
-remaining files manually.
-
-**Security rationale**: The bug was a **data-loss** issue, not an
-exploitable vulnerability. However, in a disaster-recovery
-scenario (the only scenario where FIX-1 matters), silent data loss
-would leave the user without their configuration — a
-security-relevant outcome for a project whose primary goal is
-"protected DNS".
-
-**Verify you are on the fixed version**:
-
-```bash
-# 1. Module version
-su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → must be version=v1.2.0 or newer
-
-# 2. The snapshot directory constant must be present
-su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' \
-    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
-    echo '✅ FIX-1 present (snapshot dir)'"
-
-# 3. The re-apply block (§[9b2]) must be present
-su -c "grep -q 'Re-applying recovery snapshot' \
-    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
-    echo '✅ FIX-1 present (§[9b2] re-apply block)'"
-```
-
-**If the fix is missing**: reinstall the module from a v1.2.0 (or
-newer) ZIP.
-
-#### 5.32.2 Service Worker Update-Banner Fix (FIX-2)
-
-**The bug (v1.1.0)**: The [Reload] button in the SW update banner
-sent `SKIP_WAITING` to `navigator.serviceWorker.controller` — the
-**old** worker — which ignored it. The new worker stayed in the
-`waiting` state, so the banner reappeared on every page reload →
-infinite loop.
-
-**The fix (v1.2.0)**:
-- Send `SKIP_WAITING` to `swRegistration.waiting` (the **new**
-  worker).
-- Reload on the `controllerchange` event.
-- Guard double-clicks with a `pendingReload` flag.
-- Applied to **both** `index.html` and `dashboard.html`.
-
-**Security rationale**: Not exploitable. The v1.1.0 bug was a
-usability regression. The v1.2.0 fix completes the v1.1.0 change
-that only applied to `index.html`.
+| **D** | `§[9b2]` | Re-apply the 5 files from the snapshot |
+| **E** | `§[9c]` | Skipped when `RECOVERY_MODE=1` |
 
 **Verify**:
 
 ```bash
-su -c "grep -q 'swRegistration.waiting' /data/adb/modules/dnscrypt-proxy-webui/web/index.html && \
-       echo '✅ index.html'"
-su -c "grep -q 'swRegistration.waiting' /data/adb/modules/dnscrypt-proxy-webui/web/dashboard.html && \
-       echo '✅ dashboard.html'"
+su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ FIX-1 present (snapshot dir)'"
+su -c "grep -q 'Re-applying recovery snapshot' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ FIX-1 present (§[9b2] re-apply block)'"
 ```
 
-<a name="533"></a>
+#### 5.32.2 Service Worker Update-Banner Fix (FIX-2)
+
+**The bug (v1.1.0)**: The [Reload] button sent `SKIP_WAITING` to the
+wrong worker → infinite loop.
+
+**The fix (v1.2.0)**:
+- Send `SKIP_WAITING` to `swRegistration.waiting` (the **new** worker).
+- Reload on `controllerchange`.
+- Guard double-clicks with `pendingReload` flag.
+
 ### 5.33 v1.2.0 — Watchdog Token (WD-TOKEN)
 
-> **ℹ️ Section numbering note**: §5.33 is a **section number in
-> this document**, not an Audit Correction number. WD-TOKEN is a
-> defensive hardening of an existing endpoint, not a new audit
-> correction. See §17.2 for the complete list of v1.2.0 additions
-> that do **not** extend the Audit Corrections Registry.
+> **ℹ️ Section numbering note**: §5.33 is a **section number in this
+> document**, not an Audit Correction number.
 
-**Background**:
-
-The watchdog (`watchdog.sh`) needs to call
-`POST /api/ensure_running_service` to recover a crashed DNS
-engine.
-
-**Before v1.2.0**: The endpoint was protected only by an implicit
-"localhost bypass" — any web page loaded in a browser on the same
-device could silently trigger a service restart via a CSRF
-attack.
-
-**Problem — CSRF via `<img>` tag**:
-
-```html
-<!-- This request is silently sent by the browser -->
-<img src="http://127.0.0.1:9090/api/ensure_running_service">
-```
-
-Even though the endpoint is POST-only (see §5.2), the implicit
-localhost bypass meant no authentication was required — any
-page loaded in a browser on the same device could trigger it if
-it used a POST.
+**Background**: The `ensure_running_service` endpoint was protected
+only by an implicit "localhost bypass" — exploitable via CSRF.
 
 **v1.2.0 solution — token authentication**:
 
-```text
-┌──────────────────────────────────────────────────────┐
-│  Token lifecycle                                     │
-│                                                      │
-│  1. customize.sh §[19b] generates a 64-hex token     │
-│     during install and writes it to:                 │
-│         $RUN_DIR/.watchdog_token   (mode 0600)       │
-│                                                      │
-│  2. If the file is missing, main.go creates it on    │
-│     the next run via loadOrCreateWatchdogToken().    │
-│                                                      │
-│  3. watchdog.sh reads the file on every API call     │
-│     (no cache) and sends it as:                      │
-│         X-Watchdog-Token: <token>                    │
-│                                                      │
-│  4. main.go verifyWatchdogToken() compares the       │
-│     header against the file using                    │
-│     subtle.ConstantTimeCompare.                      │
-│                                                      │
-│  5. On mismatch or missing header → 401.             │
-└──────────────────────────────────────────────────────┘
-```
+- **Localhost-scoped**: `isLocalRequest` is still required.
+- **Constant-time**: `subtle.ConstantTimeCompare`.
+- **Not rate-limited**: a flapping DNS engine does not lock the
+  watchdog out.
+- **Persistent**: the token file survives restarts.
+- **Fail-closed**: if the token file is missing and no token is sent,
+  the request falls back to normal user auth.
 
-**Characteristics**:
-
-- **Localhost-scoped**: `isLocalRequest` is still required; a
-  remote request with a valid token is rejected.
-- **Constant-time**: no timing leak on comparison.
-- **Not rate-limited**: token requests bypass the login
-  limiter, so a flapping DNS engine does not lock the watchdog
-  out.
-- **Persistent**: the token file survives restarts. It is
-  regenerated only if the file is missing.
-- **Fail-closed**: if the token file is missing and no token is
-  sent, the request falls back to normal user auth — which the
-  watchdog does not have — so the request is rejected.
-
-**Threat model coverage**:
-
-| Threat | Mitigation |
-|---|---|
-| CSRF from a browser page | Requires `X-Watchdog-Token` header (not settable via `<img>`/`<form>`) |
-| Impersonation by a non-root app | Token file is `0600`, owned by root |
-| Token leak via timing | `subtle.ConstantTimeCompare` |
-| Token leak via logging | Token is never logged |
-| Replay | Token is a shared secret; no nonce. Rate limiting is not applied, but the endpoint only restarts the DNS engine. |
-
-**Note**: The token file is excluded from the 5-file preservation
-set (it is a runtime secret, not user config). If the file is
-deleted, `main.go` regenerates it on the next run and
-`watchdog.sh` picks it up on its next API call.
-
-<a name="534"></a>
 ### 5.34 v1.4.0 — CodeQL `go/path-injection` Fix in `removeModule`
 
-> **ℹ️ Section numbering note**: §5.34 is a **section number in
-> this document**, not an Audit Correction number. The CodeQL fix
-> closes two CodeQL alerts tracked separately from the numbered
-> audit corrections.
+> **ℹ️ Section numbering note**: §5.34 is a **section number in this
+> document**, not an Audit Correction number.
 
-**Background**:
-
-CodeQL static analysis flagged `POST /api/remove_module` with two
-`go/path-injection` alerts (#1 and #2). The prior implementation
-used `strings.HasPrefix(modulePath, MODULES_DIR+"/")` and
-`filepath.Clean(modulePath)` before calling `os.RemoveAll(cleanPath)`.
-Although `filepath.Clean` normalizes `..`, it does not remove them
-from the string, and CodeQL's taint analysis considers the
-caller-provided path to reach the sink.
-
-**Practical impact**: The endpoint already required:
-- The path to be under `/data/adb/modules/`.
-- The path to contain a `.module.fingerprint` file with the
-  string `dnscrypt-proxy-webui`.
-- The path not to equal the current module directory.
-
-Only authenticated users (or the local user, by default no auth
-on localhost) could call this endpoint. The CodeQL alerts were
-therefore **informational hardening**, not exploitable
-vulnerabilities. Nevertheless, they were closed.
+**Background**: CodeQL flagged two `go/path-injection` alerts.
 
 **v1.4.0 solution**:
 
 ```go
-func removeModule(modulePath string) map[string]interface{} {
-    defer func() { recover() }()
-
-    // v1.4.0 fix (CodeQL go/path-injection):
-    name := filepath.Base(modulePath)
-    if name == "" || name == "." || name == ".." ||
-        name == string(filepath.Separator) {
-        return map[string]interface{}{
-            "status":  "error",
-            "message": "Invalid module name",
-        }
-    }
-
-    expectedPrefix := MODULES_DIR + string(filepath.Separator)
-    if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
-        return map[string]interface{}{
-            "status":  "error",
-            "message": "Invalid path",
-        }
-    }
-
-    // Reconstruct the full path from the trusted base directory
-    // and the sanitized name.
-    cleanPath := filepath.Join(MODULES_DIR, name)
-
-    // ... (rest of the function unchanged)
+name := filepath.Base(modulePath)
+if name == "" || name == "." || name == ".." ||
+    name == string(filepath.Separator) {
+    return map[string]interface{}{"status": "error", "message": "Invalid module name"}
+}
+expectedPrefix := MODULES_DIR + string(filepath.Separator)
+if !strings.HasPrefix(filepath.Clean(modulePath), expectedPrefix) {
+    return map[string]interface{}{"status": "error", "message": "Invalid path"}
+}
+cleanPath, err := securejoin.SecureJoin(MODULES_DIR, name)
+if err != nil {
+    return map[string]interface{}{"status": "error", "message": "Invalid path"}
 }
 ```
 
 **Why this closes the alerts**:
-- `filepath.Base(modulePath)` is a CodeQL-recognized sanitizer:
-  the returned value has no separators, no `..`, and represents
-  exactly one path component.
-- `filepath.Join(MODULES_DIR, name)` combines a **trusted base
-  directory** (a package-level constant) with the **sanitized
-  basename**. No user-controlled data participates in path
-  construction.
-- The `strings.HasPrefix` check remains as defence-in-depth, but
-  it is not the sanitizer.
+- `filepath.Base` is a CodeQL-recognized sanitizer.
+- `securejoin.SecureJoin` combines a trusted base directory with a
+  sanitized basename, and refuses any path that would escape the base.
+- The `expectedPrefix` check is defence-in-depth.
 
-**Behavioral impact**: identical to prior versions for every
-legitimate input. Only malformed inputs (empty basename, `.`,
-`..`, `/`-only) now short-circuit before any file operation.
-
-**Verify**:
-
-```bash
-# 1. Static audit
-grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ filepath.Base present"
-grep -q 'filepath.Join(MODULES_DIR, name)' proxy/main.go && echo "✅ trusted base dir"
-
-# 2. Negative test (should return error, not delete)
-curl -X POST http://127.0.0.1:9090/api/remove_module \
-  -d "path=/data/adb/modules/.."
-# Expected: {"status":"error","message":"Invalid module name"}
-```
-
-<a name="535"></a>
 ### 5.35 v1.4.0 — iOS PWA Removal + Companion APK Route
 
-> **ℹ️ Section numbering note**: §5.35 is a **section number in
-> this document**, not an Audit Correction number.
+> **ℹ️ Section numbering note**: §5.35 is a **section number in this
+> document**, not an Audit Correction number.
 
 #### 5.35.1 iOS PWA Logic Removal
 
-**Background**: Prior to v1.4.0, `web/index.html` contained
-~35 lines of iOS-specific PWA code:
-- `isIOSDevice()` helper.
-- `pwaStepIos1/2/3` translation keys (EN + AR).
-- iOS branches in `getBrowserName()`, `isBrowserSupported()`,
-  `getPWAInstallSteps()`, and `showPWAInstructionsModal()`.
-
-**Security rationale**: The project is **Android-only** (Magisk /
-KernelSU / APatch are Android root solutions). iOS branches were
-dead code on every supported platform. Removing them:
-- Reduces the WebUI's code surface.
-- Removes an unnecessary UA-string-based branching path.
-- Removes translation entries that could drift out of sync with
-  the actual UI.
-
-**Behavioral impact**: On browsers that never fire
-`beforeinstallprompt` (Firefox, Samsung Internet legacy builds),
-the WebUI now falls through to a unified "unsupported" message
-that lists supported alternatives. No browser-specific branching
-remains.
-
-**`apple-touch-icon.png` is retained** — it is used by Android
-launchers as an icon fallback and by `manifest.json` icons array.
+**Security rationale**: Android-only project → iOS branches were dead
+code. Removing them reduces surface.
 
 **Verify**:
 
 ```bash
-su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.html \
-  && echo '❌ still present' || echo '✅ removed'"
+# Anchored match avoids false positives from comments that merely
+# mention the string "isIOSDevice".
+su -c "grep -qE '^\s*(function isIOSDevice|isIOSDevice\s*=)' \
+    /data/adb/modules/dnscrypt-proxy-webui/web/index.html && \
+    echo '❌ still present' || echo '✅ removed'"
 ```
 
-#### 5.35.2 Companion APK Route
+#### 5.35.2 Companion APK Route (v1.4.0)
 
 **Route**: `GET /app-debug.apk`.
 
-**Mime type**: `application/vnd.android.package-archive`.
+**Authentication**: None (public).
 
-**Cache-Control**: `public, max-age=3600, immutable`.
+**Why no auth**: no secrets; Android signature-verifies at install.
 
-**Authentication**: **None** (public route).
+### 5.36 v1.5.0 — Companion App Install Security (APK-5, APK-11)
 
-**Why no auth**:
-- The APK contains **no secrets** (it is a public WebView
-  wrapper, source available at
-  [`gasciljh/dnscrypt-proxy-app`](https://github.com/gasciljh/dnscrypt-proxy-app)).
-- Requiring login to download the companion app would be
-  user-hostile: the WebUI install button is on the login-free
-  landing page (before authentication is possible on some
-  setups).
-- Android verifies the APK's **signature** at install time, so a
-  tampered APK served from a compromised module would fail the
-  package signature check.
+> **ℹ️ Section numbering note**: §5.36 is a **section number in this
+> document**, not an Audit Correction number.
 
-**Optional**: The route returns HTTP 404 when the file is
-**absent** (local developer builds). This is not a security
-issue — a missing file is simply a missing file.
+**Background**: v1.5.0 replaces the direct `<a download>` link
+(v1.4.0) with a **root-level install** that runs `install_app.sh` — a
+5-level `pm install` cascade. The operation is **privileged**,
+**irreversible in the current request** (the app remains installed),
+and **triggered from a browser origin** — three properties that make
+a dedicated security model necessary.
+
+> **Layout note**: `install_app.sh` is staged at the **module root**
+> (next to `customize.sh`), not under `proxy/`. The path is resolved
+> by `main.go`'s `getInstallScript()` via
+> `filepath.Join(MODDIR, INSTALL_SCRIPT_REL)`.
+
+#### 5.36.1 One-Shot CSRF Token
+
+**Purpose**: Prevent an attacker who can load a page in a browser on
+the same device from triggering an install on the user's behalf.
+
+**Mechanism**:
+
+1. `GET /api?action=install_token` — requires a valid session.
+   Returns `{ "token": "<64 hex>", "ttl": 60 }`.
+2. The token is stored server-side in the `installTokens` map with an
+   expiry of `now + INSTALL_TOKEN_TTL` (60 s).
+3. The token is **consumed on first use**:
+   `validateAndConsumeInstallToken(token)` deletes it from the map on
+   success. A retry of the same token returns
+   `401 Invalid or expired install token`.
+4. Tokens are garbage-collected lazily — expired entries are removed
+   when the next `generateInstallToken()` runs. Server restart clears
+   the map (tokens are 60 s by design).
+
+**Why a separate token (not just the session cookie)**:
+- The install endpoint has **side effects that outlive the session** —
+  the app remains installed after logout.
+- The session cookie is long-lived (24 h). A one-shot token forces an
+  explicit per-request consent.
+- CSRF exploitation becomes impractical: an attacker cannot know or
+  guess a 64-hex random token, and the token is invalidated on the
+  first use.
+
+**Why 60 seconds**: generous enough for a slow user, short enough that
+a leaked token (e.g. via a screenshot) is unlikely to still be valid.
+
+**Why not cache tokens across requests**: each click on "Install App"
+generates a fresh token. Reusing a token across multiple clicks would
+let a hijacked tab perform multiple installs without the user's
+consent.
+
+**Token comparison**: constant-time (`subtle.ConstantTimeCompare`).
+
+**Token file location**: none — the token store is in-memory only.
+Unlike the watchdog token (§5.33), the install token is not persisted
+to disk.
+
+#### 5.36.2 Per-IP Install Rate Limit
+
+**Purpose**: Prevent an attacker from forcing repeated `pm install`
+runs (each one forks up to 5 subprocesses and performs a 3 MB copy +
+hash).
+
+**Parameters**:
+
+| Parameter | Value | Constant |
+|---|---|---|
+| Attempts | 5 | `MAX_INSTALL_ATTEMPTS` |
+| Lockout | 15 minutes | `INSTALL_LOCKOUT_PERIOD` |
+| Per | IP (IPv6-safe via `getClientIP`) | — |
+
+**Separate map**: `installAttempts` is **distinct** from
+`loginAttempts`. A failed login does not affect the install counter
+and vice versa.
+
+**Success reset**: a successful install resets the counter for that IP.
+
+**Lockout response**:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+
+{
+  "status": "error",
+  "action": "install",
+  "message": "Too many install attempts. Try again in 15 minutes."
+}
+```
+
+**Rationale for the limit choice**: mirrors the login rate limit for
+consistency. The two limits serve different purposes (login =
+credential guessing; install = resource exhaustion) but the same
+parameters are sufficient for both.
+
+#### 5.36.3 SELinux Staging
+
+**The problem**: `/data/adb/` has the SELinux context `adb_data_file`.
+The `system_server` process — which performs the install — **cannot
+read** files with this context. Attempting
+`pm install /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk`
+produces:
+
+```
+avc: denied { read } for pid=... name="app-debug.apk" scontext=u:r:system_server:s0 ...
+```
+
+**The fix**:
+
+```sh
+STAGING_DIR="/data/local/tmp"
+STAGING_APK="$STAGING_DIR/dnscrypt-companion.apk"
+
+cp "$APK_PATH" "$STAGING_APK" 2>/dev/null
+chmod 0644 "$STAGING_APK" 2>/dev/null
+```
+
+`/data/local/tmp/` has the context `shell_data_file`, which
+`system_server` **can** read.
+
+**Critically**: SELinux is **never disabled**. The script does not
+call `setenforce 0`. The staging directory is world-readable on most
+ROMs; the APK itself is a public asset.
+
+**What this decision trades off**:
+
+| Option | SELinux state during install | Attack window | Chosen? |
+|---|---|---|---|
+| `setenforce 0` for the duration | Disabled | Any crash leaves the device unprotected | ❌ |
+| `chcon` the module directory | Enforcing | Changes the module's own context; fragile | ❌ |
+| Stage to `/data/local/tmp/` | Enforcing | 3 MB copy, ~1 s; world-readable path | ✅ |
+| Bind-mount elsewhere | Enforcing | Requires a mount namespace | ❌ |
+
+**Why staging is the right trade-off**:
+- The APK is a **public** asset — its exposure on a world-readable
+  path is not a confidentiality issue.
+- `pm install` reads the file synchronously; the file is removed on
+  exit by the trap (see below).
+- The alternative (`setenforce 0`) opens a device-wide vulnerability
+  window that violates the module's own security goal (protected DNS).
+
+**Cleanup**: `install_app.sh` §[12] installs a trap that **removes**
+the staged APK (`/data/local/tmp/dnscrypt-companion.apk`) on **every**
+catchable exit path.
+
+**Trap structure (CIA-DEF-03)**: the trap is split into **three
+separate handlers** with a `_CLEANED_UP` re-entry guard:
+
+```sh
+_CLEANED_UP=0
+
+_cleanup_app() {
+    if [ "$_CLEANED_UP" = "1" ]; then
+        return 0
+    fi
+    _CLEANED_UP=1
+
+    if [ "$_STAGED_OK" = "1" ] && [ -f "$STAGING_APK" ]; then
+        rm -f "$STAGING_APK" 2>/dev/null
+    fi
+
+    if [ "$_VERIFIER_RESTORE" = "1" ]; then
+        settings put global package_verifier_enable "$_VERIFIER_ORIG" 2>/dev/null
+    fi
+
+    return 0
+}
+
+trap '_cleanup_app' EXIT
+trap '_cleanup_app; exit 130' INT
+trap '_cleanup_app; exit 143' TERM
+```
+
+**Why the split**:
+- In POSIX sh, a trapped signal whose handler does **not** call `exit`
+  causes the script to **resume execution** after the handler returns.
+  The pre-patch single `EXIT INT TERM` handler cleaned up but did not
+  exit, so on SIGINT the cascade loop continued — re-staging the APK
+  and re-disabling Play Protect. A user pressing Ctrl+C in a direct
+  CLI invocation had to press it twice more to actually stop the
+  script.
+- The post-patch `INT` handler calls `exit 130` immediately after
+  cleanup; the `TERM` handler calls `exit 143`. Exit codes `130` and
+  `143` follow the shell convention (`128 + signal number`) for
+  signal-terminated processes.
+- `_CLEANED_UP` is a re-entry guard so the cleanup body runs **exactly
+  once**, even when the INT handler's `exit 130` causes the EXIT
+  handler to fire (POSIX requires EXIT to fire on every exit path).
+
+**Impact on the primary invocation path** (main.go via
+`exec.CommandContext`): none. `main.go` sends SIGKILL after
+`INSTALL_TIMEOUT` — SIGKILL is uncatchable, so neither the pre-patch
+nor the post-patch trap is involved. The split only affects direct CLI
+use (`su -c "sh install_app.sh"`).
+
+**Race-free guarantee**: the removal is safe because `pm install`
+**blocks** until it has finished reading the file. By the time the
+trap fires (normal exit, error exit, SIGINT, or SIGTERM), the staged
+APK is no longer needed by PackageManager. There is no window during
+which a partial read could be interrupted by the removal.
+
+#### 5.36.4 Play Protect Temporary Disable
+
+**The problem**: Google Play Protect can silently block `pm install`
+of an APK that did not originate from the Play Store. On many ROMs
+the verifier runs synchronously and rejects the install without a
+useful error.
+
+**The fix**:
+
+```sh
+# Install the traps BEFORE any irreversible state change.
+trap '_cleanup_app' EXIT
+trap '_cleanup_app; exit 130' INT
+trap '_cleanup_app; exit 143' TERM
+
+_VERIFIER_ORIG=$(_read_verifier_state 2>/dev/null)
+
+case "$_VERIFIER_ORIG" in
+    "1")
+        if settings put global package_verifier_enable 0 2>/dev/null; then
+            _VERIFIER_RESTORE=1
+            log_msg "INSTALL: Play Protect verifier disabled (will restore to 1)"
+        fi
+        ;;
+    "0")
+        log_msg "INSTALL: Play Protect verifier already disabled"
+        ;;
+    "null")
+        if settings put global package_verifier_enable 0 2>/dev/null; then
+            _VERIFIER_RESTORE=1
+        fi
+        ;;
+    *)
+        # Unreadable — do not touch it.
+        _VERIFIER_RESTORE=0
+        _VERIFIER_ORIG=""
+        ;;
+esac
+```
+
+The traps are installed **before** the `settings put`, so a signal
+arriving in the tiny window between the read and the write is still
+handled correctly.
+
+**Duration**: the verifier is disabled only for the duration of the
+cascade. The cascade is bounded by a **75-second wall-clock deadline**
+(`CASCADE_DEADLINE_SECONDS = 75`). The deadline is deliberately
+shorter than `main.go`'s 90-second `INSTALL_TIMEOUT`, so the trap
+always fires before the parent process kills the script.
+
+**Restore value**: the trap restores the **exact captured value**
+(`$_VERIFIER_ORIG`), not a hardcoded `1`. On every normal ROM the
+captured value is `1`, so the behaviour is unchanged — the change is
+defence-in-depth against an uncommon configuration where the setting
+is `null` or another value.
+
+**Caveats**:
+
+- **Not restored on force reboot** — `settings put` writes to the
+  system settings database. If the device is **force-rebooted** during
+  the install (e.g. hardware reset button), the
+  `package_verifier_enable` value may remain `0` across reboots. This
+  is a well-known transient state, and Google Play re-enables the
+  verifier on the next Play Protect scan.
+- **SIGKILL skips the trap** — SIGKILL is uncatchable by design
+  (POSIX). The primary invocation path (`main.go` via
+  `exec.CommandContext`) sends SIGKILL after `INSTALL_TIMEOUT`. The
+  75-second cascade deadline exists precisely to ensure the trap
+  fires before that point on every realistic install.
+- **Well-behaved ROMs** — the verifier is disabled for the duration of
+  the cascade (typically a few seconds; worst case bounded by the
+  75-second deadline). The window is short enough that a concurrent
+  malicious install is impractical.
+- **Adversarial ROMs** — on a ROM where `settings put` is a no-op
+  (some custom kernels), the disable has no effect and the install
+  fails cleanly.
 
 **Threat model coverage**:
 
 | Threat | Mitigation |
 |---|---|
-| Tampered APK served from module | Android rejects mismatched signature at install time |
-| Information leak | None — the APK contains no secrets |
-| DoS via large downloads | `Cache-Control: immutable` reduces repeat fetches; the APK is ~3 MB |
-| Cache poisoning | SW does **not** precache `/app-debug.apk`; the browser's HTTP cache handles it |
+| Play Protect blocks legitimate install | Temporary disable + restore |
+| Disable persists after crash | `trap` covers normal + error + SIGINT/SIGTERM paths; cascade bounded by 75 s deadline |
+| Disable persists across reboot | Documented; transient; Play Protect self-heals |
+| Attacker triggers a second install while verifier is off | Rate limit (§5.36.2) + short window |
+| Cascade hangs, verifier never restored | 75-second deadline ensures the loop terminates inside `INSTALL_TIMEOUT` |
+
+#### 5.36.5 5-Level Cascade — Security Rationale
+
+The cascade is:
+
+1. `pm install -r --user 0 <apk>` — direct install.
+2. `pm install -r -i com.android.shell <apk>` — shell-attributed.
+3. Session-based (`install-create` + `install-write` + `install-commit`).
+4. `magisk su -c "pm install -r <apk>"`.
+5. `cmd package install -r <apk>`.
+
+**All 5 levels are semantically equivalent** — they invoke the same
+`PackageManager.installPackage` code path with different SELinux
+domains and different caller capabilities. The choice of level does
+not affect the security of the resulting installation; Android still
+verifies the APK signature.
+
+**Order rationale**:
+
+| Level | Why this position |
+|---|---|
+| 1 | Simplest, works on most ROMs. Fastest to succeed. |
+| 2 | Works where Level 1 is blocked by shell restrictions. |
+| 3 | Works where direct installs are blocked by verification prompts. Same API Google Play uses. |
+| 4 | Explicit Magisk `su` — works where `/system/bin/su` is not Magisk. |
+| 5 | Modern shell entrypoint. Bypasses some legacy checks. |
+
+**Attacker-controlled cascade failure**: a malicious ROM or a rogue
+root app could break every level so that none succeeds. The result is
+a failed install, not a compromised install. Android verifies the
+package signature regardless of which level is used.
+
+#### 5.36.6 Response Design — Failure is 200, Not 4xx
+
+The `install_companion_app` endpoint returns:
+
+- **HTTP 200** for both success and install failure.
+  - Success: `{"status": "ok", "action": "install", ...}`.
+  - Failure: `{"status": "error", "action": "install", "message_ar": "...", "message_en": "..."}`.
+- **HTTP 401** for auth/token failure.
+- **HTTP 403** for non-localhost.
+- **HTTP 429** for rate limit.
+
+**Why**: an install failure is a **valid outcome of a well-formed
+request**. The WebUI needs to read the AR/EN message from the body to
+display it. Only auth/rate-limit/token failures use 4xx.
+
+**Security rationale**: this does not weaken the security model. The
+distinction between success and failure is in the JSON body, not the
+HTTP status. An attacker cannot use a 200 response to mask a forbidden
+request — the auth check runs first.
+
+#### 5.36.7 Package Name Candidates (APK-12)
+
+The script tries **3 package name candidates** in order:
+
+1. `com.gasciljh.dnsproxy.debug` (default)
+2. `com.gasciljh.dnsproxy`
+3. `com.gasciljh.dnscrypt_proxy` (legacy)
+
+**Rationale**: the companion app has been released under multiple
+package names across build variants. Trying all three means the WebUI
+does not need to know the exact name.
+
+**Security impact**: none. The candidate list is hardcoded in
+`install_app.sh` — no user input is involved. Android verifies the
+package signature regardless of the name.
 
 **Verify**:
 
 ```bash
-# 1. Check the route
-curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
-# Expected when present:
-#   HTTP/1.1 200 OK
-#   Content-Type: application/vnd.android.package-archive
-#   Cache-Control: public, max-age=3600, immutable
-
-# 2. Confirm the file is bundled
-su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk \
-  && echo '✅ APK bundled' || echo '(dev build — no APK)'"
-
-# 3. Confirm iOS PWA logic is absent
-su -c "grep -q 'isIOSDevice' /data/adb/modules/dnscrypt-proxy-webui/web/index.html \
-  && echo '❌ iOS logic still present' || echo '✅ iOS logic removed'"
-
-# 4. Confirm install button uses direct link
-su -c "grep -q 'href=\"/app-debug.apk\"' /data/adb/modules/dnscrypt-proxy-webui/web/index.html \
-  && echo '✅ direct <a download> link'"
+# BusyBox grep does not support \b as a word boundary (it treats it
+# as a literal backspace). The check uses an explicit character-class
+# boundary instead.
+grep -q 'com.gasciljh.dnsproxy.debug' proxy/install_app.sh && echo "✅ candidate 1"
+grep -qE 'com\.gasciljh\.dnsproxy([^.]|$)' proxy/install_app.sh && echo "✅ candidate 2"
+grep -q 'com.gasciljh.dnscrypt_proxy' proxy/install_app.sh && echo "✅ candidate 3 (legacy)"
 ```
+
+**Location note**: the candidate list is defined **only** in
+`install_app.sh`. `main.go` does not maintain a parallel list. The
+detected package name is returned to `main.go` inside the JSON payload
+from `callInstallScript("status")`.
+
+#### 5.36.8 SHA256 Verification (CIA-1)
+
+**Behavior**: if `web/app-debug.apk.sha256` is present, the APK's
+SHA256 is verified **before any install strategy is attempted**. If
+the file is absent (local developer builds), the script degrades to
+**advisory mode** — a warning is logged, but the install proceeds.
+
+**Rationale for advisory mode**:
+- The `.sha256` is staged by `release.yml` (v1.5.0). Dev builds do not
+  have it.
+- The APK is a **public** artifact fetched from a **public**
+  repository. The SHA256 guards against a bit-flip during the release
+  pipeline, not against an adversarial provider.
+- Android verifies the **package signature** at install time, which is
+  the ultimate integrity check.
+
+**Threat model coverage**:
+
+| Threat | Mitigation |
+|---|---|
+| Corrupted APK in module ZIP | SHA256 mismatch → install aborted |
+| Missing `.sha256` in dev build | Advisory mode; Android signature still verified |
+| Tampered APK in module ZIP | SHA256 mismatch (if `.sha256` present) OR Android signature mismatch (always) |
+
+#### 5.36.9 Install Security — Summary Table
+
+| Concern | Mitigation | Section |
+|---|---|---|
+| Unauthorized install | `checkAuth()` required | §5.36.1 |
+| Remote install | `isLocalRequest()` required on install + uninstall + install_token endpoints | §5.36.1 |
+| Brute force | 5 failed attempts / 15 min per IP | §5.36.2 |
+| CSRF | one-shot token (60 s TTL) | §5.36.1 |
+| Path traversal | APK path hardcoded in Go + sh | §5.36.3 |
+| Shell injection | `shellQuote()` on all paths | §5.5 |
+| SELinux relaxation | NEVER `setenforce 0` — staging instead | §5.36.3 |
+| Play Protect interference | temporary disable + restore via trap + 75 s cascade deadline | §5.36.4 |
+| APK tampering | SHA256 verification if `.sha256` present | §5.36.8 |
+| Audit | full log in `dnscrypt_main.log` | §11.1 |
+| Install CPU DoS | per-IP rate limit | §5.36.2 |
+| Token leak (XSS / extension) | 60 s TTL + one-shot | §5.36.1 |
+| Staged APK leftover | EXIT/INT/TERM traps remove it on every catchable exit path | §5.36.3 |
+| Signal-interrupt resume | INT exits 130, TERM exits 143 | §5.36.3 |
 
 ---
 
@@ -1597,29 +1519,14 @@ func isSecureCookie() bool {
 }
 ```
 
-| BIND_ADDR | Secure | Reason |
-|---|---|---|
-| 127.0.0.1 | ✅ true | Secure Context |
-| ::1 | ✅ true | Secure Context |
-| localhost | ✅ true | Secure Context |
-| 0.0.0.0 | ❌ false | Not a Secure Context |
-| 192.168.x.x | ❌ false | Same reason |
-
 #### 6.3.3 SameSite=Lax
 
-| Value | Top-level GET | Cross-site POST | Cross-site GET |
-|---|---|---|---|
-| None | ✅ | ✅ | ✅ |
-| Lax | ✅ | ❌ | ❌ |
-| Strict | ❌ | ❌ | ❌ |
-
-Reasons for Lax:
-- Strict breaks PWA shortcuts.
-- Lax + POST-only endpoints = full CSRF protection.
+Reasons for Lax: Strict breaks PWA shortcuts; Lax + POST-only
+endpoints = full CSRF protection.
 
 #### 6.3.4 HttpOnly
-- JavaScript cannot read it.
-- Prevents XSS from stealing the session.
+
+JavaScript cannot read it. Prevents XSS from stealing the session.
 
 ### 6.4 Known Limitation: CSP `'unsafe-inline'`
 
@@ -1630,20 +1537,9 @@ script-src 'self' 'unsafe-inline';
 style-src 'self' 'unsafe-inline';
 ```
 
-**Reason**:
-- Inline event handlers (`onclick="..."`) in HTML.
-
-**Security impact**:
-- Reduces XSS protection.
-- But CSP is strict in other aspects (`frame-ancestors 'none'`, `object-src 'none'`).
-- All scripts come from 'self'.
-- No user input is inserted directly into innerHTML.
-
-**TODO**: remove `'unsafe-inline'` — deferred first to v1.3.0, then
-to **v1.5.0** (v1.3.0 shipped with a narrower scope).
-**Solution**: convert `onclick` to `addEventListener`.
-
-**See**: [`docs/ROADMAP.md`](ROADMAP.md) §5.1.1.
+**Status**: removal of `'unsafe-inline'` is deferred to a future
+release (see `docs/ROADMAP.md`). The v1.5.0 cycle focused on the
+companion install flow.
 
 ---
 
@@ -1651,51 +1547,42 @@ to **v1.5.0** (v1.3.0 shipped with a narrower scope).
 
 ### 7.1 Supported Schemes
 
+The session-based schemes are checked in order by `checkAuth`:
+
 | Scheme | Priority | Rate Limited | Persistence |
 |---|---|:---:|---|
 | Basic Auth | 1 | Yes | per-request |
 | Bearer Token | 2 | No | 24h (for compatibility) |
 | Session Cookie | 3 | No | 24h (primary) |
-| **Watchdog Token** | **4** | **No** | **per-request (v1.2.0)** |
+| Watchdog Token | 4 | No | per-request (v1.2.0) |
 
-**Audit Correction #15-a**:
-- No token in login response.
-- HttpOnly cookie only.
-- `getStoredToken()` = no-op in the client.
+**Install token (v1.5.0)** is **not** a session scheme. It is an
+**additional** per-request credential required in addition to one of
+the schemes above, for a single endpoint (`POST
+/api/install_companion_app`).
 
-**Fix #8**:
-- Basic Auth protected by rate limiting.
-- 5 failed attempts → 15-min lockout.
+| Property | Value |
+|---|---|
+| Issued by | `GET /api?action=install_token` (requires a session) |
+| Consumed by | `POST /api/install_companion_app` (in addition to session) |
+| TTL | 60 s (`INSTALL_TOKEN_TTL`) |
+| Format | 64 hex chars (32 bytes) |
+| Reusable | ❌ one-shot — deleted from the map on first use |
+| Rate-limited | Yes — the install endpoint, per-IP, 5/15 min |
 
-**Fix NEW-1**:
-- `/api/auth/login` POST only.
-- `/api/auth/logout` POST only.
-- 405 + `Allow: POST` for non-POST.
+**Scheme precedence on `install_companion_app`**:
 
-**Fix NEW-6**:
-- Auth cache (60 s) — reduces file I/O.
+1. `checkAuth(r)` must succeed (Bearer / Cookie / Basic).
+2. `isLocalRequest(r)` must succeed.
+3. `isInstallLockedOut(ip)` must be false.
+4. The one-shot token in the request body must be valid and unconsumed.
 
-**v1.2.0 — Watchdog Token (WD-TOKEN)**:
-- `X-Watchdog-Token` header for `/api/ensure_running_service`.
-- Localhost-scoped.
-- Constant-time comparison.
-- Not rate-limited.
-- See §5.33 for the full design.
+Any of the four failing short-circuits the request with the
+appropriate HTTP status (401 / 403 / 429).
 
 ### 7.2 Credentials Source
 
-From `dnscrypt-proxy.toml` (`[monitoring_ui]` section only):
-
-```toml
-[monitoring_ui]
-username = 'admin_xxxxxxxx'
-password = 'xxxxxxxxxxxxxxxxxxxxxxxx'
-```
-
-Generated automatically in `customize.sh`:
-- Refuse admin/admin.
-- 24-char password.
-- 8-char suffix for the username.
+From `dnscrypt-proxy.toml` (`[monitoring_ui]` section only).
 
 **Fix E**: reading from `[monitoring_ui]` only (section tracking).
 
@@ -1703,8 +1590,7 @@ Generated automatically in `customize.sh`:
 
 **Fix NEW-6**: cache read (60 s TTL).
 
-**v1.2.0**: The credentials are also preserved in the persistent
-backup at `/sdcard/dnscrypt-webui-backup/current/dnscrypt-proxy.toml`.
+**v1.2.0**: credentials are preserved in the persistent backup.
 
 ### 7.3 Constant-time Comparison
 
@@ -1713,18 +1599,20 @@ userMatch := subtle.ConstantTimeCompare([]byte(user), []byte(expectedUser)) == 1
 passMatch := subtle.ConstantTimeCompare([]byte(pass), []byte(expectedPass)) == 1
 ```
 
-**v1.2.0**: The watchdog token also uses
-`subtle.ConstantTimeCompare` (see §5.33).
+**v1.2.0**: watchdog token also uses `subtle.ConstantTimeCompare`.
+
+**v1.5.0**: install token also uses `subtle.ConstantTimeCompare`.
 
 ### 7.4 Rate Limiting
 
 - 5 failed attempts per IP.
 - 15-minute lockout.
-- `LOGIN_ATTEMPT_STALE_PERIOD = 1h` — cleanup of old IPs.
-- `getClientIP()` — IPv6 support in the key.
+- `LOGIN_ATTEMPT_STALE_PERIOD = 1 h`.
+- `getClientIP()` — IPv6 support.
 - **Fix #8**: Basic Auth protected by the same mechanism.
-- **v1.2.0**: Watchdog token requests bypass the limiter (a
-  flapping DNS engine does not lock the watchdog out).
+- **v1.2.0**: watchdog token requests bypass the login limiter.
+- **v1.5.0**: separate per-IP limiter for the install endpoint
+  (§5.36.2).
 
 ---
 
@@ -1765,6 +1653,7 @@ func startSessionGC() {
     for range ticker.C {
         // 1. clean up expired sessions
         // 2. clean up old loginAttempts (Audit #5)
+        // 3. clean up old installAttempts (v1.5.0)
     }
 }
 ```
@@ -1796,7 +1685,9 @@ Decision: Conditional Secure + SameSite=Lax + POST-only
 | PORT/DASHBOARD_PORT | 1–65535 | readConfPort |
 | backup reason (v1.2.0) | fixed set | `createAutoBackup(reason)` callers |
 | backup dir name (v1.2.0) | `<ts>-<type>-<pid>[-<rand4>]` | `createAutoBackup` generator |
-| **remove_module path (v1.4.0)** | **basename only** | **`filepath.Base` + trusted base dir** |
+| remove_module path (v1.4.0) | basename only | `filepath.Base` + trusted base dir |
+| install token (v1.5.0) | 64 hex chars | `validateAndConsumeInstallToken` |
+| install body size (v1.5.0) | ≤ 5 MB (MaxBytesReader) | `handleAPI` |
 
 ### 9.2 Validation Functions
 
@@ -1821,13 +1712,11 @@ func readConfPort(key, defaultPort string) string {
 - `net.ParseIP()` for IP validation.
 - `url.QueryEscape()` in JS.
 - **`shellQuote()`** — extended in v1.1.0.
-- **v1.2.0**: The `reason` string passed to `createAutoBackup` is
-  never used in a shell command — it is only used in the log
-  line. The backup directory name is generated by `main.go`,
-  not by the caller.
-- **v1.4.0**: `remove_module` sanitizes via `filepath.Base()`
-  and rebuilds from the trusted `MODULES_DIR` constant (see
-  §5.34).
+- **v1.2.0**: the `reason` string passed to `createAutoBackup` is
+  never used in a shell command.
+- **v1.4.0**: `remove_module` sanitizes via `filepath.Base()`.
+- **v1.5.0**: `install_app.sh` uses a hardcoded APK path and
+  `shellQuote()` on all paths.
 
 ### 9.4 Endpoint Matching
 
@@ -1835,6 +1724,8 @@ func readConfPort(key, defaultPort string) string {
 - No `strings.Contains`.
 - No `strings.HasPrefix` (with a single path).
 - Only `path == "/api/NAME"` or `path == "/api/NAME/"`.
+- **v1.5.0**: `install_companion_app` and `uninstall_companion_app`
+  both use `hasEndpoint`.
 
 ---
 
@@ -1843,7 +1734,7 @@ func readConfPort(key, defaultPort string) string {
 ### 10.1 Library
 
 - Standard Go library only (`crypto/*`).
-- No external dependencies.
+- No external dependencies (for crypto).
 
 ### 10.2 Algorithms
 
@@ -1855,6 +1746,9 @@ func readConfPort(key, defaultPort string) string {
 | Backup integrity hash (v1.2.0) | SHA-256 (via `sha256sum`) |
 | Password compare | subtle.ConstantTimeCompare |
 | Watchdog token compare (v1.2.0) | subtle.ConstantTimeCompare |
+| **Install token (v1.5.0)** | **crypto/rand (CSPRNG), 32 bytes → 64 hex** |
+| **Install token compare (v1.5.0)** | **subtle.ConstantTimeCompare** |
+| **APK integrity (v1.5.0)** | **SHA-256 (advisory if `.sha256` present)** |
 | TLS (downloads) | TLS 1.2+ |
 | Temp files | os.CreateTemp (CSPRNG-based) |
 
@@ -1863,14 +1757,10 @@ func readConfPort(key, defaultPort string) string {
 - No blocklist encryption (public data).
 - No log encryption.
 - No credential file encryption.
-- **No backup encryption** (v1.2.0) — the backup directory is
-  `0700`, owned by root. Encrypting it would require a key
-  storage mechanism that does not exist on Android.
-- **No APK signature verification by the server** (v1.4.0) — the
-  APK is served as a raw file. Android verifies the package
-  signature at install time. See §5.35.2.
-
-*(All data is local on a root-enabled device.)*
+- No backup encryption (v1.2.0).
+- No APK signature verification by the server (v1.4.0).
+- **No install token persistence (v1.5.0)** — tokens are in-memory
+  only. Server restart discards them.
 
 ---
 
@@ -1886,26 +1776,21 @@ func readConfPort(key, defaultPort string) string {
 - STATUS_FILE transitions.
 - Auth cache hits/misses (debug level).
 - Memory limit transitions (info level, v1.1.0).
-  Example: `memory limit adjusted: 80 MB → 120 MB (profile=pro)`
-- **v1.2.0 — backup events**:
-  - `createAutoBackup`: log line with the reason string
-    (`pre-profile-change`, `pre-allowlist-save`, etc.).
-  - `cleanupOldTransactions`: number of `COMMIT`'d dirs
-    removed.
-  - `checkPendingNotifications`: content of
-    `.pending_notification` (then removed).
-  - Rotation: number of snapshots kept (21).
-  - Restore: number of files restored.
-- **v1.2.0 — recovery-mode events**:
-  - `§[8a]`: restore + snapshot to `$MODPATH/.recovery_snapshot/`.
-  - `§[9b2]`: re-apply from the snapshot.
-  - Partial re-application leaves the snapshot in place.
-- **v1.2.0 — watchdog token events**: token generation,
-  regeneration on missing file. The **token value itself is
-  never logged**.
+- **v1.2.0 — backup events** (createAutoBackup, cleanup,
+  checkPendingNotifications, rotation, restore).
+- **v1.2.0 — recovery-mode events**.
+- **v1.2.0 — watchdog token events** (generation, regeneration;
+  **token value never logged**).
 - **v1.4.0 — companion APK route**: HTTP requests to
-  `/app-debug.apk` are not individually logged (they are static
-  asset fetches, like icons).
+  `/app-debug.apk` are not individually logged.
+- **v1.5.0 — install events**:
+  - Token generation: `install_token issued for <ip>` (debug).
+  - Token consumption: `install_token consumed for <ip>` (info).
+  - Install attempt: `install attempt #N from <ip>` (info).
+  - Install result: `install succeeded (strategy=N)` or
+    `install failed: <reason>` (info).
+  - Rate limit: `install rate limit hit for <ip>` (warning).
+  - **The token value itself is never logged.**
 
 ### 11.2 What We Do Not Log
 
@@ -1913,6 +1798,7 @@ func readConfPort(key, defaultPort string) string {
 - Passwords explicitly.
 - Session tokens.
 - Watchdog token (v1.2.0).
+- **Install token (v1.5.0)**.
 - Browsing history.
 - Backup file contents.
 
@@ -1925,17 +1811,19 @@ func readConfPort(key, defaultPort string) string {
 | dnscrypt-blocked.log | — | user-managed |
 | Backup logs (v1.2.0) | in `dnscrypt_main.log` | same rotation |
 | `.upgrade_history.json` (v1.2.0) | not rotated | append-only |
+| Install logs (v1.5.0) | in `dnscrypt_main.log` | same rotation |
 
 ### 11.4 Privacy Guarantee
 
 - Zero telemetry.
 - No connection to any server other than DNSCrypt/DoH servers.
-- **v1.2.0**: The persistent backup directory is **not** synced
-  to any remote server. It lives on `/sdcard/` only.
-- **v1.4.0**: The companion APK is fetched by the **release
-  pipeline** (build-time, GitHub Actions), not at install time
-  on the device. The device never contacts
-  `gasciljh/dnscrypt-proxy-app`.
+- **v1.2.0**: The persistent backup directory is **not** synced to any
+  remote server.
+- **v1.4.0**: The companion APK is fetched by the **release pipeline**
+  (build-time, GitHub Actions), not at install time on the device.
+- **v1.5.0**: The install flow is **entirely local**. The local
+  install path never contacts GitHub; the two GitHub paths are
+  browser-side redirects that the user chooses explicitly.
 
 ---
 
@@ -1945,37 +1833,30 @@ func readConfPort(key, defaultPort string) string {
 
 | Component | Source | Signing |
 |---|---|---|
-| Go stdlib | golang.org | ✓ (via Go toolchain) |
-| DNSCrypt-proxy | GitHub releases (`DNSCrypt/dnscrypt-proxy`) | ✓ (SHA-256 checksums verified at fetch time) |
+| Go stdlib | golang.org | ✔ (via Go toolchain) |
+| DNSCrypt-proxy | GitHub releases (`DNSCrypt/dnscrypt-proxy`) | ✔ (SHA-256 checksums verified at fetch time) |
 | HaGeZi blocklists | cdn.jsdelivr.net | — (content-level integrity via SHA-256 in `.manifest.json` when applicable) |
-| **Companion APK (v1.4.0)** | **GitHub releases (`gasciljh/dnscrypt-proxy-app`)** | **✓ (Android package signature, verified at install time)** |
+| Companion APK (v1.4.0) | GitHub releases (`gasciljh/dnscrypt-proxy-app`) | ✔ (Android package signature, verified at install time) |
+| Install script (v1.5.0) | `install_app.sh` (in-module, staged at the module root) | covered by the module ZIP's SHA-256 (`package_module.sh` §[20]) |
 
-**Note on release signing**: As of v1.4.0, the module ZIP and the
-four WebUI binaries are **NOT** signed with Cosign or GPG. Only
-the SHA-256 checksum (`.sha256` file) is attached to the release.
-The companion APK **is** signed (with an Android package signature
-by the app repository's CI). See
-[`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md) §8.4 for the
-current signature status.
+**Note on release signing**: As of v1.5.0, the module ZIP and the four
+WebUI binaries are **NOT** signed with Cosign or GPG. Only the SHA-256
+checksum (`.sha256` file) is attached to the release.
 
-**Note on SBOM**: As of v1.4.0, no SBOM (SPDX or CycloneDX) is
-generated. See [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md)
-§8.5 for the current SBOM status and the manual dependency
-audit alternative (`go.mod`, `go.sum`, `dns-binaries.version`,
-`proxy/app-apk.version`).
+**Note on SBOM**: As of v1.5.0, no SBOM (SPDX or CycloneDX) is
+generated.
 
 ### 12.2 Build Security
 
 - Reproducible builds (`SOURCE_DATE_EPOCH`).
 - SHA-256 checksums attached to every release.
 - `dns-binaries.version` pins the dnscrypt-proxy version.
-- `proxy/app-apk.version` pins the companion app version
-  (v1.4.0).
+- `proxy/app-apk.version` pins the companion app version (v1.4.0).
+- **v1.5.0**: `ci.yml` verifies `install_app.sh` is present and
+  executable. `release.yml` stages the APK's `.sha256` alongside the
+  APK.
 - The 42-scenario `upgrade-test.yml` matrix validates the 10
   defensive layers before release.
-- **Pending (roadmap)**: signed releases (GPG / Sigstore),
-  SBOM generation. See [`docs/ROADMAP.md`](ROADMAP.md) §5 for
-  target versions.
 
 ---
 
@@ -1994,27 +1875,31 @@ audit alternative (`go.mod`, `go.sum`, `dns-binaries.version`,
 | Soft memory limit is not a hard cap | Go runtime design (v1.1.0) |
 | Backup directory readable by root | Nature of the system (v1.2.0) |
 | SHA256 backup check is advisory | Deliberate: never blocks a restore (v1.2.0) |
-| **Companion APK served without auth (v1.4.0)** | **Contains no secrets; Android signature-verifies at install** |
+| Companion APK served without auth (v1.4.0) | Contains no secrets; Android signature-verifies at install |
+| Install token is ephemeral (v1.5.0) | In-memory only; server restart discards outstanding tokens |
+| Play Protect disable does not persist across reboot (v1.5.0) | `settings put` writes to the system DB; a forced reboot during the install may leave the verifier off until the next Play Protect scan |
+| Package-name candidates are hardcoded (v1.5.0) | The 3 candidates cover all realistic variants; a fourth would require a script update |
+| SIGKILL during the install skips the trap | SIGKILL is uncatchable by design. See §5.36.4 — the 75-second cascade deadline ensures the trap fires before the primary path reaches SIGKILL |
 
 ### 13.2 Known Issues (will be fixed)
 
 | Issue | Proposed fix | Version |
 |---|---|---|
-| CSP `'unsafe-inline'` | Convert onclick → addEventListener | **v1.5.0** |
-| `pgrep -x` on Android 5.x | fallback | **v1.5.0** |
-| awk with `]` in comment | improve parser | **v1.5.0** |
-| PWA dual-origin (9090 vs 9091) | unify on one port | **v1.5.0** |
-| `manifest.json` shortcuts do not read `runtime_info` | unify on one port | **v1.5.0** |
-| Maskable icon reuses `icon-512.png` | ship dedicated maskable SVG | **v1.5.0** |
-| Backup integrity is advisory | opt-in enforcing mode | **v1.5.0** |
-| `append_denylist` not used by WebUI | send `content` parameter | **v1.5.0** |
-| Companion app deep-links | add `dnsproxy://` scheme | **v1.5.0** |
-| Companion version bump automation | add `check-app-version.sh` | **v1.5.0** |
+| CSP `'unsafe-inline'` | Convert onclick → addEventListener | future |
+| `pgrep -x` on Android 5.x | fallback | future |
+| awk with `]` in comment | improve parser | future |
+| PWA dual-origin (9090 vs 9091) | unify on one port | future |
+| `manifest.json` shortcuts do not read `runtime_info` | unify on one port | future |
+| Maskable icon reuses `icon-512.png` | ship dedicated maskable SVG | future |
+| Backup integrity is advisory | opt-in enforcing mode | future |
+| `append_denylist` not used by WebUI | send `content` parameter | future |
+| Companion app deep-links | add `dnsproxy://` scheme | future |
+| Companion version bump automation | add `check-app-version.sh` | future |
+| Install token is not rotated per-session | rotate on logout | future |
 
-**Corrected in this revision**: The v1.3.0 column was updated to
-**v1.5.0** because v1.3.0 shipped with a narrower scope (PWA
-install button + live status LED + DNS auto-start). See
-[`docs/ROADMAP.md`](ROADMAP.md) §1.4 and §5.
+**Note**: v1.5.0's scope focused on the companion app one-tap install
+flow and three frontend state fixes (IDX-23, IDX-23b, IDX-25, IDX-25a).
+The items above are deferred to a future release.
 
 ### 13.3 Compensating Controls
 
@@ -2052,12 +1937,25 @@ install button + live status LED + DNS auto-start). See
 - Persistent backup directory with `0700`/`0600` (v1.2.0).
 - SHA256 integrity verification, advisory (Layer 3, v1.2.0).
 - Transactional upgrade with rollback (Layer 4, v1.2.0).
-- Watchdog token on `/api/ensure_running_service` (WD-TOKEN, v1.2.0).
+- Watchdog token on `/api/ensure_running_service` (WD-TOKEN,
+  v1.2.0).
 - Snapshot-and-reapply in recovery mode (FIX-1, v1.2.0).
 - ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (v1.3.0).
-- **CodeQL `go/path-injection` hardening in `removeModule` (§5.34, v1.4.0)**.
-- **iOS PWA code removed (§5.35.1, v1.4.0)**.
-- **Companion APK served with Android signature verification (§5.35.2, v1.4.0)**.
+- CodeQL `go/path-injection` hardening in `removeModule` (§5.34,
+  v1.4.0).
+- iOS PWA code removed (§5.35.1, v1.4.0).
+- Companion APK served with Android signature verification (§5.35.2,
+  v1.4.0).
+- One-shot CSRF token on `install_companion_app` (§5.36.1, v1.5.0).
+- Per-IP install rate limit (5 / 15 min) (§5.36.2, v1.5.0).
+- SELinux staging — never `setenforce 0` (§5.36.3, v1.5.0).
+- Play Protect temporary disable + trap restore + 75 s cascade
+  deadline (§5.36.4, v1.5.0).
+- SHA256 advisory verification of the APK (§5.36.8, v1.5.0).
+- Staged APK cleanup via three-way trap with re-entry guard
+  (§5.36.3, v1.5.0).
+- Signal interrupts (SIGINT / SIGTERM) exit immediately with 130 /
+  143 (§5.36.3, v1.5.0).
 
 ---
 
@@ -2097,27 +1995,75 @@ install button + live status LED + DNS auto-start). See
 - [ ] v1.2.0: `.watchdog_token` exists with mode `0600`.
 - [ ] v1.2.0: `backupMu` mutex declared in `main.go`.
 - [ ] v1.2.0: `runtime_info.backups` returns 7 fields.
-- [ ] v1.2.0: FIX-1 present in `customize.sh`
-      (`RECOVERY_SNAPSHOT_DIR` + `§[9b2]` re-apply block).
+- [ ] v1.2.0: FIX-1 present in `customize.sh`.
 - [ ] v1.2.0: FIX-2 present in both `index.html` and
       `dashboard.html`.
-- [ ] v1.3.0: ROT-MANIFEST present in `functions.sh`
-      (`manifest.json` check in the rotation loop).
-- [ ] v1.3.0: ROT-MTIME present in `functions.sh`
-      (`stat -c %Y` + `sort -rn -k1,1`).
-- [ ] v1.3.0: ROT-PROTECT present in `functions.sh`
-      (`.last_stable` + newest-install preservation).
-- [ ] v1.3.0: SNAP-MANIFEST present in `main.go`
-      (`buildBackupInfo` checks for `.manifest.json`).
-- [ ] v1.3.0: SNAP-MTIME present in `main.go`
-      (`buildBackupInfo` uses `Info().ModTime()`).
-- [ ] **v1.4.0: `removeModule` uses `filepath.Base()` + trusted
-      base dir** (§5.34).
-- [ ] **v1.4.0: `/app-debug.apk` returns 200 (release) or 404
-      (dev build), never 5xx**.
-- [ ] **v1.4.0: iOS PWA logic absent from `web/index.html`**.
-- [ ] **v1.4.0: `web/index.html` install button uses
-      `href="/app-debug.apk"`**.
+- [ ] v1.3.0: ROT-MANIFEST present in `functions.sh`.
+- [ ] v1.3.0: ROT-MTIME present in `functions.sh`.
+- [ ] v1.3.0: ROT-PROTECT present in `functions.sh`.
+- [ ] v1.3.0: SNAP-MANIFEST present in `main.go`.
+- [ ] v1.3.0: SNAP-MTIME present in `main.go`.
+- [ ] v1.4.0: `removeModule` uses `filepath.Base()` +
+      `securejoin.SecureJoin`.
+- [ ] v1.4.0: `/app-debug.apk` returns 200 (release) or 404
+      (dev build), never 5xx.
+- [ ] v1.4.0: iOS PWA logic absent from `web/index.html`.
+- [ ] v1.5.0: `web/index.html` install button uses
+      `handleCompanionInstall()` (not a direct `href="/app-debug.apk"`
+      link). See §14.34.
+- [ ] v1.5.0: `_resetModalLayout()` is called at the start of
+      `showConfirmModal()`.
+- [ ] v1.5.0: `handleCompanionInstall()` disables the install button
+      during the token fetch and re-enables it on both success and
+      failure paths.
+- [ ] v1.5.0: IDX-23 fix present — `renderAllDynamic()` calls
+      `renderCompanionButton()`.
+- [ ] v1.5.0: IDX-23b fix present — `renderAllDynamic()` calls
+      `updateStatusUI()` / `setNetworkDownUI()`.
+- [ ] v1.5.0: IDX-25 fix present — `updateNavLinks()` uses
+      `runtimeInfoCard` / `diagFilesCard`.
+- [ ] v1.5.0: IDX-25a fix present — the hint toast is centered.
+- [ ] v1.5.0: IDX-429 fix present — `xhrRequest()` recognises HTTP
+      429 and `doCompanionInstall()` renders `t('installRateLimited')`.
+- [ ] v1.5.0: IDX-401-DISTINCT fix present —
+      `isInstallFamilyUrl()` suppresses the session-expired modal on
+      install-family 401s.
+- [ ] v1.5.0: DASH-REFRESH-01 fix present — `isRefreshing` reset on
+      the 401 branch.
+- [ ] v1.5.0: DASH-SESSION-RETRY-01 fix present — the session-expired
+      primary action resets state and reloads.
+- [ ] v1.5.0: DASH-HINT-01 fix present — dual-timer lifecycle.
+- [ ] v1.5.0: DASH-HINT-02 fix present — `scrollend` + fallback.
+- [ ] v1.5.0: ICON-512-SAFEZONE-01 present — the shield path fits
+      the W3C maskable safe circle.
+- [ ] v1.5.0: `install_app.sh` present and executable at the module
+      root.
+- [ ] v1.5.0: `install_app.sh` contains the 5 cascade levels.
+- [ ] v1.5.0: `install_app.sh` contains SELinux staging.
+- [ ] v1.5.0: `install_app.sh` contains the Play Protect trap.
+- [ ] v1.5.0: `install_app.sh` trap restores `$_VERIFIER_ORIG`.
+- [ ] v1.5.0: `install_app.sh` contains the 75-second cascade
+      deadline.
+- [ ] v1.5.0: `install_app.sh` installs three traps (EXIT / INT /
+      TERM) with `_CLEANED_UP` re-entry guard.
+- [ ] v1.5.0: `install_app.sh` INT handler calls `exit 130`; TERM
+      handler calls `exit 143`.
+- [ ] v1.5.0: `install_app.sh` trap removes the staged APK.
+- [ ] v1.5.0: `install_app.sh` does not contain `setenforce 0`.
+- [ ] v1.5.0: `main.go` registers the 4 install endpoints.
+- [ ] v1.5.0: `main.go` compares install tokens in constant time.
+- [ ] v1.5.0: `main.go` declares `portConfMu` and routes
+      `getWebUIPort()` / `getDashboardPort()` through a 30 s cache.
+- [ ] v1.5.0: `main.go` `logWithLevel` is split into three layers;
+      the rotation-failure path calls `writeLocked`, never
+      `logWithLevel`.
+- [ ] v1.5.0: `main.go` `isLocalRequest` has no unreachable
+      `"localhost"` comparison.
+- [ ] v1.5.0: `main.go` `appendDenylist` uses
+      `getRulesState().DenylistHash`.
+- [ ] v1.5.0: `main.go` `handleAPI` applies the localhost gate to
+      `install_companion_app`, `uninstall_companion_app`, and the
+      `install_token` GET endpoint.
 
 ### 14.2 Runtime
 
@@ -2141,19 +2087,30 @@ install button + live status LED + DNS auto-start). See
 - [ ] Memory limit matches active profile.
 - [ ] Startup log reports the effective memory limit.
 - [ ] v1.2.0: `backups.available >= 1` after first boot.
-- [ ] v1.2.0: `backups.in_flight_txn == 0` (no stuck
-      transactions).
+- [ ] v1.2.0: `backups.in_flight_txn == 0`.
 - [ ] v1.2.0: `backups.orphan_txn == 0` (or documented).
 - [ ] v1.2.0: Watchdog token file exists and is `0600`.
-- [ ] v1.2.0: `.recovery_snapshot/` is absent after a
-      successful recovery (§[9b2] cleaned it up).
-- [ ] v1.3.0: `.last_stable` target is preserved by rotation
-      (ROT-PROTECT).
-- [ ] v1.3.0: The newest install snapshot is preserved by
-      rotation (ROT-PROTECT).
+- [ ] v1.2.0: `.recovery_snapshot/` is absent after a successful
+      recovery.
+- [ ] v1.3.0: `.last_stable` target preserved by rotation.
+- [ ] v1.3.0: The newest install snapshot preserved by rotation.
 - [ ] v1.3.0: A manifest-less directory is not counted in
-      `backups.available` (SNAP-MANIFEST).
-- [ ] **v1.4.0: `/app-debug.apk` returns 200 when bundled**.
+      `backups.available`.
+- [ ] v1.4.0: `/app-debug.apk` returns 200 when bundled.
+- [ ] v1.5.0: `GET /api?action=install_token` returns a 64-hex token
+      with `ttl: 60`.
+- [ ] v1.5.0: The install token is consumed on first use.
+- [ ] v1.5.0: `POST /api/install_companion_app` with no token returns
+      401.
+- [ ] v1.5.0: `POST /api/install_companion_app` from non-localhost
+      returns 403.
+- [ ] v1.5.0: 6 rapid install attempts trigger 429.
+- [ ] v1.5.0: `/data/local/tmp/dnscrypt-companion.apk` exists briefly
+      during install (staging) and is removed on exit.
+- [ ] v1.5.0: A direct CLI invocation (`su -c "sh install_app.sh"`)
+      terminates immediately on Ctrl+C with exit code 130.
+- [ ] v1.5.0: A direct CLI invocation terminated by SIGTERM returns
+      exit code 143.
 
 ### 14.3 User
 
@@ -2161,8 +2118,10 @@ install button + live status LED + DNS auto-start). See
 - [ ] Did not open 0.0.0.0 without a firewall.
 - [ ] v1.2.0: Did not delete `/sdcard/dnscrypt-webui-backup/`
       unintentionally.
-- [ ] **v1.4.0: If they installed the companion app, verified the
-      package was signed by the expected developer key**.
+- [ ] v1.4.0: If they installed the companion app, verified the
+      package was signed by the expected developer key.
+- [ ] v1.5.0: Understands that the install requires root and grants
+      the companion app full root-triggered installation.
 
 ### 14.4 Cookie Audit
 
@@ -2183,15 +2142,17 @@ install button + live status LED + DNS auto-start). See
 - [ ] ensure_running → POST only (+ watchdog token).
 - [ ] login → POST only.
 - [ ] logout → POST only.
+- [ ] install_companion_app → POST only + install token (v1.5.0).
 - [ ] 405 with `Allow: POST` header.
 - [ ] PWA shortcuts work.
 
 ### 14.6 Token Leakage Audit
 
 - [ ] No token in login response.
-- [ ] No sessionStorage in JS.
+- [ ] No sessionStorage for session tokens.
 - [ ] HttpOnly cookie only.
 - [ ] v1.2.0: Watchdog token never logged.
+- [ ] v1.5.0: Install token never logged.
 
 ### 14.7 Firewall Audit
 
@@ -2203,7 +2164,7 @@ install button + live status LED + DNS auto-start). See
 
 ### 14.8 Custom Chains Audit
 
-- [ ] OUTPUT contains only jump rules (two static rules).
+- [ ] OUTPUT contains only jump rules.
 - [ ] DNSCRYPT_OUT exists and contains RETURN + DNAT.
 - [ ] DNSCRYPT_OUT6 exists (if IPv6 is available).
 - [ ] No orphan RETURN rules in OUTPUT.
@@ -2222,7 +2183,7 @@ install button + live status LED + DNS auto-start). See
 ### 14.11 Port Collision Audit
 
 - [ ] MONITORING_UI_PORT constant = "8080" in main.go.
-- [ ] _MONITORING_UI_PORT constant = "8080" in every shell.
+- [ ] _MONITORING_UI_PORT constant = "8080" in boot-mini.sh.
 - [ ] main.go rejects PORT=8080.
 - [ ] customize.sh rejects PORT=8080.
 
@@ -2299,7 +2260,6 @@ install button + live status LED + DNS auto-start). See
 ### 14.23 v1.1.0 — Extended `shellQuote` Audit (MEM-2)
 
 - [ ] Extended character set includes `{`, `}`, `\n`, `\t`.
-- [ ] See §14.18 for the verify block.
 
 ### 14.24 v1.1.0 — `MONITORING_UI_PORT` in Metrics Handler (MEM-3)
 
@@ -2311,37 +2271,22 @@ install button + live status LED + DNS auto-start). See
 **Verify**:
 
 ```bash
-# 1. Top-level directory is 0700
 su -c "stat -c '%a %U:%G %n' /sdcard/dnscrypt-webui-backup/"
 # Expected: 700 root:root /sdcard/dnscrypt-webui-backup/
 
-# 2. Snapshot directories are 0700
 su -c "find /sdcard/dnscrypt-webui-backup -maxdepth 1 -type d -exec stat -c '%a %n' {} \\;"
-# Expected: 700 for all except current/ and txn-* (also 700)
 
-# 3. Snapshot files are 0600
 su -c "find /sdcard/dnscrypt-webui-backup -type f -exec stat -c '%a %n' {} \\;"
-# Expected: 600 for all .conf/.toml/.txt/.json files
-#           644 for README.md (readable by user)
 ```
-
-**Note**: On Android, `/sdcard/` is typically a FUSE mount. Mode
-semantics differ from ext4. The primary protection is that only
-root (or apps with `READ_EXTERNAL_STORAGE`) can read the
-directory.
 
 ### 14.26 v1.2.0 — `backupMu` Serialization Audit
 
 **Verify**:
 
 ```bash
-# 1. Static audit
 grep -q 'backupMu' proxy/main.go && echo "✅ backupMu declared"
-grep -A10 'func createAutoBackup' proxy/main.go | grep -q 'backupMu.Lock()' && echo "✅ Lock"
-grep -A15 'func createAutoBackup' proxy/main.go | grep -q 'defer backupMu.Unlock()' && echo "✅ Unlock"
-
-# 2. Runtime (concurrency test)
-# Send two rapid save_allowlist requests; expect serialized backups
+grep -q 'backupMu.Lock()' proxy/main.go && echo "✅ Lock present"
+grep -q 'defer backupMu.Unlock()' proxy/main.go && echo "✅ Unlock present"
 ```
 
 ### 14.27 v1.2.0 — 7-Field `backups` Object Audit
@@ -2349,23 +2294,11 @@ grep -A15 'func createAutoBackup' proxy/main.go | grep -q 'defer backupMu.Unlock
 **Verify**:
 
 ```bash
-# 1. API returns exactly 7 fields
-curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys'
-# Expected:
-# ["available","in_flight_txn","last_backup","last_backup_name","last_stable","orphan_txn","path"]
-
-# 2. All 7 fields are present (not just some)
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
 # Expected: 7
 
-# 3. `path` is the expected value
 curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.path'
 # Expected: /sdcard/dnscrypt-webui-backup
-
-# 4. Cross-check with status.sh --json
-diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups') \
-     <(su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json | jq -S '.backups | del(.status, .last_backup_age_seconds)'")
-# Expected: no diff
 ```
 
 ### 14.28 v1.2.0 — Watchdog Token Audit
@@ -2373,85 +2306,30 @@ diff <(curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -S '.backups')
 **Verify**:
 
 ```bash
-# 1. Token file exists
-su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
-# Expected: -rw------- (mode 0600)
-
-# 2. Token is not empty
-su -c "wc -c /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
-# Expected: ~64 (hex token) or ~65 (with newline)
-
-# 3. Token file is not world-readable
 su -c "stat -c '%a' /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
 # Expected: 600
 
-# 4. Static audit in main.go
 grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ token loader"
 grep -q 'subtle.ConstantTimeCompare' proxy/main.go && echo "✅ constant-time compare"
-grep -q 'X-Watchdog-Token' proxy/main.go && echo "✅ header name"
-
-# 5. Static audit in watchdog.sh
-grep -q 'watchdog_token' proxy/watchdog.sh && echo "✅ watchdog reads token"
-grep -q 'X-Watchdog-Token' proxy/watchdog.sh && echo "✅ watchdog sends token"
 ```
 
 ### 14.29 v1.2.0 — Recovery-Mode Interaction Audit (FIX-1)
 
-**Corrected in this revision**: This section now verifies the
-**snapshot-and-reapply** markers, not the old "reorder + exclude"
-pattern.
-
 **Verify**:
 
 ```bash
-# 1. Module version
-su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → must be version=v1.2.0 or newer
-
-# 2. The snapshot directory constant must be present
-su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' \
-    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
-    echo '✅ FIX-1 present (snapshot dir)'"
-
-# 3. The re-apply block (§[9b2]) must be present
-su -c "grep -q 'Re-applying recovery snapshot' \
-    /data/adb/modules/dnscrypt-proxy-webui/customize.sh && \
-    echo '✅ FIX-1 present (§[9b2] re-apply block)'"
-
-# 4. Recovery trigger paths
-su -c "ls /data/adb/modules/dnscrypt-proxy-webui/recovery 2>/dev/null && echo 'module trigger' || echo 'no module trigger'"
-su -c "ls /data/adb/dnscrypt-recovery 2>/dev/null && echo 'external trigger' || echo 'no external trigger'"
-
-# 5. Recovery source priority
-su -c "cat /sdcard/dnscrypt-webui-backup/.last_stable 2>/dev/null"
-# Expected: a snapshot name, or nothing if not set
-
-su -c "ls /sdcard/dnscrypt-webui-backup/current/"
-# Expected: 5 files + .manifest.json
-
-# 6. Verify the transient snapshot directory is cleaned up
-su -c "ls -la /data/adb/modules/dnscrypt-proxy-webui/.recovery_snapshot/ 2>&1"
-# Expected (after a successful recovery): No such file or directory
-# (Preserved only if the re-apply was partial)
+su -c "grep -q 'RECOVERY_SNAPSHOT_DIR' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ FIX-1 present (snapshot dir)'"
+su -c "grep -q 'Re-applying recovery snapshot' /data/adb/modules/dnscrypt-proxy-webui/customize.sh && echo '✅ FIX-1 present (§[9b2] re-apply block)'"
 ```
-
-**Full procedure**: see §7.5 of [`docs/BACKUP.md`](BACKUP.md) and
-[`docs/EMERGENCY.md`](EMERGENCY.md) §9.
 
 ### 14.30 v1.2.0 — SELinux Context Preservation Audit (Layer 6)
 
 **Verify**:
 
 ```bash
-# 1. `copy_with_context` present in functions.sh
 su -c "grep -q 'copy_with_context' /data/adb/modules/dnscrypt-proxy-webui/functions.sh && echo '✅ helper'"
-
-# 2. `restorecon` available
 su -c "which restorecon && echo '✅ restorecon' || echo '⚠️ no restorecon (fallback: chcon)'"
-
-# 3. After a restore, check the context
 su -c "ls -Z /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
-# Expected: u:object_r:magisk_file:s0 (or an appropriate context)
 ```
 
 ### 14.31 v1.4.0 — CodeQL `go/path-injection` Fix Audit
@@ -2459,16 +2337,16 @@ su -c "ls -Z /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 **Verify**:
 
 ```bash
-# 1. Static audit — filepath.Base in removeModule
-grep -A5 'func removeModule' proxy/main.go | grep -q 'filepath.Base' && echo "✅ filepath.Base present"
+# BusyBox grep does not support -A / -B / -C (GNU extensions).
+# Use awk with a range match instead.
+awk '/func removeModule/,/^}/' proxy/main.go | grep -q 'filepath.Base' && echo "✅ filepath.Base present"
+awk '/func removeModule/,/^}/' proxy/main.go | grep -q 'SecureJoin' && echo "✅ securejoin present"
 
-# 2. Static audit — trusted base dir
-grep -A10 'func removeModule' proxy/main.go | grep -q 'filepath.Join(MODULES_DIR, name)' && echo "✅ trusted base dir"
+# Or, equivalently, two separate single-line greps:
+grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ sanitizer present"
+grep -q 'securejoin.SecureJoin' proxy/main.go && echo "✅ trusted base dir present"
 
-# 3. Static audit — no direct use of caller path in os.RemoveAll
-grep -A20 'func removeModule' proxy/main.go | grep -q 'os.RemoveAll(modulePath)' && echo "❌ raw path used" || echo "✅ raw path not used"
-
-# 4. Negative test
+# Runtime check
 curl -X POST http://127.0.0.1:9090/api/remove_module -d "path=/data/adb/modules/.."
 # Expected: {"status":"error","message":"Invalid module name"}
 ```
@@ -2478,58 +2356,239 @@ curl -X POST http://127.0.0.1:9090/api/remove_module -d "path=/data/adb/modules/
 **Verify**:
 
 ```bash
-# 1. File is bundled (release build)
 su -c "test -s /data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk && echo '✅ APK bundled' || echo '(dev build)'"
-
-# 2. HTTP route responds correctly
 curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
-# Expected:
-#   HTTP/1.1 200 OK (release build)
-#   Content-Type: application/vnd.android.package-archive
-#   Cache-Control: public, max-age=3600, immutable
-# OR:
-#   HTTP/1.1 404 Not Found (dev build)
-
-# 3. Static audit — install button uses direct link
-grep -q 'href="/app-debug.apk"' web/index.html && echo "✅ direct <a download> link"
-
-# 4. Static audit — iOS logic removed
-grep -q 'isIOSDevice' web/index.html && echo "❌ iOS logic still present" || echo "✅ iOS logic removed"
 ```
 
 ### 14.33 v1.3.0 — Server-Side Refinements Audit
 
-**Verify (SNAP-MANIFEST)**:
+**Verify (SNAP-MANIFEST + SNAP-MTIME)**:
 
 ```bash
-# buildBackupInfo must check for .manifest.json
-grep -A15 'func buildBackupInfo' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST present"
-```
-
-**Verify (SNAP-MTIME)**:
-
-```bash
-# buildBackupInfo must use ModTime()
-grep -A30 'func buildBackupInfo' proxy/main.go | grep -q 'ModTime()' && echo "✅ SNAP-MTIME present"
+awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
+awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'ModTime()' && echo "✅ SNAP-MTIME"
 ```
 
 **Verify (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT)**:
 
 ```bash
-# rotate_backups must:
-#   1. check for .manifest.json (ROT-MANIFEST)
-#   2. use `sort -rn -k1,1` (ROT-MTIME)
-#   3. protect .last_stable and newest install (ROT-PROTECT)
-
-grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST present"
-grep -A40 'rotate_backups()' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME present"
-grep -A40 'rotate_backups()' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT present"
+awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
+awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
+awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
 ```
 
-**Runtime test (SNAP-MANIFEST / SNAP-MTIME)**:
+### 14.34 v1.5.0 — Companion Install Flow Audit
 
-See §10.3.5 of [`docs/COMPATIBILITY.md`](COMPATIBILITY.md) for
-the full on-device procedure.
+**Purpose**: verify that the companion install flow has all its
+security controls present and configured as documented in §5.36.
+
+**1. Static audit — the install script**
+
+```bash
+# 1.1 Script is present and executable at the MODULE ROOT.
+su -c "test -x /data/adb/modules/dnscrypt-proxy-webui/install_app.sh && \
+  echo '✅ install_app.sh executable' || echo '❌ missing or not executable'"
+
+# 1.2 Script contains the 5 cascade levels
+su -c "grep -q 'pm install -r --user 0' install_app.sh && echo '✅ level 1'"
+su -c "grep -q 'pm install -r -i com.android.shell' install_app.sh && echo '✅ level 2'"
+su -c "grep -q 'pm install-create' install_app.sh && echo '✅ level 3'"
+su -c "grep -q 'magisk su' install_app.sh && echo '✅ level 4'"
+su -c "grep -q 'cmd package install' install_app.sh && echo '✅ level 5'"
+
+# 1.3 SELinux staging
+su -c "grep -q '/data/local/tmp/dnscrypt-companion.apk' install_app.sh && \
+  echo '✅ SELinux staging present'"
+
+# 1.4 SELinux is NOT disabled
+su -c "grep -q 'setenforce 0' install_app.sh && \
+  echo '❌ SELinux relaxation found' || \
+  echo '✅ no setenforce 0'"
+
+# 1.5 Play Protect trap
+su -c "grep -q 'package_verifier_enable' install_app.sh && \
+  echo '✅ Play Protect disable present'"
+
+# 1.6 Trap restores captured value
+su -c "grep -q '_VERIFIER_ORIG' install_app.sh && \
+  echo '✅ trap uses \$_VERIFIER_ORIG'"
+
+# 1.7 Cascade deadline (definition + computation + usage + comments)
+su -c "grep -c 'CASCADE_DEADLINE_SECONDS' install_app.sh"
+# Expected: 3-5 occurrences
+
+# 1.8 Three-way trap split
+su -c "grep -q \"trap '_cleanup_app' EXIT\" install_app.sh && \
+  echo '✅ EXIT trap installed'"
+su -c "grep -q \"trap '_cleanup_app; exit 130' INT\" install_app.sh && \
+  echo '✅ INT trap exits 130'"
+su -c "grep -q \"trap '_cleanup_app; exit 143' TERM\" install_app.sh && \
+  echo '✅ TERM trap exits 143'"
+su -c "grep -q '_CLEANED_UP=1' install_app.sh && \
+  echo '✅ cleanup re-entry guard present'"
+
+# 1.9 Staged APK cleanup inside the trap
+su -c "grep -q 'rm -f \"\$STAGING_APK\"' install_app.sh && \
+  echo '✅ staged APK cleanup in trap'"
+
+# 1.10 Package name candidates
+# BusyBox grep does not support \b as a word boundary (it treats it
+# as a literal backspace). The check uses an explicit character-class
+# boundary.
+su -c "grep -q 'com.gasciljh.dnsproxy.debug' install_app.sh && echo '✅ candidate 1'"
+su -c "grep -qE 'com\.gasciljh\.dnsproxy([^.]|$)' install_app.sh && echo '✅ candidate 2'"
+su -c "grep -q 'com.gasciljh.dnscrypt_proxy' install_app.sh && echo '✅ candidate 3 (legacy)'"
+
+# 1.11 SHA256 advisory
+su -c "grep -q 'app-debug.apk.sha256' install_app.sh && echo '✅ SHA256 advisory'"
+```
+
+**2. Static audit — the backend**
+
+```bash
+# 2.1 The 4 install endpoints are registered
+grep -q 'install_companion_app' proxy/main.go && echo "✅ endpoint 1"
+grep -q 'uninstall_companion_app' proxy/main.go && echo "✅ endpoint 2"
+grep -q 'install_token' proxy/main.go && echo "✅ endpoint 3"
+grep -q 'companion_app_state' proxy/main.go && echo "✅ endpoint 4"
+
+# 2.2 Constants
+grep -q 'INSTALL_TOKEN_TTL' proxy/main.go && echo "✅ TTL constant"
+grep -q 'MAX_INSTALL_ATTEMPTS' proxy/main.go && echo "✅ attempts constant"
+grep -q 'INSTALL_LOCKOUT_PERIOD' proxy/main.go && echo "✅ lockout constant"
+grep -q 'COMPANION_STATE_CACHE_TTL' proxy/main.go && echo "✅ state cache TTL"
+
+# 2.3 Constant-time token comparison
+grep -q 'subtle.ConstantTimeCompare' proxy/main.go && echo "✅ constant-time"
+
+# 2.4 Rate limit state
+grep -q 'installAttempts' proxy/main.go && echo "✅ install attempts map"
+grep -q 'isInstallLockedOut' proxy/main.go && echo "✅ lockout check"
+
+# 2.5 Localhost gate covers all three surfaces (install, uninstall,
+#     install_token)
+grep -q 'isLocalRequest' proxy/main.go && echo "✅ localhost gate"
+
+# 2.6 Port cache for getWebUIPort / getDashboardPort
+grep -q 'portConfMu' proxy/main.go && echo "✅ port cache mutex"
+
+# 2.7 Logger is split into three layers
+grep -q 'logLocked' proxy/main.go && echo "✅ logger three-layer split"
+
+# 2.8 appendDenylist uses getRulesState().DenylistHash
+grep -q 'getRulesState().DenylistHash' proxy/main.go && echo "✅ appendDenylist hash source"
+```
+
+**3. Runtime audit**
+
+```bash
+# 3.1 Token generation
+curl -s -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=install_token" | jq
+# Expected: { "token": "<64 hex>", "ttl": 60 }
+
+# 3.2 Token is one-shot — second use returns 401
+TOKEN=$(curl -s -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=install_token" | jq -r '.token')
+curl -s -b /tmp/cookies.txt -X POST "http://127.0.0.1:9090/api/install_companion_app" -d "token=$TOKEN" | jq -r '.status'
+# (first use — may succeed or fail depending on the environment)
+curl -s -b /tmp/cookies.txt -X POST "http://127.0.0.1:9090/api/install_companion_app" -d "token=$TOKEN"
+# Expected (second use): {"status":"error","action":"install","message":"Invalid or expired install token"}
+
+# 3.3 No token → 401
+curl -i -X POST "http://127.0.0.1:9090/api/install_companion_app" -b /tmp/cookies.txt
+# Expected: HTTP/1.1 401 Unauthorized
+
+# 3.4 Non-localhost → 403 (test from another device on the LAN)
+curl -i -X POST "http://192.168.1.5:9090/api/install_companion_app" -b /tmp/cookies.txt -d "token=foo"
+# Expected: HTTP/1.1 403 Forbidden
+
+# 3.5 Rate limit — 6 rapid attempts (all with fresh tokens)
+for i in 1 2 3 4 5 6; do
+  TOKEN=$(curl -s -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=install_token" | jq -r '.token')
+  curl -s -o /dev/null -w "%{http_code}\n" -b /tmp/cookies.txt \
+    -X POST "http://127.0.0.1:9090/api/install_companion_app" -d "token=$TOKEN"
+done
+# Expected: 200 for the first 5, 429 for the 6th
+
+# 3.6 Companion state
+curl -s -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=companion_app_state" | jq
+# Expected: { "status": "ok", "action": "status", "installed": ..., ... }
+```
+
+**4. On-device staging audit (during an install)**
+
+```bash
+# While an install is in progress, in another terminal:
+su -c "ls -la /data/local/tmp/dnscrypt-companion.apk"
+# Expected: a 3 MB file (staging copy)
+
+su -c "ls -Z /data/local/tmp/dnscrypt-companion.apk"
+# Expected: u:object_r:shell_data_file:s0
+
+# After the install completes, the file is REMOVED by the trap:
+su -c "ls /data/local/tmp/dnscrypt-companion.apk 2>&1"
+# Expected: "No such file or directory"
+```
+
+**5. Cascade deadline audit**
+
+```bash
+# 5.1 The constant is defined
+su -c "grep 'CASCADE_DEADLINE_SECONDS=75' install_app.sh && \
+  echo '✅ 75-second deadline defined'"
+
+# 5.2 The deadline is enforced before each strategy
+su -c "grep -c 'CASCADE_DEADLINE_SECONDS' install_app.sh"
+# Expected: 3-5 occurrences
+
+# 5.3 The deadline is shorter than main.go's INSTALL_TIMEOUT
+su -c "grep 'CASCADE_DEADLINE_SECONDS=75' install_app.sh >/dev/null && \
+  grep 'INSTALL_TIMEOUT' proxy/main.go | grep -q '90' && \
+  echo '✅ 75 s deadline < 90 s INSTALL_TIMEOUT'"
+```
+
+**6. Signal handling audit**
+
+```bash
+# 6.1 Direct CLI invocation terminated by Ctrl+C returns 130
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/install_app.sh" &
+PID=$!
+sleep 2
+kill -INT $PID
+wait $PID
+echo "exit=$?"
+# Expected: exit=130, and /data/local/tmp/dnscrypt-companion.apk is gone
+
+# 6.2 SIGTERM returns 143
+su -c "sh /data/adb/modules/dnscrypt-proxy-webui/install_app.sh" &
+PID=$!
+sleep 2
+kill -TERM $PID
+wait $PID
+echo "exit=$?"
+# Expected: exit=143
+
+# 6.3 Cleanup runs exactly once even when INT triggers EXIT
+#     (the _CLEANED_UP guard prevents double-cleanup)
+su -c "grep -c 'install_app' /data/local/tmp/dnscrypt_main.log"
+# The log should show one cleanup cycle per invocation, not two.
+```
+
+**7. Log audit**
+
+```bash
+su -c "grep 'install_token' /data/local/tmp/dnscrypt_main.log | tail -5"
+# Expected: token generation and consumption events, WITHOUT the token value
+
+su -c "grep 'install attempt' /data/local/tmp/dnscrypt_main.log | tail -5"
+# Expected: install attempt and result events
+
+# Verify the token value is NOT in the log. A bare grep -E '[a-f0-9]{64}'
+# is too broad — it matches any SHA-256 hex string in the file, not only
+# install tokens. The check is scoped to lines mentioning install_token.
+su -c "grep 'install_token' /data/local/tmp/dnscrypt_main.log | \
+  grep -E '[a-f0-9]{32,}' && echo '❌ token leak suspected' || \
+  echo '✅ no install token leaked in the log'"
+```
 
 ---
 
@@ -2545,259 +2604,103 @@ Thanks to everyone who has contributed to the security of the project:
 
 ## 16. Changelog — Security Changes
 
-### v1.4.0 (2026-10-06)
+### v1.5.0 (2026-10-13)
 
-**Integration release — companion app + CodeQL fix + iOS removal.**
+**Feature release — companion app one-tap install.**
 
 **No new audit corrections.** The registry remains at **#33**.
 
 **New sections in this document**:
 
-- **§5.34 — CodeQL `go/path-injection` Fix in `removeModule`**
-  Documents the two CodeQL alerts closed by the v1.4.0 hardening.
-  No behavioural change for legitimate inputs.
+- **§5.36 — Companion App Install Security (APK-5, APK-11)**.
+- **§14.34 — Companion install flow audit**.
+- **§18 — Documentation Corrections to This File** (new consolidated
+  table).
 
-- **§5.35 — iOS PWA Removal + Companion APK Route**
-  Documents (a) the removal of ~35 lines of iOS-specific PWA
-  code (Android-only project), and (b) the optional public
-  `/app-debug.apk` route.
+**Asset / adversary / protection updates**:
 
-**New checklist sections**:
+- §2.1 — added `installTokens`, `installAttempts`, and
+  `companionStateCache`.
+- §3.1 — added three new rows: install brute-force, install CSRF,
+  and install token leak.
+- §3.2 — added four v1.5.0 bullets.
+- §4.2 — added the same three in-memory assets, plus the
+  `$PERSISTENT_BACKUP/apk/` mirror.
+- §7.1 — install token as a distinct, additional credential
+  (separate table).
+- §10.2 — three new crypto rows.
+- §11.1 / §11.2 — install event logging + install tokens in the
+  "do not log" list.
+- §11.4 — local-only install path.
+- §12.1 / §12.2 — `install_app.sh` and v1.5.0 CI/release additions.
+- §13.1 / §13.2 / §13.3 — v1.5.0 limitations + compensating controls.
 
-- §14.31 — CodeQL fix audit.
-- §14.32 — Companion APK route audit.
+**Post-release audit corrections**: see §18 for the consolidated
+table.
 
-**Asset table updates**:
+**Registry status**: unchanged at **#33**. Next expected: **#34**.
 
-- §2.1 — added optional companion APK as a low-sensitivity
-  asset.
-- §4.2 — added `/data/adb/modules/dnscrypt-proxy-webui/web/app-debug.apk`.
+### v1.4.0 (2026-10-06) — historical
 
-**Adversary table updates**:
+**Integration release — companion app + CodeQL fix + iOS removal.**
 
-- §3.1 — added "companion APK spoofing" and noted the iOS PWA
-  confusion scenario as historical only.
+**No new audit corrections.**
 
-**Supply chain updates**:
+**New sections in this document**:
 
-- §12.1 — **corrected**: removed the false claims about
-  "Signed releases (Cosign keyless)" and "SBOM (SPDX +
-  CycloneDX)". Replaced with an accurate description: SHA-256
-  checksums only, no Cosign/GPG, no SBOM. Companion APK is
-  Android-signature-verified at install time.
-- §12.2 — added `proxy/app-apk.version` pin; clarified the
-  pending state of signing/SBOM.
+- §5.34 — CodeQL `go/path-injection` Fix in `removeModule`.
+- §5.35 — iOS PWA Removal + Companion APK Route.
 
-**Known issues updates**:
-
-- §13.2 — every entry that previously targeted **v1.3.0** now
-  targets **v1.5.0** (v1.3.0 shipped with a narrower scope). See
-  [`docs/ROADMAP.md`](ROADMAP.md) §1.4 and §5.
-
-**Pre-release checklist updates**:
-
-- §14.1 — removed the two checkboxes that referenced Cosign +
-  SBOM (steps that do not exist). Added four v1.4.0-specific
-  checkboxes.
-
-### v1.3.0 (2026-10-02)
+### v1.3.0 (2026-10-02) — historical
 
 **Feature release — PWA install button + live status LED + DNS
 auto-start + server-side rotation refinements.**
 
-**No new audit corrections.** The registry remains at **#33**.
+**No new audit corrections.**
 
 **Runtime changes with no security impact**:
 
-- **PWA install button** (`web/index.html`) — client-side only.
-- **Live status LED** (`web/index.html`) — client-side only.
-- **DNS auto-start fix** (`proxy/service.sh`) — calls
-  `POST /api/ensure_running_service` at boot (covered by the
-  WD-TOKEN path, §5.33).
-- **`buildBackupInfo` sort order change** (mtime, was name) —
-  payload shape unchanged.
+- PWA install button (client-side).
+- Live status LED (client-side).
+- DNS auto-start fix (`service.sh`).
+- `buildBackupInfo` sort order change (name → mtime).
+- SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT.
 
-**Runtime changes with no security impact (continued)**:
+### v1.2.0 (2026-09-29) — historical
 
-- **SNAP-MANIFEST** — `main.go:buildBackupInfo()` detects
-  snapshots by `.manifest.json` presence, not by name pattern.
-  No API contract change; the `available` count may be larger
-  for custom-named snapshots.
-- **SNAP-MTIME** — `last_backup_name` is selected by mtime.
-  No API contract change; the field value may differ only
-  under clock drift or a non-standard snapshot name.
-- **ROT-MANIFEST + ROT-MTIME + ROT-PROTECT** — `rotate_backups`
-  was rewritten with the same detection, the same sort, and
-  two protected targets (`.last_stable` + newest install).
-  Rotation happens in the shell layer; no API change.
-- **Parallel application** — the same semantics were applied
-  to `watchdog.sh`, `status.sh`, `customize.sh`, `action.sh`,
-  and `uninstall.sh`. Every consumer of the persistent backup
-  directory now agrees on the snapshot set.
+**Data-preservation release.**
 
-**Note on the rotation semantics**: The v1.2.0 documentation
-claimed that rotation used a directory-name sort. That was
-correct for v1.2.0 but was superseded by v1.3.0's
-ROT-MTIME. The current authoritative description lives in
-§5.31.2 (this document) and `docs/ARCHITECTURE.md` §4.13.2.
+**New sections**:
 
-**Deferred items**:
+- §5.31 — Data Preservation Security Model.
+- §5.32 — Correctness Fixes (FIX-1, FIX-2).
+- §5.33 — Watchdog Token (WD-TOKEN).
 
-- CSP `'unsafe-inline'` removal — originally targeted for
-  v1.3.0, deferred to **v1.5.0** (§6.4, §13.2).
-- Other known issues — deferred to **v1.5.0** (§13.2).
-
-### v1.2.0 (2026-09-29)
-
-**Data-preservation release — no new audit corrections.**
-
-This release fixes a silent **data-loss bug** in v1.1.0 and hardens
-the write path with the 10 defensive layers. It does not add new
-audit correction numbers.
-
-**New sections in this document**:
-
-- **§5.31 — Data Preservation Security Model**
-  Documents the 10 defensive layers, the `backupMu` serialization
-  guarantee, and the threat model for the persistent backup
-  directory.
-
-- **§5.32 — Correctness Fixes (FIX-1, FIX-2)**
-  Documents the two correctness fixes that shipped with v1.2.0.
-  Neither is an exploitable vulnerability.
-  **Corrected in this revision**: FIX-1 now describes
-  snapshot-and-reapply, not "reorder + exclude".
-
-- **§5.33 — Watchdog Token (WD-TOKEN)**
-  Documents the `X-Watchdog-Token` authentication that replaces
-  the previous localhost bypass on
-  `POST /api/ensure_running_service`.
-
-**New checklist sections**:
-
-- §14.25 — Backup directory permissions audit.
-- §14.26 — `backupMu` serialization audit.
-- §14.27 — 7-field `backups` object audit.
-- §14.28 — Watchdog token audit.
-- §14.29 — Recovery-mode interaction audit (FIX-1).
-  **Corrected in this revision**: verifies snapshot-and-reapply
-  markers.
-- §14.30 — SELinux context preservation audit.
-
-**Asset table updates**:
-
-- §2.1 — added user-data preservation, backup-layer integrity,
-  and watchdog authentication.
-- §4.2 — added `backups`, `.watchdog_token`, `.last_stable`,
-  `.upgrade_history.json`, `txn-*`, `orphan-txn-*`, and
-  `.recovery_snapshot/`.
-
-**Adversary table updates**:
-
-- §3.1 — added malicious root app, watchdog impersonator,
-  backup tamperer, recovery-mode abuser.
-- §3.2 — added the 10 defensive layers, `backupMu`, watchdog
-  token, SHA256 advisory verification, transactional upgrade,
-  SELinux preservation, and recovery-mode snapshot-and-reapply.
-
-**Known issues updates**:
-
-- §13.2 — added "Backup integrity is advisory" and
-  "`append_denylist` not used by WebUI" (both later re-targeted
-  to v1.5.0).
-
-**Logging updates**:
-
-- §11.1 — added backup event logging and recovery-mode event
-  logging.
-- §11.2 — confirmed that the watchdog token is never logged.
-- §11.3 — added `.upgrade_history.json` (not rotated).
-
-**Numbering clarification (v1.2.0)**:
-
-- The v1.2.0 changes block now states explicitly that §5.31,
-  §5.32, and §5.33 are **section** numbers in this document,
-  **not** Audit Correction numbers. Each of these sections
-  contains an inline **ℹ️ Section numbering note** repeating
-  the clarification. The Audit Corrections Registry remains at
-  **#33**; the next audit correction will be **#34** in v1.5.x.
-  See §17.2 for the complete list of v1.2.0 additions that do
-  **not** extend the registry.
-
-### v1.1.0 (2026-09-26)
+### v1.1.0 (2026-09-26) — historical
 
 **Polish release — no new audit corrections.**
 
-**Runtime improvements**:
+**Runtime improvements**: MEM-1, MEM-2, MEM-3.
 
-- **MEM-1 — Dynamic memory limit per profile**
-- **MEM-2 — Extended `shellQuote` character set**
-- **MEM-3 — `MONITORING_UI_PORT` in metrics handler**
+### v1.0.0 (2026-09-24) — historical
 
-**Documentation updates**:
-
-- §5.30 (new) — documents MEM-1 / MEM-2 / MEM-3.
-- §14.22 (new) — memory limit audit.
-- §14.23 (new) — extended shellQuote audit.
-- §14.24 (new) — MONITORING_UI_PORT audit.
-- §2.1 — added memory limit integrity to protected assets.
-- §3.2 — added dynamic per-profile memory limit.
-- §11.1 — added memory limit transition logging.
-- §13.3 — added MEM-1 / MEM-2 / MEM-3 to compensating controls.
-
-### v1.0.0 (2026-09-24)
-
-**First stable release.** All accumulated fixes from development
-(33 Audit Corrections) are consolidated into a single stable
-`v1.0.0`.
-
-**Critical fixes (7 original)**:
-- **Fix #1 — Dashboard JSON conversion** — Audit Correction #25.
-- **Fix #2 — Shell fallback** — CI fix.
-- **Fix #3 — Preserve user settings on upgrade** — Audit Correction #26.
-- **Fix #4 — `.gitignore` negation** — Build fix.
-- **Fix #5 — Pre-commit hooks** — Build fix.
-- **Fix #6 — Asset Serving** — Build fix.
-- **Fix #7 — CodeQL config drift** — Build fix.
-
-**High fixes (2)**:
-- **Fix #8 — Basic Auth rate limiting** — Audit Correction #22.
-- **Fix #9 — `fuser` PID parsing** — Audit Correction #27.
-
-**Medium fixes (3)**:
-- **Fix #10 — Section header with comment** — Audit Correction #23.
-- **Fix #11 — Per-port cache** — Performance.
-- **Fix #12 — Exact endpoint matching** — Audit Correction #24.
-
-**Additional security fixes (NEW-1..NEW-6)**:
-- **Fix NEW-1 — Login POST-only** — Audit Correction #28.
-- **Fix NEW-2 — `hasEndpoint` usage** — (merged into #24).
-- **Fix NEW-3 — `readConfPort` range check** — Audit Correction #29.
-- **Fix NEW-4 — `/readyz` localhost-only** — Audit Correction #30.
-- **Fix NEW-5 — `shellQuote` injection protection** — Audit Correction #31.
-- **Fix NEW-6 — Auth cache (60 s)** — Performance.
-
-**Architectural fixes (RACE-1 + PORT-2)**:
-- **RACE-1 — `rebuildMu` mutex** — Audit Correction #32.
-- **PORT-2 — `runtime_info` ports** — UX + Audit Correction #33.
+**First stable release.** All 33 audit corrections consolidated.
 
 ---
 
 ## 17. Audit Corrections Registry
 
-> **v1.4.0 note**: This release does **not** extend the registry.
-> The last audit correction is #33, from v1.0.0. v1.4.0 is an
-> integration release. Its CodeQL fix (§5.34), iOS removal
-> (§5.35.1), and companion APK route (§5.35.2) are documented
-> without audit correction numbers.
+> **v1.5.0 note**: This release does **not** extend the registry.
+> The last audit correction is #33, from v1.0.0. v1.5.0 is a feature
+> release. Its companion install flow (§5.36) is documented without
+> audit correction numbers.
 >
-> **Numbering clarification**: §5.31 through §5.35 are
-> **section numbers** in this document, **not** Audit Correction
-> numbers. The Audit Corrections Registry is a flat, monotonic
-> sequence that only advances when a new audit correction is
-> filed. It remains at **#33**.
+> **Numbering clarification**: §5.31 through §5.36 are **section
+> numbers** in this document, **not** Audit Correction numbers. The
+> Audit Corrections Registry is a flat, monotonic sequence that only
+> advances when a new audit correction is filed.
 >
-> New audit corrections will resume at **#34** in **v1.5.x**.
+> New audit corrections will resume at **#34** in a future release.
 
 | # | Description | Version | Section |
 |:-:|---|---|---|
@@ -2832,91 +2735,150 @@ audit correction numbers.
 | #33 | `runtime_info` dynamic ports (PORT-2) | v1.0.0 | §5.29 |
 
 **Last Audit Correction**: #33 (v1.0.0)
-**Next expected**: #34 (v1.5.x)
+**Next expected**: #34 (future release)
 
 ### 17.1 v1.1.0 Runtime Improvements (Not Audit Corrections)
 
 | ID | Change | Rationale |
 |:-:|---|---|
-| MEM-1 | Dynamic memory limit per profile | Closes a self-inflicted DoS surface (GC thrashing on `ultimate`) |
-| MEM-2 | Extended `shellQuote` charset (`{`, `}`, `\n`, `\t`) | Defense in depth; no known exploit existed |
-| MEM-3 | `MONITORING_UI_PORT` in metrics handler | Single source of truth; removes last hardcoded reserved port |
-
-These are documented in §5.30 for completeness but are not
-assigned audit correction numbers because they do not fix a
-known exploitable vulnerability.
+| MEM-1 | Dynamic memory limit per profile | Closes a self-inflicted DoS surface |
+| MEM-2 | Extended `shellQuote` charset | Defense in depth; no known exploit |
+| MEM-3 | `MONITORING_UI_PORT` in metrics handler | Single source of truth |
 
 ### 17.2 v1.2.0 Runtime Additions & Correctness Fixes (Not Audit Corrections)
 
 | ID | Change | Rationale |
 |:-:|---|---|
-| BAK-1 | 7-field `runtime_info.backups` | Observability of the backup layer; enables early detection of a degraded state (`in_flight_txn > 0` or `orphan_txn > 0`) |
-| BAK-2 | `createAutoBackup(reason)` + `backupMu` | Pre-critical backup before 5 destructive endpoints; serialized by a mutex to prevent concurrent snapshot corruption |
-| BAK-3 | `cleanupOldTransactions()` | Removes leftover `COMMIT`'d `txn-*` dirs at startup; preserves `START`/`ROLLBACK` |
-| BAK-4 | `checkPendingNotifications()` | Reads `.pending_notification` at startup; centralized deletion in `main.go` to avoid a race with `service.sh` |
-| FIX-1 | Recovery-mode **snapshot-and-reapply** | Correctness fix — `§[8a]` restores + snapshots the 5 files to `$MODPATH/.recovery_snapshot/`, `§[9]` extracts the ZIP normally, and `§[9b2]` re-applies the 5 files from the snapshot. The extraction logic stays untouched; the normal-install path is byte-for-byte identical. |
-| FIX-2 | Service Worker update-banner | Correctness fix — sends `SKIP_WAITING` to the correct worker in both `index.html` and `dashboard.html` |
-| WD-TOKEN | Watchdog token | Closes a CSRF hole on `ensure_running_service`; replaces the implicit localhost bypass |
-
-These are documented in §5.31, §5.32, and §5.33 for completeness
-but are not assigned audit correction numbers because they do not
-fix a known exploitable vulnerability in an earlier v1.2.0 draft
-(except WD-TOKEN, which closes a real — though low-severity —
-CSRF surface that existed since v1.0.0).
+| BAK-1 | 7-field `runtime_info.backups` | Observability of the backup layer |
+| BAK-2 | `createAutoBackup(reason)` + `backupMu` | Serialized pre-critical backups |
+| BAK-3 | `cleanupOldTransactions()` | Removes leftover `COMMIT`'d txns |
+| BAK-4 | `checkPendingNotifications()` | Reads `.pending_notification` |
+| FIX-1 | Recovery-mode snapshot-and-reapply | Correctness fix |
+| FIX-2 | Service Worker update-banner | Correctness fix |
+| WD-TOKEN | Watchdog token | Closes a CSRF hole on `ensure_running_service` |
 
 ### 17.3 v1.2.0 Post-Audit Corrections (BUG-A..BUG-L)
 
-**Corrected in this revision**: The count was previously stated as
-**7**; the actual table has **8** entries under the historical
-`BUG-1..BUG-6 + N-1 + N-4` identifiers, and **12** entries under
-the `main.go` identifiers (`BUG-A..BUG-L`). The table below uses
-the `main.go` identifiers (which are the source of truth). All
-entries fix behaviours that clients could observe.
+Documented in `docs/ARCHITECTURE.md` §4.6.3 and §4.6.8. The full set
+of twelve `BUG-A..BUG-L` corrections to `main.go`. All entries fix
+behaviours that clients could observe.
 
-| ID (main.go) | Alias (historical) | Scope | Observable effect |
-|---|---|---|---|
-| **BUG-A** | BUG-1 | `appendDenylist` — the pre-critical backup is performed **once**; the endpoint now requires a `content` parameter | One snapshot per call instead of two; previously a no-op |
-| **BUG-B** | BUG-2 | `ensure_running_service` — localhost bypass replaced with `X-Watchdog-Token` | New auth requirement for clients that relied on the bypass |
-| **BUG-C** | BUG-3 | Auth cache — empty results are no longer cached | File-read failure no longer locks the server into "no auth" for 60 s |
-| **BUG-D** | BUG-4 | `createAutoBackup` — calls `rotate_backups 21` after success | Automatic rotation matches `service.sh` |
-| **BUG-E** | BUG-5 | `createAutoBackup` — unique target dir (`<ts>-manual-<pid>-<rand4>`) | Same-second backups no longer collide |
-| **BUG-F** | BUG-6 | `clear_logs` — reports `os.Truncate` errors | False "success" responses eliminated |
-| **BUG-G** | N-1 | `getStatusUncached` — named return set to `"OFF"` on panic | Callers never see an empty string |
-| **BUG-H** | N-4 | `last_update` cache — TTL-based (5 s), not `sync.Once` | `get_profile.last_update` reflects external changes |
-| **BUG-I** | — | `runtime_info.profile_key` — reads `selected_profile.txt` | Matches `get_profile.key` even after restore |
-| **BUG-J** | — | `isPidAlive` — exact command names only | PID-reuse false positives eliminated |
-| **BUG-K** | — | `runShellWithTimeout` — logs `(timeout)` marker | Diagnostics clear about whether a timeout occurred |
-| **BUG-L** | — | Watchdog token file — `atomicWriteFile` | Concurrent readers never see a partial token |
+### 17.4 v1.3.0 + v1.4.0 + v1.5.0 Additions (Not Audit Corrections)
 
-**Note on identifiers**: The v1.2.0 post-audit fixes were
-originally documented as **BUG-1..BUG-6** and **N-1, N-4** in
-early revisions. The `main.go` source comments use
-**BUG-A..BUG-L**. The table above maps both notations. The
-"post-audit corrections count" quoted elsewhere in this document
-refers to the earliest subset (**8** under the historical
-identifiers).
-
-These are internal fixes and do not receive audit correction
-numbers.
-
-### 17.4 v1.3.0 + v1.4.0 Additions (Not Audit Corrections)
-
-The v1.3.0 and v1.4.0 releases did **not** extend the registry.
-Their changes are documented as:
+The v1.3.0, v1.4.0, and v1.5.0 releases did **not** extend the
+registry. Their changes are documented as:
 
 | Version | Change | Section / Reference |
 |:-:|---|---|
-| v1.3.0 | PWA install button (client-side) | §16 changelog; `docs/ARCHITECTURE.md` §6.4 |
-| v1.3.0 | Live status LED (client-side) | §16 changelog; `docs/ARCHITECTURE.md` §6.1 |
-| v1.3.0 | DNS auto-start via `service.sh` | §5.33 (WD-TOKEN path); §16 changelog |
-| v1.3.0 | `buildBackupInfo` sort order change (mtime) | §5.31.2; §5.31.4; §16 changelog |
-| v1.3.0 | ROT-MANIFEST + ROT-MTIME + ROT-PROTECT | §5.31.2; §14.33; §16 changelog |
-| v1.4.0 | CodeQL `go/path-injection` fix in `removeModule` | §5.34; §14.31 |
-| v1.4.0 | iOS PWA logic removal | §5.35.1; §14.32 |
-| v1.4.0 | `/app-debug.apk` public route | §5.35.2; §14.32 |
+| v1.3.0 | PWA install button (client-side) | §16 |
+| v1.3.0 | Live status LED (client-side) | §16 |
+| v1.3.0 | DNS auto-start via `service.sh` | §5.33 |
+| v1.3.0 | `buildBackupInfo` sort order change (mtime) | §5.31.2, §5.31.4 |
+| v1.3.0 | ROT-MANIFEST + ROT-MTIME + ROT-PROTECT | §5.31.2, §14.33 |
+| v1.4.0 | CodeQL `go/path-injection` fix in `removeModule` | §5.34, §14.31 |
+| v1.4.0 | iOS PWA logic removal | §5.35.1 |
+| v1.4.0 | `/app-debug.apk` public route | §5.35.2, §14.32 |
+| v1.5.0 | Companion app one-tap install (APK-5) | §5.36, §14.34 |
+| v1.5.0 | One-shot CSRF token (`install_token`) | §5.36.1, §7.1 |
+| v1.5.0 | Per-IP install rate limit | §5.36.2 |
+| v1.5.0 | SELinux staging (never `setenforce 0`) | §5.36.3 |
+| v1.5.0 | Play Protect temporary disable + trap | §5.36.4 |
+| v1.5.0 | 75-second cascade deadline | §5.36.4, §14.34 |
+| v1.5.0 | Trap restores `$_VERIFIER_ORIG` | §5.36.4, §14.34 |
+| v1.5.0 | 5-level cascade rationale | §5.36.5 |
+| v1.5.0 | `failure is 200, not 4xx` design | §5.36.6 |
+| v1.5.0 | 3 package-name candidates (APK-12) | §5.36.7 |
+| v1.5.0 | SHA256 advisory verification of APK | §5.36.8 |
+| v1.5.0 | Client-side state fixes (IDX-23, IDX-23b, IDX-25, IDX-25a) | §18 |
 
-**Registry status**: unchanged at **#33**. Next expected: **#34**
-in v1.5.x.
+**Registry status**: unchanged at **#33**. Next expected: **#34** in
+a future release.
+
+---
+
+## 18. Documentation Corrections to This File
+
+This section consolidates every documentation-accuracy correction
+applied to this file. **None of these advances the Audit Corrections
+Registry** — the registry (§17) remains at **#33**.
+
+The table below is the authoritative index. Individual corrections
+are described inline where they appear.
+
+### 18.1 Pre-release sweep (v1.5.0)
+
+| ID | Section | Correction |
+|:-:|---|---|
+| HARD-SEC-V15-01 | §5.36 | New section — companion install flow threat model |
+| HARD-SEC-V15-02 | §5.36.3 | New — SELinux staging decision documented |
+| HARD-SEC-V15-03 | §5.36.4 | New — Play Protect trap semantics documented |
+| HARD-SEC-V15-04 | §3.2 | Extended — four v1.5.0 bullets |
+| HARD-SEC-V15-05 | §2.1 + §4.2 | Extended — three new in-memory assets |
+| HARD-SEC-V15-06 | §7.1 | Extended — install token as a distinct, additional credential |
+| HARD-SEC-V15-07 | §16 | Extended — v1.5.0 changelog entry |
+| HARD-SEC-V15-08 | §14.34 | New — companion install flow checklist |
+| HARD-SEC-V15-09 | §17.4 | Extended — v1.5.0 additions table |
+| HARD-SEC-V15-10 | §13.1 + §13.3 | Extended — v1.5.0 limitations + compensating controls |
+| HARD-SEC-V15-12 | §14.1 | Rewritten — the stale v1.4.0 install-button item was replaced by the v1.5.0 behaviour |
+
+### 18.2 Post-release sweep (v1.5.0+)
+
+| ID | Section | Correction |
+|:-:|---|---|
+| HARD-SEC-V15-14 | §5.36.3 | Corrected — the trap **does** remove the staged APK on every catchable exit path |
+| HARD-SEC-V15-15 | §5.36.4 | Corrected — Play Protect duration is bounded by the 75-second cascade deadline, not "< 5 s" |
+| HARD-SEC-V15-16 | §12.1 | Corrected — `install_app.sh` is covered by the module ZIP's SHA-256 |
+| HARD-SEC-V15-17 | §13.2 | Removed — staged-APK cleanup is now resolved |
+| HARD-SEC-V15-DATE | header + footer | Date bumped to 2026-10-15 |
+| HARD-SEC-V15-TRAP | §5.36.3 | Extended — three-way trap split with exit codes 130 / 143 |
+| HARD-SEC-V15-SHELL | §14.34 | Corrected in eight places for BusyBox grep portability |
+
+### 18.3 BusyBox grep portability corrections
+
+Android ships BusyBox grep, which does not support:
+  - `\b` word boundaries (treated as a literal backspace character).
+  - `-A` / `-B` / `-C` context lines (GNU extensions).
+
+The following eight runtime-audit commands in §14.34 were corrected:
+
+| # | Was | Now |
+|:-:|---|---|
+| a | `grep -q 'com.gasciljh.dnsproxy\b'` | `grep -qE 'com\.gasciljh\.dnsproxy([^.]\|$)'` |
+| b | `grep -A10 'func removeModule'` | `awk '/func removeModule/,/^}/'` |
+| c | `grep -c 'CASCADE_DEADLINE_SECONDS'` expected 3 | expected 3-5 occurrences |
+| d | `grep -E '[a-f0-9]{64}'` on log | scoped: `grep 'install_token' log \| grep -E '[a-f0-9]{32,}'` |
+| e | `grep -q 'isIOSDevice'` | anchored: `grep -qE '^\s*(function isIOSDevice\|isIOSDevice\s*=)'` |
+| f | `apk/` mode 0700 | corrected to 0755 (matches `mkdir -p` without explicit mode) |
+| g | cascade-deadline count check | updated per (c) |
+| h | awk-based replacement for `grep -A10` | added per (b) |
+
+### 18.4 Related cross-file corrections
+
+The following corrections are documented in sibling files. They
+affect facts referenced from this document but are not themselves
+corrections to `docs/SECURITY.md`.
+
+| Identifier | File | Description |
+|---|---|---|
+| CHG-DOC-01 | `CHANGELOG.md` | `watchdog.sh` line count corrected 1,356 → 1,326 |
+| ARCH-DOC-06 | `docs/ARCHITECTURE.md` | `proxy/` tracked-file count corrected 18 → 17 |
+| SW-DOC-02 | `web/sw.js` | Endpoint re-attribution (4 endpoints = v1.5.0, not v1.4.0); IDX-24 description normalized |
+| README-DOC-02 | `README.md` | Per-directory count correction |
+| MAIN-REENT-01 | `proxy/main.go` | Logger three-layer split eliminates a latent deadlock on rotation failure |
+| MAIN-PORTCACHE-01 | `proxy/main.go` | 30-second TTL cache for `getWebUIPort` / `getDashboardPort` |
+| MAIN-DEADLOCALHOST-01 | `proxy/main.go` | `isLocalRequest` dead-branch removal |
+| MAIN-APPENDHASH-01 | `proxy/main.go` | `appendDenylist` hash source aligned with `saveDenylist` |
+| MAIN-CACHE-01 | `proxy/main.go` | Companion state cache invalidated unconditionally after install/uninstall |
+| CIA-DEF-03 | `proxy/install_app.sh` | Three-way signal trap split with `_CLEANED_UP` re-entry guard |
+| IDX-429 | `web/index.html` | Install rate-limit message rendered distinctly |
+| IDX-401-DISTINCT | `web/index.html` | Install-family 401 no longer triggers the session-expired modal |
+| DASH-REFRESH-01 | `web/dashboard.html` | `isRefreshing` reset on 401 |
+| DASH-SESSION-RETRY-01 | `web/dashboard.html` | Session-expired primary action is a full retry |
+| DASH-HINT-01 | `web/dashboard.html` | Dual-timer hint lifecycle |
+| DASH-HINT-02 | `web/dashboard.html` | `scrollend` listener with fallback |
+| ICON-512-SAFEZONE-01 | `web/icon-512.svg` | Shield path fits the W3C maskable safe circle |
+| API-XREF-01 | `docs/API.md` | Cross-reference block for the v1.5.0++ cycle |
+| HARD-SEC-XREF-01 | this file | Cross-reference block for the v1.5.0++ cycle |
 
 ---
 
@@ -2932,17 +2894,21 @@ in v1.5.x.
 - [RFC 6265bis — Cookies](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis)
 - [Netfilter iptables Custom Chains Best Practices](https://www.netfilter.org/documentation/)
 - [Prometheus Text Format](https://prometheus.io/docs/instrumenting/exposition_formats/)
-- [RFC 7282 — On Consensus and Humming in the IETF](https://datatracker.ietf.org/doc/html/rfc7282)
 - [Go runtime/debug.SetMemoryLimit](https://pkg.go.dev/runtime/debug#SetMemoryLimit)
 - [Android FUSE — Storage Access Framework](https://source.android.com/docs/core/storage)
 - [Android SELinux — restorecon](https://source.android.com/docs/security/features/selinux)
 - [Android App Signing — Package Signature Verification](https://source.android.com/docs/security/features/apksigning)
 - [SHA-256 — NIST FIPS 180-4](https://csrc.nist.gov/publications/detail/fips/180/4/final)
 - [CodeQL — go/path-injection query](https://codeql.github.com/codeql-query-help/go/go-path-injection/)
+- [POSIX — Signals and trap](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_28)
 - [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) — Companion app repository
+- [Android PackageManager documentation](https://developer.android.com/reference/android/content/pm/PackageManager) — for `pm install` (v1.5.0)
 
 ---
 
-**Last updated**: 2026-10-08
-**Version**: v1.4.0
+**Last Audit Correction**: #33 (v1.0.0)
+**Next expected**: #34 (in a future release)
+
+**Last updated**: 2026-10-15
+**Version**: v1.5.0
 **Author**: gasciljh

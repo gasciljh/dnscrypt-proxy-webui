@@ -1,305 +1,40 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
 # ============================================================
-# DNSCrypt Smart Filter – action.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — action.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Magisk / KernelSU "Action" button handler.
+# Magisk / KernelSU / APatch "Action" button handler.
 #
-#   Modes:
-#     action.sh                Start WebUI + open browser
-#     action.sh --restart      Force restart WebUI
-#     action.sh --status       Show WebUI status only
-#     action.sh --check        Comprehensive status (see below)
-#     action.sh --diagnose     Run full diagnostic report (v1.2.0)
-#     action.sh --backup       Trigger an immediate backup (v1.2.0)
-#     action.sh --help         Show help
+# Modes:
+#   action.sh                Start WebUI + open browser
+#   action.sh --restart      Force restart WebUI
+#   action.sh --status       Show WebUI status only
+#   action.sh --check        Comprehensive status
+#   action.sh --diagnose     Full diagnostic report
+#   action.sh --backup       Trigger an immediate backup
+#   action.sh --help         Show help
+#   action.sh --version      Show version
 #
 # Exit codes:
 #   0 = success
 #   1 = error (startup failed)
 #   2 = module disabled
 #   3 = backup failed (--backup only)
-#
-# Notes:
-#   • Loads functions.sh if available, otherwise uses inline fallbacks.
-#   • The version is read dynamically from module.prop (not hardcoded).
-#   • Port Guard: rejects port 8080 (reserved for monitoring_ui).
-#
-# v1.1.0 additions (kept):
-#   • --check reports the active profile + expected memory hint
-#   • Structured --check output with clear sections
-#   • Fallback for get_profile_memory_hint if functions.sh is missing
-#
-# v1.2.0 additions:
-#   • --diagnose: delegates to status.sh --diagnose
-#   • --backup: triggers an immediate manual backup
-#   • --check: new "Backup & Recovery" section
-#
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 ACT-1 — `_inline_backup_now` writes a .manifest.json
-#     with the same shape as functions.sh:write_manifest.
-#   🔧 ACT-2 — `_inline_backup_now` applies chmod 0700
-#     unconditionally (matches FSH-6 in functions.sh).
-#   🔧 ACT-3 — `--diagnose` honors the shebang when possible.
-#   🔧 ACT-4 — `--help` reflects the real --check output.
-#   🔧 ACT-5 — `_inline_backup_now` uses `<ts>-manual-$$`.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening
-# ============================================================
-#   🛡️ HARD-ACT-01 — `_inline_backup_now` now JSON-escapes the
-#     `source`, `version`, and `root_solution` fields via a
-#     shared `_act_json_escape` helper. Parity with
-#     HARD-CS-05 (customize.sh) and HARD-FSH-01 (functions.sh).
-#
-#   🛡️ HARD-ACT-02 — `_inline_backup_summary` declares `local
-#     age` at the top of the function.
-#
-#   🛡️ HARD-ACT-03 — `_inline_backup_now` had a no-op line:
-#       `[ "$ver_for_manifest" = "unknown" ] && ver_for_manifest="unknown"`
-#     Removed.
-#
-#   🛡️ HARD-ACT-04 — The `--backup` mode now prints a
-#     normalized success line REGARDLESS of which backend was
-#     used.
-#
-#   🛡️ HARD-ACT-05 — Section [18] "Try 5" rewritten as an
-#     explicit fire-and-forget with a clear comment.
-#
-#   🛡️ HARD-ACT-06 — `_inline_read_port` now performs the
-#     numeric range check with a leading-zero-safe comparison.
-#
-#   🛡️ HARD-ACT-07 — `_inline_backup_summary` now returns a
-#     distinct, unambiguous string for each state.
-#
-#   🛡️ HARD-ACT-08 — `_inline_backup_now` now writes the
-#     manifest ONLY after confirming that at least one file was
-#     copied.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — New post-audit fixes
-# ============================================================
-#   🛡️ ACT-M1 — `_inline_is_port_open` now includes a
-#     `netstat` fallback.
-#   🛡️ ACT-M2 — `_inline_read_port` leading-zero handling is
-#     now documented as the canonical implementation.
-#   🛡️ ACT-M3 — Snapshot naming convention is now explicitly
-#     documented.
-#   🛡️ ACT-L1 — `local_pid` / `local_i` renamed to `_act_pid`
-#     and `_act_i`.
-#   🛡️ ACT-L2 — `_txn_count` and `_orphan_count` now go
-#     through a numeric-validation guard.
-#   🛡️ ACT-L3 — `--check` prefers `is_dnscrypt_running` when
-#     available.
-#   🛡️ ACT-L4 — `--help` now mentions that `--check` always
-#     returns 0 (informational only).
-#   🛡️ ACT-L5 — Removed the unexplained `sleep 1` after the
-#     fire-and-forget browser launch in Try 5.
-#   🛡️ ACT-L6 — `_inline_rotate_backups` now emits a log line
-#     on success.
-#
-# Coordination with main.go:
-#   • The constant _MONITORING_UI_PORT below MUST stay in sync
-#     with MONITORING_UI_PORT in main.go.
-#   • The memory hint is DISPLAY-ONLY. main.go remains the
-#     authority for the actual debug.SetMemoryLimit() value.
-#   • Backup directory is /sdcard/dnscrypt-webui-backup/ (v1.2.0).
-#
-# ============================================================
-# v1.3.0 — Server-side refinement: _inline_rotate_backups()
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   However, the fallback rotation logic in this script's
-#   `_inline_rotate_backups()` was ALSO refined in v1.3.0 to
-#   match the canonical implementation in `functions.sh`.
-#   Earlier revisions of this header did not document this
-#   change at all (there was no v1.3.0 block), and TWO other
-#   call sites in this file were NOT updated in step — they
-#   kept using the v1.2.0 name-pattern detection:
-#
-#     • `_inline_backup_summary()` — used by --backup and by
-#       --check to report the snapshot count and the age of
-#       the newest snapshot.
-#     • The `_snap_count` block inside §[14] --check.
-#
-#   The v1.4.0 revision below (ACT-V14-03) brings those two
-#   call sites into sync with `_inline_rotate_backups` and
-#   with every other consumer in the module.
-#
-#   The v1.3.0 rotation refinement is documented under three
-#   identifiers (also used in CHANGELOG.md and in
-#   docs/ARCHITECTURE.md §4.13.2):
-#
-#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
-#     A directory is treated as a snapshot iff it contains a
-#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
-#     and `orphan-txn-*/`.
-#
-#     Before v1.3.0: only directories whose name matched the
-#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
-#     custom-named snapshots were silently skipped.
-#
-#   🔧 ROT-MTIME — mtime sort.
-#     Candidates are ordered by mtime (numeric, descending,
-#     `sort -rn -k1,1`), not by lexicographic directory name.
-#     Robust against clock drift and manual renames. Aligns
-#     `_inline_rotate_backups` with the `runtime_info.backups`
-#     API (which uses the same mtime sort since v1.3.0 — see
-#     SNAP-MTIME in proxy/main.go).
-#
-#   🔧 ROT-PROTECT — protected rotation targets.
-#     Two additional snapshots are preserved on top of the
-#     21-newest window:
-#       • The `.last_stable` target (recovery pointer).
-#       • The newest install snapshot (name matching
-#         `-v<digit>`).
-#     Without these protections, the 21-newest window could
-#     silently evict the exact snapshot that recovery mode
-#     or rollback depends on.
-#
-#   See CHANGELOG.md v1.3.0 section, and
-#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
-# ============================================================
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 ACT-APK-01 — No behavior change. The module may now
-#     ship `web/app-debug.apk` (companion Android app). It is
-#     served by main.go at `/app-debug.apk` and installed by
-#     the user from the WebUI install button.
-#
-#     `action.sh` does not touch the APK. Its install/runtime
-#     lifecycle is orthogonal to the DNS engine and WebUI.
-#
-#     Relevant mode for the user:
-#       • None — the APK is a one-shot download; once installed,
-#         the companion app opens http://127.0.0.1:9090 like any
-#         browser.
-#
-#   📱 ACT-APK-02 — Version bump v1.3.0 → v1.4.0.
-#     `--version` now reports v1.4.0. No behavior changes to
-#     any mode (--restart, --status, --check, --diagnose,
-#     --backup, --help).
-#
-#   📚 ACT-V14-03 — Cross-file parity correction for v1.3.0.
-#     Two call sites in this file were left behind when
-#     `_inline_rotate_backups()` was upgraded to v1.3.0
-#     rotation semantics:
-#
-#       1. `_inline_backup_summary()` — used by --backup and
-#          by --check to report the snapshot count and the age
-#          of the newest snapshot. It still used the v1.2.0
-#          name-pattern detection
-#          (`grep -E '^[0-9]{8}-[0-9]{6}-'`) and lexicographic
-#          `sort -r` for the "newest" lookup. Result: for a
-#          snapshot whose name did not sort the same way as
-#          its mtime (e.g. a custom-named snapshot or a
-#          snapshot whose PID suffix inverted the lexical
-#          order), the summary disagreed with the actual
-#          rotation result.
-#
-#       2. §[14] --check's `_snap_count` block — same issue,
-#          same detection rule, same disagreement with the
-#          `_inline_rotate_backups` count.
-#
-#     Fix: both call sites now use the same manifest-based
-#     detection (SNAP-MANIFEST) and mtime-descending sort
-#     (SNAP-MTIME) as `_inline_rotate_backups`, the canonical
-#     `functions.sh:rotate_backups`, and every other consumer
-#     in the module (main.go, service.sh, watchdog.sh,
-#     status.sh, customize.sh).
-#
-#     This is the SAME cross-file parity fix that was applied
-#     to watchdog.sh (WD-V14-03), status.sh (STS-V14-03),
-#     customize.sh (CSH-19), and service.sh (SVC-V14-03) in
-#     the v1.4.0 release.
-#
-#     No CLI behavior changes; only the numbers displayed by
-#     --backup and --check are now consistent with the actual
-#     on-disk state.
-#
-#   📚 ACT-V14-04 — `_inline_rotate_backups()` doc-block
-#     expanded to name the three ROT-* identifiers explicitly.
-#     Previously the doc-block said only "Matches the canonical
-#     version" without specifying which semantic version of
-#     the canonical implementation. The inline comment inside
-#     the function body already said `# v1.3.0 — Professional
-#     rotation (parity with functions.sh)`, so the top-of-file
-#     doc-block and the inline comment were out of sync.
-#
-# ============================================================
-# POSIX note on `local`:
-#   This script uses `local` for all internal variables. The
-#   `local` keyword is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path
+# [1] Module path + version
 # ============================================================
-
-# v1.2.0: --version flag (checked before any argument parsing)
-case "${1:-}" in
-	--version)
-		echo "$0: v1.4.0"
-		exit 0
-		;;
-esac
-
 MODDIR=${0%/*}
 [ "$MODDIR" = "." ] && MODDIR=$(pwd)
 case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
 
-# ============================================================
-# [2] Shared constant
-# ============================================================
-_MONITORING_UI_PORT="8080"
-
-# ============================================================
-# [3] Default paths (reconfigured after loading functions.sh)
-# ============================================================
-LOG_FILE="/data/local/tmp/dnscrypt_main.log"
-WEBUI_PID_FILE="/data/local/tmp/webui.pid"
-WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
-STATUS_FILE="/data/local/tmp/dnscrypt.status"
-CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
-
-SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
-
-# --- v1.2.0 — Data preservation paths ---
-PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
-PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
-LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
-LAST_AUTO_BACKUP_MARKER="$PERSISTENT_BACKUP/.last_auto_backup"
-USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
-
-# --- v1.2.0 — Recovery mode trigger files ---
-RECOVERY_TRIGGER_1="$MODDIR/recovery"
-RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
-
-log_msg() {
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - [action] $1" >> "$LOG_FILE" 2>/dev/null
-}
-
-# ============================================================
-# [4] Read version
-# ============================================================
 get_version() {
     local vf="$MODDIR/module.prop"
     if [ -f "$vf" ]; then
@@ -310,28 +45,91 @@ get_version() {
             return 0
         fi
     fi
-    printf 'unknown'
+    printf 'v0.0.0-unknown'
 }
 
 VERSION="$(get_version)"
 
-# ============================================================
-# [5] Internal fallback (if functions.sh is not loaded)
-# ============================================================
+# --version is handled before any other parsing so it works even
+# if the rest of the file cannot be loaded.
+case "${1:-}" in
+    --version)
+        echo "$0: $VERSION"
+        exit 0
+        ;;
+esac
 
-_FALLBACK_RUN_DIR="$MODDIR/proxy/run"
+# ============================================================
+# [2] Default paths
+# ============================================================
+LOG_FILE="/data/local/tmp/dnscrypt_main.log"
+WEBUI_PID_FILE="/data/local/tmp/webui.pid"
+WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
+STATUS_FILE="/data/local/tmp/dnscrypt.status"
+CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
 
-# ------------------------------------------------------------
-# _act_json_escape (HARD-ACT-01)
-# ------------------------------------------------------------
-# Minimal JSON string escaper. Escapes backslash and double
-# quote, and drops C0 control characters. Parity with the
-# identical helpers in customize.sh (HARD-CS-05) and
-# functions.sh (HARD-FSH-01).
-# ------------------------------------------------------------
-_act_json_escape() {
-    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\010\013\014\016-\037'
+SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
+
+# --- Data preservation paths ---
+PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
+PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
+LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
+LAST_AUTO_BACKUP_MARKER="$PERSISTENT_BACKUP/.last_auto_backup"
+USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
+
+# --- Recovery mode trigger files ---
+RECOVERY_TRIGGER_1="$MODDIR/recovery"
+RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
+
+# --- Reserved port (finalized after loading functions.sh) ---
+_MONITORING_UI_PORT=""
+
+# ============================================================
+# [3] Log prefix + fallback log_msg
+# ============================================================
+# Set LOG_PREFIX before sourcing functions.sh so boot-mini.sh's
+# log_msg picks up the [action] tag.
+LOG_PREFIX="[action]"
+
+log_msg_fallback() {
+    echo "$(date +'%Y-%m-%d %H:%M:%S') - [action] $1" >> "$LOG_FILE" 2>/dev/null
 }
+
+# ============================================================
+# [4] Load functions.sh (which sources boot-mini.sh)
+# ============================================================
+# A functions.sh that exists but fails to source does NOT
+# abort action.sh — the script falls through to the inline
+# fallbacks in [5].
+FUNCTIONS_LOADED=0
+if [ -f "$MODDIR/functions.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$MODDIR/functions.sh" 2>/dev/null
+
+    if command -v is_port_open >/dev/null 2>&1 \
+       && command -v get_webui_port >/dev/null 2>&1; then
+        FUNCTIONS_LOADED=1
+
+        if command -v init_runtime_paths >/dev/null 2>&1; then
+            init_runtime_paths
+        fi
+    fi
+fi
+
+# Restore our preferred log prefix after sourcing.
+LOG_PREFIX="[action]"
+
+# Finalize _MONITORING_UI_PORT: prefer the value from
+# boot-mini.sh (via functions.sh); fall back to 8080.
+_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
+
+# ============================================================
+# [5] Minimal inline fallbacks
+# ============================================================
+# Only the primitives required by --status and the default mode
+# are provided here. Advanced modes (--backup, --check,
+# --diagnose) fail cleanly when functions.sh is not loaded.
+_FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
     if [ -d "$_FALLBACK_RUN_DIR" ] && [ -w "$_FALLBACK_RUN_DIR" ]; then
@@ -348,15 +146,10 @@ _fallback_get_run_dir() {
     printf "%s" "/data/local/tmp"
 }
 
-# ------------------------------------------------------------
-# _inline_is_port_open
-# ------------------------------------------------------------
-# Checks whether a TCP/UDP port is listening.
-#
-# ACT-M1: Added `netstat` fallback for parity with
-# service.sh (HARD-SVC-03), watchdog.sh (HARD-WD-02), and
-# functions.sh.
-# ------------------------------------------------------------
+# --- Fallback: is_port_open ---
+# Three probes: /proc/net → ss → netstat.
+# The trailing space in ":$hex_port " prevents :1F90 from
+# matching :1F90A.
 _inline_is_port_open() {
     local port="$1"
     local proto="${2:-tcp}"
@@ -378,7 +171,7 @@ _inline_is_port_open() {
         if command -v ss >/dev/null 2>&1; then
             ss -lun 2>/dev/null | grep -q ":$port " && return 0
         elif command -v netstat >/dev/null 2>&1; then
-            netstat -lun 2>/dev/null | grep -q ":$port " && return 0
+            netstat -uln 2>/dev/null | grep -q ":$port " && return 0
         fi
     else
         if [ -f /proc/net/tcp ] && grep -qi ":$hex_port " /proc/net/tcp 2>/dev/null; then
@@ -393,13 +186,10 @@ _inline_is_port_open() {
             netstat -tln 2>/dev/null | grep -q ":$port " && return 0
         fi
     fi
-
     return 1
 }
 
-# ------------------------------------------------------------
-# _inline_read_conf: supports values containing '='
-# ------------------------------------------------------------
+# --- Fallback: read_conf ---
 _inline_read_conf() {
     local conf="$1"
     local key="$2"
@@ -422,124 +212,88 @@ _inline_read_conf() {
     printf "%s" "$default"
 }
 
-# ------------------------------------------------------------
-# _inline_read_port: Port Guard (reject 8080)
-# ------------------------------------------------------------
-# HARD-ACT-06: leading-zero-safe numeric comparison.
-# A value like "090" would be treated as octal by `[ -ge ]`
-# in some shells. The check now:
-#   1. Verifies the string is digits-only.
-#   2. Strips leading zeros before arithmetic.
-#
-# ACT-M2: This is now the canonical implementation. It will
-# be mirrored into functions.sh so that all consumers
-# (status.sh, main.go) benefit from the same fix.
-# ------------------------------------------------------------
-_inline_read_port() {
+# --- Fallback: get_port with Port Guard ---
+_inline_get_port() {
     local conf="$1"
-    local key="${2:-PORT}"
-    local default="$3"
     local val
-    val=$(_inline_read_conf "$conf" "$key" "$default")
+    val=$(_inline_read_conf "$conf" "PORT" "9090")
 
-    # Digits-only gate
     if ! echo "$val" | grep -qE '^[0-9]+$'; then
-        printf "%s" "$default"
+        printf "9090"
         return 0
     fi
 
-    # Strip leading zeros (HARD-ACT-06).
     local val_clean
     val_clean=$(printf '%s' "$val" | sed 's/^0*//')
     [ -z "$val_clean" ] && val_clean="0"
 
     if [ "$val_clean" -ge 1 ] && [ "$val_clean" -le 65535 ]; then
-        # Port Guard
         if [ "$val_clean" = "$_MONITORING_UI_PORT" ]; then
-            printf "%s" "$default"
+            log_msg_fallback "WARNING: _inline_get_port: PORT=$val_clean conflicts with monitoring_ui — falling back to 9090"
+            printf "9090"
             return 0
         fi
         printf "%s" "$val_clean"
         return 0
     fi
-    printf "%s" "$default"
+    printf "9090"
 }
 
-# ------------------------------------------------------------
-# _inline_get_profile_memory_hint (v1.1.0, self-contained)
-# ------------------------------------------------------------
-# Returns a user-facing string describing the expected soft
-# memory limit for the active profile.
-#
-# ⚠️ This is a HINT only. main.go is the authority.
-#
-# Uses the same table as:
-#   • functions.sh:get_profile_memory_hint
-#   • main.go:memoryLimitForProfile
-#   • customize.sh [21]
-#   • watchdog.sh:_wd_get_profile_memory_hint
-#
-# Table:
-#   light    →  80 MB
-#   normal   → 100 MB
-#   pro      → 120 MB
-#   proplus  → 160 MB
-#   ultimate → 220 MB
-# ------------------------------------------------------------
-_inline_get_profile_memory_hint() {
-    local profile="pro"
+# --- Fallback: start_webui ---
+# Three-way launch: setsid → busybox setsid → nohup.
+# Waits up to 20 s for the port to bind.
+_inline_start_webui() {
+    local bin="$1"
+    local port="$2"
 
-    if [ -f "$SELECTED_PROFILE_FILE" ]; then
-        local p
-        p=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
-        case "$p" in
-            light|normal|pro|proplus|ultimate) profile="$p" ;;
-        esac
+    log_msg_fallback "Starting WebUI (inline, port: $port)"
+    pkill -9 -x dnscrypt-webui 2>/dev/null
+    rm -f "$WEBUI_PID_FILE" 2>/dev/null
+
+    export HOME=/data/local/tmp
+
+    if command -v setsid >/dev/null 2>&1; then
+        setsid env HOME="$HOME" "$bin" >/dev/null 2>&1 < /dev/null &
+    elif command -v busybox >/dev/null 2>&1 && busybox --list 2>/dev/null | grep -q setsid; then
+        busybox setsid env HOME="$HOME" "$bin" >/dev/null 2>&1 < /dev/null &
+    else
+        nohup env HOME="$HOME" "$bin" >/dev/null 2>&1 < /dev/null &
     fi
 
-    local mb
-    case "$profile" in
-        light)    mb="80"  ;;
-        normal)   mb="100" ;;
-        pro)      mb="120" ;;
-        proplus)  mb="160" ;;
-        ultimate) mb="220" ;;
-        *)        mb="80"  ;;
-    esac
+    sleep 1
+    local _pid=""
+    _pid=$(pgrep -x "dnscrypt-webui" 2>/dev/null | head -n1)
+    if [ -n "$_pid" ]; then
+        printf "%s\n" "$_pid" > "${WEBUI_PID_FILE}.tmp" 2>/dev/null
+        mv -f "${WEBUI_PID_FILE}.tmp" "$WEBUI_PID_FILE" 2>/dev/null
+    fi
 
-    printf "%s MB (%s)" "$mb" "$profile"
+    local _i=0
+    while [ "$_i" -lt 20 ]; do
+        if _inline_is_port_open "$port" tcp; then
+            return 0
+        fi
+        sleep 1
+        _i=$((_i + 1))
+    done
+    return 1
 }
 
-# ------------------------------------------------------------
-# _inline_list_snapshots (ACT-V14-03 helper)
-# ------------------------------------------------------------
-# Prints one snapshot directory name per line, newest first.
-#
-# v1.3.0 semantics (parity with functions.sh:rotate_backups,
-# main.go:buildBackupInfo, service.sh:_inline_rotate_backups,
-# watchdog.sh §[5b], status.sh:_list_snapshots, and
-# customize.sh:rotate_backups):
-#   • SNAP-MANIFEST: a directory is treated as a snapshot iff
-#     it contains a `.manifest.json` file.
-#   • SNAP-MTIME:    ordered by mtime, descending
-#     (`sort -rn -k1,1`), not by lexicographic directory name.
-#
-# Excludes: current/, txn-*, orphan-txn-* (by name).
-#
-# Introduced in ACT-V14-03 to eliminate the duplication
-# between `_inline_backup_summary` and §[14] --check's
-# `_snap_count` block.
-# ------------------------------------------------------------
+# --- Fallback: list_snapshots + backup_summary ---
+# Diagnostic-only. Detection rule (SNAP-MANIFEST): a directory
+# is a snapshot iff it contains a `.manifest.json` file.
 _inline_list_snapshots() {
+    local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
-    (
+    local list
+    list=$(
         cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
         for _d in */; do
             _d="${_d%/}"
             [ -d "$_d" ] || continue
             case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
+                current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
             _mt=$(stat -c %Y "$_d" 2>/dev/null) \
@@ -547,38 +301,24 @@ _inline_list_snapshots() {
                 || _mt=0
             case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
             printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1 | awk '{print $2}'
+        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
     )
+
+    [ -z "$list" ] && return 0
+
+    if [ "$limit" -gt 0 ] 2>/dev/null; then
+        printf '%s\n' "$list" | head -n "$limit"
+    else
+        printf '%s\n' "$list"
+    fi
 }
 
-# ------------------------------------------------------------
-# _inline_backup_summary (v1.2.0, corrected in v1.4.0)
-# ------------------------------------------------------------
-# Returns a one-line summary of the backup state:
-#   "5 snapshot(s), latest 2h ago"      — backups exist
-#   "no snapshots yet"                  — dir exists but empty
-#   "not initialized"                   — dir missing
-#
-# HARD-ACT-02: `local age` is declared with the other locals.
-# HARD-ACT-07: the returned string is unambiguous; no trailing
-#              space when the age cannot be computed.
-#
-# ACT-V14-03 (v1.4.0): detection and ordering now delegate to
-# the shared `_inline_list_snapshots` helper, which uses the
-# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
-# sort (SNAP-MTIME). Before this fix, the summary used the
-# v1.2.0 name-pattern detection (`^[0-9]{8}-[0-9]{6}-`) and
-# lexicographic `sort -r` for the "newest" lookup, producing
-# a count and an age that could disagree with the actual
-# rotation result computed by `_inline_rotate_backups`.
-# ------------------------------------------------------------
 _inline_backup_summary() {
     [ -d "$PERSISTENT_BACKUP" ] || {
         printf "not initialized"
         return
     }
 
-    # ACT-V14-03: use the shared helper for count + newest.
     local _list
     _list=$(_inline_list_snapshots)
 
@@ -593,13 +333,11 @@ _inline_backup_summary() {
     local newest
     newest=$(printf '%s\n' "$_list" | head -n1)
 
-    # Age of newest
     local epoch age now age_str
     epoch=$(stat -c %Y "$PERSISTENT_BACKUP/$newest" 2>/dev/null) \
         || epoch=$(stat -f %m "$PERSISTENT_BACKUP/$newest" 2>/dev/null) \
         || epoch=0
 
-    # Numeric validation
     if ! echo "$epoch" | grep -qE '^[0-9]+$'; then
         epoch=0
     fi
@@ -628,231 +366,81 @@ _inline_backup_summary() {
     printf "%s snapshot(s), latest %s" "$count" "$age_str"
 }
 
-# ------------------------------------------------------------
-# _inline_backup_now (v1.2.0)
-# ------------------------------------------------------------
-# Manual backup trigger used by --backup when functions.sh
-# does not provide backup_user_files.
-#
-# HARD-ACT-01: JSON escaping on manifest string fields.
-# HARD-ACT-03: removed the dead `[ ... ] && ...` tautology.
-# HARD-ACT-08: manifest is written only after >= 1 file copied.
-#
-# ACT-M3: Naming convention is `<ts>-manual-<pid>`. main.go
-# uses `<ts>-manual-<pid>-<rand4>` but passes an explicit
-# `dst_dir` to `backup_user_files`, so there is no conflict.
-# ------------------------------------------------------------
-_inline_backup_now() {
-    local src_dir="$MODDIR/proxy"
-    [ -d "$src_dir" ] || {
-        echo "❌ Source directory not found: $src_dir"
-        return 1
-    }
+# ============================================================
+# [6] Unified wrappers
+# ============================================================
+# Every mode calls the wrappers below, never the underlying
+# functions directly. This lets the mode-dispatch code read
+# identically regardless of whether functions.sh loaded.
+if [ "$FUNCTIONS_LOADED" = "1" ]; then
+    is_port_listening()  { is_port_open "$1" "${2:-tcp}"; }
+    get_port()           { get_webui_port "$1"; }
+    read_conf()          { read_conf "$1" "$2" "$3"; }
+    act_log()            { log_msg "$1"; }
 
-    mkdir -p "$PERSISTENT_BACKUP" 2>/dev/null || {
-        echo "❌ Cannot create backup directory"
-        return 1
-    }
-    # ACT-2 fix: apply chmod 0700 unconditionally (matches
-    # functions.sh:ensure_backup_dir after FSH-6). On /sdcard
-    # FUSE this is usually a no-op — the effective protection
-    # remains per-file chmod 0600 below.
-    chmod 0700 "$PERSISTENT_BACKUP" 2>/dev/null
-
-    local ts
-    ts=$(date +%Y%m%d-%H%M%S)
-    # ACT-5 fix: append `-$$` so the naming convention matches
-    # functions.sh:backup_user_files (after FSH-10) and so that
-    # two concurrent `--backup` invocations in the same second
-    # cannot collide.
-    local target="$PERSISTENT_BACKUP/$ts-manual-$$"
-
-    mkdir -p "$target" 2>/dev/null || {
-        echo "❌ Cannot create snapshot directory"
-        return 1
-    }
-
-    local count=0
-    local f
-    for f in $USER_FILES; do
-        if [ -f "$src_dir/$f" ] && [ -s "$src_dir/$f" ]; then
-            if cp -f "$src_dir/$f" "$target/$f" 2>/dev/null; then
-                if command -v restorecon >/dev/null 2>&1; then
-                    restorecon "$target/$f" 2>/dev/null || true
-                elif command -v chcon >/dev/null 2>&1; then
-                    chcon u:object_r:magisk_file:s0 "$target/$f" 2>/dev/null || true
-                fi
-                chmod 0600 "$target/$f" 2>/dev/null
-                count=$((count + 1))
-            fi
-        fi
-    done
-
-    # v1.2.0 FIX: fail if 0 files were copied (HARD-ACT-08).
-    if [ "$count" -eq 0 ]; then
-        echo "❌ No files copied (source may be empty)"
-        rm -rf "$target" 2>/dev/null
-        return 1
+    if command -v get_profile_memory_hint >/dev/null 2>&1; then
+        get_mem_hint()   { get_profile_memory_hint; }
+    else
+        get_mem_hint()   { printf "unknown"; }
     fi
 
-    # ACT-1 fix: write .manifest.json with the same shape as
-    # functions.sh:write_manifest. Fields:
-    #   version, timestamp, source, root_solution,
-    #   files_count, files[]
-    local manifest="$target/.manifest.json"
-    local files_json=""
-    local sha
-    for f in $USER_FILES; do
-        if [ -f "$target/$f" ]; then
-            sha=""
-            if command -v sha256sum >/dev/null 2>&1; then
-                sha=$(sha256sum "$target/$f" 2>/dev/null | awk '{print $1}')
-            fi
-            files_json="$files_json{\"name\":\"$f\",\"sha256\":\"$sha\"},"
-        fi
-    done
-    files_json="${files_json%,}"
-
-    # Root-solution detection (best-effort).
-    local root_sol="unknown"
-    if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
-        root_sol="kernelsu"
-    elif [ -n "${APATCH:-}" ] || [ -d "/data/adb/ap" ]; then
-        root_sol="apatch"
-    elif [ -n "${MAGISK_VER_CODE:-}" ] || [ -d "/data/adb/magisk" ]; then
-        root_sol="magisk"
+    if command -v backup_user_files >/dev/null 2>&1; then
+        do_backup_now()  { backup_user_files "$MODDIR/proxy"; }
+    else
+        do_backup_now()  { return 1; }
     fi
 
-    # HARD-ACT-01: JSON-escape the string fields.
-    local src_escaped version_escaped root_escaped
-    src_escaped=$(_act_json_escape "$src_dir")
-    version_escaped=$(_act_json_escape "$VERSION")
-    root_escaped=$(_act_json_escape "$root_sol")
-
-    cat > "$manifest" << EOF
-{
-  "version": "$version_escaped",
-  "timestamp": "$ts",
-  "source": "$src_escaped",
-  "root_solution": "$root_escaped",
-  "files_count": $count,
-  "files": [$files_json]
-}
-EOF
-
-    chmod 0600 "$manifest" 2>/dev/null
-
-    echo "✅ Backup created: $target ($count file(s))"
-    return 0
-}
-
-# ------------------------------------------------------------
-# _inline_rotate_backups (v1.2.0, refined in v1.3.0)
-# ------------------------------------------------------------
-# Fallback used by --backup if functions.sh does not provide
-# rotate_backups.
-#
-# v1.3.0 REFINEMENT (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT):
-#   • ROT-MANIFEST — a directory is treated as a snapshot iff
-#     it contains a `.manifest.json` file. Excludes
-#     `current/`, `txn-*/`, and `orphan-txn-*/` by name.
-#   • ROT-MTIME — candidates are sorted by mtime (numeric,
-#     descending, `sort -rn -k1,1`), not by lexicographic
-#     directory name. Robust against clock drift and manual
-#     renames.
-#   • ROT-PROTECT — two targets are preserved on top of the
-#     21-newest window:
-#       - the `.last_stable` target (recovery pointer);
-#       - the newest install snapshot (name matching
-#         `-v<digit>`, used by rollback).
-#
-#   These three semantics match the canonical
-#   `functions.sh:rotate_backups`. See CHANGELOG.md [v1.3.0]
-#   and docs/ARCHITECTURE.md §4.13.2.
-#
-# ACT-L6: emits a log line on success, matching
-# functions.sh:rotate_backups.
-#
-# ACT-V14-04 (v1.4.0): this doc-block was expanded to name the
-# three ROT-* identifiers explicitly. Previously it said only
-# "Matches the canonical version" without specifying which
-# semantic version of the canonical implementation, while the
-# inline comment inside the function body already said
-# `# v1.3.0 — Professional rotation (parity with functions.sh)`.
-# The doc-block and the inline comment are now consistent.
-# ------------------------------------------------------------
-_inline_rotate_backups() {
-    local keep="${1:-21}"
-
-    if ! echo "$keep" | grep -qE '^[0-9]+$'; then
-        keep=21
+    if command -v rotate_backups >/dev/null 2>&1; then
+        do_rotate_backups() { rotate_backups "${1:-21}"; }
+    else
+        do_rotate_backups() { return 0; }
     fi
 
-    [ -d "$PERSISTENT_BACKUP" ] || return 0
-    [ -r "$PERSISTENT_BACKUP" ] || return 0
-
-    # v1.3.0 — Professional rotation (parity with functions.sh)
-    #   ROT-MANIFEST: detect by .manifest.json presence.
-    #   ROT-MTIME:    order by mtime, descending.
-    #   ROT-PROTECT:  preserve .last_stable target + newest install.
-    local _protected=""
-    if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
-        _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
+    if command -v cleanup_orphans >/dev/null 2>&1; then
+        do_cleanup_orphans() { cleanup_orphans; }
+    else
+        do_cleanup_orphans() { return 0; }
     fi
 
-    local _list
-    _list=$(
-        cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
-        for _d in */; do
-            _d="${_d%/}"
-            [ -d "$_d" ] || continue
-            case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
-            esac
-            [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
-                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
-                || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1
-    )
-
-    [ -z "$_list" ] && return 0
-
-    local total
-    total=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
-
-    if [ "$total" -le "$keep" ]; then
-        return 0
+    if command -v start_native_webui >/dev/null 2>&1; then
+        do_start_webui() { start_native_webui "$1" "$2"; }
+    else
+        do_start_webui() { _inline_start_webui "$1" "$2"; }
     fi
 
-    local to_remove=$((total - keep))
-    local _newest_install
-    _newest_install=$(
-        printf '%s\n' "$_list" | \
-        grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | \
-        head -n1 | \
-        awk '{print $2}'
-    )
+    if command -v is_dnscrypt_running >/dev/null 2>&1; then
+        do_is_dns_running() { is_dnscrypt_running; }
+    else
+        do_is_dns_running() { pgrep -x dnscrypt-proxy >/dev/null 2>&1; }
+    fi
 
-    local _mt _name
-    while IFS=' ' read -r _mt _name; do
-        [ -z "$_name" ] && continue
-        [ "$_name" = "$_protected" ] && continue
-        [ "$_name" = "$_newest_install" ] && continue
-        rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null
-    done <<EOF
-$(printf '%s\n' "$_list" | tail -n "$to_remove")
-EOF
+    backup_summary()     { _inline_backup_summary; }
+else
+    _FB_RUN_DIR=$(_fallback_get_run_dir)
+    WEBUI_PID_FILE="$_FB_RUN_DIR/webui.pid"
+    WATCHDOG_PID_FILE="$_FB_RUN_DIR/watchdog.pid"
+    STATUS_FILE="$_FB_RUN_DIR/dnscrypt.status"
 
-    log_msg "✅ rotate_backups (inline): done"
-    return 0
-}
+    is_port_listening()  { _inline_is_port_open "$1" "${2:-tcp}"; }
+    get_port()           { _inline_get_port "$1"; }
+    read_conf()          { _inline_read_conf "$1" "$2" "$3"; }
+    act_log()            { log_msg_fallback "$1"; }
+    get_mem_hint()       { printf "unknown (functions.sh not loaded)"; }
+    do_backup_now()      { return 1; }
+    do_rotate_backups()  { return 0; }
+    do_cleanup_orphans() { return 0; }
+    do_start_webui()     { _inline_start_webui "$1" "$2"; }
+    do_is_dns_running()  { pgrep -x dnscrypt-proxy >/dev/null 2>&1; }
+    backup_summary()     { _inline_backup_summary; }
+fi
 
 # ============================================================
-# [6] Display help
+# [7] show_help
 # ============================================================
+# Defined BEFORE the argument parser (section [8]) so that
+# `action.sh --help` works in mksh / busybox ash. The previous
+# revision defined show_help AFTER the parser, so the
+# `--help|-h` branch called an undefined function.
 show_help() {
     cat << EOF
 DNSCrypt Smart Filter – action.sh ${VERSION}
@@ -861,15 +449,13 @@ Usage:
   action.sh                Start WebUI and open browser
   action.sh --restart      Force restart WebUI
   action.sh --status       Show WebUI status only
-  action.sh --check        Comprehensive status: DNS + WebUI +
-                             config + profile/memory + backup/recovery
-  action.sh --diagnose     Run full diagnostic report (delegates to
-                             status.sh --diagnose)
+  action.sh --check        Comprehensive status
+  action.sh --diagnose     Full diagnostic report
   action.sh --backup       Trigger an immediate manual backup
   action.sh --help         Show this help
 
 Exit codes:
-  0 = success (also used by --check, which is informational only)
+  0 = success
   1 = error (startup failed)
   2 = module disabled
   3 = backup failed (--backup only)
@@ -879,71 +465,15 @@ EOF
 }
 
 # ============================================================
-# [7] Load functions.sh
+# [8] Parse command-line arguments
 # ============================================================
-FUNCTIONS_LOADED=0
-if [ -f "$MODDIR/functions.sh" ]; then
-    # shellcheck disable=SC1090
-    . "$MODDIR/functions.sh" 2>/dev/null
-    if command -v is_port_open >/dev/null 2>&1 \
-       && command -v get_webui_port >/dev/null 2>&1; then
-        FUNCTIONS_LOADED=1
-
-        if command -v init_runtime_paths >/dev/null 2>&1; then
-            init_runtime_paths
-        fi
-    fi
-fi
-
-# ============================================================
-# [8] Unified wrappers
-# ============================================================
-if [ "$FUNCTIONS_LOADED" = "1" ]; then
-    is_port_listening()  { is_port_open "$1" "${2:-tcp}"; }
-    get_port()           { get_webui_port "$1"; }
-    read_conf()          { get_conf_value "$1" "$2" "$3"; }
-
-    # v1.1.0 — memory hint wrapper
-    if command -v get_profile_memory_hint >/dev/null 2>&1; then
-        get_mem_hint()   { get_profile_memory_hint; }
-    else
-        get_mem_hint()   { _inline_get_profile_memory_hint; }
-    fi
-
-    # v1.2.0 — backup wrappers
-    if command -v backup_user_files >/dev/null 2>&1; then
-        do_backup_now()  { backup_user_files "$MODDIR/proxy"; }
-    else
-        do_backup_now()  { _inline_backup_now; }
-    fi
-
-    if command -v rotate_backups >/dev/null 2>&1; then
-        do_rotate_backups() { rotate_backups "${1:-21}"; }
-    else
-        do_rotate_backups() { _inline_rotate_backups "${1:-21}"; }
-    fi
-
-    # ACT-V14-03: always use the inline summary — it now uses
-    # the same v1.3.0 detection as the rotation function.
-    backup_summary()     { _inline_backup_summary; }
-else
-    _FB_RUN_DIR=$(_fallback_get_run_dir)
-    WEBUI_PID_FILE="$_FB_RUN_DIR/webui.pid"
-    WATCHDOG_PID_FILE="$_FB_RUN_DIR/watchdog.pid"
-    STATUS_FILE="$_FB_RUN_DIR/dnscrypt.status"
-
-    is_port_listening()  { _inline_is_port_open "$1" "${2:-tcp}"; }
-    get_port()           { _inline_read_port "$1" "PORT" "9090"; }
-    read_conf()          { _inline_read_conf "$1" "$2" "$3"; }
-    get_mem_hint()       { _inline_get_profile_memory_hint; }
-    do_backup_now()      { _inline_backup_now; }
-    do_rotate_backups()  { _inline_rotate_backups "${1:-21}"; }
-    backup_summary()     { _inline_backup_summary; }
-fi
-
-# ============================================================
-# [9] Parse command-line arguments
-# ============================================================
+# --restart is a MODIFIER on the default mode, not a mode in
+# itself. It has no effect when combined with any of the four
+# explicit modes.
+#
+# Unknown options are a hard error (exit 1) with a clear
+# message. A typo like `--restat` must not silently fall
+# through to the default "start WebUI" path.
 FORCE_RESTART=0
 STATUS_ONLY=0
 CHECK_MODE=0
@@ -967,20 +497,24 @@ for arg in "$@"; do
 done
 
 # ============================================================
-# [10] Configure paths
+# [9] Configure paths
 # ============================================================
+# BIN_DIR is the module's proxy/ subdirectory.
+# PORT is resolved via the Port Guard (rejects 8080).
 BIN_DIR="$MODDIR/proxy"
 WEBUI="$BIN_DIR/dnscrypt-webui"
 CONF_FILE="$BIN_DIR/webui.conf"
-# shellcheck disable=SC2034
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 
 PORT=$(get_port "$CONF_FILE" 2>/dev/null)
 [ -z "$PORT" ] && PORT="9090"
 
 # ============================================================
-# [11] Path 1: status only (--status)
+# [10] Path 1: status only (--status)
 # ============================================================
+# Exit codes:
+#   0 — WebUI is listening
+#   1 — WebUI is not listening
 if [ "$STATUS_ONLY" = "1" ]; then
     if is_port_listening "$PORT" tcp; then
         printf "✅ WebUI is RUNNING on port %s\n" "$PORT"
@@ -992,13 +526,14 @@ if [ "$STATUS_ONLY" = "1" ]; then
 fi
 
 # ============================================================
-# [12] Path 2: v1.2.0 — diagnose mode (--diagnose)
+# [11] Path 2: diagnose mode (--diagnose)
 # ============================================================
-# Delegates to status.sh --diagnose, which produces a full
-# report (system info, user data files, backups, health).
+# Delegates to status.sh --diagnose. Three-tier resolution:
+#   1. Executable → exec directly (kernel resolves shebang).
+#   2. Exists but not executable → chmod 0755 then exec.
+#   3. Both fail (read-only FS) → exec sh "$STATUS_SCRIPT".
 #
-# ACT-3: honors the script's shebang when possible.
-# ============================================================
+# A missing status.sh degrades gracefully to --check.
 if [ "$DIAGNOSE_MODE" = "1" ]; then
     STATUS_SCRIPT="$MODDIR/status.sh"
 
@@ -1010,37 +545,42 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
         if [ -x "$STATUS_SCRIPT" ]; then
             exec "$STATUS_SCRIPT" --diagnose
         else
-            # Fallback: read-only fs or chmod failed
             exec sh "$STATUS_SCRIPT" --diagnose
         fi
     else
         echo "⚠️ status.sh not found — falling back to --check mode"
         echo "   Expected at: $STATUS_SCRIPT"
         echo ""
-        # Fall through to check mode by continuing below
         CHECK_MODE=1
     fi
 fi
 
 # ============================================================
-# [13] Path 3: v1.2.0 — backup mode (--backup)
+# [12] Path 3: backup mode (--backup)
 # ============================================================
-# Triggers an immediate manual backup. Independent from the
-# periodic auto-backup in service.sh.
+# Triggers an immediate manual backup. Requires functions.sh.
+# When it is not loaded, the mode fails cleanly (exit 3)
+# rather than running a duplicate of backup_user_files.
 #
-# Uses functions.sh:backup_user_files when available; otherwise
-# the inline fallback (_inline_backup_now).
-#
-# Rotates after successful backup, matching service.sh.
-#
-# HARD-ACT-04: normalized stdout confirmation on both paths.
-# ============================================================
+# Exit codes:
+#   0 — backup succeeded
+#   3 — backup failed (source missing, disk full, 0 files copied)
 if [ "$BACKUP_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
     echo "║  💾 DNSCrypt – Manual Backup                 ║"
     echo "╚══════════════════════════════════════════════╝"
     echo ""
+
+    if [ "$FUNCTIONS_LOADED" != "1" ]; then
+        echo "❌ Cannot run --backup: functions.sh is not loaded."
+        echo "   The backup layer is unavailable in this state."
+        echo "   Reinstall the module or run:"
+        echo "     su -c \"sh $MODDIR/status.sh --diagnose\""
+        echo ""
+        act_log "--backup failed: functions.sh not loaded"
+        exit 3
+    fi
 
     if [ ! -d "$BIN_DIR" ]; then
         echo "❌ Module directory not found: $BIN_DIR"
@@ -1053,59 +593,29 @@ if [ "$BACKUP_MODE" = "1" ]; then
     echo ""
 
     if do_backup_now; then
-        # Rotate to keep the total bounded (v1.2.0 FIX)
         do_rotate_backups 21 >/dev/null 2>&1 || true
 
-        # HARD-ACT-04: print the confirmation explicitly so the
-        # user sees the same message whether the fallback path
-        # or functions.sh:backup_user_files handled the backup.
         echo ""
         echo "  ✅ Backup completed successfully."
         echo ""
         echo "  Current backup state:"
         echo "    $(backup_summary)"
         echo ""
-        log_msg "--backup completed successfully"
+        act_log "--backup completed successfully"
         exit 0
     else
         echo ""
         echo "  ❌ Backup failed. See message above."
-        log_msg "--backup failed"
+        act_log "--backup failed"
         exit 3
     fi
 fi
 
 # ============================================================
-# [14] Path 4: comprehensive check (--check)
+# [13] Path 4: comprehensive check (--check)
 # ============================================================
-# v1.1.0:
-#   • Structured sections (Service, Runtime, Config, Profile)
-#   • Includes the expected memory limit for the active profile
-#   • English-only output
-#
-# v1.2.0:
-#   • New "Backup & Recovery" section showing:
-#       - Snapshot count
-#       - In-flight transactions (txn-*)
-#       - Orphan transactions (orphan-txn-*)
-#       - .last_stable pointer
-#       - Auto-backup marker age
-#       - Recovery mode state
-#       - Pending notification content
-#
-# ACT-L2: `_txn_count` and `_orphan_count` now go through a
-#         numeric-validation guard before being printed.
-# ACT-L3: `--check` prefers `is_dnscrypt_running` when
-#         available (already implemented, fallback documented).
-#
-# ACT-V14-03 (v1.4.0): the `_snap_count` computation now uses
-# the shared `_inline_list_snapshots` helper, which uses the
-# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
-# sort (SNAP-MTIME). Before this fix, the block used the
-# v1.2.0 name-pattern detection (`^[0-9]{8}-[0-9]{6}-`),
-# disagreeing with `_inline_rotate_backups` and with
-# `_inline_backup_summary` for custom-named snapshots.
-# ============================================================
+# Emits a multi-section status report. Exit code: ALWAYS 0
+# (informational only).
 if [ "$CHECK_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
@@ -1114,28 +624,17 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 1: Services ---
-    echo "─── Service Status ─────────────────────────"
+    echo "─── Service Status ────────────────────────"
     if is_port_listening "$PORT" tcp; then
         printf "  🟢 WebUI    : Running on port %s\n" "$PORT"
     else
         printf "  🔴 WebUI    : Stopped\n"
     fi
 
-    # --- DNS Engine ---
-    # ACT-L3: Prefer is_dnscrypt_running (port + process check)
-    # when functions.sh is loaded. Fallback to pgrep otherwise.
-    if [ "$FUNCTIONS_LOADED" = "1" ] && command -v is_dnscrypt_running >/dev/null 2>&1; then
-        if is_dnscrypt_running; then
-            printf "  🟢 DNS      : Running on 5354/UDP\n"
-        else
-            printf "  🔴 DNS      : Stopped\n"
-        fi
+    if do_is_dns_running; then
+        printf "  🟢 DNS      : Running on 5354/UDP\n"
     else
-        if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
-            printf "  🟢 DNS      : Running (process exists)\n"
-        else
-            printf "  🔴 DNS      : Stopped\n"
-        fi
+        printf "  🔴 DNS      : Stopped\n"
     fi
 
     # --- Watchdog ---
@@ -1144,7 +643,7 @@ if [ "$CHECK_MODE" = "1" ]; then
         if [ -n "$wd_pid" ] && kill -0 "$wd_pid" 2>/dev/null; then
             wd_comm=$(cat "/proc/$wd_pid/comm" 2>/dev/null)
             case "$wd_comm" in
-                sh|ash|bash|busybox|*sh)
+                sh|ash|bash|mksh|busybox|*sh)
                     printf "  🐕 Watchdog : Running (PID: %s)\n" "$wd_pid"
                     ;;
                 *)
@@ -1158,14 +657,13 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 2: Runtime ---
-    echo "─── Runtime ────────────────────────────────"
+    echo "--- Runtime --------------------------------"
     if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
         printf "  📁 run/     : %s\n" "$RUN_DIR_ACTIVE"
     else
         printf "  📁 run/     : %s\n" "$(dirname "$WEBUI_PID_FILE")"
     fi
 
-    # STATUS_FILE = user intent (may differ from actual state)
     if [ -f "$STATUS_FILE" ]; then
         st=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
         printf "  📄 Intent   : %s (user intent)\n" "${st:-UNKNOWN}"
@@ -1173,7 +671,6 @@ if [ "$CHECK_MODE" = "1" ]; then
         printf "  📄 Intent   : (no file)\n"
     fi
 
-    # Version + functions.sh
     printf "  🏷️  Version  : %s\n" "$VERSION"
     if [ "$FUNCTIONS_LOADED" = "1" ]; then
         printf "  📚 functions: ✅ loaded\n"
@@ -1183,24 +680,22 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 3: Configuration ---
-    echo "─── Configuration ──────────────────────────"
+    echo "--- Configuration --------------------------"
     DASH_PORT=$(read_conf "$CONF_FILE" "DASHBOARD_PORT" "9091")
     printf "  🌐 WebUI port    : %s\n" "$PORT"
-    printf "  📊 Dashboard port: %s\n" "$DASH_PORT"
+    printf "  📈 Dashboard port: %s\n" "$DASH_PORT"
 
-    # Auto-restart config
     AUTO_DNS=$(read_conf "$CONF_FILE" "AUTO_RESTART_DNS" "1")
     AUTO_WEBUI=$(read_conf "$CONF_FILE" "AUTO_RESTART_WEBUI" "1")
     printf "  🔄 Auto-DNS      : %s\n" "$([ "$AUTO_DNS" = "1" ] && echo "enabled" || echo "disabled")"
     printf "  🔄 Auto-WebUI    : %s\n" "$([ "$AUTO_WEBUI" = "1" ] && echo "enabled" || echo "disabled")"
 
-    # BIND_ADDR
     BIND_ADDR=$(read_conf "$CONF_FILE" "BIND_ADDR" "127.0.0.1")
     printf "  🔌 BIND_ADDR     : %s\n" "$BIND_ADDR"
     echo ""
 
-    # --- Section 4: Profile + Memory (v1.1.0) ---
-    echo "─── Profile & Memory ───────────────────────"
+    # --- Section 4: Profile + Memory ---
+    echo "--- Profile & Memory -----------------------"
     ACTIVE_PROFILE="pro"
     if [ -f "$SELECTED_PROFILE_FILE" ]; then
         _ap=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -1217,17 +712,15 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  ℹ️  Managed by    : main.go (Go runtime soft limit)\n"
     echo ""
 
-    # --- Section 5: Backup & Recovery (v1.2.0) ---
-    echo "─── Backup & Recovery ──────────────────────"
+    # --- Section 5: Backup & Recovery ---
+    echo "--- Backup & Recovery ----------------------"
 
-    # ACT-V14-03: snapshot count via the shared v1.3.0 helper.
     _snap_count=0
     if [ -d "$PERSISTENT_BACKUP" ]; then
         _snap_count=$(_inline_list_snapshots | wc -l | tr -d ' ')
         [ -z "$_snap_count" ] && _snap_count=0
     fi
 
-    # In-flight transactions
     _txn_count=0
     if [ -d "$PERSISTENT_BACKUP" ]; then
         _txn_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -1236,7 +729,6 @@ if [ "$CHECK_MODE" = "1" ]; then
         case "$_txn_count" in ''|*[!0-9]*) _txn_count=0 ;; esac
     fi
 
-    # Orphan transactions
     _orphan_count=0
     if [ -d "$PERSISTENT_BACKUP" ]; then
         _orphan_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -1249,17 +741,14 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  📁 Path          : %s\n" "$PERSISTENT_BACKUP"
     printf "  📸 Snapshots     : %s\n" "$_snap_count"
 
-    # In-flight transactions (informational)
     if [ "$_txn_count" -gt 0 ]; then
         printf "  ⏳ In-flight txn : %s (install in progress or interrupted)\n" "$_txn_count"
     fi
 
-    # Orphan transactions (informational)
     if [ "$_orphan_count" -gt 0 ]; then
         printf "  🗃️  Orphan txn    : %s (preserved from interrupted install)\n" "$_orphan_count"
     fi
 
-    # .last_stable pointer
     if [ -f "$LAST_STABLE_FILE" ]; then
         _ls=$(cat "$LAST_STABLE_FILE" 2>/dev/null | tr -d '\r\n ')
         if [ -n "$_ls" ]; then
@@ -1267,7 +756,6 @@ if [ "$CHECK_MODE" = "1" ]; then
         fi
     fi
 
-    # Auto-backup marker age
     if [ -f "$LAST_AUTO_BACKUP_MARKER" ]; then
         _auto_mtime=$(stat -c %Y "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
             || _auto_mtime=$(stat -f %m "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
@@ -1293,12 +781,10 @@ if [ "$CHECK_MODE" = "1" ]; then
         fi
     fi
 
-    # Recovery mode state
     if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
         printf "  🚨 Recovery mode : TRIGGER PRESENT — next install will restore\n"
     fi
 
-    # Pending notification
     if [ -f "$PENDING_NOTIFY_FILE" ]; then
         _pn=$(cat "$PENDING_NOTIFY_FILE" 2>/dev/null | tr -d '\r\n ')
         if [ -n "$_pn" ]; then
@@ -1309,13 +795,12 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  ℹ️  Recovery      : touch %s/recovery && reboot\n" "$MODDIR"
     echo ""
 
-    # --- Module disabled? ---
+    # --- Section 6: Final ---
     if [ -f "$MODDIR/disable" ]; then
         printf "  ⚠️  Module        : DISABLED (remove 'disable' file to enable)\n"
         echo ""
     fi
 
-    # --- Credentials ---
     if [ -f "$CRED_FILE" ]; then
         printf "  🔐 Credentials   : available\n"
     else
@@ -1330,125 +815,122 @@ if [ "$CHECK_MODE" = "1" ]; then
 fi
 
 # ============================================================
-# [15] Refuse to start if module is disabled
+# [14] Refuse to start if module is disabled
 # ============================================================
+# Exit code 2 distinguishes this from the generic startup
+# failure (exit 1) — a caller can tell "module disabled" from
+# "WebUI failed to start".
 if [ -f "$MODDIR/disable" ]; then
-    log_msg "Module is disabled, cannot start WebUI"
+    act_log "Module is disabled, cannot start WebUI"
     printf "⚠️  Module is disabled.\n"
     printf "Enable it first from Magisk/KernelSU.\n"
     exit 2
 fi
 
 # ============================================================
-# [16] Verify WebUI binary exists
+# [15] Verify WebUI binary exists
 # ============================================================
 if [ ! -f "$WEBUI" ]; then
-    log_msg "WebUI binary not found at $WEBUI"
+    act_log "WebUI binary not found at $WEBUI"
     printf "❌ WebUI binary not found.\n"
     printf "Try reinstalling the module.\n"
     exit 1
 fi
 
 # ============================================================
-# [17] Start WebUI (if needed)
+# [16] Start WebUI (if needed)
 # ============================================================
+# Two entry conditions decide whether a start is needed:
+#   1. --restart was passed       → always start.
+#   2. The WebUI port is closed   → start (first boot, or the
+#                                    process died).
+#
+# In every other case (WebUI running, no --restart), the
+# function prints "already running" and proceeds to [17] —
+# the browser-open still runs, because the user's intent was
+# "open the WebUI" not just "start the WebUI".
 STARTED_NOW=0
 
 if [ "$FORCE_RESTART" = "1" ]; then
-    log_msg "--restart flag detected, forcing WebUI restart"
+    act_log "--restart flag detected, forcing WebUI restart"
     printf "🔄 Restarting WebUI...\n"
     STARTED_NOW=1
 elif ! is_port_listening "$PORT" tcp; then
-    log_msg "WebUI not running, starting..."
+    act_log "WebUI not running, starting..."
     printf "▶️  Starting WebUI...\n"
     STARTED_NOW=1
 fi
 
 if [ "$STARTED_NOW" = "1" ]; then
-    if [ "$FUNCTIONS_LOADED" = "1" ] && command -v cleanup_orphans >/dev/null 2>&1; then
-        cleanup_orphans 2>/dev/null
-    fi
+    if [ "$FUNCTIONS_LOADED" = "1" ]; then
+        do_cleanup_orphans 2>/dev/null
 
-    if [ "$FUNCTIONS_LOADED" = "1" ] && command -v start_native_webui >/dev/null 2>&1; then
-        if ! start_native_webui "$WEBUI" "$PORT"; then
-            log_msg "start_native_webui returned failure"
+        if ! do_start_webui "$WEBUI" "$PORT"; then
+            act_log "start_native_webui returned failure"
             printf "❌ Failed to start WebUI.\n"
             printf "Check /data/local/tmp/dnscrypt_main.log\n"
             exit 1
         fi
     else
-        # ---------- Fallback internal start ----------
-        log_msg "functions.sh unavailable, using inline fallback"
+        act_log "functions.sh unavailable, using inline fallback"
 
-        pkill -9 -x dnscrypt-webui 2>/dev/null
-        rm -f "$WEBUI_PID_FILE" 2>/dev/null
-
-        export HOME=/data/local/tmp
-
-        if command -v setsid >/dev/null 2>&1; then
-            setsid env HOME="$HOME" "$WEBUI" >/dev/null 2>&1 < /dev/null &
-        else
-            nohup env HOME="$HOME" "$WEBUI" >/dev/null 2>&1 < /dev/null &
-        fi
-
-        # ACT-L1: Renamed from `local_pid` to `_act_pid`
-        # (no `local` keyword at top level).
-        sleep 1
-        _act_pid=$(pgrep -x "dnscrypt-webui" 2>/dev/null | head -n1)
-        if [ -n "$_act_pid" ]; then
-            printf "%s\n" "$_act_pid" > "${WEBUI_PID_FILE}.tmp" 2>/dev/null
-            mv -f "${WEBUI_PID_FILE}.tmp" "$WEBUI_PID_FILE" 2>/dev/null
-        fi
-
-        # Wait for the port to open (max 20s)
-        # ACT-L1: Renamed from `local_i` to `_act_i`.
-        _act_i=0
-        while [ "$_act_i" -lt 20 ]; do
-            if is_port_listening "$PORT" tcp; then
-                break
-            fi
-            sleep 1
-            _act_i=$((_act_i + 1))
-        done
-
-        if ! is_port_listening "$PORT" tcp; then
-            log_msg "fallback start failed (timeout)"
+        if ! _inline_start_webui "$WEBUI" "$PORT"; then
+            act_log "fallback start failed (timeout)"
             printf "❌ WebUI failed to start (timeout).\n"
             exit 1
         fi
     fi
 
-    log_msg "WebUI started on port $PORT"
+    act_log "WebUI started on port $PORT"
     printf "✅ WebUI started on port %s\n" "$PORT"
 else
-    log_msg "WebUI already running on port $PORT"
+    act_log "WebUI already running on port $PORT"
     printf "ℹ️  WebUI is already running on port %s\n" "$PORT"
 fi
 
+# One-second delay when we actually started the WebUI. Lets
+# the SSE / HTTP stack settle before the browser hits it.
 if [ "$STARTED_NOW" = "1" ]; then
     sleep 1
 fi
 
 # ============================================================
-# [18] Open browser (5 fallback methods + timeout)
+# [17] Open browser (5 fallback methods + timeout)
 # ============================================================
+# Launches the default browser at http://127.0.0.1:$PORT.
+# Five fallback methods are attempted in order; the first one
+# that succeeds exits the script with status 0.
+#
+# Try 5 race condition fix:
+#   On POSIX shells, a background job started with `&` inherits
+#   the parent's process group. When the parent calls `exit 0`,
+#   the kernel delivers SIGHUP to every process in that group.
+#   On some Android ROMs, this kills the `am` command before it
+#   can hand the intent to `system_server`, and the browser
+#   silently fails to open.
+#
+#   Two protections:
+#     (a) SUBSHELL ISOLATION — `( ... ) &` runs the child in a
+#         NEW process group, decoupled from the parent's group.
+#     (b) FORK GRACE PERIOD — a 0.3 s sleep before `exit 0`
+#         gives the subshell time to fork and reach exec().
 URL="http://127.0.0.1:$PORT"
 
-log_msg "Opening browser at $URL"
+act_log "Opening browser at $URL"
 printf "🌐 Opening: %s\n" "$URL"
 
-# --- Try 1: am start --user 0 -W (standard) ---
+# --- Try 1: am start --user 0 -W (standard, blocking) ---
 if timeout 5 am start --user 0 -W \
     -a android.intent.action.VIEW \
     -d "$URL" \
     --activity-clear-top \
     >/dev/null 2>&1; then
-    log_msg "Browser opened via am start (standard)"
+    act_log "Browser opened via am start (standard)"
     printf "✅ Browser opened.\n"
     exit 0
 fi
 
-log_msg "Standard am start failed, trying alternative methods..."
+act_log "Standard am start failed, trying alternative methods..."
 
 # --- Try 2: resolve-activity then explicit start ---
 DEFAULT_BROWSER=$(cmd package resolve-activity \
@@ -1463,7 +945,7 @@ if [ -n "$DEFAULT_BROWSER" ] && [ "$DEFAULT_BROWSER" != "No activity found" ]; t
         -d "$URL" \
         -n "$DEFAULT_BROWSER" \
         >/dev/null 2>&1; then
-        log_msg "Browser opened via explicit package: $DEFAULT_BROWSER"
+        act_log "Browser opened via explicit package: $DEFAULT_BROWSER"
         printf "✅ Browser opened.\n"
         exit 0
     fi
@@ -1474,7 +956,7 @@ if timeout 5 am start \
     -a android.intent.action.VIEW \
     -d "$URL" \
     >/dev/null 2>&1; then
-    log_msg "Browser opened via am start (no --user)"
+    act_log "Browser opened via am start (no --user)"
     printf "✅ Browser opened.\n"
     exit 0
 fi
@@ -1485,25 +967,24 @@ if timeout 5 am start \
     -a android.intent.action.VIEW \
     -d "$URL" \
     >/dev/null 2>&1; then
-    log_msg "Browser opened via am start (new task)"
+    act_log "Browser opened via am start (new task)"
     printf "✅ Browser opened.\n"
     exit 0
 fi
 
 # --- Try 5: fire-and-forget ---
-# HARD-ACT-05: explicit fire-and-forget. No exit-code check
-# is performed — the intent is best-effort. We do NOT wrap
-# this in an `if` because `if cmd &` always succeeds in POSIX
-# sh (the `&` backgrounds the command and the `if` reads the
-# exit status of the backgrounding, which is always 0).
-#
-# ACT-L5: Removed the unexplained `sleep 1` that followed
-# the asynchronous launch.
-timeout 5 am start \
-    -a android.intent.action.VIEW \
-    -d "$URL" \
-    >/dev/null 2>&1 &
+# No `if` check — `if cmd &` always succeeds in POSIX sh.
+# The subshell + sleep protects against SIGHUP.
+(
+    timeout 5 am start \
+        -a android.intent.action.VIEW \
+        -d "$URL" \
+        >/dev/null 2>&1
+) &
 
-log_msg "Browser opened via am start (async, no -W)"
+# Grace period for the subshell to fork and reach exec().
+sleep 0.3
+
+act_log "Browser opened via am start (async, no -W)"
 printf "✅ Browser opened (async).\n"
 exit 0

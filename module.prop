@@ -1,164 +1,27 @@
 # ============================================================
-# DNSCrypt Smart Filter – module.prop
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — module.prop
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Magisk / KernelSU / APatch module definition file.
-#
-#   Read by the root manager during install and update.
-#   The `versionCode` drives update detection:
-#     newer versionCode → the manager offers an update.
-#
-# Fields:
-#   id                — unique module identifier (a-z, 0-9, -, _)
-#   name              — human-readable name (shown in the manager)
-#   version           — SemVer string (matches VERSION file)
-#   versionCode       — monotonic integer (see formula below)
-#   author            — maintainer handle
-#   description       — long description (shown in the manager)
-#   updateJson        — URL to update.json (auto-update metadata)
-#   minMagiskVersion  — minimum root-manager version
-#   supportUrl        — issue tracker URL
-#   donateUrl         — empty; the project accepts no donations
+# Magisk / KernelSU / APatch module definition.
 #
 # versionCode formula:
-#   versionCode = MAJOR × 1,000,000
-#               + MINOR ×    10,000
-#               + PATCH ×       100
-#               + HOTFIX
+#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
+#   v1.5.0 → 1 × 1,000,000 + 5 × 10,000 + 0 = 1050000
 #
-#   For v1.4.0:
-#     MAJOR = 1, MINOR = 4, PATCH = 0, HOTFIX = 0
-#     → 1 × 1,000,000 + 4 × 10,000 + 0 × 100 + 0
-#     → 1,040,000
+# Managed by scripts/release.sh — do not edit manually.
 #
-#   Updated automatically by scripts/release.sh (and
-#   scripts/release-patch.sh for PATCH releases). Do not edit
-#   manually — the release script verifies the change and
-#   rejects a mismatched versionCode.
-#
-# ⚠️ Warning:
-#   Do NOT add spaces around `=`.
-#   Do NOT add a trailing comment on the same line as a value.
-#   The Magisk parser is strict about this.
-#
-# ⚠️ Language policy (Global edition):
-#   This file's comments are English-only (project convention).
-#   The WebUI itself is bilingual (English default + Arabic
-#   toggle) — the `langToggle` button is present in all three
-#   HTML pages (index.html, dashboard.html, offline.html), and
-#   the user's preference is stored client-side in
-#   localStorage['dnscrypt-lang']. See the description field
-#   below for the exact wording used in the module manager.
-#
-# ⚠️ versionCode history (for reference):
-#   v1.0.0 → 1000000
-#   v1.1.0 → 1010000
-#   v1.2.0 → 1020000
-#   v1.2.1 → 1020100  (not released)
-#   v1.3.0 → 1030000
-#   v1.4.0 → 1040000  (this release)
-#   v1.4.1 → 1040100  (next PATCH, if needed)
-#   v1.5.0 → 1050000  (next MINOR)
-#
-# ============================================================
-# v1.3.0 — Server-side refinements (documentation correction)
-# ============================================================
-#   The v1.3.0 release was originally documented as client-side
-#   only (PWA install button + live status LED + DNS auto-start
-#   fix). That description was incomplete: the release also
-#   shipped server-side refinements that were not documented in
-#   the module metadata. This revision corrects the record.
-#
-#   Server-side refinements shipped in v1.3.0:
-#     • main.go:buildBackupInfo() now detects snapshots by the
-#       presence of `.manifest.json` (SNAP-MANIFEST) instead of
-#       by name pattern, and sorts them by mtime for
-#       `last_backup_name` (SNAP-MTIME).
-#     • functions.sh:rotate_backups() was rewritten to use the
-#       same manifest-based detection (ROT-MANIFEST), the same
-#       mtime sort (ROT-MTIME), and to preserve two additional
-#       targets on top of the 21-newest window: the `.last_stable`
-#       recovery pointer and the newest install snapshot
-#       (ROT-PROTECT).
-#     • service.sh gained a boot-path DNS auto-start: a bounded
-#       wait for the WebUI to become ready (up to 60 s, checking
-#       the watchdog token file + the WebUI TCP port) followed by
-#       a direct POST /api/ensure_running_service with the
-#       X-Watchdog-Token header. This closes a boot race where
-#       the watchdog's 30 s initial backoff could leave DNS
-#       unavailable for minutes after boot.
-#
-#   The same refinements were applied in parallel to watchdog.sh
-#   (§[5b] snapshot counter), status.sh (_list_snapshots),
-#   customize.sh (rotate_backups), action.sh
-#   (_inline_rotate_backups + _inline_backup_summary), and
-#   uninstall.sh (§[5b] BACKUP_COUNT / BACKUP_LAST_NAME).
-#
-#   See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13
-#   for the full reference.
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration + MAIN-01
-# ============================================================
-#   • Optional companion Android app: `web/app-debug.apk` is
-#     bundled into the module ZIP as a build artifact (fetched
-#     from gasciljh/dnscrypt-proxy-app by scripts/fetch_app_apk.sh,
-#     staged by .github/workflows/release.yml). It is served by
-#     main.go at GET /app-debug.apk (mime:
-#     application/vnd.android.package-archive, Cache-Control:
-#     public, max-age=3600, immutable).
-#   • WebUI install button changed: the beforeinstallprompt
-#     chain introduced in v1.3.0 was REMOVED and replaced by a
-#     direct `<a download>` link pointing at /app-debug.apk.
-#     No browser-specific prompt logic, no beforeinstallprompt
-#     dependency, no unsupported-browser modal.
-#   • iOS PWA logic removed from web/index.html (Android-only
-#     project): isIOSDevice(), pwaStepIos1/2/3 translations,
-#     and the iOS branches in getBrowserName() /
-#     isBrowserSupported() / getPWAInstallSteps() /
-#     showPWAInstructionsModal().
-#   • CodeQL `go/path-injection` alerts closed in main.go
-#     (removeModule): sanitize via filepath.Base() + rebuild
-#     the final path via filepath.Join(MODULES_DIR, name).
-#     No user-controlled data reaches any path expression.
-#   • MAIN-01: LOG_LEVEL is loaded immediately after
-#     initPaths() in main.go, so every subsequent log call
-#     respects the user's configured level. Previously the load
-#     happened after readSelectedProfile() / applyMemoryLimit()
-#     / getWatchdogToken() / checkPendingNotifications() /
-#     cleanupOldTransactions() — those early log lines were
-#     always emitted at the default "info" level.
-#
-# Cross-references:
-#   • VERSION            — Single Source of Truth for the module
-#                          version (read by scripts/release.sh)
-#   • proxy/app-apk.version — Single Source of Truth for the
-#                          companion Android app version (v1.4.0)
-#   • update.json        — auto-update metadata (referenced by
-#                          updateJson below)
-#   • CHANGELOG.md       — version history (v1.0.0 → v1.4.0)
-#   • docs/ARCHITECTURE.md §4.13
-#                        — v1.3.0 server-side refinements
-#   • docs/BACKUP.md     — backup system reference (v1.2.0)
-#   • docs/EMERGENCY.md  — emergency recovery guide (v1.2.0)
-#   • docs/DNS_BINARIES.md
-#                        — DNS binaries management (Level 4)
-#   • docs/UPGRADE.md    — version upgrade guide
-#   • docs/API.md §6.1.7 — runtime_info schema (7-field backups)
-#   • docs/COMPATIBILITY.md
-#                        — compatibility matrix (v1.4.0)
+# ⚠️ No spaces around `=`. No trailing comments on value lines.
 # ============================================================
 
 id=dnscrypt-proxy-webui
 name=DNSCrypt Proxy (Smart Filter)
-version=v1.4.0
-versionCode=1040000
+version=v1.5.0
+versionCode=1050000
 author=gasciljh
-description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile blocklists (HaGeZi Light → Ultimate), wildcard-aware Custom Rules, bilingual WebUI (EN/AR), JSON metrics Dashboard, atomic writes, conflict detection, Watchdog with auto-restart, nftables/iptables chains, installable PWA. v1.2.0 added 10-layer user-data preservation: multi-source detection, persistent backup in /sdcard/dnscrypt-webui-backup, SHA256 verification, transactional upgrades with auto-rollback, recovery mode, SELinux preservation, auto-backup rotation (max 21 copies), upgrade history log, and a CLI diagnose tool. v1.3.0 added a smart dynamic PWA install button and a live status LED, fixed DNS auto-start after boot, and refined backup rotation on the server side (manifest-based snapshot detection, mtime sort, protected .last_stable + newest install targets). v1.4.0 integrates an optional companion Android app (fetched separately from gasciljh/dnscrypt-proxy-app), replaces the beforeinstallprompt chain with a direct download link, hardens removeModule against CodeQL path-injection, removes iOS-specific PWA logic (Android-only project), and loads LOG_LEVEL earlier in main.go (MAIN-01). Zero telemetry.
+description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile HaGeZi blocklists (Light→Ultimate), bilingual WebUI (EN/AR), JSON metrics Dashboard, installable PWA, 10-layer user-data preservation with transactional upgrades and recovery mode. v1.5.0 adds one-tap root install for the optional companion Android app. Zero telemetry.
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json
 minMagiskVersion=20400
 supportUrl=https://github.com/gasciljh/dnscrypt-proxy-webui/issues

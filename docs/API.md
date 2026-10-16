@@ -2,254 +2,63 @@
 
 Complete reference for the HTTP API used to control the module programmatically.
 
-**Version**: v1.4.0
+**Version**: v1.5.0
 **Base URL (WebUI)**: `http://127.0.0.1:9090`
 **Base URL (Dashboard)**: `http://127.0.0.1:9091`
-**Last updated**: 2026-10-08
+**Last updated**: 2026-10-15
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
-> **v1.4.0 changes**:
+> **v1.5.0 changes**:
+>   • Version bumped from v1.4.0 to v1.5.0.
+>   • **Companion app one-tap install** — four new endpoints:
+>       - `POST /api/install_companion_app` — root install via
+>         `proxy/install_app.sh` (5-level `pm install` cascade).
+>         CSRF token required, per-IP rate limit (5 failed
+>         attempts / 15 min).
+>       - `POST /api/uninstall_companion_app` — reserved for
+>         future UI.
+>       - `GET /api?action=install_token` — one-shot CSRF token
+>         (60-second TTL) for the install flow. **Localhost-only**.
+>       - `GET /api?action=companion_app_state` — cached install
+>         state (30-second TTL).
+>   • **Install-method modal (IDX-24)** — the WebUI confirm modal
+>     offers **three actions across two categories** (local root
+>     install + open GitHub page + direct APK download).
+>   • **Install timeout raised** — the WebUI's
+>     `getTimeoutForUrl()` returns 120 s for
+>     `install_companion_app`. The server-side `INSTALL_TIMEOUT`
+>     in `main.go` §[3b] is 90 s. `HTTP_WRITE_TIMEOUT` is 150 s.
+>   • **Retry policy** — the WebUI disables retries for
+>     `install_companion_app` (`retries = 0`).
+>   • **Compatibility**: All v1.4.0 clients continue to work
+>     without modification. All v1.5.0 changes are additive.
+>   • **Post-release patches**: the `install_token` endpoint is
+>     now gated to localhost (see §1.1). `HTTP_WRITE_TIMEOUT` was
+>     raised from 60 s to 150 s to prevent client resets on slow
+>     installs.
+
+> **v1.4.0 changes** (historical):
 >   • Version bumped from v1.3.0 to v1.4.0.
->   • **New static route**: `GET /app-debug.apk` — serves the
->     optional companion Android app APK. Returns 404 when the
->     file is absent. Mime type:
->     `application/vnd.android.package-archive`. Cache-Control:
->     `public, max-age=3600, immutable`.
+>   • **New static route**: `GET /app-debug.apk`.
 >   • **`POST /api/remove_module` hardened** against CodeQL
->     `go/path-injection` — the caller-provided path is now
->     sanitized via `filepath.Base()` and rebuilt from the trusted
->     `MODULES_DIR` constant. No user-controlled data reaches any
->     path expression. Two CodeQL alerts closed.
->   • **Companion Android app integration** — a signed APK from
->     [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
->     is now bundled into the module ZIP as an **optional** asset
->     (`web/app-debug.apk`). The WebUI install button is a plain
->     `<a download>` link.
->   • **iOS PWA logic removed** — Android-only project. No API
->     impact.
->   • **Compatibility**: All v1.3.0 clients continue to work
->     without modification. All v1.4.0 changes are additive.
+>     `go/path-injection`.
+>   • **Companion Android app integration**.
 
-> **v1.3.0 changes**:
->   • Version bumped from v1.2.0 to v1.3.0.
->   • **PWA install button** (WebUI) — dynamic, always-visible,
->     browser-aware. **No API impact** — this is a client-side
->     feature.
->   • **Live status LED** on the Today counter (WebUI) — client-side
->     only.
->   • **`service.sh` DNS auto-start fix** — the boot path now calls
->     `POST /api/ensure_running_service` directly. This is the same
->     endpoint documented in §6.2.13. No API contract change.
+> **v1.3.0 changes** (historical):
+>   • **PWA install button** (WebUI).
+>   • **Live status LED** on the Today counter.
+>   • **`service.sh` DNS auto-start fix**.
 >   • **`runtime_info.backups` snapshot detection is now
->     manifest-based (SNAP-MANIFEST)** — `buildBackupInfo` counts a
->     directory as a snapshot **iff** it contains a
->     `.manifest.json` file. This is a change from v1.2.0, which
->     used a name-pattern match (`^[0-9]{8}-[0-9]{6}-`). Effect:
->     custom-named snapshots (e.g. `pre-v130-manual-...`) are now
->     visible to the API, so `runtime_info.backups.available` can
->     be **larger** than it would have been under v1.2.0 for the
->     same on-disk state.
->   • **`runtime_info.backups.last_backup_name` sort order
->     changed (SNAP-MTIME)** — `buildBackupInfo` now selects the
->     newest snapshot by **mtime** (with a name-based fallback when
->     `DirEntry.Info()` fails), not by lexicographic name. This
->     supersedes the v1.2.0 BUG-3 behavior — see §11 v1.2.0 and
->     §11 v1.3.0 for the full history. Both orderings produce the
->     same result for the standard snapshot naming convention
->     (`<YYYYMMDD>-<HHMMSS>-...`).
->   • **Server-side rotation semantics rewritten (ROT-MANIFEST +
->     ROT-MTIME + ROT-PROTECT)** — `functions.sh:rotate_backups`
->     was rewritten to use the same manifest-based detection, the
->     same mtime sort, and to preserve two additional targets on
->     top of the 21-newest window: the `.last_stable` recovery
->     pointer and the newest install snapshot (name matching
->     `-v<digit>`). **No API impact** — the rotation happens
->     entirely in the shell layer; the API only observes the
->     resulting snapshot list.
->   • **Compatibility**: All v1.2.0 clients continue to work
->     without modification. All v1.3.0 changes are additive, except
->     for the SNAP-MANIFEST change which can produce a **larger**
->     `backups.available` value for the same on-disk state (never
->     smaller — a directory without a manifest is now excluded, but
->     every snapshot produced by the shipped toolchain contains a
->     manifest).
+>     manifest-based (SNAP-MANIFEST)**.
 
-> **v1.2.0 changes**:
->   • Version bumped from v1.1.0 to v1.2.0.
->   • **Global edition — English default with Arabic toggle** —
->     the WebUI ships with English as the default language and an
->     in-page toggle to switch to Arabic. The `lang` field of
->     `manifest.json` defaults to `en` and `dir` to `ltr`; the
->     toggle switches them at runtime. Documentation remains
->     English-only. **No API break** — the language preference is
->     client-side only (`localStorage['dnscrypt-lang']`) and is
->     never transmitted to the server.
->   • `runtime_info.backups` now returns **seven** fields
->     (previously five):
->       `available`, `in_flight_txn`, `orphan_txn`,
->       `last_backup`, `last_backup_name`, `last_stable`,
->       `path`.
->     This aligns the JSON schema returned by `main.go` with
->     the one already produced by `status.sh --json` (see
->     §6.1.7 and §10.6).
+> **v1.2.0 changes** (historical):
+>   • **Global edition — English default with Arabic toggle**.
+>   • `runtime_info.backups` now returns **seven** fields.
 >   • **`POST /api/ensure_running_service` now requires the
->     `X-Watchdog-Token` header** (BUG-B fix). The v1.1.0
->     "localhost bypass" — which returned `true` unconditionally
->     for any localhost POST to that endpoint — was replaced by a
->     watchdog token stored at `$RUN_DIR/.watchdog_token` (mode
->     `0600`), generated by `customize.sh` §[19b] during install
->     (or lazily by `main.go` via `loadOrCreateWatchdogToken()`),
->     and verified using `subtle.ConstantTimeCompare`. See §2.8
->     and §6.2.13 for the full design. **This closes a CSRF
->     hole** that allowed any web page loaded in a browser on the
->     device to silently trigger a DNS service restart.
->   • `get_profile` unchanged in shape; still returns
->     `memory_limit_mb`.
+>     `X-Watchdog-Token` header**.
 >   • Five destructive endpoints now trigger a **pre-critical
->     backup** before writing:
->       - `POST /api/update_profile`
->       - `POST /api/save_allowlist`
->       - `POST /api/save_denylist`
->       - `POST /api/save_custom_rules`
->       - `POST /api/append_denylist`
->     The backup is best-effort (never blocks the operation).
->     See §6.2.3, §6.2.4, and §6.2.5.
->   • No new endpoints, no removed endpoints, no changed
->     request formats, no changed auth requirements **except**
->     the new `X-Watchdog-Token` requirement on
->     `ensure_running_service` documented above.
->   • All v1.0.0 and v1.1.0 clients continue to work without
->     modification. All changes are additive **except** the
->     watchdog-token requirement, which is a security hardening
->     of an endpoint that was previously bypassing authentication
->     entirely. See §2.8 for migration guidance.
->
-> **v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)**:
->   A pre-release audit of this file identified the following
->   issues. All of them are addressed in-place; no version bump.
->
->   🔧 API-1 — §5.1 (404 vs 405 table) showed the response body
->     for "Unknown action" and "Disallowed method" as
->     `{"error": "..."}`. The actual `handleAPI` responses use
->     `{"status": "error", "message": "..."}` for every code
->     path except `/readyz`. The table now matches the code.
->     `/readyz` is the sole endpoint that returns `{"error": ...}`
->     and its row is left unchanged.
->
->   🔧 API-2 — §10.6 claimed "Both paths return the same 7
->     fields" when comparing `runtime_info.backups` (API) with
->     `status.sh --json` `.backups` (shell). That statement was
->     incomplete: the shell tool adds TWO diagnostic-only fields
->     (`status` and `last_backup_age_seconds`), so its object has
->     NINE fields. The section now distinguishes the two shapes
->     explicitly and explains what to do if they diverge.
->
->   🔧 API-3 — §6.2.7 (`POST /api/append_denylist`) documented
->     only the "Processed N rules" response. The v1.2.0 post-audit
->     fix in `main.go` (BUG-A + BUG-E) made the handler return a
->     distinct `"No changes detected"` message when the on-disk
->     denylist already matches the request. Both branches are now
->     documented.
->
->   🔧 API-4 — §1.3 (Endpoint Map) and §6.1.7 listed only
->     `/api/runtime_info` (no trailing slash). The v1.2.0
->     post-audit fix in `main.go` (BUG-6) also registers
->     `/api/runtime_info/` with a trailing slash. Both variants
->     return the same JSON.
->
->   🔧 API-5 — §6.1.7 described the path-based form as the
->     "Alternative" to the query-string form, which was backwards.
->     Both forms are first-class; the doc now presents them as
->     equivalent entry points, listing both without implying a
->     preference.
->
->   🔧 API-6 — §8.4 JavaScript example used
->     `new EventSource('/events', { withCredentials: true })`,
->     but the note immediately below stated that the WebUI and
->     Dashboard removed `withCredentials` in v1.2.0. The example
->     now matches the shipped code (`new EventSource('/events')`)
->     and the note explains why the option is unnecessary for
->     same-origin requests.
->
->   🔧 API-7 — §6.2.13 documented the `ensure_running_service`
->     auth exemption as applying only to `127.0.0.1`. The
->     `isLocalRequest()` helper accepts three values:
->     `127.0.0.1`, `::1`, and `localhost`. The doc now lists all
->     three. **Note**: as of v1.2.0 the exemption also requires
->     a valid `X-Watchdog-Token` header (BUG-B fix) — see §2.8.
->
->   🔧 API-8 — §11 (Changelog → v1.2.0) listed only the API-level
->     additions (BAK-1, BAK-2). It did not mention the seven
->     post-audit fixes applied to `main.go` in the same release
->     window (BUG-1 .. BUG-6, N-1, N-4). The entry now lists them
->     as a distinct subsection so a reader can trace the full
->     v1.2.0 delta.
-
-> **v1.4.0 (Global Edition) — Additional hardening in this revision**:
->   • 🛡️ **API-V14-01** — `/app-debug.apk` is documented as
->     **optional**: the route returns HTTP 404 when the file is
->     absent. A missing APK does not break any other endpoint.
->   • 🛡️ **API-V14-02** — The `removeModule` CodeQL fix is
->     documented in §6.2.10 as a hardening change, not an API
->     contract change. The endpoint still returns the same JSON
->     shape for both success and error cases.
-
-> **v1.4.0 — POST-AUDIT FIXES (this revision)**:
->   A post-audit review of this file against the actual v1.3.0
->   code identified the following documentation gaps. All are
->   addressed in-place; no version bump.
->
->   🔧 **API-V14-03** — The v1.3.0 block above documented the
->     `last_backup_name` sort-order change (name → mtime,
->     SNAP-MTIME) but did NOT document the **SNAP-MANIFEST**
->     change to snapshot detection. Since v1.3.0,
->     `buildBackupInfo` counts a directory as a snapshot **iff**
->     it contains a `.manifest.json` file, not by name pattern.
->     This affects `runtime_info.backups.available` for any
->     backup directory that contains a custom-named snapshot
->     (e.g. created by a future `action.sh --backup` with a
->     different naming scheme). The v1.3.0 block above now
->     documents this explicitly, alongside the ROT-* rotation
->     semantics.
->
->   🔧 **API-V14-04** — §6.1.7's `backups.available` field
->     description said "Number of snapshots (excludes
->     `current/`, `txn-*`, `orphan-txn-*`)" without specifying
->     the detection rule. Since v1.3.0 the rule is
->     manifest-based (SNAP-MANIFEST). The field description now
->     states this explicitly.
->
->   🔧 **API-V14-05** — §11's v1.3.0 changelog entry listed only
->     the `last_backup_name` sort-order change (SNAP-MTIME). It
->     now also lists the SNAP-MANIFEST detection change, so a
->     reader comparing v1.2.0 and v1.3.0 behavior sees the full
->     picture.
->
->   🟢 **API-V14-06** — §12.7 now references SNAP-MANIFEST and
->     the ROT-* rotation semantics, matching the reference list
->     used by CHANGELOG.md [v1.3.0] and
->     docs/ARCHITECTURE.md §4.13.
->
->   🟢 **API-V14-07** — This block itself. It documents the
->     post-audit corrections applied to this file in the v1.4.0
->     cycle, matching the convention used by every other file
->     that received a header-only correction (see e.g.
->     `main.go`, `functions.sh`, `service.sh`, `watchdog.sh`,
->     `customize.sh`, `status.sh`, `action.sh`, `uninstall.sh`).
-
-> **v1.2.0 (Global Edition) — Documentation catch-up in this revision**:
->   • 🛡️ **API-DOC-01** — The `X-Watchdog-Token` requirement
->     on `POST /api/ensure_running_service` was previously
->     documented only in `ARCHITECTURE.md` §4.5.1 and §5.7,
->     not in this API reference. The full design is now
->     documented in the new §2.8 and cross-referenced from
->     §1.3, §2.7, and §6.2.13.
->   • 🛡️ **API-DOC-02** — §11 v1.2.0 changelog: the
->     post-audit corrections count has been corrected from
->     **seven** to **eight**, and the BUG-3 entry now carries
->     a note that v1.3.0 superseded its behavior (name sort →
->     mtime sort).
+>     backup** before writing.
 
 ---
 
@@ -267,6 +76,7 @@ Complete reference for the HTTP API used to control the module programmatically.
 10. [Examples](#10-examples)
 11. [Changelog](#11-changelog)
 12. [References](#12-references)
+13. [Documentation Corrections to This File](#13-documentation-corrections-to-this-file)
 
 ---
 
@@ -279,10 +89,45 @@ Complete reference for the HTTP API used to control the module programmatically.
 | **Protocol** | HTTP/1.1 |
 | **Binding** | `127.0.0.1` only (not reachable from the network by default) |
 | **Encoding** | UTF-8 |
-| **Content-Type** | `application/json` (default) |
-| **Auth** | Bearer / Cookie / Basic / Watchdog token (v1.2.0 — one endpoint only, see §2.8) |
-| **Timeout (client)** | 15 s (normal GET), 60 s (`toggle`/`restart`), 310 s (`update_profile`) |
-| **Language** | The WebUI is bilingual (English default + Arabic toggle via `langToggle`). The API itself is **language-neutral** — it returns JSON without localized strings. |
+| **Content-Type** | `application/json` (default for responses) |
+| **Auth** | Bearer / Cookie / Basic / Watchdog token / Install token |
+| **Language** | The WebUI is bilingual (English default + Arabic toggle). The API itself is **language-neutral** — it returns JSON without localized strings, except for the AR/EN message pair on install errors (§6.2.14). |
+
+**Timeout table**:
+
+| Scope | Endpoint | Value | Source |
+|---|---|---|---|
+| **HTTP client** | normal GET | 15 s | `web/index.html` `getTimeoutForUrl()` |
+| **HTTP client** | `toggle_service` / `restart_service` | 60 s | `web/index.html` |
+| **HTTP client** | `install_companion_app` | 120 s | `web/index.html` |
+| **HTTP client** | `update_profile` | 310 s | `web/index.html` |
+| **HTTP server** | every request (write phase) | 150 s | `main.go` `HTTP_WRITE_TIMEOUT` |
+| **Handler** | `install_companion_app` | 90 s | `main.go` §[3b] `INSTALL_TIMEOUT` |
+| **Cascade** | inside `install_app.sh` | 75 s | `install_app.sh` §[2] `CASCADE_DEADLINE_SECONDS` |
+
+**Timeout hierarchy**: cascade (75 s) < handler (90 s) < WriteTimeout
+(150 s) < client (up to 310 s for `update_profile`). The cascade
+deadline is deliberately shorter than the handler timeout, so the
+`EXIT / INT / TERM` trap inside `install_app.sh` always fires
+before `main.go`'s `exec.CommandContext` kills the script. See
+`docs/SECURITY.md` §5.36.4 for the trap semantics.
+
+**Localhost gate**: `main.go` applies the `isLocalRequest()` gate
+to **all three install surfaces**:
+
+- `POST /api/install_companion_app`
+- `POST /api/uninstall_companion_app`
+- `GET  /api?action=install_token`
+
+A non-loopback request to any of the three returns HTTP 403 with
+a JSON body. See §6.1.16, §6.2.14, and §6.2.15.
+
+**Service Worker bypass**: all four new companion-install
+endpoints live under `/api/*`, which is already handled by the
+Service Worker's bypass rule 2. The two GitHub URLs are external
+origins, handled by bypass rule 1. The `/app-debug.apk` fallback
+path is handled by bypass rule 9. **No Service Worker change was
+required for v1.5.0.**
 
 ### 1.2 Port Constraints
 
@@ -299,11 +144,20 @@ Complete reference for the HTTP API used to control the module programmatically.
 - `PORT` = `8080`
 - `DASHBOARD_PORT` = `8080`
 
-`readConfPort()` validates the range `[1, 65535]`. Values outside the range fall back to the default (9090 / 9091).
+`readConfPort()` validates the range `[1, 65535]`. Values outside
+the range fall back to the default (9090 / 9091).
 
 `MONITORING_UI_PORT` is declared as a Go constant in `main.go`
-and reused in every place that needs the reserved port
-including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
+and reused in every place that needs the reserved port including
+`metricsProxyHandler`.
+
+**Port cache**: `getWebUIPort()` and `getDashboardPort()` now
+route through a 30-second TTL cache. The values returned by
+`/api?action=runtime_info` are still the authoritative current
+values; the cache only avoids redundant `webui.conf` reads within
+a 30 s window. Editing `webui.conf` and reloading the WebUI may
+show the old port for up to 30 s. A `main.go` restart always
+re-reads the file.
 
 ### 1.3 Endpoint Map
 
@@ -318,13 +172,13 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 │    GET  /icon-512.svg            PWA icon (maskable)         │
 │    GET  /icon-192.png            PWA icon (PNG)              │
 │    GET  /icon-512.png            PWA icon (PNG maskable)     │
-│    GET  /apple-touch-icon.png    iOS icon                    │
+│    GET  /apple-touch-icon.png    Launcher icon fallback      │
 │    GET  /favicon-32x32.png       Modern favicon              │
 │    GET  /favicon-16x16.png       Legacy favicon              │
 │    GET  /favicon.ico             IE + bookmarks              │
 │    GET  /offline.html            Offline fallback            │
 │    GET  /app-debug.apk           Companion Android app       │
-│                                  (optional, v1.4.0)          │
+│                                  (optional)                  │
 │    GET  /                        index.html                  │
 │                                                              │
 │  Auth required (GET)                                         │
@@ -340,10 +194,13 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 │    GET  /api?action=get_progress Progress                    │
 │    GET  /api?action=check_old_modules  Old modules           │
 │    GET  /api/runtime_info        Build + ports + memory      │
-│    GET  /api/runtime_info/       (same; BUG-6 fix)           │
+│    GET  /api/runtime_info/       (same; trailing slash)      │
 │    GET  /api?action=runtime_info (same; query-string form)   │
-│                                  → both include backups      │
-│                                    (v1.2.0 — 7 fields)       │
+│                                  → all include backups       │
+│    GET  /api?action=install_token     ← v1.5.0 (localhost)   │
+│                                  One-shot CSRF token (60 s)  │
+│    GET  /api?action=companion_app_state  ← v1.5.0            │
+│                                  Install state (30 s cache)  │
 │    GET  /api/download_log        Download log file           │
 │    GET  /api/metrics             Metrics (Dashboard)         │
 │    GET  /events                  SSE stream                  │
@@ -361,16 +218,52 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 │    POST /api/remove_module       Remove old module           │
 │    POST /api/toggle_service      Toggle on/off               │
 │    POST /api/restart_service     Restart DNS                 │
+│    POST /api/install_companion_app    ← v1.5.0 (localhost)   │
+│                                  Root install (CSRF token)   │
+│    POST /api/uninstall_companion_app  ← v1.5.0 (localhost)   │
+│                                  Uninstall (reserved for UI) │
 │                                                              │
 │  Watchdog token OR user auth (POST)                          │
 │    POST /api/ensure_running_service  Ensure DNS running      │
 │      • localhost + POST + valid X-Watchdog-Token → allowed   │
 │      • otherwise → normal user auth (Bearer/Cookie/Basic)    │
-│      • see §2.8 and §6.2.13 for the full design              │
+│      • see §2.8 and §6.2.13                                  │
 └─────────────────────────────────────────────────────┘
 ```
 
-### 1.4 What was New in v1.4.0
+### 1.4 What was New in v1.5.0
+
+| Section | Change | Reference |
+|---|---|---|
+| **§1.3** | 4 new endpoints | Companion install |
+| **§3.1** | `install_companion_app` added to the rate limit table | Rate limiting |
+| **§5.2** | Install-specific error codes added | Error codes |
+| **§6.1.16** | `GET /api?action=install_token` documented | CSRF token |
+| **§6.1.17** | `GET /api?action=companion_app_state` documented | Install state |
+| **§6.2.14** | `POST /api/install_companion_app` documented | Root install |
+| **§6.2.15** | `POST /api/uninstall_companion_app` documented | Reserved for UI |
+| **§10.11** | Watchdog install examples added | — |
+| **§11** | Changelog entry for v1.5.0 | — |
+| **§12.8** | v1.5.0 References added | — |
+| **§13** | Documentation corrections consolidated | This file |
+
+**Architectural note**: v1.5.0 is additive. The API structure is
+unchanged; the only new auth requirement is the one-shot CSRF
+token on `install_companion_app`, which is a per-request token
+unrelated to the session-based schemes in §2.2.
+
+### 1.5 What was New in v1.5.0+ (Post-release)
+
+| Section | Change |
+|---|---|
+| **§1.1** | Timeout table expanded to include `HTTP_WRITE_TIMEOUT` (150 s) |
+| **§1.1** | Localhost gate documented on all three install surfaces |
+| **§6.1.16** | `install_token` endpoint documented as localhost-only |
+| **§6.2.14** | Response shapes corrected to match `main.go` |
+| **§11** | Changelog entry for the post-release patch set |
+| **§13** | All corrections consolidated |
+
+### 1.6 What was New in v1.4.0 (historical)
 
 | Section | Change | Reference |
 |---|---|---|
@@ -379,112 +272,51 @@ including `metricsProxyHandler` (v1.1.0 — see §6.1.14).
 | **§6.2.10** | `remove_module` documented with CodeQL path-injection hardening | CodeQL fix |
 | **§11** | Changelog entry for v1.4.0 | — |
 
-Architectural note: the API structure is unchanged — v1.4.0 is
-additive. All v1.3.0 clients continue to work without changes.
+### 1.7 What was New in v1.3.0 (historical)
 
-### 1.5 What was New in v1.3.0
+| Section | Change |
+|---|---|
+| **§6.2.13** | `ensure_running_service` is now called directly by `service.sh` at boot |
+| **§6.1.7** | Snapshot detection is now manifest-based (SNAP-MANIFEST) |
+| **§11** | Changelog entry for v1.3.0 |
 
-| Section | Change | Reference |
-|---|---|---|
-| **§6.2.13** | `ensure_running_service` is now called directly by `service.sh` at boot | DNS auto-start |
-| **§6.1.7** | Snapshot detection is now manifest-based (SNAP-MANIFEST); `last_backup_name` sort order changed from name → **mtime** (SNAP-MTIME) | v1.3.0 |
-| **§11** | Changelog entry for v1.3.0 | — |
+### 1.8 What was New in v1.2.0 (historical)
 
-Architectural note: the API structure is unchanged — v1.3.0 is
-additive. All v1.2.0 clients continue to work without changes.
-
-### 1.6 What was New in v1.2.0
-
-| Section | Change | Reference |
-|---|---|---|
-| **§1.1** | Language is now bilingual (EN default + AR toggle). The API stays language-neutral. | — |
-| **§2.8** | **New section**: Watchdog token (`X-Watchdog-Token`) | BUG-B |
-| **§6.1.7** | `runtime_info.backups` returns **7 fields** (was 5) | BAK-1 |
-| **§6.2.3** | `update_profile` creates a pre-critical backup | BAK-2 |
-| **§6.2.4** | `save_allowlist` creates a pre-critical backup | BAK-2 |
-| **§6.2.5** | `save_denylist` creates a pre-critical backup | BAK-2 |
-| **§6.2.6** | `save_custom_rules` creates a pre-critical backup | BAK-2 |
-| **§6.2.7** | `append_denylist` creates a pre-critical backup | BAK-2 |
-| **§6.2.13** | `ensure_running_service` now requires `X-Watchdog-Token` | BUG-B |
-| **§10.6** | New backup diagnostic examples | BAK-3 |
-| **§10.7** | New recovery-mode examples | BAK-4 |
-| **§11** | Changelog entry for v1.2.0 | — |
-
-**Compatibility**: All v1.0.0 and v1.1.0 clients continue to
-work without modification. All v1.2.0 changes are additive
-**except** the new `X-Watchdog-Token` requirement on
-`ensure_running_service` (see §2.8).
-
-### 1.7 What was New in v1.0.0
-
-| Section | Change | Reference |
-|---|---|---|
-| **§1.2** | `readConfPort` range check [1, 65535] | Fix NEW-3 |
-| **§2.3** | Login POST-only (rejects GET/HEAD/PUT/DELETE) | Fix NEW-1 |
-| **§2.5** | Logout POST-only | Fix NEW-1 |
-| **§3.3** | Basic Auth rate limiting (previously unlimited) | Fix #8 |
-| **§3.5** | Auth cache (60 s TTL) — reduces file I/O | Fix NEW-6 |
-| **§4.5** | 404 for unknown action | Fix #12 |
-| **§5.1** | 404 vs 405 — adds Login POST-only | Fix NEW-1 |
-| **§6.1.7** | `runtime_info` returns `webui_port` + `dashboard_port` | PORT-2 |
-| **§6.1.14** | `/api/metrics` JSON schema (instead of Prometheus text) | Fix #1 |
-| **§7** | Exact path matching (`hasEndpoint`) | Fix #12 |
+| Section | Change |
+|---|---|
+| **§1.1** | Language is now bilingual |
+| **§2.8** | Watchdog token (`X-Watchdog-Token`) |
+| **§6.1.7** | `runtime_info.backups` returns **7 fields** |
+| **§6.2.3–§6.2.7** | Destructive endpoints create a pre-critical backup |
+| **§6.2.13** | `ensure_running_service` requires `X-Watchdog-Token` |
+| **§10.6–§10.7** | New backup / recovery examples |
 
 ---
 
 ## 2. Authentication
 
-### 2.1 Memory Limits per Profile (v1.1.0)
-
-The Go runtime soft memory limit is set dynamically by `main.go`
-based on the active blocklist profile. This affects the memory
-reported by `runtime_info.memory_limit_mb` (§6.1.7).
-
-| Profile | `memory_limit_mb` | `profile_key` | Typical device |
-|---|---:|:---:|---|
-| Light | 80 | `light` | 1 GB RAM |
-| Normal | 100 | `normal` | 2 GB RAM |
-| PRO | 120 | `pro` | 3 GB RAM (default) |
-| PRO++ | 160 | `proplus` | 4 GB RAM |
-| Ultimate | 220 | `ultimate` | 6 GB+ RAM |
-
-**Semantics**:
-- `debug.SetMemoryLimit` is a **soft** limit — the Go runtime
-  runs GC more aggressively as usage approaches it, but it does
-  **not** kill the process (no OOM).
-- The limit is recomputed at startup (`main()`) and on every
-  profile change (`POST /api/update_profile`).
-- The value is **read-only** from the API — you cannot change it
-  via an endpoint. Change the profile instead.
-
-**Example**:
-
-```bash
-# Current limit for the active profile
-curl -s -b /tmp/cookies.txt \
-  "http://127.0.0.1:9090/api?action=runtime_info" | jq '.memory_limit_mb'
-# → 120  (if profile is "pro")
-```
-
-### 2.2 Schemes
+### 2.1 Schemes
 
 | Scheme | Header/Cookie | Priority | Rate Limited |
 |---|---|:---:|:---:|
 | Bearer | `Authorization: Bearer <token>` | 1 | No |
 | Cookie | `Cookie: dnscrypt_session=<token>` | 2 | No |
 | Basic | `Authorization: Basic <base64>` | 3 | Yes |
-| **Watchdog token** | `X-Watchdog-Token: <64-hex>` | **0 (before all above)** | **No** |
-
-Basic Auth is rate-limited (5 attempts / 15 min) since v1.0.0 — previously unlimited.
+| Watchdog token | `X-Watchdog-Token: <64-hex>` | 0 (before all above, endpoint-scoped) | No |
 
 **Watchdog token priority**: as of v1.2.0, `checkAuth()` checks
 for the `X-Watchdog-Token` header **before** any of the user
 schemes — but **only** for `POST /api/ensure_running_service`
 from a loopback address. See §2.8 for the full design.
 
-### 2.3 Credentials Source
+**Install token** is **not** an alternative to the schemes above.
+It is an additional, per-request credential required **in
+addition to** a valid session for a single endpoint. See §2.7.
 
-Credentials are read exclusively from the `[monitoring_ui]` section of `dnscrypt-proxy.toml`.
+### 2.2 Credentials Source
+
+Credentials are read exclusively from the `[monitoring_ui]`
+section of `dnscrypt-proxy.toml`.
 
 ```toml
 [monitoring_ui]
@@ -499,7 +331,7 @@ Section-restricted parsing:
 - `main.go` → `getMonitoringAuth` tracks sections.
 - `functions.sh` → `read_toml_credentials` tracks sections.
 - `watchdog.sh` → reads inline with section tracking.
-- `customize.sh` → `[18]` verification with section tracking.
+- `customize.sh` → §[18] verification with section tracking.
 
 Section header with comment is supported:
 
@@ -508,20 +340,31 @@ Section header with comment is supported:
   username = 'admin'
 ```
 
-The pattern is now extracted between `[` and `]` (first occurrence).
+The pattern is extracted between `[` and `]` (first occurrence).
 
-Auth cache (Fix NEW-6):
+Auth cache:
 
 - `getMonitoringAuth()` caches credentials for **60 seconds**.
 - Changing credentials in TOML takes effect within ≤ 60 seconds.
 - For immediate effect: restart the WebUI.
 
-### 2.4 Login — POST-only (Fix NEW-1)
+**Missing `[monitoring_ui]` section**: if the file is missing,
+unreadable, or has no non-empty `username` and `password` in the
+`[monitoring_ui]` section, `getMonitoringAuth()` returns
+`("", "")`. In that state, `checkAuth()` treats **every request
+as authorized**. This is intentional for the default localhost
+setup, but it means a **missing configuration is not a
+fail-closed condition**. If `BIND_ADDR` is anything other than
+`127.0.0.1` / `::1`, `main.go` refuses to start without
+credentials — see `docs/SECURITY.md` §5.1.
+
+### 2.3 Login — POST-only
 
 `/api/auth/login` accepts **POST only**.
 
 - GET/HEAD/PUT/DELETE → **405 Method Not Allowed**.
-- Reason: prevents a CSRF vector and prevents credentials from leaking into the URL.
+- Reason: prevents a CSRF vector and prevents credentials from
+  leaking into the URL.
 
 **Request:**
 
@@ -569,15 +412,11 @@ Set-Cookie: dnscrypt_session=<token>; Path=/; Max-Age=86400; HttpOnly; Secure; S
 
 > **Note on `Secure`**: the `Secure` attribute is set only when
 > the server runs on a loopback address (`BIND_ADDR` = `127.0.0.1`,
-> `::1`, or `localhost`). The example above assumes the default
-> `127.0.0.1` bind. On a LAN bind the attribute is omitted so
-> that browsers accept the cookie over plain HTTP. See §2.5.
+> `::1`, or `localhost`). On a LAN bind the attribute is omitted
+> so that browsers accept the cookie over plain HTTP. See §2.4.
 
-There is no `token` field in the response. Authentication relies solely on the HttpOnly cookie.
-
-> **v1.1.0 note**: the `profile` object in the response now also
-> contains `memory_limit_mb` (added in v1.1.0). Clients that
-> ignore unknown fields are unaffected.
+There is no `token` field in the response. Authentication relies
+solely on the HttpOnly cookie.
 
 **Response (405 — Method Not Allowed):**
 
@@ -610,32 +449,7 @@ Content-Type: application/json
 }
 ```
 
-Supported methods:
-
-| Method | Before | After v1.0.0 |
-|--------|:---:|:---:|
-| POST | ✅ | ✅ |
-| GET | ⚠️ accepted (CSRF) | ❌ 405 + `Allow: POST` |
-| HEAD | ⚠️ accepted | ❌ 405 + `Allow: POST` |
-| PUT | ⚠️ accepted | ❌ 405 + `Allow: POST` |
-| DELETE | ⚠️ accepted | ❌ 405 + `Allow: POST` |
-
-Test the rejection:
-
-```bash
-# ✅ POST (works)
-curl -X POST http://127.0.0.1:9090/api/auth/login \
-    -H "Content-Type: application/json" \
-    -d '{"username":"admin","password":"..."}' \
-    -c /tmp/cookies.txt
-
-# ❌ GET (rejected)
-curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
-# → HTTP/1.1 405 Method Not Allowed
-# → Allow: POST
-```
-
-### 2.5 Cookie Properties
+### 2.4 Cookie Properties
 
 | Property | Value | Note |
 |---|---|---|
@@ -643,7 +457,7 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 | Path | `/` | — |
 | MaxAge | 86400 (24 h) | — |
 | HttpOnly | `true` | JavaScript cannot read it |
-| Secure | conditional | `true` only on loopback binds (`127.0.0.1`, `::1`, `localhost`) |
+| Secure | conditional | `true` only on loopback binds |
 | SameSite | `Lax` | PWA-friendly |
 
 Secure details:
@@ -653,11 +467,11 @@ Secure details:
 
 SameSite details:
 
-- `Lax` (instead of `Strict` in older versions).
+- `Lax` (instead of `Strict`).
 - Supports PWA shortcuts.
 - Protects against CSRF (cross-site POST forbidden).
 
-### 2.6 Logout — POST-only (Fix NEW-1)
+### 2.5 Logout — POST-only
 
 `/api/auth/logout` accepts **POST only**.
 
@@ -687,7 +501,7 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 }
 ```
 
-### 2.7 Authentication Flow Diagram
+### 2.6 Authentication Flow Diagram
 
 ```text
 ┌────────────────────────────────────────────────┐
@@ -695,8 +509,8 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 │  POST /api/auth/login                                  │
 │  {"username":"admin","password":"..."}                 │
 └────────────────────┬───────────────────────────┘
-                         │
-                         ▼
+                     │
+                     ▼
 ┌───────────────────────────────────────────────────┐
 │  main.go — handleAPI                                       │
 │  if hasEndpoint(path, "auth/login") {                      │
@@ -704,8 +518,8 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 │      handleLogin(w, r)                                     │
 │  }                                                         │
 └────────────────────┬──────────────────────────────┘
-                         │
-                         ▼
+                     │
+                     ▼
 ┌────────────────────────────────────────────────────┐
 │  handleLogin()                                              │
 │  1. ip := getClientIP(r)  ← IPv6-safe                      │
@@ -721,157 +535,140 @@ Set-Cookie: dnscrypt_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax
 
 For the Watchdog token path — which runs **before** any of the
 above when the request is a localhost POST to
-`ensure_running_service` — see §2.8.
+`ensure_running_service` — see §2.8. For the install token path
+— which runs **after** normal auth on `install_companion_app` —
+see §2.7.
 
-### 2.8 Watchdog Token (v1.2.0 — BUG-B fix)
+### 2.7 Install Token (v1.5.0)
 
-The watchdog (`watchdog.sh`) needs to call
-`POST /api/ensure_running_service` to recover a crashed DNS
-engine. In v1.1.0, this endpoint was protected only by an
-implicit "localhost bypass" — `checkAuth` returned `true`
-unconditionally for any localhost POST to that path. This was
-exploitable: any web page loaded in a browser on the same
-device could silently trigger a service restart (a CSRF vector).
-
-v1.2.0 replaces the bypass with a **token**:
+The install token is a **one-shot CSRF token** consumed by
+`POST /api/install_companion_app`. It is **not** a session
+scheme; it is a per-request nonce that prevents cross-site
+request forgery on the install endpoint.
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│  Token lifecycle                                             │
+│  Token lifecycle (v1.5.0)                                    │
 │                                                              │
-│  1. customize.sh §[19b] generates a 64-hex token             │
-│     during install and writes it to:                         │
-│         $RUN_DIR/.watchdog_token   (mode 0600)               │
+│  1. Client sends GET /api?action=install_token               │
+│     • checkAuth() must succeed (session cookie or bearer)    │
+│     • isLocalRequest() must succeed                          │
+│     • generateInstallToken():                                │
+│         – 32 bytes from crypto/rand                          │
+│         – hex-encode → 64 chars                              │
+│         – store in installTokens[token] = {expiry}           │
+│         – expiry = now + INSTALL_TOKEN_TTL (60 s)            │
+│     • response: { "token": "abc...", "ttl": 60 }             │
 │                                                              │
-│  2. If the file is missing (e.g. user disabled the           │
-│     WebUI before first startup), main.go creates it          │
-│     on the next run via loadOrCreateWatchdogToken().         │
+│  2. Client sends POST /api/install_companion_app             │
+│     body: token=<token>                                      │
+│     • checkAuth() must succeed                               │
+│     • isLocalRequest() must succeed                          │
+│     • isInstallLockedOut(ip) must be false                   │
+│     • validateAndConsumeInstallToken(token):                 │
+│         – look up in installTokens                           │
+│         – if not found OR expired → 401                      │
+│         – if found → delete from map (one-shot) → allow      │
+│     • recordInstallAttempt(ip, success)                      │
+│     • callInstallScript() runs install_app.sh                │
 │                                                              │
-│  3. watchdog.sh reads the file on every API call             │
-│     (no cache) and sends it as:                              │
-│         X-Watchdog-Token: <token>                            │
-│                                                              │
-│  4. main.go verifyWatchdogToken() compares the               │
-│     header against the file using                            │
-│     subtle.ConstantTimeCompare.                              │
-│                                                              │
-│  5. On mismatch or missing header → fall through to          │
-│     normal user auth (Bearer / Cookie / Basic) → 401.        │
+│  3. Expired tokens are garbage-collected lazily              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 **Characteristics**:
 
-- **Localhost-scoped**: `isLocalRequest(r)` is still required;
-  a remote request with a valid token is rejected (it falls
-  through to normal auth, which the watchdog cannot satisfy).
-- **POST-only**: only `POST /api/ensure_running_service`
-  participates; other methods fall through to normal auth.
-- **Constant-time**: `subtle.ConstantTimeCompare` — no timing
-  leak on comparison.
-- **Not rate-limited**: token requests bypass the login
-  limiter, so a flapping DNS engine does not lock the
-  watchdog out.
-- **Persistent**: the token file survives restarts. It is
-  regenerated only if the file is missing.
-- **Fail-closed**: if the token file is missing and no token
-  is sent, the request falls back to normal user auth — which
-  the watchdog does not have — so the request is rejected
-  with `401`. `watchdog.sh` logs "no auth header" and backs
-  off (it does not retry aggressively).
-- **Atomic writes**: the token file is written with
-  `atomicWriteFile` (BUG-L fix), so concurrent readers never
-  observe a partially-written token.
+| Aspect | Value |
+|---|---|
+| TTL | 60 seconds (`INSTALL_TOKEN_TTL`) |
+| Format | 64 hex chars (32 bytes) |
+| Reusable? | ❌ One-shot — deleted from the map on first use |
+| Consumed by | `POST /api/install_companion_app` only |
+| Rate-limited? | Yes — the install endpoint, per-IP (5 failed attempts / 15 min). See §3.1 |
+| Session-related? | No — orthogonal to the cookie/bearer schemes in §2.1 |
+| Localhost-only? | Yes — `isLocalRequest()` gate on the token endpoint itself |
 
-**Token generation**:
+**Why a separate token (not just the session cookie)?** The
+install endpoint performs a root operation with side effects that
+outlive the session (the app remains installed after logout). A
+one-shot token forces the WebUI to explicitly opt-in per install
+attempt, and it makes CSRF exploitation practically impossible.
 
-| Source | Method | Length |
-|---|---|---|
-| `customize.sh §[19b]` | 64 hex chars from `/dev/urandom` (fallback: SHA256 of date+pid+rand) | 64 chars |
-| `main.go:loadOrCreateWatchdogToken()` | 32 bytes from `crypto/rand`, hex-encoded | 64 chars |
+**Why 60 seconds?** The token is generated when the user clicks
+"Install App" and consumed when the user confirms the modal.
+60 seconds is generous enough for a slow decision and short
+enough that a leaked token is unlikely to still be valid.
 
-**Token file location**:
+**Client-side handling of a 401 (IDX-401-DISTINCT)**: the WebUI's
+`xhrRequest()` suppresses the generic "Session Expired" modal for
+install-family URLs. The 401 is still surfaced to the caller, and
+the install flow renders a token-specific message
+(`t('installTokenError')`). For every other endpoint, a 401
+continues to trigger the session-expired path.
 
-```text
-$RUN_DIR/.watchdog_token         # mode 0600
-```
+### 2.8 Watchdog Token (v1.2.0)
 
-Where `$RUN_DIR` is the active runtime directory — either
-`proxy/run/` (preferred) or `/data/local/tmp/` (fallback when
-`proxy/run/` is not writable). See §7.5 in `ARCHITECTURE.md`
-for the full resolution logic.
+The watchdog (`watchdog.sh`) needs to call
+`POST /api/ensure_running_service` to recover a crashed DNS
+engine. In v1.1.0, this endpoint was protected only by an
+implicit "localhost bypass" — exploitable via CSRF.
 
-**Verification flow** (in `checkAuth()`):
+v1.2.0 replaces the bypass with a **token**:
 
-```go
-if hasEndpoint(r.URL.Path, "ensure_running_service") {
-    if r.Method == http.MethodPost && isLocalRequest(r) {
-        if verifyWatchdogToken(r) {
-            return true  // ← bypass user auth
-        }
-    }
-}
-// Fall through to normal auth: Bearer / Cookie / Basic.
-```
+- **Localhost-scoped**: `isLocalRequest(r)` is still required.
+- **POST-only**: only `POST /api/ensure_running_service`.
+- **Constant-time**: `subtle.ConstantTimeCompare`.
+- **Not rate-limited**: token requests bypass the login limiter.
+- **Persistent**: the token file survives restarts.
+- **Fail-closed**: if the token file is missing and no token is
+  sent, the request falls back to normal user auth.
 
 **Migration guidance for API clients**:
 
 - If your client previously relied on the v1.1.0 localhost
-  bypass (i.e. it called the endpoint from a script running on
-  the device without any user credentials), it must now read
-  `$RUN_DIR/.watchdog_token` and send the
-  `X-Watchdog-Token` header.
-- If your client uses a **Cookie/Bearer/Basic** session (the
-  normal user auth path), **no change is required**. The
-  watchdog-token path is opt-in; requests without the header
-  simply proceed through the standard auth pipeline.
-- The token file is **excluded** from the 5-file
-  preservation set (it is a runtime secret, not user
-  config). If it is deleted, `main.go` regenerates it on the
-  next run and `watchdog.sh` picks it up on its next API
-  call.
-
-**Security rationale** (v1.2.0 data-preservation model):
-
-| Concern | v1.2.0 mitigation |
-|---|---|
-| Backup tampering | SHA256 checksums in `.manifest.json` |
-| Backup leakage | Directory permissions `0700` (best-effort on `/sdcard`) |
-| Recovery abuse | Requires an explicit trigger file |
-| SELinux relaxation | Contexts restored via `restorecon` / `chcon` |
-| Transaction race | Numbered transaction dirs with `.state` file |
-| Disk exhaustion | Rotation capped at 21 snapshots |
-| Sensitive file inclusion | Only the 5 user config files |
-| Stale cache on restore | SW bypasses all `/api/*` paths |
-| Language toggle state | Client-side only (`localStorage`); never sent to the server |
-| **Watchdog impersonation** | **Token file (0600) + `subtle.ConstantTimeCompare` (v1.2.0)** |
-| **CSRF on service restart** | **Closed by the watchdog token (BUG-B fix, v1.2.0)** |
+  bypass, it must now read `$RUN_DIR/.watchdog_token` and send
+  the `X-Watchdog-Token` header.
+- If your client uses a **Cookie/Bearer/Basic** session, **no
+  change is required**.
 
 ---
 
 ## 3. Rate Limiting
 
-### 3.1 Limits (v1.4.0)
+### 3.1 Limits (v1.5.0)
 
 | Endpoint | Limit | Window | Enforcement |
 |---|---|---|---|
-| POST `/api/auth/login` | 5 attempts | 15 min | `handleLogin` |
-| Basic Auth (any endpoint) | 5 attempts | 15 min | `checkAuth` |
-| **Watchdog token** (`ensure_running_service`, localhost) | **unlimited** | — | `verifyWatchdogToken` — deliberately not rate-limited so a flapping DNS engine does not lock the watchdog out |
+| POST `/api/auth/login` | 5 failed attempts | 15 min | `handleLogin` |
+| Basic Auth (any endpoint) | 5 failed attempts | 15 min | `checkAuth` |
+| POST `/api/install_companion_app` | 5 **failed** attempts | 15 min | `isInstallLockedOut` |
+| Watchdog token (`ensure_running_service`, localhost) | unlimited | — | `verifyWatchdogToken` — deliberately not rate-limited |
+| GET `/api?action=install_token` | unlimited | — | Not rate-limited; the endpoint is localhost-only and side-effect-free |
 | GET `/api/*` (with Cookie/Bearer) | unlimited | — | — |
 | POST `/api/*` (with Cookie/Bearer) | unlimited | — | — |
+
+**v1.5.0 note**: the install rate limit is **per-IP** and shares
+the same 5-attempts/15-minutes parameters as the login limit,
+but uses a **separate** state map (`installAttempts` vs
+`loginAttempts`). A failed login does not affect the install
+counter and vice versa.
+
+**Rate limit scope**: the counter counts **failed install
+attempts** only. A successful install resets the counter for that
+IP. This matches the same semantics as the login rate limiter.
 
 ### 3.2 Behavior
 
 - 5 failed attempts → 15-minute lockout.
 - Lockout per IP.
-- Client IP extraction supports IPv4 and IPv6 via `net.SplitHostPort`.
+- Client IP extraction supports IPv4 and IPv6 via
+  `net.SplitHostPort`.
 - Failed Basic Auth attempts are recorded in `loginAttempts`.
 - `X-Forwarded-For` is not used (localhost-only).
 
-### 3.3 Basic Auth Rate Limiting (Fix #8)
+### 3.3 Basic Auth Rate Limiting
 
-Before:
+**Before**:
 
 ```go
 // checkAuth
@@ -883,7 +680,7 @@ if ok {
 // ← unlimited Basic Auth requests allowed
 ```
 
-After:
+**After**:
 
 ```go
 func checkAuth(r *http.Request) bool {
@@ -892,7 +689,6 @@ func checkAuth(r *http.Request) bool {
     if ok {
         ip := getClientIP(r)
 
-        // rate limiting
         if isLockedOut(ip) {
             return false
         }
@@ -904,7 +700,6 @@ func checkAuth(r *http.Request) bool {
             return true
         }
 
-        // failed attempt → record + check rate limit
         recordLoginAttempt(ip, false)
     }
     return false
@@ -919,7 +714,7 @@ Impact:
 
 ### 3.4 Client IP Extraction
 
-Before:
+**Before**:
 
 ```go
 ip := strings.Split(r.RemoteAddr, ":")[0]
@@ -927,7 +722,7 @@ ip := strings.Split(r.RemoteAddr, ":")[0]
 // IPv6 "[::1]:12345"     → "["           ❌
 ```
 
-After:
+**After**:
 
 ```go
 func getClientIP(r *http.Request) string {
@@ -941,36 +736,22 @@ func getClientIP(r *http.Request) string {
 // IPv6 "[::1]:12345"     → "::1"       ✅
 ```
 
-### 3.5 Auth Cache (60 s) — Fix NEW-6
+### 3.5 Auth Cache (60 s)
 
 `getMonitoringAuth()` caches credentials for **60 seconds**.
 
 Reason:
 
-- Before: every HTTP request read the entire `dnscrypt-proxy.toml` (~5–10 ms per request).
+- Before: every HTTP request read the entire `dnscrypt-proxy.toml`.
 - After: cache hit → ~0.05 ms per request.
-
-Impact:
-
-| Metric | Before | After |
-|---|:---:|:---:|
-| 100 req/s | ~1 MB/s I/O | ~0 MB/s (cache) |
-| Response time | ~5–10 ms | ~0.05 ms |
-| Battery consumption | High | Low |
 
 Constraints:
 
 - Changing credentials in TOML takes effect within ≤ 60 seconds.
-- For immediate effect: restart the WebUI:
-  ```bash
-  su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
-  ```
-
-> **BUG-C note (v1.2.0)**: The cache no longer stores **empty
-> results**. If the credentials file is unreadable (SELinux
-> denial, mid-upgrade, missing file), the next request re-reads
-> it instead of caching "no auth required" for 60 s. This closes
-> a full auth bypass on `BIND_ADDR=0.0.0.0`.
+- For immediate effect: restart the WebUI.
+- The cache no longer stores **empty results**. If the
+  credentials file is unreadable, the next request re-reads it
+  instead of caching "no auth required" for 60 s.
 
 **Response (429):**
 
@@ -984,18 +765,94 @@ Content-Type: application/json
 }
 ```
 
+**v1.5.0 — install rate limit response:**
+
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/json
+
+{
+  "status": "error",
+  "action": "install",
+  "message": "Too many install attempts. Try again in 15 minutes.",
+  "reason": "rate_limited"
+}
+```
+
 ---
 
 ## 4. Response Format
 
 ### 4.1 Success
 
+The API uses **four** successful response shapes, depending on
+the endpoint. There is no single canonical wrapper.
+
+**Shape A — status-tagged** (most POST endpoints):
+
 ```json
 {
   "status": "ok",
-  "data": { }
+  ...endpoint-specific fields...
 }
 ```
+
+Example — `POST /api/save_allowlist`:
+
+```json
+{
+  "status": "ok",
+  "changed": true,
+  "hash": "def456...",
+  "allow_hash": "def456...",
+  "deny_hash": "xyz789...",
+  "entries": 250000
+}
+```
+
+**Shape B — status field carrying a value** (short status
+endpoints):
+
+```json
+{ "status": "ON" }
+{ "status": "OFF" }
+```
+
+Example — `GET /api?action=status` returns `{"status": "ON"}`
+when the DNS engine is running.
+
+**Shape C — flat object, no status field** (read-only GETs):
+
+```json
+{ ...endpoint-specific fields... }
+```
+
+Examples:
+
+- `GET /api?action=install_token` → `{"token": "...", "ttl": 60}`
+- `GET /api?action=get_custom_rules` → `{"allowlist": "...", "denylist": "..."}`
+- `GET /api?action=runtime_info` → a flat object with `version`, `commit`, `backups`, etc.
+
+**Shape D — install result** (v1.5.0, two-part):
+
+```json
+{
+  "status": "ok" | "error",
+  "action": "install" | "uninstall",
+  ...endpoint-specific fields...
+}
+```
+
+See §4.6 for the full install-result shape and the 200-vs-4xx
+rationale.
+
+**Which shape does which endpoint use?** See §6 for the exact
+shape of each endpoint. As a rule of thumb:
+
+- POST endpoints that change state → **Shape A**.
+- Short read-only status endpoints → **Shape B**.
+- Read-only data endpoints → **Shape C**.
+- Companion install endpoints (v1.5.0) → **Shape D**.
 
 ### 4.2 Error
 
@@ -1003,19 +860,27 @@ Content-Type: application/json
 {
   "status": "error",
   "message": "Error description",
+  "reason": "machine_readable_reason (optional)",
   "details": "Additional details (optional)"
 }
 ```
 
-> **Exception — `/readyz`**: `/readyz` is the only endpoint that
-> does NOT use the `{status, message}` shape. On a non-localhost
-> request it returns `{"error": "readyz is localhost-only"}` with
-> HTTP 403. See §9.2.
+> **Exceptions — `/readyz` and `/api/metrics`**: the standard
+> `{status, message}` shape is used by every endpoint except
+> **two**:
 >
-> **Exception — `/api/metrics`**: `metricsProxyHandler` also uses
-> the `{"error": "..."}` shape for its own error responses
-> (401/500/502/503), because it is a dedicated handler that
-> does not go through `handleAPI`. See §6.1.14.
+>   • **`/readyz`** — on a non-localhost request returns
+>     `{"error": "readyz is localhost-only"}` with HTTP 403.
+>   • **`/api/metrics`** — `metricsProxyHandler` uses
+>     `{"error": "..."}` for its own error responses
+>     (401 / 500 / 502 / 503).
+>
+> The pre-v1.5.0 revision of this section said "/readyz is the
+> **only** endpoint that does NOT use the `{status, message}`
+> shape", then contradicted itself one sentence later by listing
+> `/api/metrics`. Both are now stated as **explicit** exceptions
+> in the same paragraph, and the "only" qualifier has been
+> removed.
 
 ### 4.3 Conflict
 
@@ -1027,6 +892,14 @@ Content-Type: application/json
 ```
 *HTTP status: 409 Conflict.*
 
+> **v1.5.0+ note**: `POST /api/append_denylist` used to produce a
+> spurious `409 conflict` when `denylist.txt` had been modified
+> externally (e.g. by `customize.sh` during an upgrade) without a
+> corresponding update to the in-memory `currentRules` snapshot.
+> The fix aligns the hash source used by `appendDenylist` with the
+> one used by `saveDenylist`, so the conflict only appears on a
+> genuine concurrent-edit scenario.
+
 ### 4.4 Processing (async)
 
 ```json
@@ -1036,7 +909,7 @@ Content-Type: application/json
 }
 ```
 
-### 4.5 Not Found (Fix #12)
+### 4.5 Not Found
 
 ```json
 {
@@ -1045,9 +918,6 @@ Content-Type: application/json
 }
 ```
 *HTTP status: 404 Not Found.*
-
-Before: unknown action → `200 OK` with `{"status": "unknown"}`.
-After: `404 Not Found` with a clear message.
 
 **Example:**
 
@@ -1060,6 +930,71 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 # }
 ```
 
+### 4.6 Install Result (v1.5.0)
+
+The `install_companion_app` endpoint uses a **two-part response
+shape**: `{status, action, ...}`. The `status` field follows the
+standard convention (`ok` or `error`), and the `action` field
+indicates what the endpoint attempted.
+
+**Success** (HTTP 200):
+
+```json
+{
+  "status": "ok",
+  "action": "install",
+  "strategy": 1,
+  "package": "com.gasciljh.dnsproxy.debug",
+  "version_name": "1.0.0",
+  "expected_version": "1.0.0",
+  "apk_size": 3284803,
+  "sha_verified": true,
+  "message_ar": "تم تثبيت التطبيق بنجاح",
+  "message_en": "Companion app installed successfully"
+}
+```
+
+**Install failure** (HTTP 200 — see rationale below):
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "message_ar": "...",
+  "message_en": "All install strategies failed — try the manual download",
+  "hint_ar": "...",
+  "hint_en": "..."
+}
+```
+
+**Auth/token/rate-limit failure** (HTTP 4xx):
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "message": "...",
+  "reason": "invalid_token" | "rate_limited" | "not_localhost" | "script_not_found" | "invalid_mode" | "no_json_output"
+}
+```
+
+**Important**: a failed install returns **HTTP 200**, not 4xx.
+The body carries `status: "error"` and the localized message.
+This is deliberate — a failed install is a valid outcome of a
+well-formed request, and the WebUI needs to read the AR/EN
+message from the body. Only auth/rate-limit/token failures use
+4xx. See §6.2.14 for the full matrix.
+
+**Client-side rendering (IDX-429, IDX-401-DISTINCT)**: the WebUI
+distinguishes the following HTTP-level failures from the generic
+"install failed" case:
+
+  • **HTTP 429** → `t('installRateLimited')`.
+  • **HTTP 401** (install-family only) → `t('installTokenError')`.
+  • **HTTP 403** → `t('installError')` with a "localhost only"
+    hint.
+  • **Other 4xx / 5xx** → `t('installError')`.
+
 ---
 
 ## 5. Error Codes
@@ -1068,14 +1003,16 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 |---|---|---|
 | 200 | ok / success | — |
 | 200 | processing | `update_profile` |
+| 200 | install error | `install_companion_app` (status=error in body) |
 | 400 | error — bad input | missing param |
-| 401 | error — unauthorized | session expired / invalid watchdog token |
-| 403 | error — forbidden | path traversal / `/readyz` from LAN |
+| 401 | error — unauthorized | session expired / invalid watchdog token / **invalid install token** |
+| 403 | error — forbidden | path traversal / `/readyz` from LAN / **install from non-localhost** |
 | 404 | error — path/action not found | `?action=foo` |
 | 405 | error — method not allowed | GET on POST endpoint / Login GET |
 | 409 | conflict — hash mismatch | concurrent edit |
 | 413 | error — file too large | POST > 5 MB |
-| 429 | error — too many requests | rate limit (login + Basic Auth) |
+| 415 | error — unsupported media type | POST with non-form Content-Type |
+| 429 | error — too many requests | rate limit (login + Basic Auth + install) |
 | 500 | error — internal error | panic recovery |
 | 502 | error — upstream error | monitoring_ui error |
 | 503 | — not ready | `/readyz` fail |
@@ -1088,29 +1025,52 @@ curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=definitely_unknown"
 | **Disallowed method** (GET on POST endpoint) | **405** | `{"status": "error", "message": "This endpoint requires POST (CSRF-GET protection)", "hint": "Use POST /api/<name>_service"}` + `Allow: POST` |
 | **Login GET** | **405** | `{"status": "error", "message": "Login requires POST (CSRF protection)"}` + `Allow: POST` |
 | **`/readyz` from LAN** | **403** | `{"error": "readyz is localhost-only"}` |
-
-> **API-1 fix**: the first two rows previously showed `{"error": "..."}`
-> bodies, which did not match the actual `handleAPI` responses.
-> `handleAPI` uses the `{status, message}` shape for every code
-> path (see §4.2). Only `/readyz` uses `{"error": ...}`, because
-> it is served by `handleReadyz` — a separate handler — and not
-> by `handleAPI`.
+| **Install from non-localhost** | **403** | `{"status": "error", "action": "install", "reason": "not_localhost", "message": "Forbidden: install is localhost-only"}` |
+| **Invalid install token** | **401** | `{"status": "error", "action": "install", "reason": "invalid_token", "message": "Invalid or expired install token"}` |
+| **Install rate limit** | **429** | `{"status": "error", "action": "install", "reason": "rate_limited", "message": "Too many install attempts. Try again in 15 minutes."}` |
+| **`install_token` from non-localhost** | **403** | `{"status": "error", "action": "install_token", "reason": "not_localhost", "message": "Forbidden: install is localhost-only"}` |
 
 ### 5.2 Not Found vs 405 Table
 
 ```text
-┌────────────────────────────┬─────┬───────────┐
-│  Scenario                       │ Code │  Fix        │
-├────────────────────────────┼─────┼───────────┤
-│  ?action=foo (unknown)          │ 404  │ Fix #12     │
-│  POST /api/save_allowlist_evil  │ 404  │ Fix #12     │
-│  GET /api/auth/login            │ 405  │ Fix NEW-1   │
-│  GET /api?action=toggle         │ 405  │ Fix #13     │
-│  /readyz from LAN               │ 403  │ Fix NEW-4   │
-│  ensure_running_service (no     │ 401  │ BUG-B       │
-│  token, no user auth)           │      │ (v1.2.0)    │
-└────────────────────────────┴─────┴───────────┘
+┌────────────────────────────────────┬─────┬───────────────────┐
+│  Scenario                               │ Code │  Fix              │
+├────────────────────────────────────┼─────┼───────────────────┤
+│  ?action=foo (unknown)                  │ 404  │ Fix #12           │
+│  POST /api/save_allowlist_evil          │ 404  │ Fix #12           │
+│  GET /api/auth/login                    │ 405  │ Fix NEW-1         │
+│  GET /api?action=toggle                 │ 405  │ Fix NEW-1         │
+│  /readyz from LAN                       │ 403  │ Fix NEW-4         │
+│  ensure_running_service (no token,      │ 401  │ BUG-B (v1.2.0)    │
+│  no user auth)                          │      │                   │
+│  install_companion_app (no token)       │ 401  │ APK-5 (v1.5.0)    │
+│  install_companion_app (non-localhost)  │ 403  │ APK-5 (v1.5.0)    │
+│  install_companion_app (5× failed)      │ 429  │ APK-11 (v1.5.0)   │
+│  install_token (non-localhost)          │ 403  │ v1.5.0+           │
+└────────────────────────────────────┴─────┴───────────────────┘
 ```
+
+### 5.3 Install-Specific Error Messages (v1.5.0)
+
+`install_app.sh` produces a structured JSON error response with
+localized AR + EN messages. The WebUI displays the message
+matching the user's language, plus an optional hint.
+
+**Error kinds**:
+
+| `reason` | `message_en` (excerpt) | Typical cause |
+|---|---|---|
+| `apk_not_found` | "Companion APK not found in the module" | Dev build without the APK |
+| `apk_empty` | "Companion APK is empty" | Failed download / partial copy |
+| `apk_too_small` | "Companion APK is suspiciously small" | Truncated file |
+| `apk_not_zip` | "Companion APK is not a valid ZIP archive" | Corrupted file |
+| `sha_mismatch` | "Integrity check failed" | Tampered/corrupted APK |
+| `insufficient_storage` | "Insufficient storage" | Device storage full |
+| `all_strategies_failed` | "All install strategies failed" | All 5 cascade levels failed |
+
+Each error may also carry `hint_ar` / `hint_en` with actionable
+advice. The WebUI renders both, and offers a **"⬇️ Download
+manually"** fallback button that navigates to `/app-debug.apk`.
 
 ---
 
@@ -1131,10 +1091,6 @@ Values: `ON` — DNS engine running, `OFF` — stopped.
 
 This endpoint is read-only. It does not write STATUS_FILE.
 
-- `STATUS_FILE` = "user intent".
-- `status endpoint` = "actual state".
-- They may differ temporarily on crash (before the Watchdog restarts).
-
 #### 6.1.2 `GET /api?action=get_profile`
 
 **Response:**
@@ -1149,10 +1105,6 @@ This endpoint is read-only. It does not write STATUS_FILE.
   "memory_limit_mb": 120
 }
 ```
-
-> **v1.1.0**: `memory_limit_mb` is a new field that mirrors the
-> active profile's soft memory limit (§2.1). It is additive —
-> clients that only need `key` / `name` / `entries` are unaffected.
 
 #### 6.1.3 `GET /api?action=get_custom_rules`
 
@@ -1175,7 +1127,13 @@ This endpoint is read-only. It does not write STATUS_FILE.
   "denylist_hash": "def456..."
 }
 ```
-*Used to verify hash before saving.*
+
+> **v1.5.0+ note**: the hashes returned here are the
+> authoritative source that `saveDenylist()` and
+> `appendDenylist()` consult for their conflict checks. A client
+> that mirrors these hashes and passes them back as
+> `expected_hash` will not see spurious `409 conflict` responses
+> when `denylist.txt` was modified externally.
 
 #### 6.1.5 `GET /api?action=stats`
 
@@ -1199,27 +1157,28 @@ This endpoint is read-only. It does not write STATUS_FILE.
 
 #### 6.1.7 `runtime_info` — ports + profile + memory + backups
 
-**Equivalent entry points (API-5 fix)**:
+**Equivalent entry points**:
 
 | Form | Handler | Notes |
 |---|---|---|
 | `GET /api/runtime_info` | `handleRuntimeInfo` | Path-based (canonical) |
-| `GET /api/runtime_info/` | `handleRuntimeInfo` | Path-based with trailing slash (BUG-6 fix) |
+| `GET /api/runtime_info/` | `handleRuntimeInfo` | Path-based with trailing slash |
 | `GET /api?action=runtime_info` | `handleAPI` | Query-string form |
 
 All three return the **same JSON body** — they invoke
 `buildRuntimeInfo()`. Choose whichever form fits the client
 convention; none is deprecated.
 
-**Response (v1.4.0):**
+**Response (v1.5.0):**
 
 ```json
 {
-  "version": "v1.4.0",
+  "version": "v1.5.0",
   "commit": "a1b2c3d",
   "build_time": "1726987200",
-  "build_time_human": "2026-09-26T10:00:00Z",
+  "build_time_human": "2026-10-10T10:00:00Z",
   "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
+  "app_version": "1.0.0",
   "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
   "status_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status",
   "pid_file": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.pid",
@@ -1234,9 +1193,9 @@ convention; none is deprecated.
     "available": 7,
     "in_flight_txn": 0,
     "orphan_txn": 0,
-    "last_backup": "2026-09-26 15:00:00",
-    "last_backup_name": "20260926-150000-manual",
-    "last_stable": "20260926-095826-v1.2.0",
+    "last_backup": "2026-10-10 15:00:00",
+    "last_backup_name": "20261010-150000-manual",
+    "last_stable": "20261010-095826-v1.5.0",
     "path": "/sdcard/dnscrypt-webui-backup"
   }
 }
@@ -1249,69 +1208,29 @@ convention; none is deprecated.
 | **Build info** | `version`, `commit`, `build_time`, `build_time_human`, `project_url` | v1.0.0 |
 | **Runtime paths** | `run_dir`, `status_file`, `pid_file`, `progress_file`, `log_file` | v1.0.0 |
 | **Network** | `bind_addr` | v1.0.0 |
-| **Dynamic ports** (PORT-2) | `webui_port`, `dashboard_port` | v1.0.0 |
-| **Memory profile** (MEM-1) | `profile_key`, `memory_limit_mb` | v1.1.0 |
-| **Backups** (BAK-1) | `available`, `in_flight_txn`, `orphan_txn`, `last_backup`, `last_backup_name`, `last_stable`, `path` | **v1.2.0** |
+| **Dynamic ports** | `webui_port`, `dashboard_port` | v1.0.0 |
+| **Memory profile** | `profile_key`, `memory_limit_mb` | v1.1.0 |
+| **Companion app version** | `app_version` | v1.4.0 |
+| **Backups** | 7 fields (see below) | v1.2.0 |
 
-**`profile_key`** — one of: `light`, `normal`, `pro`, `proplus`, `ultimate`.
-
-**`memory_limit_mb`** — the Go runtime soft limit for the active profile. See §2.1 for the mapping.
-
-**`backups` object — full schema (v1.2.0):**
+**`backups` object — full schema:**
 
 | Field | Type | Description |
 |---|---|---|
-| `available` | int | Number of snapshots. **Detection rule (v1.3.0 — SNAP-MANIFEST):** a directory counts as a snapshot **iff** it contains a `.manifest.json` file. Excludes `current/`, `txn-*`, and `orphan-txn-*` by name. Before v1.3.0 the rule was a name-pattern match (`^[0-9]{8}-[0-9]{6}-`). |
-| `in_flight_txn` | int | Number of `txn-*` directories (install in progress or interrupted) |
-| `orphan_txn` | int | Number of `orphan-txn-*` directories (preserved interrupted installs) |
+| `available` | int | Number of snapshots. **Detection rule (v1.3.0 — SNAP-MANIFEST):** a directory counts as a snapshot **iff** it contains a `.manifest.json` file. Excludes `current/`, `txn-*`, `orphan-txn-*`, and `apk/` by name. |
+| `in_flight_txn` | int | Number of `txn-*` directories |
+| `orphan_txn` | int | Number of `orphan-txn-*` directories |
 | `last_backup` | string \| null | Modification time of the newest snapshot, formatted as `YYYY-MM-DD HH:MM:SS` |
-| `last_backup_name` | string \| null | Directory name of the newest snapshot (e.g. `20260926-150000-manual`). **Sort key (v1.3.0 — SNAP-MTIME):** mtime, descending (with a name-based fallback when `DirEntry.Info()` fails). Before v1.3.0 the selection was by lexicographic name. |
+| `last_backup_name` | string \| null | Directory name of the newest snapshot. **Sort key (v1.3.0 — SNAP-MTIME):** mtime, descending (with a name-based fallback when `DirEntry.Info()` fails). |
 | `last_stable` | string \| null | Content of the `.last_stable` pointer file, or null if not set |
-| `path` | string | Absolute path of the persistent backup directory (`/sdcard/dnscrypt-webui-backup`) |
+| `path` | string | Absolute path of the persistent backup directory |
 
-> **Detection & sort notes (v1.3.0 — API-V14-03 + API-V14-04)**:
->
-> The two rules above were changed in v1.3.0 to make the API and
-> the shell tool (`status.sh --json`) agree on a single, portable
-> interpretation of the backup directory:
->
-> • **Detection** — v1.2.0 counted a directory as a snapshot
->   only when its name matched `<YYYYMMDD>-<HHMMSS>-...`.
->   v1.3.0 counts any directory that contains a
->   `.manifest.json` file, regardless of its name. Effect:
->   custom-named snapshots (e.g. produced by a future
->   `action.sh --backup` with a different naming scheme) are
->   now visible to the API. This can **increase**
->   `backups.available` for a given on-disk state; it can
->   never decrease it for snapshots produced by the shipped
->   toolchain, because every such snapshot contains a manifest.
->
-> • **Sort** — v1.2.0 selected `last_backup_name` by lexicographic
->   directory name. v1.3.0 selects it by mtime. Because the
->   standard naming convention is `<YYYYMMDD>-<HHMMSS>-...`,
->   both orderings produce the same result **except** when a
->   snapshot is created with a name that does not follow the
->   convention, or when the system clock is adjusted backwards.
->
-> The rotation policy in `functions.sh` uses the same semantics
-> (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT) so that the API and
-> the shell agree on which snapshots exist and which are the
-> newest. See `docs/ARCHITECTURE.md` §4.13.
-
-**Why these fields exist**:
-- **Observability** — a user reporting a GC or performance issue can paste the JSON output.
-- **Verification** — the WebUI/Dashboard System Info panel displays them.
-- **Shell equivalent** — `functions.sh:get_profile_memory_hint()` for memory, `status.sh --json` for backups.
-- **Consistency** — the JSON schema now matches `status.sh --json` on the seven shared fields (see §10.6; the shell tool adds two more).
-
-**Benefits**:
-
-- HTML/JS can update links dynamically.
-- Supports LAN access (`window.location.hostname`).
-- Supports IPv6 loopback (`[::1]`).
-- Clients can detect a corrupted backup layer (e.g. `orphan_txn > 0`).
-
-**`status_file`** = "user intent". Values: ON / OFF. Written only by `startService` / `stopService`. To check the actual state, use `GET /api?action=status`.
+> **v1.5.0+ note**: the `webui_port` and `dashboard_port` values
+> are now served from a 30-second TTL cache. The response shape
+> and field names are unchanged; the cache is transparent to the
+> client. A manual edit of `webui.conf` followed by an immediate
+> reload may show the old value for up to 30 seconds. A `main.go`
+> restart always re-reads the file.
 
 #### 6.1.8 `GET /api?action=logs`
 
@@ -1321,7 +1240,7 @@ Last 300 lines from the log.
 
 ```json
 {
-  "logs": "[2026-09-26T10:30:00Z] 🚀 Starting DNSCrypt WebUI...\n[...]"
+  "logs": "[2026-10-10T10:30:00Z] 🚀 Starting DNSCrypt WebUI...\n[...]"
 }
 ```
 
@@ -1358,7 +1277,6 @@ Last 300 lines from the log.
   "count": 3
 }
 ```
-*File types: active, archive, emergency, sensitive.*
 
 #### 6.1.10 `GET /api?action=read_log&file=<name>&confirm=1`
 
@@ -1447,38 +1365,9 @@ Cache-Control: no-cache, no-store, must-revalidate
 
 Dashboard-only endpoint (port 9091).
 
-Before v1.0.0: returned Prometheus text with `Content-Type: application/json` → `JSON.parse()` failed → Dashboard showed "Cannot fetch data" permanently.
-
-After v1.0.0: `parsePrometheus()` → `buildDashboardJSON()` → `Content-Type: application/json`.
-
-**v1.1.0 change (MEM-3)**: The upstream URL used by
-`metricsProxyHandler` is now built from the `MONITORING_UI_PORT`
-Go constant instead of the hardcoded string `"8080"`. Behavior
-is unchanged:
-
-```go
-// Before v1.1.0:
-"http://127.0.0.1:8080/api/metrics"
-
-// After v1.1.0:
-"http://127.0.0.1:" + MONITORING_UI_PORT + "/api/metrics"
-```
-
-The observable API contract is identical. The change only
-removes one hardcoded reference to the reserved port.
-
-**Flow:**
-
-```text
-Dashboard (9091)
-  → GET /api/metrics (main.go)
-    → metricsProxyHandler
-      → GET http://127.0.0.1:<MONITORING_UI_PORT>/api/metrics  ← v1.1.0
-        → monitoring_ui (dnscrypt-proxy)
-          → returns JSON or Prometheus text
-      → JSON response passed through OR parsePrometheus() + buildDashboardJSON()
-  ← JSON response
-```
+**v1.1.0 change**: The upstream URL used by
+`metricsProxyHandler` is built from the `MONITORING_UI_PORT`
+Go constant instead of the hardcoded string `"8080"`.
 
 **Request:**
 
@@ -1496,7 +1385,7 @@ Content-Type: application/json; charset=utf-8
 Cache-Control: no-cache, no-store, must-revalidate
 
 {
-  "generated_at": "2026-09-26T10:30:00Z",
+  "generated_at": "2026-10-10T10:30:00Z",
   "total_queries": 15234,
   "blocked_queries": 1523,
   "queries_per_second": 0,
@@ -1521,28 +1410,7 @@ Cache-Control: no-cache, no-store, must-revalidate
 }
 ```
 
-**Field details:**
-
-| Field | Type | Description |
-|-------|:----:|-------------|
-| `generated_at` | string | RFC3339 timestamp |
-| `total_queries` | float64 | Total queries |
-| `blocked_queries` | float64 | Blocked queries |
-| `queries_per_second` | float64 | QPS (currently 0 — placeholder) |
-| `uptime_seconds` | float64 | Uptime (currently 0 — placeholder) |
-| `avg_response_time` | float64 | Average response time (currently 0 — placeholder) |
-| `cache_stats.enabled` | bool | `true` if cache is active |
-| `cache_stats.cache_hit_ratio` | float64 | 0.0–1.0 (hit ratio) |
-| `cache_stats.cache_hits` | float64 | Cache hits |
-| `cache_stats.cache_misses` | float64 | Cache misses |
-| `cache_stats.configured_size` | float64 | Configured size |
-| `query_types` | array | Empty array (filled later) |
-| `resolver_health` | array | Empty array (filled later) |
-| `top_domains` | array | Empty array (filled later) |
-| `sources` | array | Empty array (filled later) |
-| `recent_queries` | array | Empty array (filled later) |
-
-**Response (401 Unauthorized):**
+**Response (401 / 500 / 502 / 503):**
 
 ```json
 {
@@ -1550,72 +1418,13 @@ Cache-Control: no-cache, no-store, must-revalidate
 }
 ```
 
-> **Exception**: `metricsProxyHandler` — like `handleReadyz` — uses
-> the `{"error": ...}` shape rather than the `{status, message}`
-> shape that `handleAPI` uses. See §4.2.
+> **Exception**: `metricsProxyHandler` — like `handleReadyz` —
+> uses the `{"error": ...}` shape rather than `{status, message}`.
+> See §4.2 for the two-exception note.
 
-**Response (500 Internal Server Error):**
+#### 6.1.15 `GET /app-debug.apk` — Companion Android App
 
-```json
-{
-  "error": "Monitoring authentication not configured"
-}
-```
-
-**Response (502 Bad Gateway):**
-
-```json
-{
-  "error": "Upstream returned HTTP 500"
-}
-```
-
-**Response (503 Service Unavailable):**
-
-```json
-{
-  "error": "DNSCrypt-Proxy is stopped or unreachable"
-}
-```
-
-**Supported Prometheus metric names (fallback mode):**
-
-| Prometheus name | JSON field |
-|---|---|
-| `dnscrypt_proxy_query_total` | `total_queries` |
-| `dnscrypt_query_total` | (fallback) |
-| `dnscrypt_proxy_queries_total` | (fallback) |
-| `dnscrypt_proxy_blocked_query_total` | `blocked_queries` |
-| `dnscrypt_blocked_query_total` | (fallback) |
-| `dnscrypt_proxy_cache_hits_total` | `cache_hits` |
-| `dnscrypt_proxy_cache_hit_total` | (fallback) |
-| `dnscrypt_cache_hits_total` | (fallback) |
-| `dnscrypt_proxy_cache_misses_total` | `cache_misses` |
-| `dnscrypt_proxy_cache_miss_total` | (fallback) |
-| `dnscrypt_cache_misses_total` | (fallback) |
-
-If a Prometheus label has multiple values (e.g. `cache_hits_total{type="positive"}`), `parsePrometheus` sums them all under the same name.
-
-**Verify:**
-
-```bash
-# Query main.go directly
-curl -s http://127.0.0.1:9091/api/metrics | jq '.total_queries'
-
-# Check Content-Type
-curl -sI http://127.0.0.1:9091/api/metrics | grep Content-Type
-# Expected: Content-Type: application/json; charset=utf-8
-```
-
-#### 6.1.15 `GET /app-debug.apk` — Companion Android App (v1.4.0)
-
-Serves the optional companion Android app APK. The APK is
-**not** required for the module to function; it is bundled into
-the module ZIP as an optional asset.
-
-**Source**: staged by `.github/workflows/release.yml` via
-`scripts/fetch_app_apk.sh` from
-[gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app).
+Serves the optional companion Android app APK.
 
 **Public route** — no authentication required.
 
@@ -1640,53 +1449,247 @@ Content-Length: 3145728
 ```http
 HTTP/1.1 404 Not Found
 Content-Type: text/plain; charset=utf-8
+X-Content-Type-Options: nosniff
+Content-Length: 19
+
+404 page not found
 ```
 
-The 404 case is normal for local developer builds. The WebUI
-install button (`<a download href="/app-debug.apk">`) will
-simply lead to a "file not found" page in the browser.
+> **v1.5.0 note**: The WebUI install button no longer links to
+> this route directly. It opens the **install-method modal**
+> (IDX-24) whose primary action performs a root install via
+> `POST /api/install_companion_app`. The `/app-debug.apk` route
+> remains reachable as a **fallback** when the local install
+> fails.
+
+#### 6.1.16 `GET /api?action=install_token` (v1.5.0)
+
+Generates a **one-shot CSRF token** for the companion app
+install flow. The token is consumed by the next
+`POST /api/install_companion_app` from the same IP.
+
+**Auth**: session cookie (or Bearer/Basic). **Localhost-only**
+(the `isLocalRequest` gate is applied to this GET endpoint — see
+§1.1).
+
+**Request:**
+
+```http
+GET /api?action=install_token HTTP/1.1
+Host: 127.0.0.1:9090
+Cookie: dnscrypt_session=<token>
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "token": "abc123def456789...",
+  "ttl": 60
+}
+```
+
+**Response (401 Unauthorized — no session):**
+
+```json
+{
+  "status": "error",
+  "message": "Unauthorized"
+}
+```
+
+**Response (403 Forbidden — non-localhost):**
+
+```json
+{
+  "status": "error",
+  "action": "install_token",
+  "reason": "not_localhost",
+  "message": "Forbidden: install is localhost-only"
+}
+```
+
+**Field details**:
+
+| Field | Type | Description |
+|---|---|---|
+| `token` | string | 64 hex chars (32 random bytes from `crypto/rand`). Single-use. |
+| `ttl` | int | Token lifetime in seconds. Currently always `60`. |
+
+**Characteristics**:
+
+- **One-shot**: the token is removed from the server-side map
+  on the first successful use.
+- **Ephemeral**: the map is in memory only. A server restart
+  invalidates all outstanding tokens.
+- **Lazy GC**: expired tokens are removed from the map when
+  the next `generateInstallToken()` call runs.
+- **Not rate-limited**: generating a token is cheap and
+  side-effect-free. The rate limit applies to the **install
+  attempt** (§6.2.14).
 
 **Verify:**
 
 ```bash
-# Check the route (with APK present)
-curl -sI http://127.0.0.1:9090/app-debug.apk | grep -E 'HTTP|Content-Type|Cache-Control'
-# Expected:
-#   HTTP/1.1 200 OK
-#   Content-Type: application/vnd.android.package-archive
-#   Cache-Control: public, max-age=3600, immutable
+# Generate a token
+curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=install_token" | jq
 
-# Check the route (with APK absent)
-curl -sI http://127.0.0.1:9090/app-debug.apk | grep HTTP
-# Expected: HTTP/1.1 404 Not Found
+# Expected:
+# {
+#   "token": "abc123...",
+#   "ttl": 60
+# }
 ```
 
-**Cache-Control rationale**: APK files are immutable once
-released (the filename encodes the app version). The 1-hour cache
-avoids re-downloading the same APK on repeated WebUI visits while
-still allowing updates when a new release is published.
+#### 6.1.17 `GET /api?action=companion_app_state` (v1.5.0)
+
+Returns the current install state of the companion app.
+
+**Auth**: session cookie (or Bearer/Basic).
+
+**Cache**: the server caches the result for **30 seconds**
+(`COMPANION_STATE_CACHE_TTL`). The cache is **invalidated** after
+every install/uninstall attempt — success OR failure. A failed
+install attempt can still have partially succeeded, so the cache
+must not keep reporting `{installed: false}` when the package
+manager may have registered the app a few seconds later.
+
+**Request:**
+
+```http
+GET /api?action=companion_app_state HTTP/1.1
+Host: 127.0.0.1:9090
+Cookie: dnscrypt_session=<token>
+```
+
+**Response (200 OK — installed):**
+
+```json
+{
+  "status": "ok",
+  "action": "status",
+  "installed": true,
+  "package": "com.gasciljh.dnsproxy.debug",
+  "version_name": "1.0.0",
+  "expected_version": "1.0.0"
+}
+```
+
+**Response (200 OK — not installed):**
+
+```json
+{
+  "status": "ok",
+  "action": "status",
+  "installed": false,
+  "package": "com.gasciljh.dnsproxy.debug",
+  "expected_version": "1.0.0"
+}
+```
+
+> **Note**: when the package is not installed, `install_app.sh`
+> returns the **default candidate** name
+> (`com.gasciljh.dnsproxy.debug`) in the `package` field, and
+> **omits** the `version_name` field entirely. This matches the
+> behaviour of `_emit_json` inside `install_app.sh`.
+
+**Response (200 OK — installed but different version):**
+
+```json
+{
+  "status": "ok",
+  "action": "status",
+  "installed": true,
+  "package": "com.gasciljh.dnsproxy.debug",
+  "version_name": "0.9.5",
+  "expected_version": "1.0.0"
+}
+```
+
+**Response (401 Unauthorized):**
+
+```json
+{
+  "status": "error",
+  "message": "Unauthorized"
+}
+```
+
+**Field details**:
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | Always `"ok"` on a successful probe. |
+| `action` | string | Always `"status"`. |
+| `installed` | bool | `true` if the package is installed. |
+| `package` | string | The detected package name. When not installed, defaults to the first candidate. |
+| `version_name` | string | Installed version. **Absent** when not installed. |
+| `expected_version` | string | Version expected by this module (`proxy/app-apk.version`). |
+
+**Package name candidates**: the server tries three candidates
+in order: `com.gasciljh.dnsproxy.debug`,
+`com.gasciljh.dnsproxy`, and `com.gasciljh.dnscrypt_proxy`
+(legacy).
+
+**WebUI usage**: the button label is set based on three cases:
+
+| `installed` | `version_name == expected_version` | Button |
+|---|:---:|---|
+| `false` | — | 📲 "Install App" |
+| `true` | `true` | ✅ "Installed" (disabled) |
+| `true` | `false` | 🔄 "Update App" |
+
+**Verify:**
+
+```bash
+curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=companion_app_state" | jq
+```
 
 ---
 
 ### 6.2 POST Endpoints
 
+**Content-Type requirement**: every POST endpoint that reads a
+request body calls `requireFormContentType()`. Accepted values:
+
+- `application/x-www-form-urlencoded`
+- `multipart/form-data`
+- **Empty** (accepted for compatibility with `wget --post-data=''`)
+
+Any other Content-Type (e.g. `application/json`) returns **HTTP
+415 Unsupported Media Type** with:
+
+```json
+{
+  "status": "error",
+  "message": "Content-Type must be application/x-www-form-urlencoded or multipart/form-data"
+}
+```
+
+**Exception**: `POST /api/auth/login` accepts both
+`application/json` and `application/x-www-form-urlencoded` (§2.3).
+
+**Body size limit**: `MaxBytesReader` caps every POST body at
+**5 MB** (`MAX_POST_BODY_SIZE`). Exceeding the limit returns HTTP
+413 with a JSON body.
+
 #### 6.2.1 `POST /api/auth/login`
 
-*(see §2.4)*
+See §2.3.
 
 #### 6.2.2 `POST /api/auth/logout`
 
-*(see §2.6)*
+See §2.5.
 
 #### 6.2.3 `POST /api/update_profile`
 
 Update the blocklist from a profile.
 
-**Pre-critical backup (v1.2.0):** Before writing, the handler
-calls `createAutoBackup("pre-profile-change")`, which snapshots
-the 5 user config files to the persistent backup directory
-(`/sdcard/dnscrypt-webui-backup/`). This is **best-effort**: a
-failed backup logs a warning but does not block the update.
+**Pre-critical backup**: Before writing, the handler calls
+`createAutoBackup("pre-profile-change")`, which snapshots the 5
+user config files to the persistent backup directory.
 
 **Request:**
 
@@ -1708,23 +1711,10 @@ profile=pro
 ```
 *Timeout: 310 s for the HTTP request.*
 
-RACE-1: if `updateProfile` is running and `allowlist` is saved at the same time, `rebuildMu` serializes the rebuilds — may appear slower but is safe.
-
-**v1.1.0 (MEM-1)**: After a successful rebuild, the handler
-applies the new profile's memory limit via `applyMemoryLimit()`.
-The new limit is reflected in subsequent `runtime_info` calls
-(§6.1.7).
-
-**v1.2.0 (BAK-2)**: A pre-critical backup is created before the
-profile change. The backup appears as a new snapshot directory
-under `/sdcard/dnscrypt-webui-backup/`. It is visible via
-`runtime_info.backups.last_backup_name`.
-
 #### 6.2.4 `POST /api/save_allowlist`
 
-**Pre-critical backup (v1.2.0):** Calls
-`createAutoBackup("pre-allowlist-save")` before writing
-(best-effort).
+**Pre-critical backup**: Calls
+`createAutoBackup("pre-allowlist-save")` before writing.
 
 **Request:**
 
@@ -1734,10 +1724,6 @@ Content-Type: application/x-www-form-urlencoded
 
 allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
 ```
-**Params:**
-
-- `allowlist` (required) — content (URL-encoded).
-- `expected_hash` (optional) — hash from `get_custom_rules`.
 
 **Response (200 — changed):**
 
@@ -1765,11 +1751,6 @@ allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
 }
 ```
 
-> When the submitted content is byte-identical to what is
-> already on disk, the handler short-circuits: no file write,
-> no blocklist rebuild, no service reload. `changed: false`
-> is returned and the hashes are the current on-disk values.
-
 **Response (409 conflict):**
 
 ```json
@@ -1783,17 +1764,15 @@ allowlist=googleadservices.com%0As.youtube.com&expected_hash=abc123...
 
 Same as `save_allowlist` but uses the `denylist` param.
 
-**Pre-critical backup (v1.2.0):** Calls
-`createAutoBackup("pre-denylist-save")` before writing
-(best-effort).
+**Pre-critical backup**: Calls
+`createAutoBackup("pre-denylist-save")` before writing.
 
 #### 6.2.6 `POST /api/save_custom_rules`
 
 Save both atomically.
 
-**Pre-critical backup (v1.2.0):** Calls
-`createAutoBackup("pre-custom-rules-save")` before writing
-(best-effort).
+**Pre-critical backup**: Calls
+`createAutoBackup("pre-custom-rules-save")` before writing.
 
 **Request:**
 
@@ -1819,11 +1798,8 @@ allowlist=googleadservices.com&denylist=facebook.com
 
 #### 6.2.7 `POST /api/append_denylist`
 
-**Pre-critical backup (v1.2.0):** The pre-critical backup is
-performed **once** by the delegated `saveDenylist` path (the
-v1.2.0 post-audit fix BUG-A removed a duplicate call in the
-original `appendDenylist` implementation). The backup is
-best-effort.
+**Pre-critical backup**: The pre-critical backup is performed
+**once** by the delegated `saveDenylist` path.
 
 **Request:**
 
@@ -1848,7 +1824,7 @@ content=tracker.example.com%0Aads.example.com
 }
 ```
 
-**Response — no change (API-3 fix):**
+**Response — no change:**
 
 ```json
 {
@@ -1862,19 +1838,12 @@ content=tracker.example.com%0Aads.example.com
 }
 ```
 
-> The `"Appended and processed N rules"` message reports the
-> **total blocklist entry count** (not the size of the deny
-> list). The `"No changes detected"` branch triggers when the
-> on-disk denylist is byte-identical to what the handler reads
-> back — in that case the atomic-save path short-circuits and
-> no rebuild is performed.
-
-> **v1.2.0 note (BUG-A)**: Prior to the post-audit fix, the
-> endpoint took no arguments and re-saved the current denylist
-> unchanged — a no-op that still consumed a pre-critical backup
-> slot. That behavior has been removed. Callers that relied on
-> it must now send a `content` parameter, or use
-> `POST /api/save_denylist` with the full new content.
+> **v1.5.0+ note**: the internal hash check now uses
+> `getRulesState().DenylistHash` — the same source that
+> `saveDenylist()` consults — instead of a freshly-read
+> `fileHash(DENYLIST_FILE)`. On the API surface this only changes
+> the edge case of an externally modified `denylist.txt`
+> (spurious `409` no longer occurs). Normal calls are unaffected.
 
 #### 6.2.8 `POST /api/clear_log_file`
 
@@ -1895,9 +1864,6 @@ file=dnscrypt_main.log.1726700000.old.gz
   "message": "File cleared successfully"
 }
 ```
-*Restrictions:*
-- Cannot clear the active log (`dnscrypt_main.log`).
-- Cannot clear sensitive files.
 
 #### 6.2.9 `POST /api/clear_logs`
 
@@ -1916,25 +1882,9 @@ Clear the main log.
 
 > **v1.4.0 CodeQL hardening**: The handler now sanitizes the
 > caller-provided path via `filepath.Base()` and rebuilds the
-> final path from the trusted `MODULES_DIR` constant:
->
-> ```go
-> name := filepath.Base(modulePath)
-> if name == "" || name == "." || name == ".." ||
->     name == string(filepath.Separator) {
->     return map[string]interface{}{
->         "status":  "error",
->         "message": "Invalid module name",
->     }
-> }
-> cleanPath := filepath.Join(MODULES_DIR, name)
-> ```
->
-> This closes two CodeQL `go/path-injection` alerts (#1 and #2)
-> that were filed against the previous implementation. No
-> user-controlled data reaches any path expression from this
-> point onwards. The endpoint's request/response contract is
-> **unchanged** — this is purely a defence-in-depth hardening.
+> final path from the trusted `MODULES_DIR` constant, using
+> `securejoin.SecureJoin`. This closes two CodeQL
+> `go/path-injection` alerts (#1 and #2).
 
 **Request:**
 
@@ -1954,27 +1904,12 @@ path=/data/adb/modules/dnscrypt-old
 }
 ```
 
-**Security:**
-- Path must be under `/data/adb/modules/`.
-- Path is sanitized via `filepath.Base()` before use.
-- Must contain `.module.fingerprint` with `dnscrypt-proxy-webui`.
-- Cannot remove the current module.
-
 **Response (400 — invalid path):**
 
 ```json
 {
   "status": "error",
   "message": "Invalid module name"
-}
-```
-
-**Response (400 — path outside MODULES_DIR):**
-
-```json
-{
-  "status": "error",
-  "message": "Invalid path"
 }
 ```
 
@@ -2007,12 +1942,6 @@ Content-Length: 0
 }
 ```
 
-**Notes:**
-- May take 1–60 s (depending on service state).
-- Recommended HTTP timeout: 60 s.
-- When stopping: `STATUS_FILE` = "OFF" (user intent).
-- When starting: `STATUS_FILE` = "ON" (user intent).
-
 **Response to GET (error):**
 
 ```http
@@ -2044,10 +1973,6 @@ Content-Length: 0
   "status": "ON"
 }
 ```
-*Notes:*
-- Internal flow: `stopService()` → `startService()`.
-- May take 2–60 s.
-- Recommended HTTP timeout: 60 s.
 
 #### 6.2.13 `POST /api/ensure_running_service`
 
@@ -2055,25 +1980,16 @@ Called by the Watchdog **and** (since v1.3.0) by `service.sh` at
 boot to ensure the DNS engine starts even when the WebUI has not
 yet loaded.
 
-**Authentication (v1.2.0 — BUG-B fix)**: As of v1.2.0 this
-endpoint has **TWO** distinct auth paths, in this order:
+**Authentication (v1.2.0)**: this endpoint has **TWO** distinct
+auth paths, in this order:
 
 1. **Watchdog token** (preferred for the Watchdog):
    - `POST` method, **and**
-   - request from a **loopback** address (`127.0.0.1`, `::1`, or
-     `localhost`), **and**
+   - request from a **loopback** address, **and**
    - `X-Watchdog-Token` header that matches the token at
      `$RUN_DIR/.watchdog_token` (constant-time comparison).
-   - If **any** of the three fails → fall through to path 2.
 
-2. **Normal user auth** (same as every other POST endpoint):
-   - Bearer / Cookie / Basic, as documented in §2.2.
-
-> **This is a change from v1.1.0.** The v1.1.0 behavior —
-> "localhost + POST → allowed unconditionally" — was removed
-> because it was CSRF-exploitable. See §2.8 for the full design
-> and migration guidance. **Clients that relied on the v1.1.0
-> bypass must now send the `X-Watchdog-Token` header.**
+2. **Normal user auth** (same as every other POST endpoint).
 
 **Request (with watchdog token):**
 
@@ -2081,14 +1997,6 @@ endpoint has **TWO** distinct auth paths, in this order:
 POST /api/ensure_running_service HTTP/1.1
 Host: 127.0.0.1:9090
 X-Watchdog-Token: 3f8e...  (64 hex chars)
-Content-Length: 0
-```
-
-**Request (with user session):**
-
-```http
-POST /api/ensure_running_service HTTP/1.1
-Cookie: dnscrypt_session=<token>
 Content-Length: 0
 ```
 
@@ -2121,16 +2029,6 @@ Content-Length: 0
 }
 ```
 
-**Response (busy):**
-
-```json
-{
-  "status": "error",
-  "action": "busy",
-  "message": "Service busy"
-}
-```
-
 **Response (401 — no token, no user auth):**
 
 ```json
@@ -2140,37 +2038,288 @@ Content-Length: 0
 }
 ```
 
-This endpoint relies on `STATUS_FILE` as "user intent":
-- `STATUS_FILE` = "ON" → DNS engine crashed; Watchdog restarts it.
-- `STATUS_FILE` = "OFF" → user stopped the service; Watchdog does nothing.
+**v1.3.0 note**: `service.sh` at boot performs the same POST call
+after waiting (bounded) for the WebUI to bind its port.
 
-**Authentication exemption details (API-7 fix)**:
-`isLocalRequest()` accepts **three** values:
-- `127.0.0.1`
-- `::1`
-- `localhost`
+#### 6.2.14 `POST /api/install_companion_app` (v1.5.0)
 
-Requests from a LAN IP (even with a valid token) go through
-normal user auth. Any method other than POST, or any other
-endpoint, goes through normal user auth.
+Performs a **root-level install** of the companion Android app.
+The server runs `proxy/install_app.sh`, which tries a 5-level
+`pm install` cascade.
 
-**v1.3.0 note**: `service.sh` at boot performs the same POST
-call after waiting (bounded) for the WebUI to bind its port.
-This is the fix for the previous issue where DNS auto-start was
-delayed by the Watchdog's 30-second polling interval. See
-`CHANGELOG.md` §[v1.3.0].
+**Auth**: session cookie (or Bearer/Basic) **AND** a valid
+one-shot CSRF token from §6.1.16. **Localhost only.**
 
-**Implementation cross-reference**:
+**Rate limit**: 5 **failed** attempts / 15 min per IP. A
+successful install resets the counter.
 
-| Concern | Location |
-|---|---|
-| Token file generation (install time) | `customize.sh` §[19b] |
-| Token file generation (runtime fallback) | `main.go:loadOrCreateWatchdogToken()` |
-| Token file path | `$RUN_DIR/.watchdog_token` (mode `0600`) |
-| Token verification | `main.go:verifyWatchdogToken()` — uses `subtle.ConstantTimeCompare` |
-| Header name | `X-Watchdog-Token` (constant `WATCHDOG_TOKEN_HEADER`) |
-| Watchdog consumer | `watchdog.sh` — reads the file on every API call (no cache) |
-| Helper (shell) | `functions.sh:get_watchdog_token()` (FSH-11) |
+**Retry policy**: the WebUI disables retries for this endpoint
+(`retries = 0` in `xhrPost`). Rationale: the first request
+consumes the CSRF token, so a retry would produce "Invalid or
+expired install token" even when the first install is still in
+progress.
+
+**Timeouts**:
+- Client-side (WebUI `getTimeoutForUrl`): **120 s**.
+- Server-side (`main.go` §[3b] `INSTALL_TIMEOUT`): **90 s**.
+- Cascade-side (`install_app.sh` §[2] `CASCADE_DEADLINE_SECONDS`):
+  **75 s**.
+- HTTP WriteTimeout (server, applies to every response):
+  **150 s**.
+
+The 75 s deadline is deliberately shorter than the 90 s
+`INSTALL_TIMEOUT`, so the `EXIT / INT / TERM` trap in
+`install_app.sh` always fires before `main.go`'s context deadline
+kills the script. See `docs/SECURITY.md` §5.36.4 for the trap
+semantics.
+
+**Request:**
+
+```http
+POST /api/install_companion_app HTTP/1.1
+Host: 127.0.0.1:9090
+Cookie: dnscrypt_session=<token>
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 71
+
+token=abc123def456789abc123def456789abc123def456789abc123def4567890
+```
+
+**Body params**:
+
+| Param | Required | Description |
+|---|---|---|
+| `token` | ✅ | The one-shot CSRF token from §6.1.16. 64 hex chars. |
+
+**Response (200 OK — install succeeded):**
+
+```json
+{
+  "status": "ok",
+  "action": "install",
+  "strategy": 1,
+  "package": "com.gasciljh.dnsproxy.debug",
+  "version_name": "1.0.0",
+  "expected_version": "1.0.0",
+  "apk_size": 3284803,
+  "sha_verified": true,
+  "message_ar": "تم تثبيت التطبيق بنجاح",
+  "message_en": "Companion app installed successfully"
+}
+```
+
+**Response (200 OK — install failed):**
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "message_ar": "فشلت جميع استراتيجيات التثبيت — جرّب التنزيل اليدوي",
+  "message_en": "All install strategies failed — try the manual download",
+  "hint_ar": "تأكد من أن الجهاز غير محمي بواسطة Play Protect.",
+  "hint_en": "Check that the device is not protected by Play Protect."
+}
+```
+
+> **Note**: a failed install returns **HTTP 200**. The `status`
+> field carries the failure. Only auth/rate-limit/token failures
+> use 4xx.
+
+**Response (401 — invalid or expired token):**
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "reason": "invalid_token",
+  "message": "Invalid or expired install token"
+}
+```
+
+**Response (401 — no session):**
+
+```json
+{
+  "status": "error",
+  "message": "Unauthorized"
+}
+```
+
+**Response (403 — non-localhost):**
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "reason": "not_localhost",
+  "message": "Forbidden: install is localhost-only"
+}
+```
+
+**Response (429 — rate limited):**
+
+```json
+{
+  "status": "error",
+  "action": "install",
+  "reason": "rate_limited",
+  "message": "Too many install attempts. Try again in 15 minutes."
+}
+```
+
+**Response field details**:
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string | `"ok"` or `"error"` |
+| `action` | string | Always `"install"` |
+| `reason` | string | Present on 4xx responses only. One of: `invalid_token`, `rate_limited`, `not_localhost`, `script_not_found`, `invalid_mode`, `no_json_output`. |
+| `strategy` | int (1-5) | Which cascade level succeeded. Present only on `status: "ok"`. |
+| `package` | string | Detected package name. Present only on success. |
+| `version_name` | string | Installed version. Present only on success. |
+| `expected_version` | string | Version expected by this module (`proxy/app-apk.version`). |
+| `apk_size` | int | APK size in bytes. |
+| `sha_verified` | bool | `true` if `web/app-debug.apk.sha256` was present and matched. |
+| `message_ar` | string | Arabic error/success message. |
+| `message_en` | string | English error/success message. |
+| `hint_ar` | string | Optional Arabic hint. Present only on some errors. |
+| `hint_en` | string | Optional English hint. Present only on some errors. |
+
+**The 5-level cascade** (first success wins):
+
+| Level | Command | Notes |
+|:-:|---|---|
+| **1** | `pm install -r --user 0 <apk>` | Direct install as the current user. |
+| **2** | `pm install -r --user 0 -i com.android.shell <apk>` | Install attributed to the shell app. |
+| **3** | Session-based (`install-create` + `install-write` + `install-commit`) | The same API Google Play uses. |
+| **4** | `magisk su -c "pm install -r <apk>"` | Explicit Magisk root. |
+| **5** | `cmd package install -r <apk>` | Modern PackageManager shell entrypoint (Android 8.0+). |
+
+After each level, the script polls `pm list packages` for up to
+15 seconds to confirm the install succeeded (the exit code of
+`pm install` alone is not reliable across ROMs).
+
+**SELinux staging**: the APK is first copied to
+`/data/local/tmp/dnscrypt-companion.apk` (context
+`shell_data_file`, readable by `system_server`). **SELinux is
+never disabled** — the script does not call `setenforce 0`. The
+staged copy is removed on exit by the trap.
+
+**Trap semantics**: the signal handling in `install_app.sh` uses
+**three separate handlers** (`EXIT` / `INT` / `TERM`) with a
+`_CLEANED_UP` re-entry guard inside a named `_cleanup_app()`
+function. The `INT` handler calls `exit 130`; the `TERM` handler
+calls `exit 143`. The staged APK is removed on every catchable
+exit path. This does not affect the HTTP contract — `main.go`
+sends SIGKILL after `INSTALL_TIMEOUT`, which is uncatchable, so
+the primary invocation path is unchanged.
+
+**Play Protect**: the package verifier is temporarily disabled
+during the cascade, and restored on exit via the three-way trap.
+The cascade is bounded by the 75 s deadline so the trap always
+fires inside `main.go`'s 90 s `INSTALL_TIMEOUT`. The trap restores
+the exact captured value (`$_VERIFIER_ORIG`), not a hardcoded `1`.
+
+**SHA256 verification**: if `web/app-debug.apk.sha256` is present,
+the APK's SHA256 is verified before any install strategy is
+attempted. If the `.sha256` file is absent, the script degrades
+to advisory mode.
+
+**Client-side handling — IDX-429 + IDX-401-DISTINCT**: the WebUI
+distinguishes:
+
+  • **429** → `t('installRateLimited')`.
+  • **401** → `t('installTokenError')` (session-expired modal
+    suppressed for install-family URLs).
+  • **403** → `t('installError')` with a "localhost only" hint.
+  • **other 4xx / 5xx** → `t('installError')`.
+
+**Verify:**
+
+```bash
+# 1. Get a token
+TOKEN=$(curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=install_token" | jq -r '.token')
+
+# 2. Install
+curl -s -b /tmp/cookies.txt \
+  -X POST http://127.0.0.1:9090/api/install_companion_app \
+  -d "token=$TOKEN" | jq
+
+# Expected (success):
+# {
+#   "status": "ok",
+#   "action": "install",
+#   "strategy": 1,
+#   "package": "com.gasciljh.dnsproxy.debug",
+#   "version_name": "1.0.0",
+#   "message_ar": "...",
+#   "message_en": "..."
+# }
+```
+
+#### 6.2.15 `POST /api/uninstall_companion_app` (v1.5.0)
+
+Removes the companion app package.
+
+**Status**: reserved for future UI. The v1.5.0 install-method
+modal (IDX-24) does **not** expose an uninstall button.
+
+**Auth**: session cookie (or Bearer/Basic). **Localhost only.**
+
+**Request:**
+
+```http
+POST /api/uninstall_companion_app HTTP/1.1
+Host: 127.0.0.1:9090
+Cookie: dnscrypt_session=<token>
+Content-Length: 0
+```
+
+**Response (200 OK — uninstall succeeded):**
+
+```json
+{
+  "status": "ok",
+  "action": "uninstall",
+  "package": "com.gasciljh.dnsproxy.debug",
+  "message_ar": "تمت إزالة التطبيق بنجاح",
+  "message_en": "Companion app uninstalled successfully"
+}
+```
+
+**Response (200 OK — uninstall failed):**
+
+```json
+{
+  "status": "error",
+  "action": "uninstall",
+  "message_ar": "فشلت إزالة التطبيق",
+  "message_en": "Uninstall failed"
+}
+```
+
+**Response (403 — non-localhost):**
+
+```json
+{
+  "status": "error",
+  "action": "uninstall",
+  "reason": "not_localhost",
+  "message": "Forbidden: install is localhost-only"
+}
+```
+
+**Implementation**: runs `pm uninstall <pkg>` for the first
+candidate that is currently installed. On success, the
+`companionStateCache` is invalidated.
+
+**Verify:**
+
+```bash
+curl -s -b /tmp/cookies.txt \
+  -X POST http://127.0.0.1:9090/api/uninstall_companion_app | jq
+```
 
 ---
 
@@ -2178,17 +2327,16 @@ delayed by the Watchdog's 30-second polling interval. See
 
 ### 7.1 `hasEndpoint()` Function
 
-Before:
+**Before**:
 
 ```go
 if strings.Contains(r.URL.Path, "update_profile") {
     // ← also matches: /api/update_profile_evil
-    // ← also matches: /prefix/api/update_profile
     // ← dangerous: loose match
 }
 ```
 
-After:
+**After**:
 
 ```go
 func hasEndpoint(path, name string) bool {
@@ -2207,26 +2355,11 @@ func hasEndpoint(path, name string) bool {
 | `/api/update_profile/child` | ✅ (**bug**) | ❌ |
 | `/api/save_allowlist_extra` | ❌ | ❌ |
 
-### 7.3 Examples
+### 7.3 Endpoints Using `hasEndpoint`
 
-Correct:
+All POST endpoints use `hasEndpoint`, including the v1.5.0
+install endpoints:
 
-```http
-POST /api/save_allowlist HTTP/1.1
-→ hasEndpoint(path, "save_allowlist") = true ✅
-```
-
-Incorrect (not handled):
-
-```http
-POST /api/save_allowlist_evil HTTP/1.1
-→ hasEndpoint(path, "save_allowlist") = false ❌
-→ returns 404 Not Found
-```
-
-### 7.4 Endpoints Using `hasEndpoint`
-
-All POST endpoints use `hasEndpoint`:
 - `auth/login`, `auth/logout`
 - `update_profile`
 - `save_allowlist`
@@ -2239,17 +2372,21 @@ All POST endpoints use `hasEndpoint`:
 - `toggle_service`
 - `restart_service`
 - `ensure_running_service`
+- `install_companion_app`
+- `uninstall_companion_app`
 
-### 7.5 Supported Path Variants
+### 7.4 Supported Path Variants
 
 For each endpoint, these two paths are equivalent:
 
 ```text
 ✅ /api/save_allowlist        ← canonical
 ✅ /api/save_allowlist/       ← trailing slash
+✅ /api/install_companion_app
+✅ /api/install_companion_app/
 ```
 
-### 7.6 Rejected Path Variants
+### 7.5 Rejected Path Variants
 
 ```text
 ❌ /api/save_allowlist_extra  ← suffix
@@ -2258,19 +2395,21 @@ For each endpoint, these two paths are equivalent:
 ❌ /api/SAVE_ALLOWLIST        ← case-sensitive
 ```
 
-### 7.7 Test Coverage
+### 7.6 Test Coverage
 
 ```bash
-# Quick check on the source
 grep -q 'func hasEndpoint' proxy/main.go && echo "✅ present"
 
-# Runtime check
 curl -i "http://127.0.0.1:9090/api?action=nonexistent"
 # → 404 Not Found
 
 curl -i -X POST "http://127.0.0.1:9090/api/save_allowlist_evil" \
   -b /tmp/cookies.txt
 # → 404 Not Found (not treated as save_allowlist)
+
+curl -i -X POST "http://127.0.0.1:9090/api/install_companion_app/" \
+  -b /tmp/cookies.txt
+# → 401 (trailing slash accepted, but no token)
 ```
 
 ---
@@ -2295,12 +2434,6 @@ Cache-Control: no-cache
 Connection: keep-alive
 X-Accel-Buffering: no
 ```
-
-**Behavior:**
-- Connection stays open.
-- Keepalive every 15 s (`: keepalive\n\n`).
-- Write Deadline: 30 s per flush.
-- Slow clients are disconnected after 30 s.
 
 ### 8.2 Event Types
 
@@ -2340,10 +2473,6 @@ data: 100|✅ Protection applied successfully (250000 entries)
 ### 8.4 JavaScript Client
 
 ```javascript
-// API-6 fix: `withCredentials` is not passed — it is unnecessary
-// for same-origin requests. The /events endpoint is same-origin
-// with both the WebUI (9090) and the Dashboard (9091), so the
-// browser sends cookies automatically.
 const sse = new EventSource('/events');
 
 sse.addEventListener('status', (e) => {
@@ -2360,24 +2489,7 @@ sse.onerror = () => {
 };
 ```
 
-> **Note (v1.2.0)**: `withCredentials: true` is optional for
-> same-origin requests — cookies are sent automatically. The
-> WebUI and Dashboard dropped this option in v1.2.0 as part of a
-> cleanup. It remains supported by the browser for clients that
-> connect from a different origin (rare, and usually blocked by
-> CORS anyway).
-
 ### 8.5 SSE Write Deadline
-
-Problem in the old design:
-
-```go
-// http.Server.WriteTimeout = 0 (infinite)
-// If the client is slow (TCP buffer full), Fprint blocks forever
-fmt.Fprint(w, msg)   // ← may hang the goroutine
-```
-
-Solution:
 
 ```go
 rc := http.NewResponseController(w)
@@ -2407,7 +2519,7 @@ ok
 
 **Public** — does not require auth.
 
-### 9.2 `GET /readyz` — localhost-only (Fix NEW-4)
+### 9.2 `GET /readyz` — localhost-only
 
 Readiness check. Verifies dependencies.
 
@@ -2421,7 +2533,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "ok",
-  "version": "v1.4.0",
+  "version": "v1.5.0",
   "status": "ready"
 }
 ```
@@ -2434,7 +2546,7 @@ Requests from outside localhost → **403 Forbidden**.
   "blocklist": "ok",
   "run_dir": "ok",
   "dns_engine": "not_running",
-  "version": "v1.4.0",
+  "version": "v1.5.0",
   "status": "unhealthy"
 }
 ```
@@ -2449,24 +2561,6 @@ Content-Type: application/json
   "error": "readyz is localhost-only"
 }
 ```
-
-> **Exception**: `/readyz` is one of the few endpoints that
-> returns `{"error": ...}` instead of `{"status": "error",
-> "message": ...}`. This is because it is served by the dedicated
-> `handleReadyz` handler, not by `handleAPI`. See §4.2.
-
-*Checks:*
-- `config` — `dnscrypt-proxy.toml` exists.
-- `blocklist` — `blocklist.txt` readable.
-- `run_dir` — `proxy/run/` writable.
-- `dns_engine` — dnscrypt-proxy running on 5354.
-
-**Difference between `/healthz` and `/readyz`:**
-
-| Endpoint | Access | Info Exposed | Use Case |
-|----------|:---:|---|---|
-| `/healthz` | public | `ok` only | Load balancer liveness |
-| `/readyz` | localhost-only | system details | Debugging + startup |
 
 ### 9.3 Docker / Kubernetes
 
@@ -2509,13 +2603,8 @@ curl -b /tmp/cookies.txt http://127.0.0.1:9090/api?action=status
 **Toggle (POST):**
 
 ```bash
-# ✅ correct — POST
 curl -b /tmp/cookies.txt \
   -X POST http://127.0.0.1:9090/api/toggle_service
-
-# ❌ wrong — GET (CSRF protection)
-curl -b /tmp/cookies.txt http://127.0.0.1:9090/api?action=toggle
-# → 405 Method Not Allowed + Allow: POST
 ```
 
 **Restart:**
@@ -2534,13 +2623,10 @@ curl -b /tmp/cookies.txt \
   -d "expected_hash=abc123..."
 ```
 
-**Ensure running (v1.2.0 — with watchdog token):**
+**Ensure running (with watchdog token):**
 
 ```bash
-# Read the token file
 TOKEN=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token")
-
-# Send it as a header
 curl -X POST http://127.0.0.1:9090/api/ensure_running_service \
   -H "X-Watchdog-Token: $TOKEN"
 ```
@@ -2551,89 +2637,58 @@ curl -X POST http://127.0.0.1:9090/api/ensure_running_service \
 curl -b /tmp/cookies.txt -N http://127.0.0.1:9090/events
 ```
 
-**Download log:**
+**Metrics:**
 
 ```bash
-curl -b /tmp/cookies.txt \
-  -o dnscrypt_main.log \
-  "http://127.0.0.1:9090/api/download_log?file=dnscrypt_main.log"
-```
-
-**Metrics (Dashboard):**
-
-```bash
-# Now returns JSON instead of Prometheus text
 curl -b /tmp/cookies.txt http://127.0.0.1:9091/api/metrics | jq
-
-# Expected: JSON with total_queries, blocked_queries, cache_stats, ...
 ```
 
-**Companion APK route (v1.4.0):**
+**Companion APK route:**
 
 ```bash
-# Check if the companion APK is available
 curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
 # Expected when present:
 #   HTTP/1.1 200 OK
 #   Content-Type: application/vnd.android.package-archive
 #   Cache-Control: public, max-age=3600, immutable
-
-# Download it
-curl -o DNS-Proxy.apk http://127.0.0.1:9090/app-debug.apk
 ```
 
-**Basic Auth rate limiting:**
+**v1.5.0 — Full companion install flow (two requests):**
 
 ```bash
-# 5 failed attempts → 15-minute lockout
+# 1. Generate the one-shot CSRF token
+TOKEN=$(curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=install_token" | jq -r '.token')
+
+# 2. Install
+curl -s -b /tmp/cookies.txt \
+  -X POST http://127.0.0.1:9090/api/install_companion_app \
+  -d "token=$TOKEN" | jq
+
+# 3. Verify state
+curl -s -b /tmp/cookies.txt \
+  "http://127.0.0.1:9090/api?action=companion_app_state" | jq
+```
+
+**v1.5.0 — Uninstall (reserved for future UI):**
+
+```bash
+curl -s -b /tmp/cookies.txt \
+  -X POST http://127.0.0.1:9090/api/uninstall_companion_app | jq
+```
+
+**v1.5.0+ — Detecting HTTP 429 (install rate limit):**
+
+```bash
 for i in 1 2 3 4 5 6; do
-  curl -u "wronguser:wrongpass" http://127.0.0.1:9090/api?action=status
-  echo ""
+  TOKEN=$(curl -s -b /tmp/cookies.txt \
+    "http://127.0.0.1:9090/api?action=install_token" | jq -r '.token')
+  CODE=$(curl -s -o /dev/null -w "%{http_code}" -b /tmp/cookies.txt \
+    -X POST "http://127.0.0.1:9090/api/install_companion_app" \
+    -d "token=$TOKEN")
+  echo "attempt $i → HTTP $CODE"
 done
-# Each response is HTTP 401. After the 5th failure the IP is
-# locked; the 6th request still returns 401 (no 429 — 429 is
-# only emitted by handleLogin for the /api/auth/login endpoint).
-```
-
-**Login GET rejected:**
-
-```bash
-curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
-# HTTP/1.1 405 Method Not Allowed
-# Allow: POST
-```
-
-**Unknown action:**
-
-```bash
-curl -i "http://127.0.0.1:9090/api?action=foo"
-# HTTP/1.1 404 Not Found
-```
-
-**v1.1.0 — Runtime info with profile + memory:**
-
-```bash
-# Full runtime_info
-curl -b /tmp/cookies.txt \
-  "http://127.0.0.1:9090/api?action=runtime_info" | jq
-
-# Only the two v1.1.0 fields
-curl -b /tmp/cookies.txt \
-  "http://127.0.0.1:9090/api?action=runtime_info" | jq '{profile_key, memory_limit_mb}'
-# Expected: {"profile_key": "pro", "memory_limit_mb": 120}
-```
-
-**v1.2.0 — Runtime info with backup state (all three path forms):**
-
-```bash
-# Path form
-curl -b /tmp/cookies.txt http://127.0.0.1:9090/api/runtime_info | jq '.backups'
-
-# Path form with trailing slash (BUG-6 fix — same JSON)
-curl -b /tmp/cookies.txt http://127.0.0.1:9090/api/runtime_info/ | jq '.backups'
-
-# Query-string form (same JSON)
-curl -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups'
+# Expected: 200 for the first 5, 429 for the 6th.
 ```
 
 ### 10.2 Python
@@ -2644,14 +2699,6 @@ import requests
 BASE = "http://127.0.0.1:9090"
 DASHBOARD = "http://127.0.0.1:9091"
 
-# Login
-r = requests.post(f"{BASE}/api/auth/login", json={
-    "username": "admin_abc12345",
-    "password": "SecurePass123",
-})
-r.raise_for_status()
-
-# Session with cookies
 s = requests.Session()
 s.post(f"{BASE}/api/auth/login", json={
     "username": "admin_abc12345",
@@ -2661,10 +2708,6 @@ s.post(f"{BASE}/api/auth/login", json={
 # Status
 status = s.get(f"{BASE}/api?action=status").json()
 print(f"Service: {status['status']}")
-
-# Toggle (POST)
-new_status = s.post(f"{BASE}/api/toggle_service").json()
-print(f"New status: {new_status['status']}")
 
 # Save allowlist
 resp = s.post(f"{BASE}/api/save_allowlist", data={
@@ -2676,45 +2719,42 @@ print(resp.json())
 # Metrics
 metrics = s.get(f"{DASHBOARD}/api/metrics").json()
 print(f"Total queries: {metrics['total_queries']}")
-print(f"Blocked: {metrics['blocked_queries']}")
-print(f"Cache hit ratio: {metrics['cache_stats']['cache_hit_ratio']:.2%}")
 
-# Runtime info (PORT-2 + MEM-1 + BAK-1)
+# Runtime info
 info = s.get(f"{BASE}/api?action=runtime_info").json()
-print(f"WebUI port: {info['webui_port']}")
-print(f"Dashboard port: {info['dashboard_port']}")
 print(f"Profile: {info['profile_key']}")
 print(f"Memory limit: {info['memory_limit_mb']} MB")
 
-# v1.2.0 — Backup state
-bk = info["backups"]
-print(f"Backups available: {bk['available']}")
-print(f"Latest backup: {bk['last_backup_name']}")
-print(f"Last stable: {bk['last_stable']}")
-print(f"In-flight txn: {bk['in_flight_txn']}")
-print(f"Orphan txn: {bk['orphan_txn']}")
-print(f"Backup path: {bk['path']}")
+# v1.5.0 — Companion install flow
+token_resp = s.get(f"{BASE}/api?action=install_token").json()
+token = token_resp["token"]
+print(f"Token TTL: {token_resp['ttl']} s")
 
-# v1.4.0 — Companion APK availability
-apk_head = s.head(f"{BASE}/app-debug.apk")
-print(f"Companion APK: HTTP {apk_head.status_code}")
+install_resp = s.post(f"{BASE}/api/install_companion_app", data={
+    "token": token,
+})
 
-# v1.2.0 — Watchdog token (from device)
-# Note: this is normally done by watchdog.sh on the device itself.
-# The example below assumes the caller has root access to read the file.
-try:
-    import subprocess
-    token = subprocess.check_output([
-        "su", "-c",
-        "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
-    ]).decode().strip()
-    resp = requests.post(
-        f"{BASE}/api/ensure_running_service",
-        headers={"X-Watchdog-Token": token},
-    )
-    print(f"ensure_running_service: {resp.json()}")
-except Exception as e:
-    print(f"Watchdog token not available: {e}")
+# Distinguish the three failure modes (IDX-429 + IDX-401-DISTINCT).
+if install_resp.status_code == 429:
+    print("🚫 Rate limited — retry in 15 minutes.")
+elif install_resp.status_code == 401:
+    print("❌ CSRF token expired or invalid (session is fine).")
+elif install_resp.status_code == 403:
+    print("❌ Non-localhost request.")
+else:
+    result = install_resp.json()
+    if result["status"] == "ok":
+        print(f"✅ Installed: {result['package']} v{result['version_name']}")
+        print(f"   Strategy: {result['strategy']} (1=safest, 5=last resort)")
+    else:
+        print(f"❌ {result.get('message_en', 'Unknown error')}")
+        if result.get("hint_en"):
+            print(f"   Hint: {result['hint_en']}")
+
+# Companion state
+state = s.get(f"{BASE}/api?action=companion_app_state").json()
+print(f"Installed: {state['installed']}")
+print(f"Version: {state.get('version_name', 'n/a')} (expected: {state['expected_version']})")
 ```
 
 ### 10.3 Go
@@ -2729,10 +2769,10 @@ import (
     "io"
     "net/http"
     "net/http/cookiejar"
+    "net/url"
 )
 
 const base = "http://127.0.0.1:9090"
-const dashboard = "http://127.0.0.1:9091"
 
 func main() {
     jar, _ := cookiejar.New(nil)
@@ -2744,65 +2784,41 @@ func main() {
         "password": "SecurePass123",
     }
     body, _ := json.Marshal(creds)
-
-    resp, err := client.Post(base+"/api/auth/login", "application/json",
+    client.Post(base+"/api/auth/login", "application/json",
         bytes.NewReader(body))
-    if err != nil {
-        panic(err)
-    }
-    defer resp.Body.Close()
 
-    // Status
-    resp2, _ := client.Get(base + "/api?action=status")
-    defer resp2.Body.Close()
-    b2, _ := io.ReadAll(resp2.Body)
-    fmt.Println(string(b2))
+    // v1.5.0 — Companion install flow
 
-    // Toggle (POST)
-    resp3, _ := client.Post(base+"/api/toggle_service",
-        "application/x-www-form-urlencoded", nil)
-    defer resp3.Body.Close()
-    b3, _ := io.ReadAll(resp3.Body)
-    fmt.Println(string(b3))
+    // 1. Get token
+    respTok, _ := client.Get(base + "/api?action=install_token")
+    defer respTok.Body.Close()
+    var tok map[string]interface{}
+    json.NewDecoder(respTok.Body).Decode(&tok)
+    fmt.Printf("Token TTL: %v s\n", tok["ttl"])
 
-    // Metrics
-    resp4, _ := client.Get(dashboard + "/api/metrics")
-    defer resp4.Body.Close()
-    var metrics map[string]interface{}
-    json.NewDecoder(resp4.Body).Decode(&metrics)
-    fmt.Printf("Total queries: %v\n", metrics["total_queries"])
+    // 2. Install
+    token := tok["token"].(string)
+    respInst, _ := client.PostForm(base+"/api/install_companion_app",
+        url.Values{"token": {token}})
+    defer respInst.Body.Close()
 
-    // Runtime info (PORT-2 + MEM-1 + BAK-1)
-    resp5, _ := client.Get(base + "/api?action=runtime_info")
-    defer resp5.Body.Close()
-    var info map[string]interface{}
-    json.NewDecoder(resp5.Body).Decode(&info)
-    fmt.Printf("WebUI port: %v\n", info["webui_port"])
-    fmt.Printf("Dashboard port: %v\n", info["dashboard_port"])
-    fmt.Printf("Profile: %v\n", info["profile_key"])
-    fmt.Printf("Memory limit: %v MB\n", info["memory_limit_mb"])
-
-    // v1.2.0 — Backup state
-    if bk, ok := info["backups"].(map[string]interface{}); ok {
-        fmt.Printf("Backups available: %v\n", bk["available"])
-        fmt.Printf("Latest backup: %v\n", bk["last_backup_name"])
-        fmt.Printf("In-flight txn: %v\n", bk["in_flight_txn"])
-        fmt.Printf("Orphan txn: %v\n", bk["orphan_txn"])
+    switch respInst.StatusCode {
+    case http.StatusTooManyRequests:
+        fmt.Println("🚫 Rate limited — retry in 15 minutes.")
+    case http.StatusUnauthorized:
+        fmt.Println("❌ CSRF token expired or invalid (session is fine).")
+    case http.StatusForbidden:
+        fmt.Println("❌ Non-localhost request.")
+    default:
+        instBody, _ := io.ReadAll(respInst.Body)
+        fmt.Printf("Install: HTTP %d\n%s\n", respInst.StatusCode, instBody)
     }
 
-    // v1.4.0 — Companion APK availability
-    resp6, _ := client.Head(base + "/app-debug.apk")
-    defer resp6.Body.Close()
-    fmt.Printf("Companion APK: HTTP %d\n", resp6.StatusCode)
-
-    // v1.2.0 — Watchdog token
-    // (see Python example §10.2 for the same call)
-    req7, _ := http.NewRequest("POST",
-        base+"/api/ensure_running_service", nil)
-    req7.Header.Set("X-Watchdog-Token", "…64-hex-chars…")
-    resp7, _ := client.Do(req7)
-    defer resp7.Body.Close()
-    fmt.Printf("ensure_running_service: HTTP %d\n", resp7.StatusCode)
+    // 3. State
+    respState, _ := client.Get(base + "/api?action=companion_app_state")
+    defer respState.Body.Close()
+    stateBody, _ := io.ReadAll(respState.Body)
+    fmt.Printf("State: %s\n", stateBody)
 }
 ```
 
@@ -2810,76 +2826,45 @@ func main() {
 
 ```javascript
 const BASE = 'http://127.0.0.1:9090';
-const DASHBOARD = 'http://127.0.0.1:9091';
 
-async function login(username, password) {
-  const resp = await fetch(`${BASE}/api/auth/login`, {
+async function installCompanionApp() {
+  const tokResp = await fetch(`${BASE}/api?action=install_token`, {
+    credentials: 'same-origin',
+  });
+  if (!tokResp.ok) {
+    console.error('Failed to get token:', tokResp.status);
+    return;
+  }
+  const { token } = await tokResp.json();
+
+  const installResp = await fetch(`${BASE}/api/install_companion_app`, {
     method: 'POST',
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `token=${encodeURIComponent(token)}`,
   });
-  return resp.json();
-}
 
-async function getStatus() {
-  const resp = await fetch(`${BASE}/api?action=status`, {
-    credentials: 'same-origin',
-  });
-  return resp.json();
-}
+  if (installResp.status === 429) {
+    console.error('🚫 Too many install attempts. Try again later.');
+    return;
+  }
+  if (installResp.status === 401) {
+    console.error('❌ CSRF token expired. Please retry the install.');
+    return;
+  }
+  if (installResp.status === 403) {
+    console.error('❌ Install is localhost-only.');
+    return;
+  }
 
-// Toggle — POST
-async function toggleService() {
-  const resp = await fetch(`${BASE}/api/toggle_service`, {
-    method: 'POST',
-    credentials: 'same-origin',
-  });
-  return resp.json();
-}
-
-// Restart — POST
-async function restartService() {
-  const resp = await fetch(`${BASE}/api/restart_service`, {
-    method: 'POST',
-    credentials: 'same-origin',
-  });
-  return resp.json();
-}
-
-// Metrics
-async function getMetrics() {
-  const resp = await fetch(`${DASHBOARD}/api/metrics`, {
-    credentials: 'same-origin',
-  });
-  return resp.json();
-}
-
-// Runtime info (PORT-2 + MEM-1 + BAK-1)
-async function getRuntimeInfo() {
-  const resp = await fetch(`${BASE}/api?action=runtime_info`, {
-    credentials: 'same-origin',
-  });
-  return resp.json();
-}
-
-// v1.4.0 — Check companion APK availability
-async function checkCompanionApk() {
-  const resp = await fetch(`${BASE}/app-debug.apk`, { method: 'HEAD' });
-  return resp.status === 200;
-}
-
-// v1.2.0 — Ensure running with watchdog token
-// Note: browsers cannot read files from the device filesystem,
-// so this example is only useful when the token has been
-// supplied to the page by some other means (e.g. a
-// user-provided text field during a diagnostics session).
-async function ensureRunning(watchdogToken) {
-  const resp = await fetch(`${BASE}/api/ensure_running_service`, {
-    method: 'POST',
-    headers: { 'X-Watchdog-Token': watchdogToken },
-  });
-  return resp.json();
+  const result = await installResp.json();
+  if (result.status === 'ok') {
+    console.log(`✅ Installed via strategy ${result.strategy}`);
+    console.log(`   Package: ${result.package}`);
+  } else {
+    console.error(`❌ ${result.message_en}`);
+  }
+  return result;
 }
 ```
 
@@ -2901,94 +2886,48 @@ curl -i "http://127.0.0.1:9090/api/auth/login?username=admin&password=X"
 # Allow: POST
 ```
 
-**Toggle GET:**
+**ensure_running_service without any auth:**
 
 ```bash
-curl -i -b /tmp/cookies.txt "http://127.0.0.1:9090/api?action=toggle"
-# HTTP/1.1 405 Method Not Allowed
-# Allow: POST
-# {"status": "error", "message": "...", "hint": "Use POST /api/toggle_service"}
-```
-
-**/readyz from LAN:**
-
-```bash
-# From another device on the LAN
-curl -i "http://192.168.1.5:9091/readyz"
-# HTTP/1.1 403 Forbidden
-# {"error": "readyz is localhost-only"}
-```
-
-**ensure_running_service without any auth (v1.2.0):**
-
-```bash
-# No watchdog token, no session cookie
 curl -i -X POST http://127.0.0.1:9090/api/ensure_running_service
 # HTTP/1.1 401 Unauthorized
 # {"status": "error", "message": "Unauthorized"}
 ```
 
-### 10.6 Backup Diagnostics (v1.2.0)
+**v1.5.0 — install without token:**
+
+```bash
+curl -i -X POST http://127.0.0.1:9090/api/install_companion_app \
+  -b /tmp/cookies.txt
+# HTTP/1.1 401 Unauthorized
+# {"status": "error", "action": "install", "reason": "invalid_token", "message": "Invalid or expired install token"}
+```
+
+**v1.5.0+ — install_token from a non-localhost address** (only
+if `BIND_ADDR=0.0.0.0` on the server):
+
+```bash
+curl -i "http://192.168.1.5:9090/api?action=install_token" \
+  -b /tmp/cookies.txt
+# HTTP/1.1 403 Forbidden
+# {"status": "error", "action": "install_token", "reason": "not_localhost", "message": "Forbidden: install is localhost-only"}
+```
+
+### 10.6 Backup Diagnostics
 
 **Read the full backup state via the API:**
 
 ```bash
-# Full runtime_info (includes the backups object)
 curl -b /tmp/cookies.txt \
   "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups'
 ```
 
-Expected shape:
-
-```json
-{
-  "available": 7,
-  "in_flight_txn": 0,
-  "orphan_txn": 0,
-  "last_backup": "2026-09-26 15:00:00",
-  "last_backup_name": "20260926-150000-manual",
-  "last_stable": "20260926-095826-v1.2.0",
-  "path": "/sdcard/dnscrypt-webui-backup"
-}
-```
-
-**Only the essential fields:**
-
-```bash
-curl -b /tmp/cookies.txt \
-  "http://127.0.0.1:9090/api?action=runtime_info" \
-  | jq '{available: .backups.available, latest: .backups.last_backup_name, last_stable: .backups.last_stable}'
-```
-
-**Detect a degraded backup layer:**
-
-```bash
-# Any non-zero txn count means the installer needs attention.
-curl -b /tmp/cookies.txt \
-  "http://127.0.0.1:9090/api?action=runtime_info" \
-  | jq 'select(.backups.in_flight_txn > 0 or .backups.orphan_txn > 0)'
-```
-
-**Compare with `status.sh --json` (API-2 fix):**
-
-The `backups` object has **different shapes** depending on the
-source. Both describe the same reality; they differ only in the
-amount of diagnostic detail they expose:
+**Compare with `status.sh --json`:**
 
 | Source | Field count | Extra fields |
 |---|---:|---|
 | `runtime_info` (HTTP API) | **7** | — |
 | `status.sh --json` (shell) | **9** | `status`, `last_backup_age_seconds` |
-
-The two shell-only fields are:
-- **`status`** — `"ok"` \| `"empty"` \| `"missing"`. A coarse
-  classification of the backup layer's health.
-- **`last_backup_age_seconds`** — integer number of seconds since
-  the newest snapshot. Provided so that shell scripts do not have
-  to compute the delta themselves (there is no `date -r` in some
-  Android shells).
-
-Run both and compare the seven shared fields:
 
 ```bash
 # API (7 fields)
@@ -2999,112 +2938,36 @@ curl -b /tmp/cookies.txt \
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups | keys'
 ```
 
-Both paths return the same seven shared fields. If the seven
-shared fields ever diverge, the `main.go` and `status.sh`
-versions are out of sync — restart the WebUI (or reinstall the
-module) to pick up the matching versions.
+### 10.7 Recovery Mode
 
-**Trigger a manual backup (on the device):**
+**Trigger recovery:**
 
 ```bash
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
-```
-
-**Run the full diagnostic report (on the device):**
-
-```bash
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
-```
-
-The `--diagnose` report is human-readable and includes:
-- System + module info.
-- The 5 user data files with size + mtime.
-- The backup listing (sorted by name).
-- In-flight + orphan transaction listings.
-- Recovery mode state.
-- Health checks with a final ✅ / ⚠️ / ❌.
-
-### 10.7 Recovery Mode (v1.2.0)
-
-Recovery mode restores the last known-good configuration from
-the persistent backup directory. It is intended for scenarios
-where the module cannot boot normally or user data was
-corrupted.
-
-**Trigger recovery (on the device):**
-
-```bash
-# Option A — module-specific trigger
 su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"
 su -c "reboot"
-
-# Option B — external trigger (survives module folder loss)
-su -c "touch /data/adb/dnscrypt-recovery"
-su -c "reboot"
 ```
-
-On the next boot, `customize.sh` runs before normal installation
-and restores the last known-good snapshot. Then it continues
-with the normal install flow.
-
-**Recovery source priority** (enforced by `customize.sh §[8a]`):
-
-1. `$PERSISTENT_BACKUP/.last_stable` → the pointer file.
-2. `$PERSISTENT_BACKUP/current/` → the live snapshot.
-3. `$FOUND_SOURCE` → the in-place data (fallback).
 
 **Verify the recovery succeeded:**
 
 ```bash
-# After the reboot, check the runtime info
 curl -b /tmp/cookies.txt \
   "http://127.0.0.1:9090/api?action=runtime_info" | jq '.backups.last_stable'
 ```
 
-**Inspect the recovery log:**
+### 10.8 Language Preference
 
-```bash
-su -c "grep 'RECOVERY MODE' /data/local/tmp/dnscrypt_install.log"
-```
-
-**Full documentation:**
-- [`docs/EMERGENCY.md`](EMERGENCY.md) — step-by-step recovery procedures.
-- [`docs/BACKUP.md`](BACKUP.md) — backup system reference.
-- [`docs/UPGRADE.md`](UPGRADE.md) §3.1 — the v1.1.0 → v1.2.0 upgrade path.
-
-### 10.8 Language Preference (v1.2.0)
-
-**The API is language-neutral.** The WebUI's bilingual toggle
-(English default + Arabic) is a **client-side concern only**:
-
-- The preference is stored in `localStorage['dnscrypt-lang']`
-  (values: `"en"` or `"ar"`).
-- No API endpoint accepts or returns a language identifier.
-- No server-side state is involved.
-- The Service Worker cache (`web/sw.js`) is language-neutral:
-  it caches the HTML once, and the toggle operates on the DOM.
-
-**Verify the client state (from the browser console):**
+The API is language-neutral. The bilingual toggle is a
+**client-side concern only**.
 
 ```javascript
-// Read the current preference
 localStorage.getItem('dnscrypt-lang')  // → "en" (default) or "ar"
-
-// Read the current document state
-document.documentElement.lang  // → "en" or "ar"
-document.documentElement.dir   // → "ltr" or "rtl"
 ```
 
-**Impact on API clients**: **None.** A script that calls the API
-does not need to know or set the language. The JSON payloads are
-identical regardless of the WebUI language.
-
-### 10.9 Companion APK Route (v1.4.0)
+### 10.9 Companion APK Route
 
 **Check availability:**
 
 ```bash
-# HTTP HEAD — fastest way to check if the APK is available
 curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
 ```
 
@@ -3114,384 +2977,284 @@ curl -sI http://127.0.0.1:9090/app-debug.apk | head -3
 curl -o DNS-Proxy.apk http://127.0.0.1:9090/app-debug.apk
 ```
 
-**Verify the APK is a valid ZIP (APK = ZIP):**
+### 10.10 Watchdog Token
 
-```bash
-file DNS-Proxy.apk
-# Expected: Android package (APK), Zip archive data
-```
-
-**Expected status codes:**
-
-| Scenario | HTTP Status | Notes |
-|---|---|---|
-| APK bundled (release build) | **200 OK** | Content-Type + Cache-Control set |
-| APK absent (dev build) | **404 Not Found** | `text/plain` body |
-
-**The WebUI install button** (`index.html`) uses a direct link:
-
-```html
-<a id="pwaInstallBtn" class="pwa-install-btn"
-   href="/app-debug.apk" download="DNS-Proxy.apk">
-    📲 Install App
-</a>
-```
-
-- No JavaScript required.
-- No browser-specific logic.
-- The `download` attribute forces the browser to download the
-  file rather than navigate to it.
-
-### 10.10 Watchdog Token (v1.2.0)
-
-**Read the token file (requires root):**
+**Read the token file:**
 
 ```bash
 su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
-# → e.g. 3f8e2a1b...  (64 hex chars)
 ```
 
-**Call the endpoint with the token:**
+**Call the endpoint:**
 
 ```bash
 TOKEN=$(su -c "cat /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token")
 curl -i -X POST http://127.0.0.1:9090/api/ensure_running_service \
   -H "X-Watchdog-Token: $TOKEN"
-# HTTP/1.1 200 OK
-# {"status": "ON", "action": "started"}
 ```
 
-**Call the endpoint without the token** (should fail unless a
-user session is active):
+### 10.11 Companion Install — Complete Workflow (v1.5.0)
 
 ```bash
-curl -i -X POST http://127.0.0.1:9090/api/ensure_running_service
-# HTTP/1.1 401 Unauthorized
-# {"status": "error", "message": "Unauthorized"}
+#!/system/bin/sh
+# v1.5.0 — companion install from a shell script.
+
+BASE="http://127.0.0.1:9090"
+COOKIE_JAR="/tmp/dnscrypt_cookies.txt"
+
+# 0. Login (if not already logged in)
+curl -s -c "$COOKIE_JAR" -X POST "$BASE/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"pass"}' > /dev/null
+
+# 1. Check if already installed
+STATE=$(curl -s -b "$COOKIE_JAR" "$BASE/api?action=companion_app_state")
+INSTALLED=$(echo "$STATE" | jq -r '.installed')
+if [ "$INSTALLED" = "true" ]; then
+    echo "Already installed:"
+    echo "$STATE" | jq
+    exit 0
+fi
+
+# 2. Get a CSRF token
+TOKEN=$(curl -s -b "$COOKIE_JAR" "$BASE/api?action=install_token" | jq -r '.token')
+if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+    echo "❌ Failed to get install token"
+    exit 1
+fi
+
+# 3. Install — capture both the status code and the body
+RESP=$(curl -s -b "$COOKIE_JAR" -w "\n%{http_code}" \
+  -X POST "$BASE/api/install_companion_app" \
+  -d "token=$TOKEN")
+
+HTTP_CODE=$(echo "$RESP" | tail -n1)
+BODY=$(echo "$RESP" | sed '$d')
+
+case "$HTTP_CODE" in
+    200)
+        STATUS=$(echo "$BODY" | jq -r '.status')
+        if [ "$STATUS" = "ok" ]; then
+            STRATEGY=$(echo "$BODY" | jq -r '.strategy')
+            PACKAGE=$(echo "$BODY" | jq -r '.package')
+            VERSION=$(echo "$BODY" | jq -r '.version_name')
+            echo "✅ Installed: $PACKAGE v$VERSION (strategy $STRATEGY)"
+        else
+            echo "❌ Install failed:"
+            echo "$BODY" | jq -r '.message_en'
+            if echo "$BODY" | jq -e '.hint_en' > /dev/null 2>&1; then
+                echo "   Hint: $(echo "$BODY" | jq -r '.hint_en')"
+            fi
+            exit 1
+        fi
+        ;;
+    429)
+        echo "🚫 Too many install attempts. Try again in 15 minutes."
+        exit 1
+        ;;
+    401)
+        echo "❌ CSRF token expired. Please retry the install."
+        exit 1
+        ;;
+    403)
+        echo "❌ Install is localhost-only."
+        exit 1
+        ;;
+    *)
+        echo "❌ Unexpected HTTP $HTTP_CODE"
+        echo "$BODY" | jq
+        exit 1
+        ;;
+esac
+
+# 4. Verify
+curl -s -b "$COOKIE_JAR" "$BASE/api?action=companion_app_state" | jq
 ```
 
-**Regenerate the token** (delete the file; `main.go` recreates it
-on the next run):
+**Fallback to manual download when install fails:**
 
 ```bash
-su -c "rm /data/adb/modules/dnscrypt-proxy-webui/proxy/run/.watchdog_token"
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
+# If the root install fails, the APK is still available at:
+#   http://127.0.0.1:9090/app-debug.apk
+curl -o /sdcard/Download/DNS-Proxy.apk \
+  "http://127.0.0.1:9090/app-debug.apk"
 ```
-
-**Full documentation:**
-- §2.8 above — design and lifecycle.
-- `ARCHITECTURE.md` §4.5.1 and §5.7 — implementation details.
-- `proxy/functions.sh` → `get_watchdog_token()` (FSH-11).
 
 ---
 
 ## 11. Changelog
 
-### v1.4.0 (2026-10-06)
+### v1.5.0 (2026-10-13)
+
+**Feature release — companion app one-tap install.**
+
+**Added (API surface)**:
+
+- **`POST /api/install_companion_app`** (§6.2.14).
+- **`POST /api/uninstall_companion_app`** (§6.2.15).
+- **`GET /api?action=install_token`** (§6.1.16).
+- **`GET /api?action=companion_app_state`** (§6.1.17).
+- **`install_companion_app` rate limit** — 5 failed attempts /
+  15 min per IP.
+- **Install-specific error messages** — AR + EN, with optional
+  hints. See §5.3.
+
+**Changed (API surface)**:
+
+- **§1.3 Endpoint Map** — includes the four new endpoints.
+- **§3.1 Rate Limiting table** — includes `install_companion_app`.
+- **§5.2 Error-code table** — includes install-specific codes.
+- **§6.1.15** — updated to note that `/app-debug.apk` remains as
+  a fallback path.
+
+**Compatibility**:
+
+- All v1.4.0 clients continue to work without modification.
+- All v1.5.0 changes are additive at the API level.
+- The new endpoints are handled by the existing `/api/*`
+  Service Worker bypass rule — no SW change required.
+
+**Documentation corrections**: see §13 for the consolidated
+table.
+
+**Audit Corrections**: **None** — the registry in
+`docs/SECURITY.md` §17 remains at **#33**.
+
+### v1.5.0+ (2026-10-15) — Post-release patches
+
+**Documentation-accuracy and client-side rendering pass.**
+
+**No new audit corrections.** The registry remains at **#33**.
+
+**Server-side changes**:
+
+- `GET /api?action=install_token` is now **localhost-only**. The
+  `isLocalRequest()` gate covers all three install surfaces.
+- `HTTP_WRITE_TIMEOUT` raised from **60 s → 150 s** so the client
+  never sees a connection reset while a slow install is still
+  running.
+
+**Client-side changes (WebUI)**:
+
+- **IDX-429** — the WebUI renders `t('installRateLimited')` for
+  HTTP 429 from `install_companion_app`.
+- **IDX-401-DISTINCT** — the WebUI suppresses the generic
+  "Session Expired" modal for install-family 401s.
+
+**Documentation corrections**: see §13.
+
+**Registry status**: unchanged at **#33**.
+
+### v1.4.0 (2026-10-06) — historical
 
 **Integration release — companion Android app + CodeQL cleanup.**
 
 **Added**:
 
-- **`GET /app-debug.apk`** — serves the optional companion
-  Android app APK. Returns 404 when the file is absent. Mime:
-  `application/vnd.android.package-archive`; Cache-Control:
-  `public, max-age=3600, immutable`.
-- **`proxy/app-apk.version`** — Single Source of Truth for the
-  companion app version (fetched by `scripts/fetch_app_apk.sh`).
+- **`GET /app-debug.apk`**.
+- **`proxy/app-apk.version`**.
 
 **Changed**:
 
 - **`POST /api/remove_module`** — CodeQL `go/path-injection`
-  hardening. The caller-provided path is now sanitized via
-  `filepath.Base()` and rebuilt from the trusted `MODULES_DIR`
-  constant. Two CodeQL alerts (#1, #2) closed. No API contract
-  change — the request/response shapes are unchanged.
-- **`web/index.html`** — the install button is now a plain
-  `<a download href="/app-debug.apk">` link. No `onclick` handler,
-  no `beforeinstallprompt` state.
-- **iOS PWA logic removed** — Android-only project.
+  hardening.
+- **`web/index.html`** — the install button was a plain
+  `<a download href="/app-debug.apk">` link.
+- **iOS PWA logic removed**.
 
-**Compatibility**:
+**Audit Corrections**: **None**.
 
-- All v1.3.0 clients continue to work without modification.
-- All v1.4.0 changes are additive at the API level.
-- The new `/app-debug.apk` route does not affect any existing
-  endpoint.
-- The `remove_module` hardening does not change the endpoint's
-  observable behaviour for valid inputs.
-
-**Fixed**:
-
-- **CodeQL `go/path-injection` in `removeModule`** — 2 alerts
-  closed via `filepath.Base()` sanitization. See §6.2.10.
-
-**Removed**:
-
-- **iOS PWA logic** (~35 lines in `web/index.html`) — Android-only.
-
-**Audit Corrections**: **None** — the registry remains at
-**#33**.
-
-### v1.3.0 (2026-10-02)
+### v1.3.0 (2026-10-02) — historical
 
 **Feature release — PWA install button + live status LED +
 DNS auto-start + server-side snapshot refinements.**
 
 **Added**:
 
-- **PWA install button** (`web/index.html`) — dynamic,
-  always-visible, browser-aware. **No API impact** — this is a
-  client-side feature.
-- **Live status LED** on the Today counter (`web/index.html`) —
-  client-side only.
+- **PWA install button** (`web/index.html`).
+- **Live status LED** on the Today counter.
 
 **Changed**:
 
-- **`service.sh`** — the boot path now waits (bounded) for the
-  WebUI to bind its port, then calls
-  `POST /api/ensure_running_service` directly. This is the same
-  endpoint documented in §6.2.13. No API contract change.
-- **`proxy/build.sh`** — documentation only; no behavioural
-  change.
-- **`main.go:buildBackupInfo()`** — snapshot detection is now
-  **manifest-based (SNAP-MANIFEST)**: a directory is counted as
-  a snapshot **iff** it contains a `.manifest.json` file. Before
-  v1.3.0 the rule was a name-pattern match
-  (`^[0-9]{8}-[0-9]{6}-`). This makes custom-named snapshots
-  visible to `runtime_info.backups.available`. See §6.1.7 for
-  the field description.
-- **`main.go:buildBackupInfo()`** — `last_backup_name` sort is
-  now **mtime-based (SNAP-MTIME)**, with a name-based fallback
-  when `DirEntry.Info()` fails. This supersedes the v1.2.0
-  BUG-3 behavior that sorted by directory name. This affects
-  the value of `runtime_info.backups.last_backup_name` only in
-  the edge case where a snapshot directory does not follow the
-  standard `<YYYYMMDD>-<HHMMSS>-...` naming convention. See
-  §6.1.7 for the field description.
-- **`functions.sh:rotate_backups()`** — rotation rewritten with
-  the same semantics as `buildBackupInfo` (**ROT-MANIFEST** +
-  **ROT-MTIME**), plus two protected targets on top of the
-  21-newest window (**ROT-PROTECT**): the `.last_stable`
-  recovery pointer and the newest install snapshot (name
-  matching `-v<digit>`). **No API impact** — the rotation
-  happens in the shell layer; the API only observes the
-  resulting snapshot list. See `docs/ARCHITECTURE.md` §4.13
-  for the full reference.
-- **Parallel refinements** — the same SNAP-MANIFEST / ROT-*
-  semantics were applied to `watchdog.sh`, `status.sh`,
-  `customize.sh`, `action.sh`, and `uninstall.sh` so that
-  every consumer of the persistent backup directory agrees on
-  which snapshots exist and which is the newest.
+- **`service.sh`** — boot path calls
+  `POST /api/ensure_running_service` directly.
+- **`main.go:buildBackupInfo()`** — SNAP-MANIFEST + SNAP-MTIME.
+- **`functions.sh:rotate_backups()`** — ROT-* semantics.
 
-**Compatibility**:
+**Audit Corrections**: **None**.
 
-- All v1.2.0 clients continue to work without modification.
-- All v1.3.0 changes are additive at the API level, **except**
-  the SNAP-MANIFEST detection change, which can produce a
-  **larger** `backups.available` value for the same on-disk
-  state (never smaller for snapshots produced by the shipped
-  toolchain — every such snapshot contains a manifest).
+### v1.2.0 (2026-09-29) — historical
 
-**Audit Corrections**: **None** — the registry remains at
-**#33**.
-
-### v1.2.0 (2026-09-29)
-
-**Data-preservation release — no breaking changes. All changes are additive.**
+**Data-preservation release.**
 
 **Added (API surface)**:
 
-- **§2.8** — New section documenting the **watchdog token**
-  (`X-Watchdog-Token` header) introduced by the BUG-B fix
-  (v1.2.0). See below for the full list of post-audit fixes.
+- **§2.8** — Watchdog token (`X-Watchdog-Token` header).
 - **§6.1.7** — `runtime_info.backups` now returns **seven**
-  fields: `available`, `in_flight_txn`, `orphan_txn`,
-  `last_backup`, `last_backup_name`, `last_stable`, `path`
-  (BAK-1).
-- **§6.2.3, §6.2.4, §6.2.5, §6.2.6, §6.2.7** — five destructive
-  endpoints now trigger a pre-critical backup before writing
-  (BAK-2). The backup is best-effort and never blocks the
-  operation.
-- **§10.6** — new examples for backup diagnostics.
-- **§10.7** — new examples for recovery mode.
-- **§10.8** — new section documenting that the API is
-  language-neutral (the WebUI toggle is client-side only).
-- **§10.10** — new examples for the watchdog token.
+  fields.
+- **§6.2.3–§6.2.7** — five destructive endpoints now trigger a
+  pre-critical backup.
+- **§10.6, §10.7, §10.8, §10.10** — new examples.
 
 **Changed (API surface)**:
 
 - **§6.2.13** — `POST /api/ensure_running_service` now requires
-  the `X-Watchdog-Token` header (or a normal user session). The
-  v1.1.0 "localhost bypass" was removed. See §2.8.
+  the `X-Watchdog-Token` header (or a normal user session).
 
-**v1.2.0 post-audit fixes (main.go — API-8 fix)**:
+**v1.2.0 post-audit fixes (`main.go`)**:
 
-The v1.2.0 post-audit pass applied **eight** corrections to
-`proxy/main.go`. They do not change the API contract for the
-vast majority of clients, but they fix behaviors that clients
-could observe:
+| ID | Scope |
+|---|---|
+| BUG-A | `appendDenylist` — pre-critical backup performed once |
+| BUG-B | `ensure_running_service` — watchdog token replaces localhost bypass |
+| BUG-C | Auth cache — empty results are no longer cached |
+| BUG-D | `createAutoBackup` — calls `rotate_backups 21` after success |
+| BUG-E | `createAutoBackup` — unique target dir |
+| BUG-F | `clear_logs` — reports `os.Truncate` errors |
+| BUG-G | `getStatusUncached` — sets `"OFF"` on panic |
+| BUG-H | `last_update` cache — TTL-based (5 s) |
+| BUG-I | `runtime_info.profile_key` — reads `selected_profile.txt` |
+| BUG-J | `isPidAlive` — exact command names only |
+| BUG-K | `runShellWithTimeout` — logs `(timeout)` marker |
+| BUG-L | Watchdog token file — atomic writes |
 
-| ID | Scope | Observable effect |
-|---|---|---|
-| **BUG-A** | `appendDenylist` — the pre-critical backup is performed **once**, via `saveDenylist` | One snapshot per call instead of two; also, the endpoint now requires a `content` parameter (previously a no-op) |
-| **BUG-B** | `ensure_running_service` — the localhost bypass was replaced with the `X-Watchdog-Token` header | **New auth requirement** for clients that relied on the bypass. See §2.8 |
-| **BUG-C** | Auth cache — empty results are no longer cached | A file-read failure no longer locks the server into "no auth required" for 60 s |
-| **BUG-D** | `createAutoBackup` — now calls `rotate_backups 21` after success | Automatic rotation matches `service.sh`; no unbounded snapshot accumulation |
-| **BUG-E** | `createAutoBackup` — unique target dir `<ts>-manual-<pid>-<rand4>` | Same-second backups no longer collide |
-| **BUG-F** | `clear_logs` — now reports `os.Truncate` errors | False "success" responses are eliminated |
-| **BUG-G** | `getStatusUncached` — named return set to `"OFF"` on panic | Callers never see an empty string |
-| **BUG-H** | `last_update` cache — TTL-based (5 s), not `sync.Once` | `get_profile.last_update` reflects external changes to `blocklist.txt` |
-| **BUG-I** | `runtime_info.profile_key` — reads `selected_profile.txt` | Matches `get_profile.key` even after `customize.sh` restores an older profile file |
-| **BUG-J** | `isPidAlive` — exact command names only | PID-reuse false positives eliminated |
-| **BUG-K** | `runShellWithTimeout` — logs `(timeout)` marker and elapsed time | Diagnostics are clear about whether a timeout occurred |
-| **BUG-L** | Watchdog token file — written with `atomicWriteFile` | Concurrent readers never see a partial token |
+### v1.1.0 (2026-09-26) — historical
 
-> **Historical note on BUG-A vs BUG-1 (BUG-3 correction)**: In
-> an earlier revision of this file, this table used the
-> identifiers `BUG-1` .. `BUG-6` and `N-1`, `N-4`. Those
-> identifiers are the ones used in the `main.go` source
-> comments and in `SECURITY.md`. The table above uses the
-> `main.go` identifiers directly, so the two views are now
-> consistent. There are **eight** entries, not seven — the
-> previous count was wrong.
-
-**v1.2.0 historical note — BUG-3 (`buildBackupInfo` sort)**:
-
-The v1.2.0 post-audit fix identified as **BUG-3** changed
-`buildBackupInfo()` to sort snapshots by **directory name** (a
-lexicographic sort), so that `last_backup_name` matched
-`status.sh --json` and the rotation policy. **v1.3.0
-superseded this** by switching back to an **mtime** sort with
-a name-based fallback. See §11 v1.3.0 above and the sort-order
-note in §6.1.7.
-
-**Changed (documentation only — no API surface change)**:
-
-- **§1.1** — the language field is now bilingual (EN default +
-  AR toggle). All "English-only" references were replaced with
-  "English default with Arabic toggle".
-- **§1.5** — new section describing the v1.3.0 changes
-  (added in v1.3.0, retained here as history).
-- **§1.6** — the previous "What is New in v1.0.0" section
-  (renumbered from §1.5).
-- **§11** — this entry.
-- **§12** — References now include `docs/BACKUP.md`,
-  `docs/EMERGENCY.md`, and `docs/UPGRADE.md`.
-
-**Deprecated**:
-
-- None.
-
-**Removed**:
-
-- None.
-
-**Fixed**:
-
-- No API-level fixes at the contract level. All v1.2.0 fixes to
-  `main.go` (listed above) are internal — the request/response
-  shapes are unchanged **except** for the new `X-Watchdog-Token`
-  requirement on `ensure_running_service`.
-
-**Client compatibility**:
-
-- **v1.0.0 clients**: unaffected. All new fields are additive.
-- **v1.1.0 clients**: unaffected. The `backups` object gained
-  two fields; clients that read only the original five fields
-  continue to work.
-- **v1.2.0 clients**: can rely on all seven `backups` fields
-  being present.
-- **Order of fields**: not guaranteed. Use a JSON parser, not
-  string indexing.
-
-### v1.1.0 (2026-09-26)
-
-**Polish release — no breaking changes. All changes are additive.**
+**Polish release.**
 
 **Added**:
 
-- **§2.1** — Memory limits per profile table (MEM-1).
 - **§6.1.7** — `runtime_info` returns `profile_key` and
   `memory_limit_mb`.
 - **§6.1.2** — `get_profile` returns `memory_limit_mb`.
-- **§6.1.14** — note that `metricsProxyHandler` uses the
-  `MONITORING_UI_PORT` constant (MEM-3).
+- **§6.1.14** — `metricsProxyHandler` uses the
+  `MONITORING_UI_PORT` constant.
 
-**Changed (internal only — same API surface)**:
+### v1.0.0 (2026-09-24) — historical
 
-- `metricsProxyHandler` builds the upstream URL from the Go
-  constant `MONITORING_UI_PORT` instead of the hardcoded
-  string `"8080"`.
-- `updateProfile` calls `applyMemoryLimit()` after a
-  successful profile change (affects the value returned by
-  `runtime_info.memory_limit_mb`).
-- `main()` calls `applyMemoryLimit()` once at startup instead
-  of using a hardcoded `debug.SetMemoryLimit(80 MB)`.
-
-**Deprecated**:
-
-- None.
-
-**Removed**:
-
-- None.
-
-**Fixed**:
-
-- No API-level fixes. (The MEM-1 / MEM-2 / MEM-3 changes close
-  edge cases; they are not audit corrections. See
-  docs/SECURITY.md §17.)
-
-**Client compatibility**:
-
-- **v1.0.0 clients**: unaffected. All new fields are additive.
-- **v1.1.0 clients**: can rely on `profile_key` and
-  `memory_limit_mb` being present.
-- **Order of fields**: not guaranteed. Use a JSON parser, not
-  string indexing.
-
-### v1.0.0 (2026-09-24)
+**First stable release.**
 
 Security / correctness:
 
-- Fixed: **Login POST-only** — `/api/auth/login` and `/api/auth/logout` reject non-POST (405 + Allow: POST) — Fix NEW-1.
-- Fixed: **`/readyz` localhost-only** — rejects LAN (403) — Fix NEW-4.
-- Fixed: **`shellQuote()`** — shell injection protection in `MODDIR` — Fix NEW-5.
-- Fixed: **`readConfPort` range check** — [1, 65535] — Fix NEW-3.
-- Fixed: **`hasEndpoint()`** — exact path matching instead of `strings.Contains` — Fix #12 + NEW-2.
-- Fixed: **404 for unknown action** — instead of 200 + "unknown" — Fix #12.
-- Fixed: **Basic Auth rate limiting** — 5 attempts / 15 minutes — Fix #8.
-- Fixed: `metricsProxyHandler` — Prometheus → JSON — Fix #1.
-- Fixed: `getSystemShell()` — fallback for Linux — Fix #2.
-- Fixed: `getMonitoringAuth` — section header with comment — Fix #10.
-- Fixed: `isPortOpenCached` — per-port cache — Fix #11.
+- Fixed: **Login POST-only**.
+- Fixed: **`/readyz` localhost-only**.
+- Fixed: **`shellQuote()`** — shell injection protection.
+- Fixed: **`readConfPort` range check** — [1, 65535].
+- Fixed: **`hasEndpoint()`** — exact path matching.
+- Fixed: **404 for unknown action**.
+- Fixed: **Basic Auth rate limiting**.
+- Fixed: `metricsProxyHandler` — Prometheus → JSON.
+- Fixed: `getSystemShell()`.
+- Fixed: `getMonitoringAuth` — section header with comment.
+- Fixed: `isPortOpenCached` — per-port cache.
 
 State & architecture:
 
-- Added: **`rebuildMu` mutex** — serializes `rebuildBlocklist` — RACE-1.
-- Added: **`runtime_info` ports** — `webui_port` + `dashboard_port` — PORT-2.
-- Added: **Auth cache (60 s)** — reduces file I/O — Fix NEW-6.
-- Fixed: **Preserve settings on upgrade** — backup/restore — Fix #3.
-- Fixed: `.gitignore` — `proxy/run/*` instead of `proxy/run/` — Fix #4.
+- Added: **`rebuildMu` mutex** — RACE-1.
+- Added: **`runtime_info` ports** — PORT-2.
+- Added: **Auth cache (60 s)**.
+- Fixed: **Preserve settings on upgrade**.
 - Fixed: `recordLoginAttempt` — no idle allocation.
-
-Documentation:
-
-- Updated: §1.2 — Port range check (NEW-3).
-- Updated: §1.4 — What's New.
-- Updated: §2.3 — Login POST-only (NEW-1).
-- Updated: §2.5 — Logout POST-only.
-- Updated: §3.3 — Basic Auth rate limiting.
-- Updated: §3.5 — Auth cache.
-- Updated: §4.5 — 404 errors.
-- Updated: §5.1 — 404 vs 405 table.
-- Updated: §6.1.7 — runtime_info ports (PORT-2).
-- Updated: §6.1.14 — /api/metrics JSON schema.
-- Added: §7.5–7.7 — Path variants + verification.
-- Updated: §9.2 — /readyz localhost-only.
-- Updated: §10.5 — Error cases.
-- Updated: §12 — References.
 
 ---
 
@@ -3507,31 +3270,34 @@ Documentation:
 - MDN EventSource — https://developer.mozilla.org/en-US/docs/Web/API/EventSource
 - Prometheus Text Format — https://prometheus.io/docs/instrumenting/exposition_formats/
 - Go runtime/debug — SetMemoryLimit — https://pkg.go.dev/runtime/debug#SetMemoryLimit
+- Android PackageManager documentation — https://developer.android.com/reference/android/content/pm/PackageManager
+- POSIX — Signals and trap — https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_28
 
 ### 12.2 Project Documentation
 
 | Document | Purpose |
 |---|---|
 | [docs/ARCHITECTURE.md](ARCHITECTURE.md) | Full architecture |
-| [docs/SECURITY.md](SECURITY.md) | Audit Corrections Registry |
+| [docs/SECURITY.md](SECURITY.md) | Audit Corrections Registry + §5.36 companion install security + §18 documentation corrections |
 | [docs/DEVELOPMENT.md](DEVELOPMENT.md) | Developer guide |
 | [docs/TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Troubleshooting |
 | [docs/CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 | [docs/COMPATIBILITY.md](COMPATIBILITY.md) | Compatibility matrix |
-| [docs/DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries (Level 4) |
+| [docs/DNS_BINARIES.md](DNS_BINARIES.md) | DNS binaries |
 | [docs/GLOSSARY.md](GLOSSARY.md) | Glossary |
 | [docs/HALL_OF_FAME.md](HALL_OF_FAME.md) | Contributors recognition |
 | [docs/ROADMAP.md](ROADMAP.md) | Roadmap |
 | [docs/INSTALL.md](INSTALL.md) | Installation guide |
 | [docs/UPGRADE.md](UPGRADE.md) | Upgrade guide |
 | [docs/FAQ.md](FAQ.md) | FAQ |
-| [docs/BACKUP.md](BACKUP.md) | Backup system reference (v1.2.0) |
-| [docs/EMERGENCY.md](EMERGENCY.md) | Emergency recovery guide (v1.2.0) |
+| [docs/BACKUP.md](BACKUP.md) | Backup system reference |
+| [docs/EMERGENCY.md](EMERGENCY.md) | Emergency recovery guide |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
 
 ### 12.3 Companion App Repository
 
-The companion Android app is maintained in a separate repository:
+The companion Android app is maintained in a separate
+repository:
 
 | Link | Purpose |
 |---|---|
@@ -3540,59 +3306,51 @@ The companion Android app is maintained in a separate repository:
 | [Issues](https://github.com/gasciljh/dnscrypt-proxy-app/issues) | Bug reports |
 
 The APK is fetched by `scripts/fetch_app_apk.sh` at release time
-from the version pinned in `proxy/app-apk.version` (Single Source
-of Truth).
+from the version pinned in `proxy/app-apk.version` (Single
+Source of Truth).
+
+The install cascade in `proxy/install_app.sh` serves the APK to
+PackageManager. The APK's SHA256 is verified against
+`web/app-debug.apk.sha256` when the file is present.
 
 ### 12.4 v1.0.0 References
 
-| Fix | Number | Reference |
-|---|:---:|---|
-| Dashboard JSON | #1 | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Shell fallback | #2 | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| Preserve settings | #3 | [SECURITY.md](SECURITY.md) |
-| `.gitignore` negation | #4 | [SECURITY.md](SECURITY.md) |
-| Login POST-only | NEW-1 | [SECURITY.md](SECURITY.md) |
-| `hasEndpoint` | #12 + NEW-2 | [SECURITY.md](SECURITY.md) |
-| `readConfPort` range | NEW-3 | [SECURITY.md](SECURITY.md) |
-| `/readyz` localhost | NEW-4 | [SECURITY.md](SECURITY.md) |
-| `shellQuote` | NEW-5 | [SECURITY.md](SECURITY.md) |
-| Auth cache | NEW-6 | [SECURITY.md](SECURITY.md) |
-| Basic Auth rate limit | #8 | [SECURITY.md](SECURITY.md) |
-| Section header comment | #10 | [SECURITY.md](SECURITY.md) |
-| Per-port cache | #11 | [SECURITY.md](SECURITY.md) |
-| `rebuildMu` (RACE-1) | — | [SECURITY.md](SECURITY.md) |
-| `runtime_info` (PORT-2) | — | [SECURITY.md](SECURITY.md) |
+| Fix | Number |
+|---|:---:|
+| Dashboard JSON | #1 |
+| Shell fallback | #2 |
+| Preserve settings | #3 |
+| `.gitignore` negation | #4 |
+| Login POST-only | NEW-1 |
+| `hasEndpoint` | #12 + NEW-2 |
+| `readConfPort` range | NEW-3 |
+| `/readyz` localhost | NEW-4 |
+| `shellQuote` | NEW-5 |
+| Auth cache | NEW-6 |
+| Basic Auth rate limit | #8 |
+| Section header comment | #10 |
+| Per-port cache | #11 |
+| `rebuildMu` (RACE-1) | — |
+| `runtime_info` (PORT-2) | — |
 
 ### 12.5 v1.1.0 References
 
 | Change | ID | Reference |
 |---|:---:|---|
-| Dynamic memory limit | MEM-1 | [SECURITY.md](SECURITY.md) §5.30.1, §14.22 |
+| Dynamic memory limit | MEM-1 | [SECURITY.md](SECURITY.md) §5.30.1 |
 | Extended shellQuote | MEM-2 | [SECURITY.md](SECURITY.md) §5.30.2 |
-| MONITORING_UI_PORT in metrics handler | MEM-3 | [SECURITY.md](SECURITY.md) §5.30.3, §14.24 |
-
-> **Note**: MEM-1 / MEM-2 / MEM-3 are **not** audit corrections.
-> They are runtime improvements documented in SECURITY.md §17.1.
-> The Audit Corrections Registry remains at #33 (last entry from
-> v1.0.0). The next audit correction will be #34.
+| MONITORING_UI_PORT in metrics handler | MEM-3 | [SECURITY.md](SECURITY.md) §5.30.3 |
 
 ### 12.6 v1.2.0 References
 
 | Change | ID | Reference |
 |---|:---:|---|
-| `runtime_info.backups` full schema (7 fields) | BAK-1 | [BACKUP.md](BACKUP.md) §8.1, [ARCHITECTURE.md](ARCHITECTURE.md) §16.7 |
+| `runtime_info.backups` full schema (7 fields) | BAK-1 | [BACKUP.md](BACKUP.md) §8.1, [ARCHITECTURE.md](ARCHITECTURE.md) §4.10 |
 | Pre-critical backup on destructive endpoints | BAK-2 | [BACKUP.md](BACKUP.md) §4.3, [ARCHITECTURE.md](ARCHITECTURE.md) §4.10 |
-| Backup diagnostic examples | BAK-3 | [BACKUP.md](BACKUP.md) §8.1–§8.3, [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §7.8–§7.10 |
-| Recovery mode examples | BAK-4 | [EMERGENCY.md](EMERGENCY.md) §9, [UPGRADE.md](UPGRADE.md) §3.1 |
-| **Watchdog token** (`X-Watchdog-Token`) | **BUG-B** | **§2.8 above**, [ARCHITECTURE.md](ARCHITECTURE.md) §4.5.1, §5.7 |
-| Post-audit fixes to `main.go` (BUG-A .. BUG-L) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §4.10.5 |
-
-> **Note**: BAK-1 / BAK-2 / BAK-3 / BAK-4 are **not** audit
-> corrections. They are data-preservation additions documented
-> in [SECURITY.md](SECURITY.md) §5.31. The BUG-A .. BUG-L fixes
-> are post-audit corrections to `main.go` and are documented in
-> [ARCHITECTURE.md](ARCHITECTURE.md) §4.6.5 and §4.11. The
-> Audit Corrections Registry remains at #33.
+| Backup diagnostic examples | BAK-3 | [BACKUP.md](BACKUP.md) §8.1–§8.3 |
+| Recovery mode examples | BAK-4 | [EMERGENCY.md](EMERGENCY.md) §9 |
+| Watchdog token (`X-Watchdog-Token`) | WD-TOKEN | §2.8 above, [ARCHITECTURE.md](ARCHITECTURE.md) §4.5.1 |
+| Post-audit fixes to `main.go` (BUG-A .. BUG-L) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §4.6.3 |
 
 ### 12.7 v1.3.0 / v1.4.0 References
 
@@ -3601,26 +3359,135 @@ of Truth).
 | PWA install button (WebUI) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.4 |
 | Live status LED (WebUI) | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.1 |
 | DNS auto-start fix (`service.sh`) | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.3.0] |
-| Snapshot detection — manifest-based (SNAP-MANIFEST) | SNAP-MANIFEST | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.1, §4.10.1 |
-| `last_backup_name` sort order — mtime (SNAP-MTIME) | SNAP-MTIME | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.1, §4.10.1 |
+| Snapshot detection — manifest-based (SNAP-MANIFEST) | SNAP-MANIFEST | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.1 |
+| `last_backup_name` sort order — mtime (SNAP-MTIME) | SNAP-MTIME | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.1 |
 | Rotation — manifest-based detection (ROT-MANIFEST) | ROT-MANIFEST | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.2 |
 | Rotation — mtime sort (ROT-MTIME) | ROT-MTIME | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.2 |
-| Rotation — protected targets (ROT-PROTECT) | ROT-PROTECT | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.2, §11.31–§11.33 |
-| Companion Android app integration | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0], [COMPATIBILITY.md](COMPATIBILITY.md) §1.9 |
+| Rotation — protected targets (ROT-PROTECT) | ROT-PROTECT | [ARCHITECTURE.md](ARCHITECTURE.md) §4.13.2 |
+| Companion Android app integration | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0] |
 | CodeQL `go/path-injection` fix in `removeModule` | — | [CHANGELOG.md](../CHANGELOG.md) §[v1.4.0], §6.2.10 above |
 | `/app-debug.apk` route (optional) | — | §6.1.15 above |
 
-> **Note**: v1.3.0 and v1.4.0 do **not** add audit corrections.
-> They are feature / integration releases. The Audit Corrections
-> Registry remains at #33. The CodeQL fix in v1.4.0 closes two
-> **CodeQL alerts** (#1, #2) that are tracked separately from the
-> numbered audit corrections.
+### 12.8 v1.5.0 References
+
+| Change | ID | Reference |
+|---|:---:|---|
+| Companion app install (root cascade) | — | §6.2.14 above, [ARCHITECTURE.md](ARCHITECTURE.md) §3.11, §5.8 |
+| Install-method modal (IDX-24) | IDX-24 | [ARCHITECTURE.md](ARCHITECTURE.md) §3.11, §6.4 |
+| Companion button state survives language toggles | IDX-23 | [ARCHITECTURE.md](ARCHITECTURE.md) §6.9 |
+| Status card updates instantly on language toggle | IDX-23b | [ARCHITECTURE.md](ARCHITECTURE.md) §6.10 |
+| Dashboard section-nav fix | IDX-25 | [ARCHITECTURE.md](ARCHITECTURE.md) §6.11 |
+| Dashboard centered hint | IDX-25a | [ARCHITECTURE.md](ARCHITECTURE.md) §6.12 |
+| Install token (one-shot CSRF) | APK-5 | §6.1.16 above |
+| Companion state endpoint + 30 s cache | APK-6 | §6.1.17 above |
+| 5-level `pm install` cascade | APK-5 | §6.2.14 above, [ARCHITECTURE.md](ARCHITECTURE.md) §5.8.5 |
+| SELinux staging | APK-11 | §6.2.14 above, [ARCHITECTURE.md](ARCHITECTURE.md) §5.8.3 |
+| Play Protect temporary disable | APK-11 | §6.2.14 above, [ARCHITECTURE.md](ARCHITECTURE.md) §5.8.4 |
+| Per-IP install rate limit | APK-11 | §3.1 above |
+| Package name candidates | APK-12 | §6.1.17 above, [ARCHITECTURE.md](ARCHITECTURE.md) §5.8.7 |
+| Companion install security | — | [SECURITY.md](SECURITY.md) §5.36 |
+| Companion install API | — | §6.2.14 above |
+
+### 12.9 v1.5.0+ References
+
+| Change | ID | Reference |
+|---|:---:|---|
+| Timeout table expanded (client / server / cascade) | — | §1.1 above |
+| `install_token` endpoint now localhost-only | — | §1.1, §6.1.16 above |
+| `HTTP_WRITE_TIMEOUT` raised to 150 s | — | §1.1 above |
+| Install rate-limit message (client-side) | IDX-429 | §3.1, §6.2.14 above |
+| Install-family 401 distinctness (client-side) | IDX-401-DISTINCT | §2.7, §4.6, §6.2.14 above |
+| `logWithLevel` three-layer split | — | [ARCHITECTURE.md](ARCHITECTURE.md) §4.6.8, §11.55 |
+| Port cache for `getWebUIPort` / `getDashboardPort` | — | §1.2, §6.1.7 above |
+| `isLocalRequest` dead-branch removal | — | [ARCHITECTURE.md](ARCHITECTURE.md) §4.6.8 |
+| `appendDenylist` hash source alignment | — | §4.3, §6.1.4, §6.2.7 above |
+| Dashboard `isRefreshing` reset on 401 | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.10 |
+| Dashboard session-expired modal retry | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.10 |
+| Dashboard hint dual-timer | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.12 |
+| Dashboard hint `scrollend` scheduling | — | [ARCHITECTURE.md](ARCHITECTURE.md) §6.12 |
+| Maskable safe-circle fit | — | `web/icon-512.svg` header |
+| Three-way signal trap split | — | §6.2.14 above; [SECURITY.md](SECURITY.md) §5.36.3 |
+
+---
+
+## 13. Documentation Corrections to This File
+
+This section consolidates every documentation-accuracy
+correction applied to this file. **None of these advances the
+Audit Corrections Registry** — the registry in
+`docs/SECURITY.md` §17 remains at **#33**.
+
+### 13.1 Pre-release sweep (v1.5.0)
+
+| ID | Section | Correction |
+|:-:|---|---|
+| — | §1.4 | "What was New in v1.5.0" table added |
+| — | §2.7 | Install token moved to a distinct, non-session section |
+| — | §3.1 | `install_companion_app` added to the rate limit table |
+| — | §5.2 | Install-specific error codes added |
+| — | §6.1.16 | `install_token` documented |
+| — | §6.1.17 | `companion_app_state` documented |
+| — | §6.2.14 | `install_companion_app` documented |
+| — | §6.2.15 | `uninstall_companion_app` documented |
+| — | §10.11 | Watchdog install examples added |
+
+### 13.2 Post-release sweep (v1.5.0+)
+
+| ID | Section | Correction |
+|:-:|---|---|
+| — | §1.1 | Timeout table expanded to include `HTTP_WRITE_TIMEOUT` |
+| — | §1.1 | Localhost gate documented on all three install surfaces |
+| — | §2.1 + §2.2 | Internal reference `§2.9` → `§2.7` (Install Token section) |
+| — | §4.1 | "three" response shapes → **"four"** |
+| — | §4.2 | "only exception" → **"two exceptions"** (`/readyz` + `/api/metrics`) |
+| — | §4.6 | Install failure response split: 200 for install failure, 4xx for auth/rate-limit/token |
+| — | §5.1 | Install-specific response shapes corrected to match `main.go`: added `reason` field to 401/429/403; removed `action` from generic 401; corrected the 429 message text |
+| — | §5.1 | Added the 415 Unsupported Media Type row |
+| — | §6.1.16 | Added 403 response for non-localhost |
+| — | §6.1.17 | Not-installed response corrected: `package` returns the default candidate; `version_name` is absent |
+| — | §6.2.14 | Response shapes corrected to match `main.go` |
+| — | §6.2.15 | Response shapes corrected to match `main.go` |
+| — | §13 | New section — this consolidated correction index |
+
+### 13.3 BusyBox compatibility
+
+The `docs/SECURITY.md` §14.34 audit commands contain BusyBox
+portability corrections. `docs/API.md` does not cite any
+BusyBox-incompatible shell commands; no equivalent corrections
+are required here.
+
+### 13.4 Identifier cross-references
+
+The following corrections are documented in sibling files. They
+affect facts referenced from this document but are not
+themselves corrections to `docs/API.md`.
+
+| Identifier | File | Description |
+|---|---|---|
+| CHG-DOC-01 | `CHANGELOG.md` | `watchdog.sh` line count corrected 1,356 → 1,326 |
+| ARCH-DOC-04..06 | `docs/ARCHITECTURE.md` | File counts corrected (97 tracked / +7 / 18 in proxy) |
+| HARD-SEC-XREF-01 | `docs/SECURITY.md` | Cross-reference block for the v1.5.0++ cycle |
+| README-DOC-02 | `README.md` | Per-directory count correction |
+| MAIN-XREF-01 | `proxy/main.go` | Documentation-only cross-reference block |
+| SW-DOC-02 | `web/sw.js` | Endpoint re-attribution (4 endpoints = v1.5.0, not v1.4.0) |
+
+### 13.5 Deprecated identifiers
+
+The following identifiers appeared in earlier revisions of this
+file and are **no longer referenced**:
+
+- **API-V15-01..18** — consolidated into §13.2.
+- **API-DATE** — the date bump is now documented in the header.
+- **API-XREF-01** — consolidated into §13.4.
+- **API-1..8** (v1.2.0 post-audit) — the corrections themselves
+  are still in effect; only the identifiers were removed from the
+  inline text and are now summarized here.
+
+---
 
 **Last Audit Correction**: #33 (v1.0.0)
 **Next expected**: #34 (in a future release)
 
----
-
-**Last updated**: 2026-10-08
-**Version**: v1.4.0
+**Last updated**: 2026-10-15
+**Version**: v1.5.0
 **Author**: gasciljh

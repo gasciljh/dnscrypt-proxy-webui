@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================
-# DNSCrypt Smart Filter – build.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — build.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Cross-compiles the WebUI (main.go) for 4 Android architectures
-#   using the Android NDK. Supports reproducible builds.
+# Cross-compiles the WebUI (main.go) for 4 Android architectures
+# using the Android NDK. Supports reproducible builds.
 #
 # Architectures:
 #   • arm64  → arm64-v8a
@@ -17,226 +16,57 @@
 #   • 386    → x86 (32-bit)
 #
 # Modes:
-#   • Single arch  : --single <arch>
-#   • All archs    : (default)
-#   • Parallel     : --parallel (build all in parallel)
+#   ./build.sh                     Build all 4 architectures
+#   ./build.sh --single <arch>     Build one architecture
+#   ./build.sh --parallel          Build all in parallel
 #
 # Flags:
-#   --clean            Clean proxy/build/ before building
-#   --package          Create a binaries ZIP after build
-#   --enable-upx       Compress with UPX (may break PIE)
-#   --keep-logs        Keep build logs even on success
-#   --output-dir DIR   Custom output directory
-#   --info             Show environment + NDK info
-#   --list             List supported architectures
-#   --help, -h         Show help
+#   --clean              Clean proxy/build/ before building
+#   --package            Create a binaries ZIP after build
+#   --enable-upx         Compress with UPX (may break PIE)
+#   --keep-logs          Keep build logs even on success
+#   --output-dir DIR     Custom output directory
+#   --info               Show environment + NDK info
+#   --list               List supported architectures
+#   --help, -h           Show help
 #
 # Environment variables:
-#   ANDROID_NDK_HOME   NDK path (optional but recommended)
-#   PROJECT_URL        Project URL (defaults to GitHub repo)
-#   BUILD_DIR          Override output directory
-#   SOURCE_DATE_EPOCH  Fixed timestamp (auto-extracted from git)
-#   CGO_ENABLED        Overridden internally (0 or 1)
+#   ANDROID_NDK_HOME     NDK path (optional but recommended)
+#   PROJECT_URL          Project URL
+#   BUILD_DIR            Override output directory
+#   SOURCE_DATE_EPOCH    Fixed timestamp (auto-extracted from git)
 #
-# Output:
-#   proxy/build/
-#     ├── dnscrypt-webui-arm64
-#     ├── dnscrypt-webui-arm
-#     ├── dnscrypt-webui-amd64
-#     ├── dnscrypt-webui-386
-#     └── checksums.txt
+# Output (proxy/build/):
+#   dnscrypt-webui-arm64
+#   dnscrypt-webui-arm
+#   dnscrypt-webui-amd64
+#   dnscrypt-webui-386
+#   checksums.txt
 #
 # Reproducibility:
-#   • SOURCE_DATE_EPOCH is extracted from the last git commit.
-#   • -trimpath normalizes file paths.
-#   • -buildid= removes random build IDs.
-#   • Result: same commit → same SHA-256.
+#   • SOURCE_DATE_EPOCH extracted from the last git commit
+#   • -trimpath normalizes file paths
+#   • -buildid= removes random build IDs
+#   • Result: same commit → same SHA-256
 #
-# ============================================================
-# v1.2.0 — No build-system changes
-# ============================================================
-# The v1.2.0 release is a data-preservation release. It does
-# NOT touch the build system. Specifically:
-#
-#   ┌────────────────────────┬──────────────────────┐
-#   │ Aspect                     │ Status                   │
-#   ├────────────────────────┼──────────────────────┤
-#   │ New Go source files        │ None                     │
-#   │ New build tags             │ None                     │
-#   │ New linker flags           │ None                     │
-#   │ New runtime dependencies   │ None                     │
-#   │ New toolchain requirements │ None                     │
-#   │ BuildVersion value         │ v1.2.0 (from VERSION)    │
-#   └────────────────────────┴──────────────────────┘
-#
-# The 10 defensive layers introduced by v1.2.0 live entirely
-# in existing shell scripts (customize.sh, service.sh,
-# status.sh, uninstall.sh, functions.sh, watchdog.sh) and
-# in main.go. None of those changes require any modification
-# to the build pipeline.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — POST-AUDIT FIXES (this file)
-# ============================================================
-#   🔧 BLD-1 — Several helper functions used a `local_*`
-#     prefix on variables that are NOT local. Renamed.
-#
-#   🔧 BLD-2 — `EXPECTED_ARCH_COUNT` is now derived from
-#     `ALL_ARCHS` via word-splitting.
-#
-#   🔧 BLD-3 — The `timeout 300` wrapper around `go build`
-#     now checks for `timeout(1)` availability and falls back
-#     to running `go build` without a timeout.
-#
-#   🔧 BLD-4 — When `SOURCE_DATE_EPOCH=0`, `checksums.txt` now
-#     prints `unknown (SOURCE_DATE_EPOCH=0)`.
-#
-#   🔧 BLD-5 — `--enable-upx` is now validated at argument
-#     parsing time.
-#
-#   🔧 BLD-6 — `$(...)`-based command substitutions uniform.
-#
-#   🔧 BLD-7 — `VERSION_NO_V` computed once at the top.
-#
-#   🔧 BLD-8 — `go mod init` failure now produces a clear
-#     diagnostic message.
-#
-# ============================================================
-# v1.3.0 — No changes to the build pipeline
-# ============================================================
-#   📌 The v1.3.0 release did not touch this file.
-#
-#   The v1.3.0 release is primarily a feature release:
-#     • PWA install button (client-side, web/index.html)
-#     • Live status LED (client-side, web/index.html)
-#     • DNS auto-start fix (shell-side, proxy/service.sh)
-#
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
-#
-#   Why this file was NOT modified:
-#     • The build pipeline cross-compiles proxy/main.go for
-#       4 Android architectures with reproducible flags
-#       (-trimpath, -buildid=, SOURCE_DATE_EPOCH). It does
-#       NOT inspect the internal semantics of the compiled
-#       code.
-#     • The v1.3.0 server-side changes (SNAP-*, ROT-*) are
-#       pure source-level refinements in Go and shell files.
-#       They compile and package with the SAME flags as
-#       v1.2.0 — no new build tags, no new linker flags, no
-#       new runtime dependencies, no new toolchain
-#       requirements.
-#     • The 4-architecture matrix, the NDK detection, the
-#       LDFLAGS injection (BuildVersion/BuildCommit/BuildTime/
-#       ProjectURL), and the reproducible-build guarantees are
-#       all unchanged.
-#
-#   Therefore the entire build pipeline is byte-for-byte
-#   identical between v1.2.0 and v1.3.0. See CHANGELOG.md
-#   [v1.3.0] and docs/ARCHITECTURE.md §4.13 for the full delta.
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 BLD-V14-01 — No behavior change. build.sh does not
-#     build the companion Android app APK (that lives in a
-#     separate repository: gasciljh/dnscrypt-proxy-app). The
-#     module build only cross-compiles proxy/main.go for the
-#     4 Android architectures, exactly as before.
-#
-#   📱 BLD-V14-02 — Version bump v1.3.0 → v1.4.0.
-#     Documentation only. The 4-architecture cross-compile,
-#     reproducible build flags, and LDFLAGS injection are all
-#     unchanged.
-#
-#   📱 BLD-V14-03 — The CodeQL `go/path-injection` fix in
-#     `main.go::removeModule` compiles cleanly with the same
-#     flags. No new build dependency, no new linker flag.
-#
-#   📱 BLD-V14-04 — MAIN-01 (the `LOG_LEVEL` load-order fix
-#     in `main.go`) is a source-level change only. It does
-#     NOT alter the build pipeline, the LDFLAGS, or the
-#     reproducible-build guarantees.
-#
-# ============================================================
-# BuildVersion ↔ VERSION — how it works
-# ============================================================
-# The `BuildVersion` variable in main.go is injected at build
-# time via the -X linker flag. Its value comes from the VERSION
-# file (single source of truth).
-#
-# ⚠️ Do NOT hardcode the version anywhere in this script.
-# ============================================================
-# Relation to other scripts in the repository
-# ============================================================
-# This script is one of six build/release-related scripts:
-#
-#   ┌───────────────────────────┬────────────────────────┐
-#   │ Script                         │ Responsibility             │
-#   ├───────────────────────────┼────────────────────────┤
-#   │ scripts/release.sh             │ Bump VERSION + tag         │
-#   │ scripts/release-patch.sh       │ PATCH-only (hotfix)        │
-#   │ scripts/package_module.sh      │ Create the Magisk ZIP      │
-#   │ scripts/fetch_dns_binaries.sh  │ Download dnscrypt-proxy    │
-#   │ scripts/fetch_app_apk.sh       │ Fetch companion app APK    │
-#   │ scripts/generate-icons.sh      │ Generate PNG/ICO from SVG  │
-#   │ proxy/build.sh (this file)     │ Cross-compile WebUI        │
-#   └───────────────────────────┴────────────────────────┘
-#
-# ============================================================
-# Cross-references:
-# ============================================================
-#   • VERSION                        — Single Source of Truth
-#                                       for BuildVersion
-#   • proxy/main.go                  — consumer of BuildVersion
-#   • proxy/go.mod                   — Go module definition
-#   • scripts/release.sh             — bumps VERSION + tag
-#   • scripts/release-patch.sh       — PATCH-only automation
-#   • scripts/package_module.sh      — packages the ZIP
-#   • scripts/fetch_dns_binaries.sh  — DNS engine binaries
-#   • scripts/fetch_app_apk.sh       — companion APK (v1.4.0)
-#   • scripts/generate-icons.sh      — icon generation pipeline
-#   • .github/workflows/ci.yml       — 4-arch build matrix
-#   • .github/workflows/release.yml  — release pipeline
-#   • docs/ARCHITECTURE.md §4.13     — v1.3.0 server-side
-#                                       refinements
-#   • docs/DNS_BINARIES.md           — DNS binaries (Level 4)
-#   • CHANGELOG.md                   — version history
-#                                       (v1.0.0 → v1.4.0)
-# ============================================================
-# UPX + PIE warning
-# ============================================================
-# Android 5+ requires PIE (Position-Independent Executable).
-# UPX compression strips the ELF segments that Android uses to
-# verify PIE-ness, so a UPX-compressed binary will NOT run on
-# Android 5+.
-#
-# ⚠️ Recommendation: do NOT use --enable-upx for release
-#    builds.
-# ============================================================
-# Examples:
-#   ./build.sh --clean --parallel
-#   ./build.sh --single arm64
-#   ./build.sh --output-dir /tmp/my-build
-#   PROJECT_URL=https://github.com/MyUser/MyRepo ./build.sh --clean
+# ⚠️ UPX + PIE:
+#   Android 5+ requires PIE. UPX strips the ELF segments Android
+#   uses to verify PIE-ness. A UPX-compressed binary will NOT run
+#   on Android 5+. Do NOT use --enable-upx for release builds.
 # ============================================================
 
 set -euo pipefail
 
-# ------------------------------------------------------------
+# ============================================================
 # [1] Path resolution
-# ------------------------------------------------------------
+# ============================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSION_FILE="${REPO_ROOT}/VERSION"
 
-# ------------------------------------------------------------
+# ============================================================
 # [2] Colors (conditional on TTY)
-# ------------------------------------------------------------
+# ============================================================
 if [ -t 1 ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
     BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'
@@ -245,9 +75,9 @@ else
     RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
-# ------------------------------------------------------------
+# ============================================================
 # [3] Configuration
-# ------------------------------------------------------------
+# ============================================================
 BUILD_DIR="${BUILD_DIR:-${SCRIPT_DIR}/build}"
 
 OUTPUT_PREFIX="dnscrypt-webui"
@@ -261,22 +91,17 @@ USE_UPX=0
 ALL_ARCHS="arm64 arm amd64 386"
 KEEP_LOGS=0
 
-# BLD-2: derive the expected count from the single source of
-# truth instead of hard-coding it.
 EXPECTED_ARCH_COUNT=0
 for _a in $ALL_ARCHS; do
     EXPECTED_ARCH_COUNT=$((EXPECTED_ARCH_COUNT + 1))
 done
 unset _a
 
-# ------------------------------------------------------------
-# ProjectURL (customizable)
-# ------------------------------------------------------------
 PROJECT_URL="${PROJECT_URL:-https://github.com/gasciljh/dnscrypt-proxy-webui}"
 
-# ------------------------------------------------------------
-# [4] Read VERSION
-# ------------------------------------------------------------
+# ============================================================
+# [4] Read VERSION (SSOT for BuildVersion)
+# ============================================================
 read_version() {
     if [ ! -f "$VERSION_FILE" ]; then
         echo -e "${RED}❌ VERSION not found at: ${VERSION_FILE}${NC}" >&2
@@ -295,17 +120,30 @@ read_version() {
 }
 
 SCRIPT_VERSION=$(read_version)
-
-# BLD-7: VERSION_NO_V is computed once.
 VERSION_NO_V="${SCRIPT_VERSION#v}"
 
-# ------------------------------------------------------------
-# [5] Reproducible build vars
-# ------------------------------------------------------------
+# ============================================================
+# [5] Reproducible build vars (strict SOURCE_DATE_EPOCH)
+# ============================================================
+# SOURCE_DATE_EPOCH semantics:
+#   0          = unknown / not applicable (no git, no commit)
+#   > 0        = epoch seconds; enables reproducible builds
+#   invalid    = coerced to 0 with a warning below
+#
+# The value is validated HERE — downstream code (LDFLAGS, the
+# checksum block) may assume SOURCE_DATE_EPOCH is a non-negative
+# integer. No other section re-validates it.
+#
+# The case pattern `*[!0-9]*` matches any string that contains a
+# non-digit character. Since `-` is not a digit, negative values
+# like "-1" fall into the first branch and are coerced to 0.
+# No additional `-lt 0` test is required.
+
+SOURCE_DATE_EPOCH_RAW=""
+
 if command -v git >/dev/null 2>&1 && \
    git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
-    SOURCE_DATE_EPOCH=$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || echo "0")
-    export SOURCE_DATE_EPOCH
+    SOURCE_DATE_EPOCH_RAW=$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || echo "0")
     BUILD_COMMIT=$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo "unknown")
     GIT_DIRTY=""
     if ! git -C "$REPO_ROOT" diff-index --quiet HEAD -- 2>/dev/null; then
@@ -313,13 +151,28 @@ if command -v git >/dev/null 2>&1 && \
     fi
     BUILD_COMMIT="${BUILD_COMMIT}${GIT_DIRTY}"
 else
-    export SOURCE_DATE_EPOCH=0
+    SOURCE_DATE_EPOCH_RAW="0"
     BUILD_COMMIT="unknown"
 fi
 
-# ------------------------------------------------------------
+# Strict validation — must be a non-negative decimal integer.
+# Any non-digit (including `-`) falls through to the first branch.
+case "$SOURCE_DATE_EPOCH_RAW" in
+    ''|*[!0-9]*)
+        SOURCE_DATE_EPOCH=0
+        ;;
+    *)
+        SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH_RAW"
+        ;;
+esac
+export SOURCE_DATE_EPOCH
+unset SOURCE_DATE_EPOCH_RAW
+
+# ============================================================
 # [6] Helper functions
-# ------------------------------------------------------------
+# ============================================================
+
+# detect_environment — identify the build environment.
 detect_environment() {
     if [ -n "${GITHUB_ACTIONS:-}" ]; then
         ENV_TYPE="github-actions"
@@ -335,9 +188,14 @@ detect_environment() {
     export ENV_TYPE
 }
 
-# ------------------------------------------------------------
-# [7] NDK detection
-# ------------------------------------------------------------
+# detect_ndk — find the Android NDK path.
+#
+# Search order:
+#   1. Environment variables (ANDROID_NDK_HOME, ANDROID_NDK_ROOT,
+#      NDK, NDK_ROOT)
+#   2. Common install locations
+#
+# A valid NDK path must contain toolchains/llvm/prebuilt/*/bin.
 detect_ndk() {
     local var val
 
@@ -372,9 +230,7 @@ detect_ndk() {
     return 1
 }
 
-# ------------------------------------------------------------
-# [8] NDK bin path
-# ------------------------------------------------------------
+# get_ndk_bin — extract the platform-specific bin/ directory.
 get_ndk_bin() {
     local ndk_path="$1"
     local platform_dir
@@ -391,9 +247,7 @@ get_ndk_bin() {
     printf '%s/bin' "$platform_dir"
 }
 
-# ------------------------------------------------------------
-# [9] CC per architecture
-# ------------------------------------------------------------
+# get_cc_for_arch — map a short arch name to its NDK clang path.
 get_cc_for_arch() {
     local arch="$1"
     local ndk_bin="$2"
@@ -411,9 +265,7 @@ get_cc_for_arch() {
     esac
 }
 
-# ------------------------------------------------------------
-# [10] Go variables
-# ------------------------------------------------------------
+# get_go_vars — map a short arch name to "GOARCH:GOARM".
 get_go_vars() {
     case "$1" in
         arm64) printf 'arm64:' ;;
@@ -423,9 +275,9 @@ get_go_vars() {
     esac
 }
 
-# ------------------------------------------------------------
-# [11] Header
-# ------------------------------------------------------------
+# ============================================================
+# [7] Header
+# ============================================================
 print_header() {
     echo ""
     echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
@@ -435,9 +287,9 @@ print_header() {
     echo ""
 }
 
-# ------------------------------------------------------------
-# [12] Help text
-# ------------------------------------------------------------
+# ============================================================
+# [8] Help text
+# ============================================================
 print_help() {
     print_header
     cat << 'EOF'
@@ -474,22 +326,13 @@ Notes:
     Do NOT use it for release builds.
   • The output directory can be overridden by --output-dir or
     by the BUILD_DIR environment variable.
-
-References:
-  scripts/release.sh            Bump VERSION + tag
-  scripts/release-patch.sh      PATCH-only automation
-  scripts/package_module.sh     Create the Magisk ZIP
-  scripts/fetch_dns_binaries.sh Download dnscrypt-proxy
-  scripts/fetch_app_apk.sh      Fetch companion app APK (v1.4.0)
-  scripts/generate-icons.sh     Generate PNG/ICO from SVG
-  proxy/main.go                 Consumer of BuildVersion
 EOF
     exit 0
 }
 
-# ------------------------------------------------------------
-# [13] Info output
-# ------------------------------------------------------------
+# ============================================================
+# [9] Info output
+# ============================================================
 print_info() {
     print_header
     detect_environment
@@ -545,9 +388,9 @@ print_info() {
     exit 0
 }
 
-# ------------------------------------------------------------
-# [14] Architecture list
-# ------------------------------------------------------------
+# ============================================================
+# [10] Architecture list
+# ============================================================
 print_archs() {
     print_header
     echo -e "  Architectures: ${CYAN}${ALL_ARCHS}${NC}"
@@ -556,9 +399,9 @@ print_archs() {
     exit 0
 }
 
-# ------------------------------------------------------------
-# [15] CLI arguments
-# ------------------------------------------------------------
+# ============================================================
+# [11] CLI arguments
+# ============================================================
 DO_CLEAN=0
 DO_PACKAGE=0
 DO_PARALLEL=0
@@ -603,19 +446,30 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# Make BUILD_DIR absolute
+# Make BUILD_DIR absolute. If the parent directory does not
+# exist, warn and fall back to the current working directory
+# rather than producing a bogus path.
 case "$BUILD_DIR" in
     /*) ;;
-    *) BUILD_DIR="$(cd "$(dirname "$BUILD_DIR")" 2>/dev/null && pwd)/$(basename "$BUILD_DIR")" ;;
+    *)
+        _build_parent="$(dirname "$BUILD_DIR")"
+        _build_base="$(basename "$BUILD_DIR")"
+        if _parent_abs="$(cd "$_build_parent" 2>/dev/null && pwd)"; then
+            BUILD_DIR="${_parent_abs}/${_build_base}"
+        else
+            echo -e "${YELLOW}⚠️  Parent of BUILD_DIR does not exist: ${_build_parent}${NC}" >&2
+            echo -e "${YELLOW}   Falling back to: $(pwd)/${_build_base}${NC}" >&2
+            BUILD_DIR="$(pwd)/${_build_base}"
+        fi
+        unset _build_parent _build_base _parent_abs
+        ;;
 esac
 
-# Warn: --parallel with --single
 if [ "$DO_PARALLEL" = "1" ] && [ -n "$SINGLE_ARCH" ]; then
     echo -e "${YELLOW}⚠️  --parallel is meaningless with --single — ignoring${NC}" >&2
     DO_PARALLEL=0
 fi
 
-# BLD-5: verify UPX is installed at argument-parsing time.
 if [ "$USE_UPX" = "1" ]; then
     if ! command -v upx >/dev/null 2>&1; then
         echo -e "${YELLOW}⚠️  --enable-upx requested but 'upx' not found — disabling UPX${NC}" >&2
@@ -623,16 +477,15 @@ if [ "$USE_UPX" = "1" ]; then
     fi
 fi
 
-# BLD-3: check whether `timeout` is available.
 if command -v timeout >/dev/null 2>&1; then
     HAS_TIMEOUT=1
 else
     HAS_TIMEOUT=0
 fi
 
-# ------------------------------------------------------------
-# [16] Header + Go check
-# ------------------------------------------------------------
+# ============================================================
+# [12] Header + Go check
+# ============================================================
 print_header
 detect_environment
 echo -e "  🌍 Environment: ${CYAN}${ENV_TYPE}${NC}"
@@ -647,10 +500,28 @@ if ! command -v go >/dev/null 2>&1; then
     exit 1
 fi
 
+# Extract Go version robustly. Release builds report
+# `go version go1.22.3 ...` — $3 is `go1.22.3`. Development
+# builds report `go version devel go1.22-xyz ...` — $3 is
+# `devel` and the minor is not parseable from that token.
 GO_VERSION_RAW=$(go version | awk '{print $3}')
-GO_VERSION_NUM="${GO_VERSION_RAW#go}"
-GO_MAJOR=$(echo "$GO_VERSION_NUM" | cut -d. -f1)
-GO_MINOR=$(echo "$GO_VERSION_NUM" | cut -d. -f2)
+case "$GO_VERSION_RAW" in
+    go*)
+        GO_VERSION_NUM="${GO_VERSION_RAW#go}"
+        ;;
+    *)
+        GO_VERSION_NUM=$(go version | grep -oE 'go[0-9]+\.[0-9]+' | head -n1 | sed 's/^go//')
+        ;;
+esac
+
+GO_MAJOR=$(echo "${GO_VERSION_NUM:-0}" | cut -d. -f1)
+GO_MINOR=$(echo "${GO_VERSION_NUM:-0}" | cut -d. -f2)
+
+if ! echo "$GO_MAJOR" | grep -qE '^[0-9]+$' || \
+   ! echo "$GO_MINOR" | grep -qE '^[0-9]+$'; then
+    echo -e "${RED}❌ Cannot parse Go version from: $(go version)${NC}" >&2
+    exit 1
+fi
 
 echo -e "${GREEN}✅ Go:${NC} $(go version)"
 
@@ -666,22 +537,21 @@ else
     echo -e "${YELLOW}⚠️  timeout:${NC} not available (build will NOT be time-bounded)"
 fi
 
-# ------------------------------------------------------------
-# [17] Check main.go
-# ------------------------------------------------------------
+# ============================================================
+# [13] Check main.go
+# ============================================================
 if [ ! -f "${SCRIPT_DIR}/main.go" ]; then
     echo -e "${RED}❌ main.go not found at ${SCRIPT_DIR}${NC}" >&2
     exit 1
 fi
 
-# ------------------------------------------------------------
-# [18] go.mod
-# ------------------------------------------------------------
+# ============================================================
+# [14] go.mod
+# ============================================================
 cd "$SCRIPT_DIR"
 
 if [ ! -f "go.mod" ]; then
     echo -e "${DIM}→ go mod init dnscrypt-webui${NC}"
-    # BLD-8: don't silently swallow the failure.
     if ! go mod init dnscrypt-webui >/dev/null 2>&1; then
         if [ ! -f "go.mod" ]; then
             echo -e "${RED}❌ 'go mod init' failed and go.mod is still missing${NC}" >&2
@@ -696,9 +566,9 @@ if [ -f "go.mod" ] && [ -f "go.sum" ]; then
     go mod download >/dev/null 2>&1 || true
 fi
 
-# ------------------------------------------------------------
-# [19] Full LDFLAGS
-# ------------------------------------------------------------
+# ============================================================
+# [15] Full LDFLAGS
+# ============================================================
 LDFLAGS="${LDFLAGS_BASE}"
 LDFLAGS="${LDFLAGS} -X main.BuildVersion=${SCRIPT_VERSION}"
 LDFLAGS="${LDFLAGS} -X main.BuildCommit=${BUILD_COMMIT}"
@@ -708,9 +578,9 @@ LDFLAGS="${LDFLAGS} -buildid="
 
 GOFLAGS=(-buildvcs=false -trimpath -mod=readonly)
 
-# ------------------------------------------------------------
-# [20] NDK detection
-# ------------------------------------------------------------
+# ============================================================
+# [16] NDK detection
+# ============================================================
 NDK_PATH=""
 NDK_BIN=""
 
@@ -733,18 +603,18 @@ else
     echo ""
 fi
 
-# ------------------------------------------------------------
-# [21] UPX + PIE warning
-# ------------------------------------------------------------
+# ============================================================
+# [17] UPX + PIE warning
+# ============================================================
 if [ "$USE_UPX" = "1" ]; then
     echo -e "${YELLOW}⚠️  UPX enabled — may break PIE${NC}"
     echo -e "${DIM}   Android 5+ requires PIE. Verify the output.${NC}"
     echo ""
 fi
 
-# ------------------------------------------------------------
-# [22] Clean
-# ------------------------------------------------------------
+# ============================================================
+# [18] Clean
+# ============================================================
 if [ "$DO_CLEAN" = "1" ] && [ -d "$BUILD_DIR" ]; then
     echo -e "${BLUE}🧹 Cleaning ${BUILD_DIR}${NC}"
     rm -rf "$BUILD_DIR"
@@ -752,9 +622,9 @@ fi
 
 mkdir -p "$BUILD_DIR"
 
-# ------------------------------------------------------------
-# [23] Determine architectures
-# ------------------------------------------------------------
+# ============================================================
+# [19] Determine architectures
+# ============================================================
 if [ -n "$SINGLE_ARCH" ]; then
     ARCHS="$SINGLE_ARCH"
     EXPECTED_ARCH_COUNT=1
@@ -762,9 +632,12 @@ else
     ARCHS="$ALL_ARCHS"
 fi
 
-# ------------------------------------------------------------
-# [24] Build function for a single architecture
-# ------------------------------------------------------------
+# ============================================================
+# [20] Build a single architecture
+# ============================================================
+# Output discipline: each call prints exactly ONE line. In
+# parallel mode this prevents the progress prefix and the
+# result suffix from interleaving across architectures.
 build_arch() {
     local ARCH="$1"
     local GO_VARS
@@ -775,9 +648,7 @@ build_arch() {
     local OUTPUT="$BUILD_DIR/${OUTPUT_PREFIX}-${ARCH}"
     local LOGFILE="$BUILD_DIR/.build-${ARCH}.log"
 
-    printf "  ${CYAN}→${NC} %-8s ${DIM}(GOARCH=%s%s)${NC}  " \
-        "$ARCH" "$GOARCH_VAL" "${GOARM_VAL:+ GOARM=$GOARM_VAL}"
-
+    # Resolve the C compiler for this architecture.
     local CC_PATH=""
     local CGO_MODE=0
     if [ -n "$NDK_BIN" ]; then
@@ -801,7 +672,7 @@ build_arch() {
     [ -n "$GOARM_VAL" ] && BUILD_ENV+=("GOARM=$GOARM_VAL")
     [ -n "$CC_PATH" ] && BUILD_ENV+=("CC=$CC_PATH")
 
-    # BLD-3: use `timeout` when available.
+    # Build. Use `timeout` when available (5-minute cap per arch).
     local build_ok=0
     if [ "$HAS_TIMEOUT" = "1" ]; then
         if timeout 300 env "${BUILD_ENV[@]}" go build \
@@ -825,17 +696,25 @@ build_arch() {
         fi
     fi
 
+    # Single-line result for both parallel and serial modes.
+    local PREFIX
+    PREFIX=$(printf "  ${CYAN}→${NC} %-8s ${DIM}(GOARCH=%s%s)${NC}  " \
+        "$ARCH" "$GOARCH_VAL" "${GOARM_VAL:+ GOARM=$GOARM_VAL}")
+
     if [ "$build_ok" = "1" ]; then
         if [ ! -s "$OUTPUT" ]; then
-            echo -e "${RED}✗ (empty file)${NC}"
+            printf '%s%s\n' "$PREFIX" "${RED}✗ (empty file)${NC}"
             return 1
         fi
 
+        # Verify ELF magic when `od` is available. On stripped-down
+        # hosts where `od` is missing, log a warning once instead
+        # of silently skipping the check.
         if command -v od >/dev/null 2>&1; then
             local magic
             magic=$(od -An -tx1 -N4 "$OUTPUT" 2>/dev/null | tr -d ' \n')
             if [ "$magic" != "7f454c46" ]; then
-                echo -e "${RED}✗ (not ELF)${NC}"
+                printf '%s%s\n' "$PREFIX" "${RED}✗ (not ELF)${NC}"
                 return 1
             fi
         fi
@@ -856,12 +735,12 @@ build_arch() {
         local CGO_STATUS=""
         [ "$CGO_MODE" = "1" ] && CGO_STATUS="${DIM}[cgo-${OS_TARGET}]${NC}"
 
-        echo -e "${GREEN}✓${NC} $PIE_STATUS $CGO_STATUS"
+        printf '%s%s %s %s\n' "$PREFIX" "${GREEN}✓${NC}" "$PIE_STATUS" "$CGO_STATUS"
         chmod +x "$OUTPUT"
         [ "$KEEP_LOGS" = "1" ] || rm -f "$LOGFILE"
         return 0
     else
-        echo -e "${RED}✗${NC}"
+        printf '%s%s\n' "$PREFIX" "${RED}✗${NC}"
         echo ""
         echo -e "${RED}════ Build log for $ARCH ════${NC}"
         tail -30 "$LOGFILE" 2>/dev/null || true
@@ -870,11 +749,18 @@ build_arch() {
     fi
 }
 
-# ------------------------------------------------------------
-# [25] Build
-# ------------------------------------------------------------
+# ============================================================
+# [21] Build
+# ============================================================
 echo -e "${BOLD}🔨 Building ${SCRIPT_VERSION} for:${NC} ${CYAN}${ARCHS}${NC}"
 echo ""
+
+if command -v od >/dev/null 2>&1; then
+    OD_AVAILABLE=1
+else
+    OD_AVAILABLE=0
+    echo -e "${YELLOW}⚠️  'od' not available — ELF magic verification will be skipped${NC}"
+fi
 
 START_TIME=$(date +%s)
 FAILED_ARCHS=""
@@ -913,9 +799,9 @@ fi
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
 
-# ------------------------------------------------------------
-# [26] Build summary
-# ------------------------------------------------------------
+# ============================================================
+# [22] Build summary
+# ============================================================
 echo ""
 if [ -z "$FAILED_ARCHS" ]; then
     echo -e "${GREEN}✅ Build complete${NC} ${DIM}(${ELAPSED}s, ${SUCCESS_COUNT}/${EXPECTED_ARCH_COUNT})${NC}"
@@ -928,18 +814,21 @@ if [ "$SUCCESS_COUNT" -lt "$EXPECTED_ARCH_COUNT" ]; then
     echo -e "${RED}❌ Output count (${SUCCESS_COUNT}) is less than expected (${EXPECTED_ARCH_COUNT})${NC}" >&2
 fi
 
-# ------------------------------------------------------------
-# [27] Checksums
-# ------------------------------------------------------------
+# ============================================================
+# [23] Checksums
+# ============================================================
 if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
     echo -e "${BOLD}🔐 Generating checksums...${NC}"
 
     CHECKSUM_FILE="$BUILD_DIR/checksums.txt"
 
-    # BLD-4: when SOURCE_DATE_EPOCH=0, print "unknown".
-    if [ "$SOURCE_DATE_EPOCH" -gt 0 ] 2>/dev/null; then
-        BUILD_DATE_HUMAN=$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date -u +'%Y-%m-%d %H:%M:%S UTC')
+    # Compute a human-readable build date. When SOURCE_DATE_EPOCH=0
+    # OR the platform's `date` cannot interpret `-d @N` (BSD/macOS
+    # without GNU coreutils), fall back to "unknown" — NOT to the
+    # current date, which would silently break reproducibility.
+    if [ "$SOURCE_DATE_EPOCH" -gt 0 ]; then
+        BUILD_DATE_HUMAN=$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || echo "unknown")
     else
         BUILD_DATE_HUMAN="unknown (SOURCE_DATE_EPOCH=0)"
     fi
@@ -954,6 +843,7 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
         echo ""
     } > "$CHECKSUM_FILE"
 
+    # Deterministic filename order via LC_ALL=C sort.
     cd "$BUILD_DIR"
     CHECKSUM_TOOL=""
     if command -v sha256sum >/dev/null 2>&1; then
@@ -963,10 +853,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     fi
 
     if [ -n "$CHECKSUM_TOOL" ]; then
-        for f in "${OUTPUT_PREFIX}"-*; do
+        for f in $(printf '%s\n' "${OUTPUT_PREFIX}"-* | LC_ALL=C sort); do
             [ -f "$f" ] || continue
             case "$f" in
-                *.log|*.log.*) continue ;;
+                *.log|*.log.*|checksums.txt) continue ;;
             esac
             $CHECKSUM_TOOL "$f" >> "checksums.txt"
         done
@@ -977,9 +867,9 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     cd - >/dev/null
 fi
 
-# ------------------------------------------------------------
-# [28] Output table
-# ------------------------------------------------------------
+# ============================================================
+# [24] Output table
+# ============================================================
 if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
     echo -e "${BOLD}📦 Build artifacts:${NC}"
@@ -1005,9 +895,9 @@ if [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
 fi
 
-# ------------------------------------------------------------
-# [29] Packaging (binaries only)
-# ------------------------------------------------------------
+# ============================================================
+# [25] Packaging (binaries only)
+# ============================================================
 if [ "$DO_PACKAGE" = "1" ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo -e "${BOLD}📦 Creating binaries ZIP...${NC}"
     PKG_NAME="${OUTPUT_PREFIX}-${VERSION_NO_V}-binaries.zip"
@@ -1020,7 +910,7 @@ if [ "$DO_PACKAGE" = "1" ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
 
         FILES_TO_ZIP=""
         cd "$BUILD_DIR"
-        for f in "${OUTPUT_PREFIX}"-* checksums.txt; do
+        for f in $(printf '%s\n' "${OUTPUT_PREFIX}"-* checksums.txt | LC_ALL=C sort); do
             [ -f "$f" ] || continue
             case "$f" in
                 *.log|*.log.*) continue ;;
@@ -1042,9 +932,9 @@ if [ "$DO_PACKAGE" = "1" ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
     echo ""
 fi
 
-# ------------------------------------------------------------
-# [30] Final PIE verification
-# ------------------------------------------------------------
+# ============================================================
+# [26] Final PIE verification
+# ============================================================
 if [ "$SUCCESS_COUNT" -gt 0 ] && command -v file >/dev/null 2>&1; then
     echo -e "${BOLD}🔍 PIE Verification:${NC}"
     ALL_PIE=1
@@ -1069,9 +959,9 @@ if [ "$SUCCESS_COUNT" -gt 0 ] && command -v file >/dev/null 2>&1; then
     echo ""
 fi
 
-# ------------------------------------------------------------
-# [31] Exit
-# ------------------------------------------------------------
+# ============================================================
+# [27] Exit
+# ============================================================
 if [ -n "$FAILED_ARCHS" ]; then
     exit 1
 fi

@@ -1,56 +1,87 @@
 # ============================================================
-# ShellCheck configuration — DNSCrypt Smart Filter
+# DNSCrypt Smart Filter — .shellcheckrc
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
+# Author: gasciljh
+# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# This file configures ShellCheck behavior project-wide.
-# Documentation: https://www.shellcheck.net/wiki/Directive
+# Project-wide ShellCheck configuration.
+# Applies to every shell script under proxy/ and scripts/.
 #
-# Principle: disable only FALSE POSITIVES and NOTES that
-# would require invasive rewrites of correct code. Real
-# bugs and warnings are NOT disabled here — they are fixed
-# in the source files.
+# Where ShellCheck runs:
+#   • Local pre-commit hook (.pre-commit-config.yaml §[2])
+#   • Local `make check-backup` / `make check-all`
+#
+# Where ShellCheck does NOT run:
+#   • CI — removed from .github/workflows/ci.yml on 2026-09-30.
+#     Rationale: even with --shell=bash and four excluded
+#     warning classes, it emitted false positives that blocked
+#     PRs without catching real bugs. Shell script safety is
+#     now enforced jointly by:
+#       – bash -n syntax check (ci.yml)
+#       – Verify Layer 1-10 function presence (ci.yml)
+#       – Verify companion install script (ci.yml)
+#       – The pre-commit hook below
+#
+# Principle: disable only verified false positives and style
+# notes. Real bugs and warnings are fixed in the source files —
+# not suppressed here.
+#
+# Reference: https://www.shellcheck.net/wiki/Directive
+#
+# Note on multiple `disable=` directives: they are MERGED
+# (union), not last-wins.
 # ============================================================
 
 # ------------------------------------------------------------
-# [1] Notes that are style preferences, not bugs
+# Global disables
 # ------------------------------------------------------------
+# SC2012 — "Use find instead of ls to better handle
+#           non-alphanumeric filenames."
+#   Accepted: the module uses `ls -1` for read-only
+#   enumeration of known directories (backup snapshots).
+#   `find` would add complexity without benefit — the
+#   directory layout is controlled by the module itself.
 #
-# SC2012 — "Use find instead of ls to better handle non-
-#   alphanumeric filenames."
-#   The project intentionally uses `ls -1` in read-only
-#   listing paths where the directory contents are known
-#   (backup snapshots) and where `find` would add
-#   complexity without benefit. Reviewed and accepted.
-disable=SC2012
-
-# ------------------------------------------------------------
-# [2] False positives in the mksh/ksh environment
-# ------------------------------------------------------------
-#
-# SC1091 — "Not following: ... was not specified as input"
-#   `source` targets use variables (`$SCRIPT_DIR/lib.sh`).
-#   ShellCheck cannot resolve them at parse time. The
-#   sources are always available at runtime in the module
+# SC1091 — "Not following: ... was not specified as input."
+#   Accepted: `source` targets are resolved at runtime
+#   (e.g. `. "$FUNCTIONS"`). ShellCheck cannot resolve them
+#   at parse time. The files are always present in the module
 #   environment.
-disable=SC1091
+# ------------------------------------------------------------
+disable=SC2012,SC1091
 
 # ------------------------------------------------------------
-# [3] File-level suppressions (see comments in each file)
+# Per-file suppressions (documented, NOT global)
 # ------------------------------------------------------------
+# Applied inline with `# shellcheck disable=SCxxxx` in the
+# specific files that need them. Hoisting these to the global
+# scope would hide real issues elsewhere.
 #
-# The following checks are disabled per-file with inline
-# directives (not globally) because they only apply to
-# specific files or patterns:
+#   SC1090 — non-constant source (variable path).
+#            Applies to `. "$MODDIR/functions.sh"` in
+#            proxy/*.sh. Distinct from SC1091 (which is global).
 #
-#   • SC2059 — printf format string is a variable
-#     (color codes). Applies to proxy/*.sh with a
-#     consistent trusted-constant pattern.
+#   SC2034 — variable appears unused (intentionally kept for
+#            readability or consumed by Magisk at runtime).
+#            Applies to specific variables in proxy/*.sh.
 #
-#   • SC2329 — function never invoked directly
-#     (invoked via `trap`). Applies to proxy/release.sh,
-#     scripts/release*.sh.
+#   SC2059 — printf format string is a variable.
+#            Applies to color-code helpers in proxy/status.sh.
 #
-#   • SC2034 — variable appears unused
-#     (intentionally documented for readers / consumed by
-#     Magisk at runtime). Applies to specific variables
-#     in proxy/*.sh.
-# ============================================================
+#   SC2064 — trap with double-quotes expands at definition time.
+#            Applies to scripts/fetch_dns_binaries.sh where the
+#            temporary directory must be captured at trap install.
+#
+#   SC2086 — word splitting on purpose (e.g. TIMEOUT_CMD).
+#            Applies to proxy/install_app.sh and proxy/build.sh.
+#
+#   SC2317 — unreachable code (return-or-exit idiom in
+#            boot-mini.sh and functions.sh).
+#
+#   SC2329 — function never invoked directly (invoked via
+#            `trap`). Applies to scripts/release*.sh,
+#            scripts/generate-icons.sh,
+#            scripts/package_module.sh, and
+#            proxy/install_app.sh.
+# ------------------------------------------------------------

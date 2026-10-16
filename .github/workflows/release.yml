@@ -1,268 +1,94 @@
 # ============================================================
 # DNSCrypt Smart Filter – Release Workflow
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Publishes a GitHub Release when a version tag is pushed.
-#   Can also be triggered manually via workflow_dispatch for
-#   re-publishing an existing tag (does NOT create new tags).
+# Publishes a GitHub Release when a version tag is pushed.
+# Can also be triggered manually via workflow_dispatch for
+# re-publishing an existing tag (does NOT create new tags).
 #
-# ============================================================
-# Release trigger:
-# ============================================================
-#   Two paths lead to a release:
-#
+# Release triggers:
 #   1. Tag push (automated, preferred)
-#        Tag pattern: v<MAJOR>.<MINOR>.<PATCH>
-#                     v<MAJOR>.<MINOR>.<PATCH>-<prerelease>
+#        Tag pattern: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]
 #        Created by:  scripts/release.sh
 #                     scripts/release-patch.sh
-#        Tag type:    ANNOTATED (via `git tag -a` in release.sh)
+#        Tag type:    ANNOTATED (git tag -a)
 #
 #   2. workflow_dispatch (manual, emergency)
-#        Triggered from: Actions → Release → Run workflow
 #        Version source: VERSION file
-#        Requires: an existing tag matching VERSION to be present
+#        Requires: an existing tag matching VERSION
 #        Use when: re-publishing a release without a new commit
-#        Tag type: ANNOTATED (the tag must already exist)
 #
-# ============================================================
 # update.json responsibility (IMPORTANT):
-# ============================================================
 #   This workflow does NOT modify update.json.
 #
 #   update.json is updated LOCALLY by scripts/release.sh in
 #   the same commit that bumps VERSION and module.prop. As of
-#   v1.2.0, release.sh writes three fields together:
-#     • version     (e.g. "v1.4.0")
-#     • versionCode (e.g. 1040000)
-#     • zipUrl      (built from the tag pattern below)
+#   v1.5.0, release.sh writes SIX fields together:
+#     • version             (e.g. "v1.5.0")
+#     • versionCode         (e.g. 1050000)
+#     • versionName         (e.g. "v1.5.0 (Global Edition)")
+#     • releaseDate         (e.g. "2026-10-15")
+#     • zipUrl              (built from the tag pattern)
+#     • x-note-last-updated (same as releaseDate)
 #
-#   The zipUrl written by release.sh uses the SAME template that
-#   this workflow uses to attach the release asset:
+#   The zipUrl uses the SAME template this workflow uses to
+#   attach the release asset:
 #     https://github.com/<owner>/<repo>/releases/download/
 #         <tag>/dnscrypt-webui-<version-without-v>-module.zip
 #
 #   Because release.sh writes the URL before the tag is pushed,
 #   the commit and the release are guaranteed to be consistent.
 #
-# ============================================================
-# Pipeline steps (16):
-# ============================================================
-#   ┌────┬─────────────────────────────────┬──────────┐
-#   │ #  │ Step                                │ Duration     │
-#   ├────┼─────────────────────────────────┼──────────┤
-#   │  1 │ Checkout (fetch-depth: 0)           │ ~5 s         │
-#   │  2 │ Setup Go 1.22                       │ ~10 s        │
-#   │  3 │ Setup Android NDK r26b              │ ~30 s        │
-#   │  4 │ Determine + validate version        │ ~2 s         │
-#   │  5 │ Verify tag exists (dispatch only)   │ ~2 s         │
-#   │  6 │ Install packaging tools             │ ~15 s        │
-#   │  7 │ Fetch companion app APK (v1.4.0)    │ ~10 s        │
-#   │  8 │ Build WebUI binaries (4 arch)       │ ~60 s        │
-#   │  9 │ Verify binaries (ELF + PIE)         │ ~5 s         │
-#   │ 10 │ Stage APK for module ZIP (v1.4.0)   │ ~2 s         │
-#   │ 11 │ Package Magisk module               │ ~30 s        │
-#   │ 12 │ List final artifacts                │ ~2 s         │
-#   │ 13 │ Upload artifacts (backup)           │ ~20 s        │
-#   │ 14 │ Extract CHANGELOG section           │ ~2 s         │
-#   │ 15 │ Create GitHub Release               │ ~10 s        │
-#   │ 16 │ Sync main → develop                 │ ~15 s        │
-#   └────┴─────────────────────────────────┴──────────┘
+# Release artifacts (8 files):
+#   • dnscrypt-webui-<ver>-module.zip
+#   • dnscrypt-webui-<ver>-module.zip.sha256
+#   • dnscrypt-webui-arm64
+#   • dnscrypt-webui-arm
+#   • dnscrypt-webui-amd64
+#   • dnscrypt-webui-386
+#   • DNS-Proxy-v<app-ver>.apk          (optional)
+#   • DNS-Proxy-v<app-ver>.apk.sha256   (optional)
 #
-#   Total: ~3–5 minutes (excluding runner setup).
+#   The two APK files are OPTIONAL. When the companion APK
+#   cannot be fetched, the release proceeds without them.
+#   All other 6 files are ALWAYS attached.
 #
-# ============================================================
-# Release artifacts (8 files attached to the GitHub Release):
-# ============================================================
-#   • dnscrypt-webui-<ver>-module.zip         (~12 MB)
-#   • dnscrypt-webui-<ver>-module.zip.sha256  (~100 B)
-#   • dnscrypt-webui-arm64                    (~8 MB)
-#   • dnscrypt-webui-arm                      (~7 MB)
-#   • dnscrypt-webui-amd64                    (~7.5 MB)
-#   • dnscrypt-webui-386                      (~7 MB)
-#   • DNS-Proxy-v<app-ver>.apk                (~3 MB, v1.4.0)
-#   • DNS-Proxy-v<app-ver>.apk.sha256         (~100 B, v1.4.0)
-#
-#   The two APK files are OPTIONAL. When the companion APK cannot
-#   be fetched (network failure, missing app-apk.version), the
-#   release proceeds without them. All other 6 files are ALWAYS
-#   attached.
-#
-#   Also uploaded as a workflow artifact (backup, 30-day retention).
-#
-# ============================================================
-# Non-goals (what this workflow does NOT do):
-# ============================================================
+# Non-goals:
 #   • No GPG signing of the tag or the artifacts.
 #     The tag is created ANNOTATED by release.sh (git tag -a),
-#     not signed (git tag -s).
+#     NOT signed (git tag -s).
+#   • No Cosign signature.
+#   • No SBOM. The SHA256 file is the only integrity artifact.
+#   • No update.json modification.
+#   • No tag creation on workflow_dispatch.
+#   • No APK signature verification. The companion APK is
+#     served as a static file and installed via Android's
+#     PackageManager, which verifies the signature at install.
+#   • No install_app.sh execution. The script runs on the
+#     device, triggered by the WebUI.
 #
-#   • No Cosign signature. `cosign` is not invoked anywhere.
-#
-#   • No SBOM. A software bill of materials is not generated.
-#     The SHA256 file is the only integrity artifact attached
-#     to the release.
-#
-#   • No update.json modification. See above.
-#
-#   • No tag creation on workflow_dispatch. The tag must
-#     already exist. Use scripts/release.sh to create one.
-#
-# ============================================================
-# Sync main → develop (step 16):
-# ============================================================
+# Sync main → develop:
 #   After the release is published, this workflow syncs main
-#   into develop. See docs/adr/0003-post-release-sync.md.
+#   into develop. Safety:
+#     • continue-on-error: true — a failed sync NEVER fails
+#     • if: github.event_name == 'push' — only on tag pushes
+#   See docs/adr/0003-post-release-sync.md.
 #
-#   Safety:
-#     • `continue-on-error: true` — a failed sync NEVER fails
-#       the release.
-#     • `if: github.event_name == 'push'` — only on tag pushes.
+# Action versions:
+#   • actions/checkout@v4
+#   • actions/setup-go@v5
+#   • actions/upload-artifact@v4
+#   • nttld/setup-ndk@v1
+#   • softprops/action-gh-release@v2
 #
-# ============================================================
-# ⚠️ Action versions:
-# ============================================================
-#   This workflow references:
-#     • actions/checkout@v4
-#     • actions/setup-go@v5
-#     • actions/upload-artifact@v4
-#     • nttld/setup-ndk@v1
-#     • softprops/action-gh-release@v2
-#
-#   These are the currently stable major versions. If a
-#   dependency update is desired, Dependabot will open PRs on
-#   a weekly cadence for the github-actions ecosystem.
-#
-#   If any `uses:` line fails with "reference not found", see
-#   the note in ci.yml — the resolution is the same (check the
-#   action's releases page and update the version).
-#
-# ============================================================
-# ⚠️ Permissions:
-# ============================================================
-#   `contents: write` is required for:
+# Permissions:
+#   contents: write is required for:
 #     • Creating the GitHub Release
 #     • Pushing to develop in the sync step
-#
-#   Do not downgrade to `contents: read`.
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 REL-1 — Header now says "Publishes a GitHub Release".
-#   🔧 REL-2 — Documentation clarified: this workflow does NOT
-#     modify update.json.
-#   🔧 REL-3 — Non-goals section explicitly lists GPG, Cosign,
-#     and SBOM.
-#   🔧 REL-4 — Verify step checks binary size (> 1 MB).
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening in this revision
-# ============================================================
-#   🛡️ HARD-REL-03 (was missing from the previous revision;
-#     documented here for completeness) — The version string is
-#     escaped before it reaches a regex context. In
-#     `scripts/release.sh`, dots in `1.2.0` are escaped to
-#     `1\.2\.0` via `sed 's/\./\\./g'` before being used in
-#     an awk/sed pattern. This prevents the regex `1.2.0` from
-#     matching `1a2b0` or `1-2-0`. The SAME fix is applied to
-#     the `Extract CHANGELOG section` step below, which had
-#     been overlooked in the first pass of this revision.
-#
-#   🛡️ HARD-REL-12 — workflow_dispatch now REQUIRES an
-#     existing tag. Without this check, the
-#     `softprops/action-gh-release` step would create a
-#     lightweight tag via the GitHub API, producing an
-#     inconsistent mix of annotated tags (from release.sh)
-#     and lightweight tags (from manual runs). The new step
-#     "Verify tag exists" fails fast with a clear message
-#     when the tag is missing.
-#
-#   🛡️ HARD-REL-13 — Action versions downgraded to
-#     currently-stable majors. The prior `@v7` references
-#     were speculative and would break the workflow if the
-#     versions did not exist. Dependabot will propose upgrades.
-#
-#   🛡️ HARD-REL-14 — Release notes are now read from
-#     CHANGELOG.md when a matching section exists, falling
-#     back to GitHub's auto-generated notes otherwise. This
-#     keeps the GitHub Release page consistent with the
-#     curated CHANGELOG instead of silently producing a
-#     second source of truth.
-#
-#   🛡️ HARD-REL-15 — All workflow context values
-#     (`github.event_name`, `github.ref_name`) are now passed
-#     through `env:` instead of being interpolated directly
-#     into the shell script. This eliminates the entire class
-#     of "context values as shell tokens" issues.
-#
-#   🛡️ HARD-REL-16 — `cache: true` for setup-go. The prior
-#     `cache: false` disabled module caching and added 20–40 s
-#     of unnecessary downloads per run.
-#
-#   🛡️ HARD-REL-17 — Version format is validated in BOTH
-#     trigger paths, not just the tag-push path.
-#
-# ============================================================
-# v1.3.0 — No changes to the release pipeline
-# ============================================================
-#   The v1.3.0 release is primarily a feature release (PWA
-#   install button, live status LED, DNS auto-start after
-#   boot). All three changes are client-side or shell-side:
-#     • PWA install button  → web/index.html (client-side)
-#     • Live status LED     → web/index.html (client-side)
-#     • DNS auto-start fix  → proxy/service.sh (shell)
-#
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
-#
-#   This workflow (release.yml) was NOT modified in v1.3.0.
-#   It builds and packages the module ZIP but does NOT inspect
-#   the snapshot-detection or rotation logic in the shipped
-#   scripts. Its artifact list, build matrix, and sync step
-#   are all unchanged from v1.2.0.
-#
-#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13.
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 REL-18 — New step "Fetch companion Android app APK".
-#     Downloads app-debug.apk from gasciljh/dnscrypt-proxy-app
-#     and places it in dist/ as DNS-Proxy-v<app-version>.apk
-#     (best-effort: a failed fetch does NOT fail the release).
-#
-#   📱 REL-19 — New step "Stage APK for module ZIP".
-#     Copies dist/DNS-Proxy-v*.apk → web/app-debug.apk so that
-#     package_module.sh (running later in the pipeline) can
-#     bundle the companion app into the module ZIP.
-#     If no APK is found, a warning is logged and packaging
-#     continues (APK is OPTIONAL, matching package_module.sh).
-#
-#   📱 REL-20 — Release assets now include:
-#     • dist/DNS-Proxy-v*.apk
-#     • dist/DNS-Proxy-v*.apk.sha256
-#
-#     The list above has been updated from 6 to 8 files to
-#     reflect this. The two APK entries are conditional: they
-#     are attached only when the APK was successfully fetched.
-#
-#   📱 REL-21 — The "Pipeline steps" table above has been
-#     corrected from 13 to 16. The count now reflects the
-#     actual number of steps in the `release` job, including:
-#       • Step 5  — Verify tag exists (HARD-REL-12)
-#       • Step 7  — Fetch companion APK (REL-18)
-#       • Step 10 — Stage APK for module ZIP (REL-19)
-#       • Step 12 — List final artifacts
-#       • Step 14 — Extract CHANGELOG section (HARD-REL-14)
+#   Do not downgrade to contents: read.
 # ============================================================
 
 name: Release
@@ -294,8 +120,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          # HARD-REL-16: caching re-enabled. The Go module cache
-          # speeds up repeated runs significantly.
           cache: true
 
       - name: Setup NDK
@@ -308,10 +132,11 @@ jobs:
       # ============================================================
       # [Determine + validate version]
       # ============================================================
-      # HARD-REL-15: context values are passed via env, not
-      # interpolated directly into the shell script.
-      # HARD-REL-17: the version is validated in both trigger
-      # paths (push and workflow_dispatch), not just push.
+      # Context values are passed via env, not interpolated
+      # directly into the shell script.
+      #
+      # The version is validated in BOTH trigger paths (push and
+      # workflow_dispatch), not just push.
       # ============================================================
       - name: Determine and validate version
         id: version
@@ -327,7 +152,6 @@ jobs:
             V=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           fi
 
-          # HARD-REL-17: format validation on both paths.
           if ! printf '%s' "$V" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
             echo "::error::Invalid version format: '$V'"
             echo "::error::Expected: v<major>.<minor>.<patch>[-prerelease]"
@@ -339,9 +163,9 @@ jobs:
           echo "::notice::Version: $V"
 
       # ============================================================
-      # [HARD-REL-12] Require tag existence on workflow_dispatch
+      # [Require tag existence on workflow_dispatch]
       # ============================================================
-      # Without this check, `softprops/action-gh-release` would
+      # Without this check, softprops/action-gh-release would
       # create a lightweight tag via the GitHub API, producing
       # an inconsistent mix of tag types. This step fails fast
       # and tells the operator to use scripts/release.sh.
@@ -371,11 +195,15 @@ jobs:
             zip unzip jq curl ca-certificates
 
       # ============================================================
-      # Fetch the companion Android app APK (v1.4.0)
+      # Fetch the companion Android app APK
       # ============================================================
-      # Downloads app-debug.apk from the companion repo
-      # (gasciljh/dnscrypt-proxy-app) and renames it to
-      # DNS-Proxy-v<app-version>.apk in dist/.
+      # Downloads app-debug.apk from the companion repo and
+      # renames it to DNS-Proxy-v<app-version>.apk in dist/.
+      #
+      # The fetch script also writes
+      # dist/DNS-Proxy-v<app-version>.apk.sha256 whose content
+      # references the FINAL staged name (app-debug.apk) rather
+      # than the intermediate dist name.
       #
       # Version source: proxy/app-apk.version
       #
@@ -423,41 +251,74 @@ jobs:
           echo "::notice::All 4 WebUI binaries OK"
 
       # ============================================================
-      # Stage APK for module ZIP (v1.4.0 — REL-19)
+      # Stage APK + .sha256 for module ZIP
       # ============================================================
-      # Copies dist/DNS-Proxy-v*.apk → web/app-debug.apk so that
-      # package_module.sh (running in the next step) can bundle
-      # the companion app into the module ZIP. The APK is
-      # OPTIONAL: if it is missing (e.g. the fetch step failed),
-      # a warning is logged and packaging proceeds.
+      # Copies BOTH files from dist/ to web/:
+      #   dist/DNS-Proxy-v*.apk         → web/app-debug.apk
+      #   dist/DNS-Proxy-v*.apk.sha256  → web/app-debug.apk.sha256
+      #
+      # package_module.sh bundles both into the module ZIP.
+      # The sidecar is consumed at install time by
+      # proxy/install_app.sh to SHA256-verify the APK before
+      # `pm install`. Absence of the sidecar is not fatal —
+      # install_app.sh degrades to advisory mode.
+      #
+      # Content validation: after staging, the .sha256 content
+      # is checked to confirm it references `app-debug.apk`
+      # (the FINAL staged name), not the intermediate dist name.
+      # This is a REGRESSION GUARD against a future drift in
+      # fetch_app_apk.sh. It is a warning, not an error, because
+      # install_app.sh reads only the first field of the
+      # sidecar.
+      #
+      # The grep pattern uses POSIX character classes
+      # ([[:space:]]) instead of a literal two-space sequence,
+      # so it tolerates CRLF line endings without weakening the
+      # filename requirement.
       # ============================================================
-      - name: Stage APK for module ZIP
+      - name: Stage APK + .sha256 for module ZIP
         run: |
           set -euo pipefail
-          apk=$(ls dist/DNS-Proxy-v*.apk 2>/dev/null | head -n1 || true)
-          if [ -n "$apk" ] && [ -f "$apk" ]; then
-            mkdir -p web
-            cp -f "$apk" web/app-debug.apk
-            chmod 0644 web/app-debug.apk
-            echo "::notice::APK staged: $apk → web/app-debug.apk"
-            ls -la web/app-debug.apk
 
-            # v1.5.0 (APK-8): stage the SHA256 sidecar alongside
-            # the APK so that install_app.sh can verify integrity
-            # before running `pm install`. Absence of the sidecar
-            # is not fatal — install_app.sh degrades to advisory
-            # mode (skips verification with a warning).
-            sha="${apk}.sha256"
-            if [ -f "$sha" ]; then
-              cp -f "$sha" web/app-debug.apk.sha256
-              chmod 0644 web/app-debug.apk.sha256
-              echo "::notice::SHA256 staged: $sha → web/app-debug.apk.sha256"
-              ls -la web/app-debug.apk.sha256
-            else
-              echo "::warning::No .sha256 sidecar found — install_app.sh will run in advisory mode"
-            fi
-          else
+          apk=$(ls dist/DNS-Proxy-v*.apk 2>/dev/null | head -n1 || true)
+          if [ -z "$apk" ] || [ ! -f "$apk" ]; then
             echo "::warning::No APK found in dist/ — module ZIP will not include companion app"
+            exit 0
+          fi
+
+          mkdir -p web
+          cp -f "$apk" web/app-debug.apk
+          chmod 0644 web/app-debug.apk
+          echo "::notice::APK staged: $apk → web/app-debug.apk"
+          ls -la web/app-debug.apk
+
+          sha="${apk}.sha256"
+          if [ ! -f "$sha" ]; then
+            echo "::warning::No .sha256 sidecar found — install_app.sh will run in advisory mode"
+            echo "::warning::Expected at: $sha"
+            exit 0
+          fi
+
+          cp -f "$sha" web/app-debug.apk.sha256
+          chmod 0644 web/app-debug.apk.sha256
+          echo "::notice::SHA256 staged: $sha → web/app-debug.apk.sha256"
+          ls -la web/app-debug.apk.sha256
+
+          # Content check: expected format
+          #     <64-lowercase-hex>  app-debug.apk
+          # Whitespace between hash and filename is matched with
+          # [[:space:]]+ to tolerate CRLF.
+          if grep -qE '^[0-9a-f]{64}[[:space:]]+app-debug\.apk[[:space:]]*$' web/app-debug.apk.sha256; then
+            echo "::notice::Sidecar content OK — references app-debug.apk"
+          else
+            echo "::warning::Sidecar content does not match the expected format."
+            echo "::warning::Expected: '<64-lowercase-hex>  app-debug.apk'"
+            echo "::warning::Got:"
+            sed 's/^/::warning::  /' web/app-debug.apk.sha256 || true
+            echo "::warning::install_app.sh reads only the first field, so this"
+            echo "::warning::does NOT block the install — but 'sha256sum -c' on"
+            echo "::warning::the staged sidecar will fail."
+            echo "::warning::Check scripts/fetch_app_apk.sh."
           fi
 
       - name: Package Magisk module
@@ -490,15 +351,14 @@ jobs:
           if-no-files-found: error
 
       # ============================================================
-      # [HARD-REL-03 + HARD-REL-14] Extract CHANGELOG section
+      # Extract CHANGELOG section
       # ============================================================
-      # HARD-REL-03: dots in the version string are escaped
-      # before they are embedded in the awk regex. Without
-      # this, `1.2.0` matches `1a2b0`, `1-2-0`, etc.
+      # Dots in the version string are escaped before they are
+      # embedded in the awk regex. Without this, `1.2.0` matches
+      # `1a2b0`, `1-2-0`, etc.
       #
-      # HARD-REL-14: falls back to GitHub's auto-generated
-      # notes only when a matching section is missing from
-      # CHANGELOG.md.
+      # Falls back to GitHub's auto-generated notes only when a
+      # matching section is missing from CHANGELOG.md.
       # ============================================================
       - name: Extract CHANGELOG section
         id: changelog
@@ -508,11 +368,6 @@ jobs:
           set -euo pipefail
 
           V_NO_V="${V#v}"
-          # HARD-REL-03: escape regex metacharacters in the
-          # version string. Only `.` needs escaping for the
-          # version format `X.Y.Z`, but the sed call is a
-          # no-op for prerelease suffixes containing dots
-          # (e.g. `1.2.0-rc.1` → `1\.2\.0-rc\.1`).
           VER_ESCAPED=$(printf '%s' "$V_NO_V" | sed 's/\./\\./g')
 
           OUT="/tmp/release_notes.md"
@@ -553,7 +408,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ============================================================
-      # [Post-release synchronization]
+      # Post-release synchronization
       # ============================================================
       # Sync develop with main after a successful release.
       #
@@ -602,9 +457,9 @@ jobs:
           else
             echo "::notice::Fast-forward not possible — rebasing develop onto main"
             if ! git rebase origin/main; then
-              # After a squash-merge, develop's individual commits may
-              # become empty during rebase. Skip them until rebase ends
-              # or a real conflict is detected.
+              # After a squash-merge, develop's individual commits
+              # may become empty during rebase. Skip them until
+              # rebase ends or a real conflict is detected.
               echo "::warning::Rebase issues — attempting to skip empty commits"
               while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
                 if ! git rebase --skip 2>/dev/null; then

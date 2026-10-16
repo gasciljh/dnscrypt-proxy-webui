@@ -1,244 +1,36 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Continuous Integration — builds the WebUI binaries for all
-#   4 supported architectures on every push/PR to main or develop.
+# Continuous Integration — builds the WebUI binaries for all
+# 4 supported architectures on every push/PR to main or
+# develop, and validates the shell integration.
 #
-# Steps (per architecture):
-#   • Checkout source
-#   • Setup Go 1.22
-#   • Setup Android NDK r26b
-#   • Cross-compile for the target architecture
-#   • Upload the produced binary as an artifact
+# Jobs:
+#   1. build              — 4-arch build matrix
+#   2. backup-smoke-test  — shell syntax + integration checks
 #
 # Branch strategy:
 #   • main    → stable releases (protected)
 #   • develop → integration branch (features merged here first)
 #
-# Paths ignored:
+# Paths ignored (push only):
 #   • Markdown files (**/*.md)
 #   • docs/** directory
 #
-#   Rationale: documentation-only changes should not consume CI
-#   minutes or block PRs. CodeQL runs on ALL changes (including
-#   docs) — see codeql.yml — so documentation PRs still get a
-#   security review.
+#   Documentation-only changes should not consume CI minutes.
+#   CodeQL runs on ALL changes (see codeql.yml), so docs PRs
+#   still get a security review. PRs always run CI regardless
+#   of paths — a PR can never merge without a green build.
 #
-#   Note: `paths-ignore` applies ONLY to the `push` trigger.
-#   Pull requests always run CI, regardless of which files they
-#   touch. This ensures that a PR can never merge without a green
-#   build, even if it looks like a docs-only change.
-#
-#   Note: `.github/workflows/**` is deliberately NOT in the
-#   ignore list. A change to a workflow file MUST be validated
-#   by running that workflow, otherwise a broken YAML could sit
-#   undetected on main. The cost (a few CI minutes) is accepted
-#   in exchange for this safety guarantee.
-#
-# ⚠️ Action versions:
-#   This workflow references:
-#     • actions/checkout@v4
-#     • actions/setup-go@v5
-#     • actions/upload-artifact@v4
-#
-#   These are the currently stable major versions, matching
-#   .github/workflows/release.yml and .github/workflows/codeql.yml.
-#
-#   If a dependency update is desired, Dependabot will open PRs
-#   on a weekly cadence for the github-actions ecosystem. Do NOT
-#   manually bump the versions across workflows without
-#   coordinating with dependabot.yml.
-#
-# Trigger matrix:
-#   ┌────────────────┬─────────┬───────────────────┐
-#   │ Event             │ Branch   │ Notes                 │
-#   ├────────────────┼─────────┼───────────────────┤
-#   │ push              │ main     │ full build            │
-#   │ push              │ develop  │ full build            │
-#   │ pull_request      │ main     │ full build (always)   │
-#   │ pull_request      │ develop  │ full build (always)   │
-#   │ workflow_dispatch │ any      │ manual (see below)    │
-#   └────────────────┴─────────┴───────────────────┘
-#
-# Job matrix:
-#   Four architectures are built in parallel:
-#     • arm64  → arm64-v8a    (most modern Android devices)
-#     • arm    → armeabi-v7a  (older 32-bit ARM devices)
-#     • amd64  → x86_64       (emulators, x86 tablets)
-#     • 386    → x86          (legacy 32-bit x86)
-#
-#   fail-fast is disabled: if one architecture fails, the others
-#   still complete.
+#   .github/workflows/** is deliberately NOT in the ignore
+#   list — a workflow change MUST be validated by running it.
 #
 # Concurrency:
-#   Only one CI run per branch is allowed at a time. When a new
-#   push arrives while a run is in progress, the older run is
-#   cancelled.
-#
-# ============================================================
-# v1.2.0 changes:
-# ============================================================
-#   • Added `backup-smoke-test` job.
-#   • Kept the 4-architecture `build` job unchanged.
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 CI-1 — `backup-smoke-test` now checks `main.go` for
-#     cleanupOldTransactions, buildBackupInfo, buildRuntimeInfo.
-#
-#   🔧 CI-1b — `backup-smoke-test` now verifies the web asset
-#     files referenced by main.go are present. SUB-ITEM of CI-1
-#     (the web-asset check is part of the same smoke-test job);
-#     counted with CI-1 in the release notes, not separately.
-#
-#   🔧 CI-2 — `shellcheck` scope documented: 5 of 8 scripts.
-#     (SUPERSEDED by HARD-CI-10 on 2026-09-30 — shellcheck was
-#      subsequently REMOVED from the workflow entirely. The
-#      scope note above is retained for historical context only;
-#      no shellcheck step exists in the current workflow.)
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening in this revision
-# ============================================================
-#   🛡️ HARD-CI-01 — Action versions aligned with release.yml
-#     (checkout@v4, setup-go@v5, upload-artifact@v4). The prior
-#     `@v7` references were speculative and would break the
-#     workflow if the versions did not exist. Dependabot will
-#     propose upgrades.
-#
-#   🛡️ HARD-CI-02 — `cache: true` for setup-go. The prior
-#     `cache: false` disabled module caching and added 20–40 s
-#     of unnecessary downloads per run × 4 architectures.
-#
-#   🛡️ HARD-CI-03 — Web asset check now uses `-s` (non-empty)
-#     instead of `-f`. A zero-byte file from a failed checkout
-#     is now caught. Parity with HARD-PM-05 in
-#     package_module.sh.
-#
-#   🛡️ HARD-CI-04 — PERSISTENT_BACKUP path consistency now
-#     also verifies `proxy/main.go`. Without this, a change in
-#     Go but not in Shell (or vice versa) would produce two
-#     different backup directories silently.
-#
-#   🛡️ HARD-CI-05 — All smoke test steps now use
-#     `set -euo pipefail` instead of `set -e`. Parity with
-#     scripts/package_module.sh and scripts/release.sh.
-#
-#   🛡️ HARD-CI-06 — The PERSISTENT_BACKUP check now
-#     distinguishes "file missing" from "content mismatch" in
-#     its error message.
-#
-#   🛡️ HARD-CI-07 — Version-consistency check. Verifies that
-#     VERSION, module.prop, update.json, web/manifest.json, and
-#     web/sw.js all agree on the same version string. Closes
-#     H-08 (CACHE_VERSION drift) from the original audit and
-#     enforces the version-file matrix documented in
-#     CHANGELOG.md §"Version Files — Where to Update".
-#
-#   🛡️ HARD-CI-08 — Documentation-only clarification. The
-#     `paths-ignore` list at the workflow level remains
-#     unchanged: `**.md` and `docs/**` are still excluded on
-#     `push`. The note in this header is intended to make the
-#     existing behaviour explicit — it does NOT change it.
-#     (Earlier drafts of this header claimed CHANGELOG.md was
-#     removed from the exception list, which was never true.
-#     That claim has been corrected here.)
-#
-#   🛡️ HARD-CI-09 (2026-09-29) — Shellcheck now runs with
-#     `--shell=bash` and excludes 4 warning classes. Reason:
-#     the 5 scripts run under Android's mksh
-#     (#!/system/bin/sh), which supports bash-isms like
-#     `local`, `[[ ]]`, ${var:0:N}, and $RANDOM. Shellcheck
-#     defaulted to POSIX sh and produced ~230 false-positive
-#     SC3043/SC3057/SC3060/SC3028 warnings on every run,
-#     blocking PR #12 and all Dependabot PRs via the
-#     "Backup Smoke Test" required check. The 4 exclusions:
-#       - SC2010 (ls | grep) — accepted pattern here
-#       - SC2034 (unused variable) — some are exported
-#       - SC2115 (rm -rf "$var" without ?) — guards exist
-#       - SC2155 (declare+assign) — intentional style
-#     No production code was changed; only the CI invocation.
-#
-#     (SUPERSEDED by HARD-CI-10 on 2026-09-30 — shellcheck was
-#      REMOVED entirely. Even with `--shell=bash` and the four
-#      exclusions above, shellcheck still emitted false
-#      positives (SC1091, SC2164, SC2154, ...) that blocked
-#      the pipeline without catching real bugs. `bash -n` in
-#      the "Shell syntax check" step now covers syntax, and
-#      the "Verify Layer 1-10 function presence" step provides
-#      a project-specific sanity check. The configuration
-#      described in this entry is retained for historical
-#      context only — no shellcheck step exists in the
-#      current workflow.)
-#
-#   🛡️ HARD-CI-10 (2026-09-30) — Shellcheck REMOVED from the
-#     workflow. See the inline note at the point where the
-#     step was previously located (in the backup-smoke-test
-#     job) for the full rationale. `bash -n` on all 8 scripts
-#     remains as the syntax check; static analysis is now the
-#     responsibility of CodeQL and developer-side pre-commit
-#     hooks.
-#
-# ============================================================
-# v1.3.0 — No changes to the CI configuration
-# ============================================================
-#   The v1.3.0 release is primarily a feature release (PWA
-#   install button, live status LED, DNS auto-start after
-#   boot). All three changes are client-side or shell-side:
-#     • PWA install button  → web/index.html (client-side)
-#     • Live status LED     → web/index.html (client-side)
-#     • DNS auto-start fix  → proxy/service.sh (shell)
-#
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
-#
-#   This workflow (ci.yml) was NOT modified in v1.3.0. It
-#   contains no snapshot enumeration and no reference to the
-#   detection or ordering semantics. Its smoke-test steps
-#   check for FUNCTION PRESENCE only (e.g.
-#   `grep -q 'rotate_backups'` in functions.sh), not for the
-#   internal implementation of those functions. Therefore the
-#   v1.3.0 refinements have no bearing on this workflow.
-#
-#   The build matrix, the `backup-smoke-test` job, and the
-#   version-consistency check are all unchanged from v1.2.0.
-#
-#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13.
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 CI-APK-01 — New smoke-test step
-#     "Verify companion app metadata". Validates:
-#       • proxy/app-apk.version format (X.Y.Z, no "v")
-#       • scripts/fetch_app_apk.sh presence
-#
-#     The companion app is OPTIONAL. A missing version file or
-#     script produces a warning, not a build failure. This
-#     mirrors the OPTIONAL semantics in package_module.sh and
-#     release.yml.
-#
-#   📱 CI-APK-02 — The web-asset smoke test does NOT
-#     require web/app-debug.apk. The APK is staged by the
-#     release pipeline (release.yml), not committed to git
-#     (see .gitignore §[20]). Requiring it here would break
-#     CI on every push.
-#
-#   📱 CI-APK-03 — No change to the `build` job, the shell-syntax
-#     check, the layer-presence check, the PERSISTENT_BACKUP
-#     consistency check, the docs-reference check, the web-asset
-#     check, or the version-consistency check. All 7 pre-existing
-#     smoke-test steps remain unchanged.
+#   One CI run per branch. A new push cancels the older run.
 # ============================================================
 
 name: CI
@@ -282,7 +74,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-          # HARD-CI-02: caching re-enabled.
           cache: true
 
       - name: Setup NDK
@@ -309,35 +100,25 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
-  # [2] Backup smoke test (v1.2.0)
+  # [2] Backup smoke test
   # ============================================================
-  # Validates the shell scripts and configuration that
-  # implement the 10 data-preservation layers introduced in
-  # v1.2.0. Runs in seconds and catches:
-  #   • Shell syntax errors in the modified scripts
+  # Validates the shell scripts and the cross-file invariants
+  # that are not exercised by the build matrix.
+  #
+  # Catches:
+  #   • Shell syntax errors in module scripts
+  #   • Lost shebangs
   #   • Missing function names that other scripts depend on
-  #   • Missing constants (e.g. PERSISTENT_BACKUP)
+  #   • Missing constants
   #   • Inconsistent paths across scripts AND main.go
-  #   • Missing documentation files
-  #   • Missing web assets referenced by main.go
-  #   • Version drift between VERSION, module.prop, update.json,
-  #     web/manifest.json, and web/sw.js
+  #   • Version drift across 5 files
+  #   • Companion install-script regressions
+  #   • Layered Bootstrap drift (Phase 0)
+  #   • Reserved-port constant drift (shell ↔ Go)
+  #   • Truncated or placeholder web assets (Step 5)
   #
   # This is NOT a full data-preservation test — that runs on a
   # real device via .github/workflows/upgrade-test.yml.
-  #
-  # ⚠️ shellcheck status (superseded — see HARD-CI-10):
-  #    shellcheck was REMOVED from this workflow on 2026-09-30.
-  #    The prior invocation ran on 5 of the 8 scripts and used
-  #    `--shell=bash` with 4 excluded warning classes. Even
-  #    with that configuration it produced false positives that
-  #    blocked PRs without catching real bugs. `bash -n` (in the
-  #    "Shell syntax check" step below) covers syntax; the
-  #    "Verify Layer 1-10 function presence" step provides a
-  #    project-specific sanity check. Static analysis is now
-  #    the responsibility of CodeQL + developer-side pre-commit
-  #    hooks.
-  # ============================================================
   backup-smoke-test:
     name: Backup Smoke Test
     runs-on: ubuntu-22.04
@@ -345,11 +126,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ============================================================
+      # Step 1 — Shell syntax check (bash -n on 10 scripts)
+      # ============================================================
       - name: Shell syntax check (bash -n)
         run: |
           set -euo pipefail
-          echo "::group::bash -n on v1.2.0 scripts (all 8)"
+          echo "::group::bash -n on all module scripts (10)"
+
+          EXPECTED_SHEBANG='#!/system/bin/sh'
+
           for f in \
+            proxy/boot-mini.sh \
             proxy/customize.sh \
             proxy/functions.sh \
             proxy/service.sh \
@@ -357,87 +145,101 @@ jobs:
             proxy/uninstall.sh \
             proxy/action.sh \
             proxy/post-fs-data.sh \
-            proxy/watchdog.sh; do
-            echo "  → $f"
-            bash -n "$f"
-          done
-          echo "::endgroup::"
-          echo "✅ All 8 shell scripts pass bash -n"
+            proxy/watchdog.sh \
+            proxy/install_app.sh; do
 
-      # HARD-CI-10 (2026-09-30): shellcheck removed.
-      # The 5 scripts use bash-isms that are valid under
-      # Android mksh. Even with --shell=bash, shellcheck
-      # emitted false positives (SC1091, SC2164, SC2154,
-      # ...) that blocked the pipeline without catching
-      # real bugs. bash -n (above) covers syntax. Static
-      # analysis is now the responsibility of CodeQL +
-      # developer-side pre-commit hooks.
+            if [ ! -s "$f" ]; then
+              echo "::error::missing or empty: $f"
+              exit 1
+            fi
+
+            if ! bash -n "$f"; then
+              echo "::error::syntax error in $f"
+              exit 1
+            fi
+            echo "  ✓ syntax OK: $f"
+
+            SB="$(head -n1 "$f" || true)"
+            case "$SB" in
+              "$EXPECTED_SHEBANG"*) : ;;
+              '') : ;;
+              *)
+                echo "::error::unexpected shebang in $f"
+                echo "::error::  expected: $EXPECTED_SHEBANG"
+                echo "::error::  found:    $SB"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::endgroup::"
+          echo "✅ All 10 shell scripts pass bash -n and shebang check"
+
+      # ============================================================
+      # Step 2 — Verify Layer 1-10 function presence
+      # ============================================================
+      # Each check is a hard failure. The pre-fix revision used
+      # `grep -q PATTERN file && echo "✅"`, which is silently
+      # exempt from `set -e` (Bash exempts any command that
+      # precedes the last `&&`/`||` in an AND-OR list). The step
+      # exited 0 even when every required function was missing.
       #
-      # The "Verify Layer 1-10 function presence" step
-      # (below) provides a project-specific sanity check
-      # that is more meaningful than generic shellcheck.
+      # The helper below converts each check into an unconditional
+      # assertion: file missing or pattern absent → exit 1.
       - name: Verify Layer 1-10 function presence
         run: |
           set -euo pipefail
           echo "::group::Verifying v1.2.0 data-preservation layers"
 
-          # Layer 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8: customize.sh
-          grep -q 'CANDIDATE_SOURCES' proxy/customize.sh && \
-            echo "  ✅ Layer 1: multi-source detection"
-          grep -q 'PERSISTENT_BACKUP' proxy/customize.sh && \
-            echo "  ✅ Layer 2: persistent backup path"
-          grep -q 'verify_backup_integrity' proxy/customize.sh && \
-            echo "  ✅ Layer 3: integrity verification"
-          grep -q 'begin_transaction' proxy/customize.sh && \
-            echo "  ✅ Layer 4: transaction begin"
-          grep -q 'rollback_transaction' proxy/customize.sh && \
-            echo "  ✅ Layer 4: transaction rollback"
-          grep -q 'commit_transaction' proxy/customize.sh && \
-            echo "  ✅ Layer 4: transaction commit"
-          grep -q 'detect_root_solution' proxy/customize.sh && \
-            echo "  ✅ Layer 5: root-solution detection"
-          grep -q 'copy_with_context' proxy/customize.sh && \
-            echo "  ✅ Layer 6: SELinux context preservation"
-          grep -q 'recovery' proxy/customize.sh && \
-            echo "  ✅ Layer 7: recovery mode trigger"
-          grep -q 'migrate_config' proxy/customize.sh && \
-            echo "  ✅ Layer 8: config migrations"
+          _check_required() {
+            local file="$1" pattern="$2" label="$3"
+            if [ ! -f "$file" ]; then
+              echo "::error::$label — file missing: $file"
+              exit 1
+            fi
+            if ! grep -q "$pattern" "$file"; then
+              echo "::error::$label — pattern not found: '$pattern' in $file"
+              exit 1
+            fi
+            echo "  ✅ $label"
+          }
 
-          # Layer 9: functions.sh + service.sh + main.go
-          grep -q 'auto_backup_if_needed' proxy/functions.sh && \
-            echo "  ✅ Layer 9: auto-backup helper"
-          grep -q 'rotate_backups' proxy/functions.sh && \
-            echo "  ✅ Layer 9: backup rotation"
-          grep -q 'backup_user_files' proxy/functions.sh && \
-            echo "  ✅ Layer 9: backup_user_files helper"
-          grep -q 'restore_user_files' proxy/functions.sh && \
-            echo "  ✅ Layer 9: restore_user_files helper"
-          grep -q 'auto_backup_if_needed' proxy/service.sh && \
-            echo "  ✅ Layer 9: service.sh calls auto-backup"
+          # Layers 1-8: customize.sh
+          _check_required proxy/customize.sh 'CANDIDATE_SOURCES'    'Layer 1: multi-source detection'
+          _check_required proxy/customize.sh 'PERSISTENT_BACKUP'    'Layer 2: persistent backup path'
+          _check_required proxy/customize.sh 'verify_backup_integrity' 'Layer 3: integrity verification'
+          _check_required proxy/customize.sh 'begin_transaction'    'Layer 4: transaction begin'
+          _check_required proxy/customize.sh 'rollback_transaction' 'Layer 4: transaction rollback'
+          _check_required proxy/customize.sh 'commit_transaction'   'Layer 4: transaction commit'
+          _check_required proxy/customize.sh 'detect_root_solution' 'Layer 5: root-solution detection'
+          _check_required proxy/customize.sh 'copy_with_context'    'Layer 6: SELinux context preservation'
+          _check_required proxy/customize.sh 'recovery'             'Layer 7: recovery mode trigger'
+          _check_required proxy/customize.sh 'migrate_config'       'Layer 8: config migrations'
+
+          # Layer 9: functions.sh + service.sh
+          _check_required proxy/functions.sh 'auto_backup_if_needed' 'Layer 9: auto-backup helper'
+          _check_required proxy/functions.sh 'rotate_backups'        'Layer 9: backup rotation'
+          _check_required proxy/functions.sh 'backup_user_files'     'Layer 9: backup_user_files helper'
+          _check_required proxy/functions.sh 'restore_user_files'    'Layer 9: restore_user_files helper'
+          _check_required proxy/service.sh   'auto_backup_if_needed' 'Layer 9: service.sh calls auto-backup'
 
           # Layer 10: status.sh
-          grep -q 'diagnose' proxy/status.sh && \
-            echo "  ✅ Layer 10: diagnose mode in status.sh"
-          grep -q 'backups' proxy/status.sh && \
-            echo "  ✅ Layer 10: backups in status.sh JSON"
+          _check_required proxy/status.sh 'diagnose' 'Layer 10: diagnose mode in status.sh'
+          _check_required proxy/status.sh 'backups'  'Layer 10: backups in status.sh JSON'
 
           # main.go additions
-          grep -q 'createAutoBackup' proxy/main.go && \
-            echo "  ✅ main.go: createAutoBackup"
-          grep -q 'checkPendingNotifications' proxy/main.go && \
-            echo "  ✅ main.go: checkPendingNotifications"
-          grep -q 'cleanupOldTransactions' proxy/main.go && \
-            echo "  ✅ main.go: cleanupOldTransactions"
-          grep -q 'buildBackupInfo' proxy/main.go && \
-            echo "  ✅ main.go: buildBackupInfo (BAK-1)"
-          grep -q 'buildRuntimeInfo' proxy/main.go && \
-            echo "  ✅ main.go: buildRuntimeInfo (BAK-1 wiring)"
+          _check_required proxy/main.go 'createAutoBackup'          'main.go: createAutoBackup'
+          _check_required proxy/main.go 'checkPendingNotifications' 'main.go: checkPendingNotifications'
+          _check_required proxy/main.go 'cleanupOldTransactions'    'main.go: cleanupOldTransactions'
+          _check_required proxy/main.go 'buildBackupInfo'           'main.go: buildBackupInfo'
+          _check_required proxy/main.go 'buildRuntimeInfo'          'main.go: buildRuntimeInfo'
 
           echo "::endgroup::"
           echo "✅ All v1.2.0 layer functions present"
 
-      # HARD-CI-04 + HARD-CI-06: extend the check to main.go
-      # and give a clearer error message.
+      # ============================================================
+      # Step 3 — Verify PERSISTENT_BACKUP path consistency
+      # ============================================================
       - name: Verify PERSISTENT_BACKUP path consistency
         run: |
           set -euo pipefail
@@ -462,73 +264,158 @@ jobs:
               echo "  ✅ $f references $EXPECTED"
             else
               echo "  ❌ $f does not contain '$EXPECTED'"
-              echo "     (either the file was changed and the path drifted,"
-              echo "      or the constant was renamed — check manually)"
               exit 1
             fi
           done
 
           echo "::endgroup::"
-          echo "✅ PERSISTENT_BACKUP path consistent across scripts + main.go"
+          echo "✅ PERSISTENT_BACKUP path consistent"
 
+      # ============================================================
+      # Step 4 — Verify v1.2.0 documentation references
+      # ============================================================
+      # Converted from `test -f ... && echo "✅"` (silent under
+      # `set -e`) to hard assertions.
       - name: Verify v1.2.0 docs referenced
         run: |
           set -euo pipefail
           echo "::group::Verifying v1.2.0 documentation references"
 
-          test -f docs/BACKUP.md && echo "  ✅ docs/BACKUP.md present"
-          test -f docs/EMERGENCY.md && echo "  ✅ docs/EMERGENCY.md present"
+          if [ ! -f docs/BACKUP.md ]; then
+            echo "::error::docs/BACKUP.md missing"
+            exit 1
+          fi
+          echo "  ✅ docs/BACKUP.md present"
 
-          grep -q 'BACKUP.md' proxy/customize.sh && \
-            echo "  ✅ customize.sh → BACKUP.md"
-          grep -q 'EMERGENCY.md' proxy/customize.sh && \
-            echo "  ✅ customize.sh → EMERGENCY.md"
+          if [ ! -f docs/EMERGENCY.md ]; then
+            echo "::error::docs/EMERGENCY.md missing"
+            exit 1
+          fi
+          echo "  ✅ docs/EMERGENCY.md present"
+
+          if ! grep -q 'BACKUP.md' proxy/customize.sh; then
+            echo "::error::customize.sh does not reference BACKUP.md"
+            exit 1
+          fi
+          echo "  ✅ customize.sh → BACKUP.md"
+
+          if ! grep -q 'EMERGENCY.md' proxy/customize.sh; then
+            echo "::error::customize.sh does not reference EMERGENCY.md"
+            exit 1
+          fi
+          echo "  ✅ customize.sh → EMERGENCY.md"
 
           echo "::endgroup::"
           echo "✅ v1.2.0 documentation references verified"
 
-      # HARD-CI-03: use -s (non-empty), not -f (exists).
-      - name: Verify web asset files exist and are non-empty
+      # ============================================================
+      # Step 5 — Verify web asset files exist and have sane sizes
+      # ============================================================
+      # A `-s` check (non-empty) alone is insufficient: a
+      # truncated download, a placeholder stub, or an HTML error
+      # page saved as a binary asset all satisfy "size > 0" but
+      # break the module at runtime. This step therefore
+      # enforces a per-file MINIMUM SIZE that any legitimate
+      # asset is expected to exceed by a wide margin.
+      #
+      # The minimums below are deliberately conservative — they
+      # only catch genuinely broken files. A legitimate asset is
+      # normally 5–100× the minimum.
+      #
+      #   Asset                       Typical     Minimum
+      #   --------------------------- ----------- ---------
+      #   index.html                  ~160 KB     10 KB
+      #   dashboard.html              ~86 KB      10 KB
+      #   manifest.json               ~3 KB       200 B
+      #   sw.js                       ~24 KB      2 KB
+      #   offline.html                ~18 KB      2 KB
+      #   icon-192.svg                ~9 KB       500 B
+      #   icon-512.svg                ~9 KB       500 B
+      #   icon-192.png                ~14 KB      500 B
+      #   icon-512.png                ~78 KB      1 KB
+      #   apple-touch-icon.png        ~18 KB      500 B
+      #   favicon-32x32.png           ~1.4 KB     200 B
+      #   favicon-16x16.png           ~553 B      100 B
+      #   favicon.ico                 ~4.7 KB     500 B
+      #
+      # Files not listed in the table are still checked for
+      # non-emptiness. Adding a new required web asset to
+      # main.go means adding it to the MANIFEST below.
+      - name: Verify web asset files exist and have sane sizes
         run: |
           set -euo pipefail
           echo "::group::Verifying web assets referenced by main.go"
 
-          for f in \
-            web/index.html \
-            web/dashboard.html \
-            web/manifest.json \
-            web/sw.js \
-            web/offline.html \
-            web/icon-192.png \
-            web/icon-512.png \
-            web/icon-192.svg \
-            web/icon-512.svg \
-            web/apple-touch-icon.png \
-            web/favicon-32x32.png \
-            web/favicon-16x16.png \
-            web/favicon.ico; do
-            if [ -s "$f" ]; then
-              echo "  ✅ $f"
-            else
-              echo "  ❌ missing or empty: $f"
+          # _require_min_size <path> <min_bytes> <label>
+          #
+          # Fails with a distinct error for each of the three
+          # possible states:
+          #   • missing
+          #   • empty (0 bytes)
+          #   • present but smaller than the required minimum
+          _require_min_size() {
+            local path="$1" min="$2" label="$3"
+
+            if [ ! -e "$path" ]; then
+              echo "::error::${label}: missing — $path"
               exit 1
             fi
-          done
+
+            local size
+            size=$(stat -c%s "$path" 2>/dev/null || echo 0)
+
+            if [ "$size" -eq 0 ]; then
+              echo "::error::${label}: empty (0 bytes) — $path"
+              exit 1
+            fi
+
+            if [ "$size" -lt "$min" ]; then
+              echo "::error::${label}: suspiciously small (${size} < ${min} bytes) — $path"
+              echo "::error::  A file this small is likely a truncated download, a"
+              echo "::error::  placeholder stub, or an HTML error page saved as a"
+              echo "::error::  binary asset. Re-run the corresponding tool:"
+              echo "::error::    • HTML/JS/JSON — verify your checkout (git status web/)"
+              echo "::error::    • PNG/ICO      — ./scripts/generate-icons.sh --force"
+              exit 1
+            fi
+
+            echo "  ✅ ${label} (${size} bytes)"
+          }
+
+          # --- Primary HTML ---
+          _require_min_size "web/index.html"      10240 "index.html"
+          _require_min_size "web/dashboard.html"  10240 "dashboard.html"
+
+          # --- PWA assets ---
+          _require_min_size "web/manifest.json"     200 "manifest.json"
+          _require_min_size "web/sw.js"            2048 "sw.js"
+          _require_min_size "web/offline.html"     2048 "offline.html"
+
+          # --- SVG icons ---
+          _require_min_size "web/icon-192.svg"      500 "icon-192.svg"
+          _require_min_size "web/icon-512.svg"      500 "icon-512.svg"
+
+          # --- PNG icons ---
+          _require_min_size "web/icon-192.png"      500 "icon-192.png"
+          _require_min_size "web/icon-512.png"     1024 "icon-512.png"
+          _require_min_size "web/apple-touch-icon.png" 500 "apple-touch-icon.png"
+
+          # --- Favicons ---
+          _require_min_size "web/favicon-32x32.png" 200 "favicon-32x32.png"
+          _require_min_size "web/favicon-16x16.png" 100 "favicon-16x16.png"
+          _require_min_size "web/favicon.ico"       500 "favicon.ico"
 
           echo "::endgroup::"
-          echo "✅ All web assets present and non-empty"
+          echo "✅ All web assets present and satisfy minimum size requirements"
 
-      # HARD-CI-07: verify version consistency across all
-      # release-relevant files. This is the check that closes
-      # H-08 (CACHE_VERSION drift) from the original audit.
+      # ============================================================
+      # Step 6 — Verify version consistency (5 files)
+      # ============================================================
       - name: Verify version consistency
         run: |
           set -euo pipefail
           echo "::group::Verifying version consistency"
 
-          # ------------------------------------------------------------
-          # Source of truth: VERSION file.
-          # ------------------------------------------------------------
           if [ ! -s VERSION ]; then
             echo "  ❌ VERSION file is missing or empty"
             exit 1
@@ -537,9 +424,6 @@ jobs:
           echo "  VERSION file:           $V"
           V_NO_V="${V#v}"
 
-          # ------------------------------------------------------------
-          # module.prop: version=
-          # ------------------------------------------------------------
           if [ ! -s module.prop ]; then
             echo "  ❌ module.prop is missing or empty"
             exit 1
@@ -554,9 +438,6 @@ jobs:
             exit 1
           fi
 
-          # ------------------------------------------------------------
-          # update.json: .version
-          # ------------------------------------------------------------
           if [ ! -s update.json ]; then
             echo "  ❌ update.json is missing or empty"
             exit 1
@@ -572,9 +453,6 @@ jobs:
             exit 1
           fi
 
-          # ------------------------------------------------------------
-          # web/manifest.json: .version (no "v" prefix)
-          # ------------------------------------------------------------
           if [ ! -s web/manifest.json ]; then
             echo "  ❌ web/manifest.json is missing or empty"
             exit 1
@@ -590,10 +468,6 @@ jobs:
             exit 1
           fi
 
-          # ------------------------------------------------------------
-          # web/sw.js: CACHE_VERSION constant
-          # (H-08 from the original audit)
-          # ------------------------------------------------------------
           if [ ! -s web/sw.js ]; then
             echo "  ❌ web/sw.js is missing or empty"
             exit 1
@@ -608,10 +482,9 @@ jobs:
           if [ "$SW_V" = "$V" ]; then
             echo "  ✅ web/sw.js CACHE_VERSION:      $SW_V"
           else
-            echo "  ❌ web/sw.js CACHE_VERSION mismatch (H-08)"
+            echo "  ❌ web/sw.js CACHE_VERSION mismatch"
             echo "     expected: $V"
             echo "     found:    $SW_V"
-            echo "     Update web/sw.js before merging."
             exit 1
           fi
 
@@ -619,13 +492,7 @@ jobs:
           echo "✅ Version consistency verified across 5 files"
 
       # ============================================================
-      # Verify companion app metadata (v1.4.0)
-      # ============================================================
-      # Validates proxy/app-apk.version format (X.Y.Z) and
-      # verifies that scripts/fetch_app_apk.sh is present.
-      #
-      # The companion app is OPTIONAL — a missing version file
-      # produces a warning, not an error.
+      # Step 7 — Verify companion app metadata
       # ============================================================
       - name: Verify companion app metadata
         run: |
@@ -654,3 +521,265 @@ jobs:
 
           echo "::endgroup::"
           echo "✅ Companion app metadata verified"
+
+      # ============================================================
+      # Step 8 — Verify companion install script
+      # ============================================================
+      - name: Verify companion install script
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying proxy/install_app.sh"
+
+          if [ ! -s proxy/install_app.sh ]; then
+            echo "::error::proxy/install_app.sh missing or empty"
+            exit 1
+          fi
+
+          if [ ! -x proxy/install_app.sh ]; then
+            echo "::warning::proxy/install_app.sh is not executable — fixing"
+            chmod +x proxy/install_app.sh
+          fi
+
+          LINES="$(wc -l < proxy/install_app.sh | tr -d ' ')"
+          echo "  ✓ present: proxy/install_app.sh (${LINES} lines)"
+
+          # ---- Cascade markers (5 levels) ----
+          echo ""
+          echo "  Verifying cascade-level markers..."
+          MARKERS=(
+            "pm install -r --user 0|level 1"
+            "pm install -r -i com.android.shell|level 2"
+            "pm install-create|level 3"
+            "magisk su|level 4"
+            "cmd package install|level 5"
+          )
+          MISSING=0
+          for entry in "${MARKERS[@]}"; do
+            pattern="${entry%%|*}"
+            label="${entry##*|}"
+            if grep -q "$pattern" proxy/install_app.sh; then
+              echo "    ✓ ${label}: ${pattern}"
+            else
+              echo "    ❌ ${label} missing: ${pattern}"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+          if [ "$MISSING" -gt 0 ]; then
+            echo "::error::${MISSING} cascade-level marker(s) missing"
+            exit 1
+          fi
+
+          # ---- Cascade deadline ----
+          echo ""
+          if grep -q 'CASCADE_DEADLINE_SECONDS' proxy/install_app.sh; then
+            echo "  ✓ cascade deadline: CASCADE_DEADLINE_SECONDS"
+          else
+            echo "::error::CASCADE_DEADLINE_SECONDS missing"
+            exit 1
+          fi
+
+          # ---- Play Protect trap ----
+          if grep -q 'package_verifier_enable' proxy/install_app.sh; then
+            echo "  ✓ Play Protect trap: package_verifier_enable"
+          else
+            echo "::error::package_verifier_enable missing"
+            exit 1
+          fi
+
+          # ---- SELinux staging path ----
+          if grep -q '/data/local/tmp/dnscrypt-companion.apk' proxy/install_app.sh; then
+            echo "  ✓ SELinux staging: /data/local/tmp/dnscrypt-companion.apk"
+          else
+            echo "::error::SELinux staging path missing"
+            exit 1
+          fi
+
+          # ---- SELinux posture ----
+          if grep -v '^[[:space:]]*#' proxy/install_app.sh \
+               | grep -qE 'setenforce[[:space:]]+0'; then
+            echo "::error::'setenforce 0' found in executable code"
+            exit 1
+          fi
+          echo "  ✓ SELinux posture: no active 'setenforce 0'"
+
+          # ---- CSH-22 integration ----
+          echo ""
+          echo "  Verifying CSH-22 integration..."
+
+          if grep -q 'install_app.sh' proxy/customize.sh; then
+            echo "    ✓ customize.sh references install_app.sh"
+          else
+            echo "::error::customize.sh does NOT reference install_app.sh"
+            exit 1
+          fi
+
+          if grep -q 'INSTALL_SCRIPT_REL' proxy/main.go; then
+            echo "    ✓ main.go declares INSTALL_SCRIPT_REL"
+          else
+            echo "::error::main.go does NOT declare INSTALL_SCRIPT_REL"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+          echo "✅ Companion install script verified"
+
+      # ============================================================
+      # Step 9 — Verify boot-mini.sh integration (Layered Bootstrap)
+      # ============================================================
+      # Layer 0 / Layer 1 split:
+      #   • boot-mini.sh defines the 5 primitives.
+      #   • boot-mini.sh is the single source of truth for
+      #     _MONITORING_UI_PORT.
+      #   • functions.sh sources boot-mini.sh.
+      #   • functions.sh does NOT redefine the 5 primitives.
+      #
+      # log_msg is checked differently: functions.sh may keep a
+      # deprecated `log_fn` alias, but must not reimplement
+      # `log_msg` itself.
+      - name: Verify boot-mini.sh integration
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying boot-mini.sh integration"
+
+          # ---- Presence ----
+          if [ ! -s proxy/boot-mini.sh ]; then
+            echo "::error::proxy/boot-mini.sh missing or empty"
+            exit 1
+          fi
+          echo "  ✓ present: proxy/boot-mini.sh"
+
+          # ---- 5 primitives ----
+          for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do
+            if grep -qE "^${fn}\(\)" proxy/boot-mini.sh; then
+              echo "  ✓ primitive: $fn"
+            else
+              echo "::error::boot-mini.sh missing primitive: $fn"
+              exit 1
+            fi
+          done
+
+          # ---- _MONITORING_UI_PORT defined here ----
+          if grep -q '^_MONITORING_UI_PORT=' proxy/boot-mini.sh; then
+            echo "  ✓ _MONITORING_UI_PORT defined in boot-mini.sh"
+          else
+            echo "::error::_MONITORING_UI_PORT not defined in boot-mini.sh"
+            exit 1
+          fi
+
+          # ---- functions.sh sources boot-mini.sh ----
+          if grep -q 'boot-mini.sh' proxy/functions.sh; then
+            echo "  ✓ functions.sh sources boot-mini.sh"
+          else
+            echo "::error::functions.sh does not source boot-mini.sh"
+            exit 1
+          fi
+
+          # ---- functions.sh must NOT redefine Layer-0 primitives ----
+          # Exception: log_msg may be aliased as log_fn, but not
+          # reimplemented. The other four must be absent entirely.
+          for fn in get_run_dir read_conf is_port_open get_webui_port; do
+            if grep -qE "^${fn}[[:space:]]*\(\)" proxy/functions.sh; then
+              echo "::error::functions.sh redefines Layer-0 primitive: $fn"
+              exit 1
+            fi
+          done
+          echo "  ✓ functions.sh does not redefine Layer-0 primitives"
+
+          # ---- _MONITORING_UI_PORT must not be redefined ----
+          if grep -qE '^_MONITORING_UI_PORT=' proxy/functions.sh; then
+            echo "::error::functions.sh redefines _MONITORING_UI_PORT"
+            exit 1
+          fi
+          echo "  ✓ functions.sh does not redefine _MONITORING_UI_PORT"
+
+          echo "::endgroup::"
+          echo "✅ boot-mini.sh integration verified"
+
+      # ============================================================
+      # Step 10 — Verify reserved-port constant sync
+      # ============================================================
+      # The reserved port (8080) appears in two places:
+      #   • boot-mini.sh — _MONITORING_UI_PORT="8080"
+      #   • main.go      — MONITORING_UI_PORT = "8080"
+      #
+      # Other scripts that need the constant MUST either:
+      #   • inherit it from boot-mini.sh (via functions.sh), OR
+      #   • use the fallback pattern ${_MONITORING_UI_PORT:-...},
+      #   • OR leave it empty and finalize after sourcing.
+      #
+      # Any hardcoded numeric literal in a shell script other
+      # than boot-mini.sh is a drift and fails the build.
+      #
+      # The accepted-pattern case below uses a trailing `"` in
+      # the match — the actual scripts end their fallback lines
+      # with `}"`, not just `}`. The pre-fix revision omitted
+      # the trailing quote and therefore failed on every
+      # script that used the accepted pattern.
+      - name: Verify reserved-port constant sync
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying reserved-port constant sync"
+
+          BOOT_VAL="$(grep '^_MONITORING_UI_PORT=' proxy/boot-mini.sh \
+                      | head -n1 \
+                      | sed -E 's/^_MONITORING_UI_PORT="?([^"]*)"?$/\1/' \
+                      | tr -d '\r\n ')"
+          if [ "$BOOT_VAL" != "8080" ]; then
+            echo "::error::boot-mini.sh defines _MONITORING_UI_PORT='$BOOT_VAL' (expected '8080')"
+            exit 1
+          fi
+          echo "  ✓ boot-mini.sh: _MONITORING_UI_PORT=\"8080\""
+
+          GO_VAL="$(grep -E '^\s*MONITORING_UI_PORT\s*=' proxy/main.go \
+                    | head -n1 \
+                    | sed -E 's/.*=\s*"([^"]*)".*/\1/' \
+                    | tr -d '\r\n ')"
+          if [ "$GO_VAL" != "8080" ]; then
+            echo "::error::main.go defines MONITORING_UI_PORT='$GO_VAL' (expected '8080')"
+            exit 1
+          fi
+          echo "  ✓ main.go:      MONITORING_UI_PORT = \"8080\""
+
+          echo ""
+          echo "  Checking other shell scripts for hardcoded literals..."
+
+          for f in \
+            proxy/customize.sh \
+            proxy/functions.sh \
+            proxy/service.sh \
+            proxy/action.sh \
+            proxy/status.sh \
+            proxy/uninstall.sh \
+            proxy/post-fs-data.sh \
+            proxy/watchdog.sh \
+            proxy/install_app.sh; do
+
+            [ -f "$f" ] || continue
+
+            # Any line of the form `_MONITORING_UI_PORT=<value>`
+            # is checked. Accepted forms:
+            #   _MONITORING_UI_PORT=""                          (empty)
+            #   _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-...}" (fallback)
+            # Anything else (a hardcoded literal like "8080" or
+            # any other number) is drift.
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              case "$line" in
+                '_MONITORING_UI_PORT=""')
+                  echo "    ✓ $f — empty definition (finalized later)"
+                  ;;
+                '_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-'*'}"')
+                  echo "    ✓ $f — fallback pattern"
+                  ;;
+                *)
+                  echo "::error::$f has an unsafe _MONITORING_UI_PORT definition:"
+                  echo "::error::  $line"
+                  echo "::error::Accepted: empty or \${_MONITORING_UI_PORT:-...} fallback"
+                  exit 1
+                  ;;
+              esac
+            done < <(grep -E '^_MONITORING_UI_PORT=' "$f" 2>/dev/null || true)
+          done
+
+          echo "::endgroup::"
+          echo "✅ Reserved-port constant sync verified (shell ↔ Go)"

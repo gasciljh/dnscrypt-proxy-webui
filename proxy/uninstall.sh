@@ -1,424 +1,155 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
 # ============================================================
-# DNSCrypt Smart Filter – uninstall.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — uninstall.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-15
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Magisk / KernelSU / APatch uninstall script.
+# Magisk / KernelSU / APatch uninstall script.
 #
-#   Triggered automatically when the module is removed via the
-#   Magisk/KernelSU manager, or manually for cleanup.
+# Triggered automatically when the module is removed via the
+# root manager, or manually for cleanup.
 #
-# Responsibilities (v1.2.0):
+# Responsibilities:
 #   • Kill all running processes (dnscrypt-proxy, dnscrypt-webui)
 #     and WAIT for them to actually exit before proceeding.
-#   • Clean the firewall (Custom Chains + Legacy)
-#   • Reset system DNS settings (private_dns_mode)
-#   • Restore the original route_localnet value
-#   • Remove runtime files (run/, PIDs, STATUS_FILE, logs, caches)
-#   • Remove module configuration files (webui.conf, .toml, blocklists)
-#   • Remove the module fingerprint + disable file
-#   • Remove the external recovery trigger
-#   • Resolve txn-* directories (Layer 4 — v1.2.0):
-#       – COMMIT              → removed (self-cleanup was interrupted)
+#   • Clean the firewall (Custom Chains + Legacy).
+#   • Reset system DNS settings (private_dns_mode).
+#   • Restore the original route_localnet value.
+#   • Remove runtime files (run/, PIDs, STATUS_FILE, logs, caches).
+#   • Remove module configuration files.
+#   • Remove the module fingerprint + disable file.
+#   • Resolve txn-* directories:
+#       – COMMIT              → removed (self-cleanup interrupted)
 #       – ROLLBACK / empty    → removed (rollback already applied)
-#       – START               → RENAMED to orphan-txn-* and PRESERVED
-#       – no .state           → RENAMED to orphan-txn-* and PRESERVED
-#     (see [0.2] for the complete policy and rationale)
-#   • PRESERVE pre-existing orphan-txn-* directories
-#   • Remove any legacy backup directory from v1.0.0
+#       – START / no state    → RENAMED to orphan-txn-* and PRESERVED
+#   • PRESERVE pre-existing orphan-txn-* directories.
+#   • Remove any legacy backup directory from v1.0.0.
 #   • PRESERVE the persistent backup directory
 #     (/sdcard/dnscrypt-webui-backup/) so the user can restore
-#     their settings if they reinstall later (Layer 2 — v1.2.0)
-#   • Notify the user of the backup location and count
+#     their settings if they reinstall later.
+#   • PRESERVE the companion APK mirror
+#     (/sdcard/dnscrypt-webui-backup/apk/).
 #
 # Options:
 #   uninstall.sh          Full cleanup (default)
 #   uninstall.sh --help   Show help
 #
 # Exit codes:
-#   0 = success (full or partial cleanup completed)
+#   0 = success
 #   1 = security violation (MODDIR outside expected paths)
 #   2 = unknown command-line argument
 #
+# Design: SELF-CONTAINED (deliberate)
 # ============================================================
-# [0] v1.2.0 — Backup policy (IMPORTANT)
+# This script does NOT source functions.sh. Sourcing it would:
+#   • create RUN_DIR and .bootstrap_cache — files that this
+#     script is about to delete,
+#   • run functions.sh's top-level initialization, which is
+#     counterproductive at uninstall time.
+#
+# More importantly, uninstall.sh must work even when
+# functions.sh is missing or corrupt. It is the last script the
+# module runs — if it depends on a broken library, the user is
+# left with no way to clean up.
+#
+# Consequence: firewall cleanup and process cleanup below are
+# inline, even though equivalent functions live in
+# functions.sh. The duplication is intentional.
+#
+# Backup policy (IMPORTANT):
 # ============================================================
 # This script does NOT delete /sdcard/dnscrypt-webui-backup/.
 #
-# The persistent backup directory contains the 5 user config
-# files snapshotted at every upgrade and at every pre-critical
-# operation (profile change, allowlist/denylist save).
+# The persistent backup directory contains:
+#   • The 5 user config files snapshotted at every upgrade.
+#   • The companion APK mirror at apk/ (created best-effort by
+#     customize.sh §[10c]).
 #
 # Preserving this directory allows the user to:
-#   1. Reinstall the module later and recover their settings
-#      automatically (Layer 1 + Layer 2 multi-source detection).
-#   2. Manually inspect, copy, or back up their configuration
-#      to another device before the SD card is wiped.
+#   1. Reinstall the module later and recover settings
+#      automatically.
+#   2. Inspect, copy, or back up their configuration manually.
+#   3. Find the companion APK via a file manager without root
+#      access to /data/adb/.
 #
-# The user can delete it manually at any time:
+# The user can delete the whole directory at any time:
 #     su -c "rm -rf /sdcard/dnscrypt-webui-backup"
 #
+# Transaction handling:
 # ============================================================
-# [0.1] v1.1.0 — No auto-backup on uninstall
-# ============================================================
-# Previous versions (v1.0.0) created a backup at:
-#   /data/local/tmp/dnscrypt_backup_uninstall/
+# Four cases for txn-* directories:
 #
-# This behavior was intentionally removed in v1.1.0. The reason:
-#   • The module no longer ships a restore utility for that
-#     specific path.
-#   • A v1.0.0-style backup created false expectations of
-#     recoverability.
-#   • Users who want to keep settings should do so manually,
-#     OR rely on the v1.2.0 persistent backup directory
-#     (/sdcard/dnscrypt-webui-backup/) which survives uninstall.
+#   1. State "COMMIT"      → removed (leftover from a successful
+#                            install that was interrupted before
+#                            its own cleanup).
+#   2. State "ROLLBACK"    → removed (rollback was applied).
+#   3. State "START"       → renamed to orphan-txn-* and
+#                            preserved (may contain the only copy
+#                            of the user's data).
+#   4. No .state (or empty) → renamed to orphan-txn-* and
+#                            preserved (covers the crash-between-
+#                            mkdir-and-echo case).
 #
-# Any existing backup directory from v1.0.0 is cleaned up
-# automatically by this script (see section [10]).
+# Any pre-existing orphan-txn-* directories are PRESERVED as-is.
 #
-# ============================================================
-# [0.2] v1.2.0 — Transaction handling on uninstall
-# ============================================================
-# The transaction system (Layer 4) creates directories like:
-#   /sdcard/dnscrypt-webui-backup/txn-<timestamp>-<pid>/
-#
-# During uninstall, four cases are handled:
-#
-#   1. txn-* with state "COMMIT"
-#      → Removed. This is a leftover from a successful install
-#        that was interrupted before its own cleanup step.
-#
-#   2. txn-* with state "ROLLBACK"
-#      → Removed. The rollback was already applied; the
-#        snapshot is no longer needed.
-#
-#   3. txn-* with state "START"
-#      → RENAMED to orphan-txn-<timestamp>-<pid> and PRESERVED.
-#        This transaction was interrupted mid-flight. The
-#        directory may contain the only copy of a user's data.
-#
-#   4. txn-* with NO .state file (or an empty .state)
-#      → RENAMED to orphan-txn-<timestamp>-<pid> and PRESERVED.
-#        The transaction was interrupted between `mkdir` and
-#        the `echo START > .state` step. As with case 3, the
-#        directory may contain the only copy of a user's data.
-#        See UNI-6 fix for the rationale.
-#
-# Any pre-existing orphan-txn-* directories are PRESERVED
-# as-is — they are the user's explicit signal that they want
-# to inspect them.
-#
-# See docs/BACKUP.md §7 and docs/EMERGENCY.md for details.
-#
-# ============================================================
-# [0.3] v1.2.0 — The 10 defensive layers (context)
-# ============================================================
-#   ┌────┬──────────────────────┬─────────────────────┐
-#   │ #  │ Layer                │ Role of uninstall   │
-#   ├────┼──────────────────────┼─────────────────────┤
-#   │ 1  │ Multi-source detect  │ install-time only   │
-#   │ 2  │ Persistent backup    │ PRESERVED (not rem) │
-#   │ 3  │ Integrity verify     │ install-time only   │
-#   │ 4  │ Transactional upgrad │ cleanup + preserve  │
-#   │ 5  │ Root-solution compat │ detected for summary│
-#   │ 6  │ SELinux preservation │ not applicable      │
-#   │ 7  │ Recovery mode        │ trigger cleaned     │
-#   │ 8  │ Config migrations    │ install-time only   │
-#   │ 9  │ Automation + rotation│ not applicable      │
-#   │ 10 │ Observability        │ final summary       │
-#   └────┴──────────────────────┴─────────────────────┘
-#
-#   Uninstall touches Layer 4 (transaction cleanup), Layer 7
-#   (external recovery trigger cleanup), and reads Layer 10
-#   (final summary). All other layers are either install-time
-#   concerns or explicitly preserved.
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 UNI-1 — External recovery trigger (/data/adb/dnscrypt-
-#     recovery) is now removed during uninstall (section [16b]).
-#
-#   🔧 UNI-2 — Corrected the [8] comment to describe the actual
-#     functional divergence vs customize.sh (loopback comment tag).
-#
-#   🔧 UNI-3 — `_ip` inside the legacy RETURN cleanup loop is now
-#     declared `local`.
-#
-#   🔧 UNI-4 — The user-facing message in [19] now mentions the
-#     START → orphan-txn rename behavior.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening in this revision
-# ============================================================
-#   🛡️ HARD-UNI-01 (was UNI-5) — `BACKUP_ORPHAN_COUNT` was
-#     computed in [5b] BEFORE [9] renamed any START/no-state
-#     transactions to orphan-txn-*. The final report therefore
-#     printed a stale count. A new derived variable
-#     `BACKUP_ORPHAN_FINAL = BACKUP_ORPHAN_COUNT + ORPHAN_TXN_RENAMED`
-#     is now used by [18] and [19].
-#
-#   🛡️ HARD-UNI-02 (was UNI-6) — A `txn-*` directory WITHOUT a
-#     `.state` file (or with an empty `.state`) is no longer
-#     deleted. It is now RENAMED to orphan-txn-* and PRESERVED,
-#     on the assumption that a crash occurred between `mkdir`
-#     and the `echo START > .state` step of customize.sh.
-#
-#   🛡️ HARD-UNI-03 (was UNI-7) — `functions.sh` is no longer
-#     sourced unconditionally in [7]. Sourcing it had the side
-#     effect of creating $RUN_DIR and the bootstrap cache via
-#     `init_runtime_paths`, which the script was about to
-#     delete anyway. The guard now checks for the specific
-#     symbol we need (`aggressive_cleanup`) without running
-#     the file's top-level initialization.
-#
-#   🛡️ HARD-UNI-04 (was UNI-8) — The inline cleanup is now
-#     invoked exactly ONCE in [11], regardless of whether
-#     `aggressive_cleanup` was used. Previously the inline path
-#     ran twice (belt-and-suspenders), which duplicated every
-#     `iptables -D` / `nft delete` call and added log noise.
-#
-#   🛡️ HARD-UNI-05 (was UNI-9) — Unknown command-line arguments
-#     are now a hard error (exit 2), instead of being silently
-#     ignored. A typo like `uninstall.sh --dry-run` no longer
-#     triggers a full, silent uninstall.
-#
-#   🛡️ HARD-UNI-06 (was UNI-10) — The top-level
-#     "Responsibilities" list has been rewritten to describe
-#     the actual behavior of the transaction resolver
-#     (delete COMMIT/ROLLBACK, rename-and-preserve START/no-state).
-#
-#   🛡️ HARD-UNI-07 (was UNI-11) — The comment in [16b] about a
-#     "race with the root manager" has been corrected. The
-#     reason for not removing RECOVERY_TRIGGER_1 is simply
-#     that the root manager deletes the whole module folder
-#     after this script exits, so a manual removal here would
-#     be redundant.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Follow-up hardening (historical)
-# ============================================================
-#   🛡️ HARD-UNI-08 — `_inline_kill_all` now WAITS for the
-#     processes to actually disappear (up to 3 seconds) before
-#     returning. Previously `pkill -9` + immediate `rm -rf $RUN_DIR`
-#     could race against a process stuck in D-state, leaving
-#     stale files behind or partially deleting the run dir.
-#
-#   🛡️ HARD-UNI-09 — The txn-* resolver loop ([9]) is now
-#     wrapped in a function `_resolve_txn_dirs` and uses
-#     `local` for its internal variables, matching the style
-#     already used by `_inline_cleanup_firewall`.
-#
-#   🛡️ HARD-UNI-10 — `ndc resolver flushdefaultif` is now
-#     logged on both success and failure. Previously a silent
-#     failure left the user with a hung resolver and no trace
-#     in the log to explain it.
-#
-#   🛡️ HARD-UNI-11 — The `[17]` PRESERVED log line is now
-#     emitted only when the persistent backup directory
-#     actually exists. A fresh install (no backup dir) no
-#     longer prints a misleading "PRESERVED" message.
-#
-#   🛡️ HARD-UNI-12 — The `$( ... && echo X || echo Y )` idiom
-#     used in the final summary has been replaced with explicit
-#     `if/else` blocks to avoid the fragile `&&/||` fallback
-#     if `echo` itself were to fail (e.g. closed stdout).
-#
-#   🛡️ HARD-UNI-13 — `RECOVERY_TRIGGER_1` ($MODDIR/recovery)
-#     is now removed explicitly here, in addition to being
-#     cleaned by the root manager. This avoids the rare
-#     scenario where a reinstall happens before the module
-#     folder is fully removed, which would spuriously enter
-#     recovery mode on the next install.
-#
-#   🛡️ HARD-UNI-14 — The `--help` output and the final user
-#     message now document the exit codes, so a manual
-#     invocation can be scripted reliably.
-#
-# Security:
-#   • MODDIR must be inside /data/adb/modules/
-#   • MODDIR cannot equal the modules directory itself
-#
-# Design:
-#   • Inline fallbacks are always used for the actual cleanup.
-#     functions.sh is loaded only to obtain `aggressive_cleanup`
-#     when it is present and safe to call — and the sourcing
-#     is guarded to avoid running that file's initialization.
-#   • The firewall cleanup list is functionally equivalent to:
-#       - customize.sh    : _inline_cleanup_firewall
-#       - post-fs-data.sh : inline_firewall_cleanup
-#     The one intentional difference (127.0.0.1's comment tag)
-#     is documented in [8]. Any change to the legacy cleanup
-#     rules MUST be applied to all three files consistently.
-#
-# Non-responsibilities (deliberately NOT done here):
-#   • No `debug.SetMemoryLimit` reset — the Go runtime releases
-#     memory when the process exits; there is no persistent state.
-#   • No firewall rule creation — this is a removal script; only
-#     cleanup runs.
-#   • No system-wide DNS reconfiguration beyond private_dns_mode
-#     reset. Any custom resolvers set by the user are preserved.
-#   • No deletion of /sdcard/dnscrypt-webui-backup/ — see [0].
-#   • No deletion of orphan-txn-* — see [0.2].
-#   • No handling of the companion Android app APK — see [0.4].
-#
-# ============================================================
-# v1.3.0 — Server-side refinement: snapshot detection
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   However, the snapshot detection and ordering semantics
-#   used by EVERY consumer of the persistent backup directory
-#   were refined in v1.3.0, and this file is one of those
-#   consumers (via §[5b] `BACKUP_COUNT` / `BACKUP_LAST_NAME`).
-#
-#   Earlier revisions of this header had NO v1.3.0 block at
-#   all, while the two inline snapshot-enumeration pipelines
-#   in §[5b] still used the v1.2.0 name-pattern detection and
-#   lexicographic ordering. The v1.4.0 revision below
-#   (UNS-V14-03) brings those pipelines into sync with every
-#   other consumer in the module.
-#
-#   The v1.3.0 refinement is documented under two identifiers
-#   (also used in CHANGELOG.md and docs/ARCHITECTURE.md §4.13.1):
-#
-#   🔧 SNAP-MANIFEST — manifest-based snapshot detection.
-#     A directory is treated as a snapshot iff it contains a
-#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
-#     and `orphan-txn-*/`.
-#
-#     Before v1.3.0: only directories whose name matched the
-#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
-#     custom-named snapshots were silently skipped, and
-#     directories that happened to match the name pattern but
-#     lacked a manifest were silently counted.
-#
-#   🔧 SNAP-MTIME — mtime sort.
-#     Candidates are ordered by mtime (numeric, descending,
-#     `sort -rn -k1,1`), not by lexicographic directory name.
-#     Robust against clock drift and manual renames. Aligns
-#     the snapshot count and the "latest" name with the
-#     `runtime_info.backups` API and with every other consumer
-#     in the module (main.go, functions.sh, service.sh,
-#     watchdog.sh, status.sh, customize.sh, action.sh).
-#
-#   See CHANGELOG.md v1.3.0 section, and
-#   docs/ARCHITECTURE.md §4.13.1 and §11.31–§11.32.
-# ============================================================
-#
-# ============================================================
-# [0.4] v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 UNS-V14-01 — No behavior change. The module uninstall
-#     path does NOT touch the companion app APK.
-#
-#     `web/app-debug.apk` is a build artifact of the module
-#     ZIP. It is removed automatically when the root manager
-#     deletes the whole module folder after this script exits.
-#     There is nothing to clean up here:
-#       • The APK is NOT one of the 5 preserved config files.
-#       • The APK is NOT written to the persistent backup
-#         directory (/sdcard/dnscrypt-webui-backup/).
-#       • The user's separately-installed companion app (if
-#         any) lives in /data/data/<package>/ and is
-#         unaffected by this script.
-#
-#   📱 UNS-V14-02 — Version bump v1.3.0 → v1.4.0.
-#     Documentation only. No change to the cleanup path, the
-#     transaction resolver, the recovery-trigger cleanup, or
-#     the final summary.
-#
-#   📚 UNS-V14-03 — Documentation-sync correction for v1.3.0.
-#     Two snapshot-enumeration pipelines in §[5b] were left
-#     behind when the snapshot detection semantics changed in
-#     v1.3.0:
-#
-#       1. `BACKUP_COUNT` — used to report "Snapshots: N" in
-#          the final summary (sections [17], [18], [19]). It
-#          used the v1.2.0 name-pattern detection
-#          (`grep -E '^[0-9]{8}-[0-9]{6}-'`), so it:
-#            • Under-counted custom-named snapshots
-#              (e.g. "pre-v130-manual-...") that lacked the
-#              timestamp prefix.
-#            • Over-counted any directory that matched the
-#              name pattern but lacked a `.manifest.json`
-#              file.
-#
-#       2. `BACKUP_LAST_NAME` — used to report "Latest: X" in
-#          the same summary. It used the v1.2.0 name-pattern
-#          detection AND `sort -r` (lexicographic reverse),
-#          so the reported "latest" name could disagree with
-#          the actual newest snapshot whenever:
-#            • mtimes and directory names diverged (e.g. clock
-#              drift, or two snapshots created in the same
-#              second with PID suffixes in different order), or
-#            • a custom-named snapshot was newer than every
-#              timestamp-named one.
-#
-#     Fix: both pipelines now use a new shared helper
-#     `_uninstall_list_snapshots`, which uses the v1.3.0
-#     manifest-based detection (SNAP-MANIFEST) and mtime
-#     descending sort (SNAP-MTIME), matching every other
-#     consumer in the module.
-#
-#     This is the SAME cross-file parity fix that was applied
-#     to watchdog.sh (WD-V14-03), status.sh (STS-V14-03),
-#     customize.sh (CSH-19), service.sh (SVC-V14-03), and
-#     action.sh (ACT-V14-03) in the v1.4.0 release.
-#
-#     No CLI behavior changes; only the numbers displayed by
-#     the final summary are now consistent with the actual
-#     on-disk state and with the other scripts.
-#
-# ============================================================
 # POSIX note on `local`:
-#   This script uses `local` inside its internal helper
-#   functions (_inline_cleanup_firewall, _resolve_txn_dirs,
-#   _uninstall_list_snapshots).
-#   The `local` keyword is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
+# ============================================================
+# This script uses `local` inside three helper functions:
+#   • _inline_cleanup_firewall  (_chain, _chain6, _ip)
+#   • _inline_kill_all          (_ki_wait, _ki_alive)
+#   • _resolve_txn_dirs         (_txn, _state, _safe_name)
+#
+# `_uninstall_list_snapshots` uses SUBSHELL ISOLATION instead
+# of `local`. Its loop body runs inside a `( ... )` subshell, so
+# the loop variables exist only there and never leak into the
+# parent shell.
+#
+# The `local` keyword is supported by mksh, busybox ash, bash,
+# dash, and ksh — every shell Android ships.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path
+# [1] Module path + version
 # ============================================================
-
-# v1.2.0: --version flag (checked before any argument parsing)
-case "${1:-}" in
-	--version)
-		echo "$0: v1.4.0"
-		exit 0
-		;;
-esac
-
 MODDIR=${0%/*}
 [ "$MODDIR" = "." ] && MODDIR=$(pwd)
 case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
 
+get_module_version() {
+    local vf="$MODDIR/module.prop"
+    if [ -f "$vf" ]; then
+        local v
+        v=$(grep "^version=" "$vf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+    printf 'v0.0.0-unknown'
+}
+
+MODULE_VERSION="$(get_module_version)"
+
+case "${1:-}" in
+    --version)
+        echo "$0: $MODULE_VERSION"
+        exit 0
+        ;;
+esac
+
 # ============================================================
 # [2] Parse command-line arguments
 # ============================================================
-# HARD-UNI-05: unknown arguments are a hard error. Magisk does
-# not pass extra arguments to uninstall scripts, so a non-empty
-# unknown argument almost certainly means a manual invocation
-# with a typo — and silently proceeding would be dangerous on
-# a destructive script.
-#
-# HARD-UNI-14: exit codes are now documented in --help.
-# ============================================================
+# Unknown arguments are a hard error. Magisk does not pass
+# extra arguments to uninstall scripts, so a non-empty unknown
+# argument almost certainly means a manual invocation with a
+# typo — and silently proceeding would be dangerous on a
+# destructive script.
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
@@ -430,7 +161,7 @@ Usage:
   uninstall.sh --help   Show this help
 
 Exit codes:
-  0 = success (full or partial cleanup completed)
+  0 = success
   1 = security violation (MODDIR outside expected paths)
   2 = unknown command-line argument
 
@@ -438,23 +169,24 @@ Note:
   This script is normally invoked automatically by Magisk when the
   module is removed. Do not run it manually except for cleanup.
 
-  No automatic backup is created (v1.1.0+ behavior).
-
   Your persistent backup directory is PRESERVED so you can
   restore settings if you reinstall later:
     /sdcard/dnscrypt-webui-backup/
 
+  This includes the companion APK mirror:
+    /sdcard/dnscrypt-webui-backup/apk/
+
   Any txn-* directory that was interrupted mid-flight (state=START
-  or missing .state) will be renamed to orphan-txn-* and PRESERVED
-  — it may contain the only copy of a user's data. Inspect
-  manually before deleting.
+  or missing .state) will be renamed to orphan-txn-* and PRESERVED.
+  Inspect manually before deleting.
 
   A pending recovery trigger (/data/adb/dnscrypt-recovery), if any,
   is REMOVED — it has no meaning once the module is gone.
 
-  The companion Android app APK (web/app-debug.apk, v1.4.0) is
-  NOT touched. It is deleted with the module folder by the root
-  manager. Any separately-installed companion app is unaffected.
+  The companion Android app APK is NOT touched by this script.
+  The module-internal copy is deleted with the module folder by
+  the root manager. Any separately-installed companion app is
+  unaffected.
 
   If you want to keep your settings in a separate manual backup,
   copy them before uninstalling:
@@ -464,7 +196,6 @@ EOF
             exit 0
             ;;
         "")
-            # Empty string (e.g. from `uninstall.sh ""`) — ignore
             ;;
         *)
             echo "ERROR: unknown argument: $arg" >&2
@@ -482,24 +213,43 @@ LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 RUN_DIR="$MODDIR/proxy/run"
 BIN_DIR="$MODDIR/proxy"
 
-# --- v1.2.0 — Data preservation paths ---
+# --- Data preservation paths ---
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
-# shellcheck disable=SC2034
+
+# The 5 files the persistent backup directory preserves.
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- v1.2.0 — Recovery trigger paths (mirrors customize.sh) ---
+# --- Companion APK mirror paths ---
+# Lives inside the persistent backup directory; preserved
+# automatically. Used by §[5b] (detection) and §[18] (report).
+APK_MIRROR_DIR="$PERSISTENT_BACKUP/apk"
+APK_MIRROR_FILE="$APK_MIRROR_DIR/app-debug.apk"
+APK_MIRROR_SHA_FILE="$APK_MIRROR_DIR/app-debug.apk.sha256"
+
+# --- Recovery trigger paths ---
 RECOVERY_TRIGGER_1="$MODDIR/recovery"
 RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
 
-# Legacy backup directory (v1.0.0) — cleaned up below
+# Legacy backup directory (v1.0.0) — cleaned up below.
 LEGACY_BACKUP_DIR="/data/local/tmp/dnscrypt_backup_uninstall"
 
 # ============================================================
-# [4] Protected log_msg
+# [4] Protected log helper
 # ============================================================
+# Appends a timestamped line to $LOG_FILE with the
+# `[UNINSTALL]` prefix.
+#
+# The `LOG_DISABLED` flag short-circuits all writes once §[14]
+# has removed the log file. Without it, the log is auto-created
+# by every subsequent call, requiring a final `rm` at the end
+# of the script.
+LOG_DISABLED=0
+
 log_msg() {
+    [ "$LOG_DISABLED" = "1" ] && return 0
+
     if [ ! -d "/data/local/tmp" ]; then
         return 0
     fi
@@ -510,7 +260,7 @@ log_msg() {
 }
 
 log_msg "════════════════════════════════════════════"
-log_msg "Uninstall started (v1.4.0 — Global Edition)"
+log_msg "Uninstall started ($MODULE_VERSION)"
 log_msg "MODDIR=$MODDIR"
 log_msg "RUN_DIR=$RUN_DIR"
 log_msg "Backup dir (preserved): $PERSISTENT_BACKUP"
@@ -518,6 +268,22 @@ log_msg "Backup dir (preserved): $PERSISTENT_BACKUP"
 # ============================================================
 # [5] Security checks
 # ============================================================
+# Three validations before ANY destructive action:
+#
+#   1. MODDIR must be inside /data/adb/modules/ — the canonical
+#      Magisk/KernelSU/APatch location. A MODDIR outside this
+#      tree is almost certainly a bug or a malicious wrapper,
+#      and the script refuses to proceed (exit 1).
+#
+#   2. MODDIR must not be exactly /data/adb/modules — that
+#      would be the parent directory of every module, and
+#      removing it would destroy every installed module.
+#      Exit 1 on detection.
+#
+#   3. The module's basename should start with "dnscrypt"
+#      (case-insensitive). A module folder with a different
+#      name is suspicious but not necessarily fatal — the
+#      script logs a warning and continues.
 case "$MODDIR" in
     /data/adb/modules/*) ;;
     *)
@@ -541,26 +307,25 @@ case "$MODULE_ID" in
 esac
 
 # ============================================================
-# [5a] v1.4.0 — shared snapshot enumeration helper (UNS-V14-03)
+# [5a] Snapshot enumeration helper
 # ============================================================
 # Prints one snapshot directory name per line, newest first.
 #
-# v1.3.0 semantics (parity with functions.sh:rotate_backups,
-# main.go:buildBackupInfo, service.sh:_inline_rotate_backups,
-# watchdog.sh §[5b], status.sh:_list_snapshots,
-# customize.sh:rotate_backups, and action.sh
-# :_inline_list_snapshots):
+# Detection and ordering:
 #   • SNAP-MANIFEST: a directory is treated as a snapshot iff
 #     it contains a `.manifest.json` file.
-#   • SNAP-MTIME:    ordered by mtime, descending
-#     (`sort -rn -k1,1`), not by lexicographic directory name.
+#   • SNAP-MTIME: ordered by mtime, descending.
 #
-# Excludes: current/, txn-*, orphan-txn-* (by name).
+# Excludes (by name): current/, txn-*, orphan-txn-*,
+# .restore_snap.*, apk/.
 #
-# Introduced in UNS-V14-03 to eliminate the duplication
-# between the BACKUP_COUNT and BACKUP_LAST_NAME lookups in
-# §[5b].
-# ============================================================
+# Uses SUBSHELL ISOLATION (`( ... )`), not `local`, for its
+# internal loop variables. The subshell serves three purposes:
+#   1. The inner `cd "$PERSISTENT_BACKUP"` does not leak into
+#      the parent shell.
+#   2. The loop variables (`_d`, `_mt`) exist only in the
+#      subshell — no name collisions are possible.
+#   3. The function works on any POSIX sh implementation.
 _uninstall_list_snapshots() {
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
@@ -570,7 +335,7 @@ _uninstall_list_snapshots() {
             _d="${_d%/}"
             [ -d "$_d" ] || continue
             case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
+                current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
             _mt=$(stat -c %Y "$_d" 2>/dev/null) \
@@ -578,13 +343,35 @@ _uninstall_list_snapshots() {
                 || _mt=0
             case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
             printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1 | awk '{print $2}'
+        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
     )
 }
 
 # ============================================================
-# [5b] Read active profile + root solution (v1.2.0 — summary)
+# [5b] Read state for the final report
 # ============================================================
+# Collects the state that the final summary (§[18]) reports to
+# the user:
+#
+#   ACTIVE_PROFILE         — profile key (defaults to "unknown")
+#   ROOT_SOLUTION          — "KernelSU" | "APatch" | "Magisk" | "unknown"
+#   BACKUP_COUNT           — number of snapshots
+#   BACKUP_LAST_NAME       — newest snapshot name, or empty
+#   BACKUP_TXN_COUNT       — number of in-flight transaction dirs
+#   BACKUP_ORPHAN_COUNT    — number of pre-existing orphan dirs
+#   BACKUP_LAST_STABLE     — content of .last_stable, or empty
+#   APK_MIRROR_PRESENT     — 1 if $APK_MIRROR_FILE exists
+#   APK_MIRROR_SHA_PRESENT — 1 if the .sha256 sidecar exists
+#   APK_MIRROR_SIZE_BYTES  — size of the mirror APK in bytes
+#
+# All counts are computed via subshells that do not leak `cd`
+# into the parent. Numeric values are validated before use in
+# any arithmetic.
+#
+# Note on BACKUP_ORPHAN_COUNT: this is the count of orphan-txn-*
+# dirs that existed BEFORE §[9] ran. §[9] may rename additional
+# txn-* dirs into orphan-txn-*, so §[17b] computes a FINAL count
+# (`BACKUP_ORPHAN_FINAL`) that includes those renames.
 ACTIVE_PROFILE="unknown"
 if [ -f "$BIN_DIR/selected_profile.txt" ]; then
     _ap=$(cat "$BIN_DIR/selected_profile.txt" 2>/dev/null | tr -d '\r\n ')
@@ -594,7 +381,7 @@ if [ -f "$BIN_DIR/selected_profile.txt" ]; then
 fi
 log_msg "Active profile at uninstall: $ACTIVE_PROFILE"
 
-# --- Root solution detection (v1.2.0) ---
+# --- Root solution detection ---
 detect_root_solution() {
     if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
         printf "KernelSU"
@@ -614,23 +401,20 @@ detect_root_solution() {
 ROOT_SOLUTION=$(detect_root_solution)
 log_msg "Root solution: $ROOT_SOLUTION"
 
-# --- Count preserved snapshots (v1.2.0, corrected v1.4.0) ---
-# UNS-V14-03: both BACKUP_COUNT and BACKUP_LAST_NAME now use
-# the shared `_uninstall_list_snapshots` helper, which uses the
-# v1.3.0 manifest-based detection (SNAP-MANIFEST) and mtime
-# descending sort (SNAP-MTIME). Before this fix, the two
-# pipelines used the v1.2.0 name-pattern detection
-# (`grep -E '^[0-9]{8}-[0-9]{6}-'`) and lexicographic
-# `sort -r` for the "latest" lookup, disagreeing with every
-# other consumer in the module.
+# --- Count preserved snapshots ---
 BACKUP_COUNT=0
 BACKUP_LAST_NAME=""
 BACKUP_LAST_STABLE=""
 BACKUP_TXN_COUNT=0
 BACKUP_ORPHAN_COUNT=0
 
+# APK mirror presence flags — set here (not in [18]) so that
+# [18] can report the mirror without re-probing the filesystem.
+APK_MIRROR_PRESENT=0
+APK_MIRROR_SHA_PRESENT=0
+APK_MIRROR_SIZE_BYTES=0
+
 if [ -d "$PERSISTENT_BACKUP" ]; then
-    # UNS-V14-03: manifest-based detection + mtime sort.
     _ul_list=$(_uninstall_list_snapshots)
 
     if [ -n "$_ul_list" ]; then
@@ -656,11 +440,36 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
         BACKUP_LAST_STABLE=$(cat "$LAST_STABLE_FILE" 2>/dev/null | tr -d '\r\n ')
     fi
 
+    # Detect the companion APK mirror and its optional .sha256
+    # sidecar. Informational only — the mirror is preserved
+    # automatically because it lives inside $PERSISTENT_BACKUP.
+    if [ -f "$APK_MIRROR_FILE" ]; then
+        APK_MIRROR_PRESENT=1
+        _apk_size=$(wc -c < "$APK_MIRROR_FILE" 2>/dev/null | tr -d ' ')
+        case "$_apk_size" in
+            ''|*[!0-9]*) _apk_size=0 ;;
+        esac
+        APK_MIRROR_SIZE_BYTES=$_apk_size
+
+        if [ -f "$APK_MIRROR_SHA_FILE" ] && [ -s "$APK_MIRROR_SHA_FILE" ]; then
+            APK_MIRROR_SHA_PRESENT=1
+        fi
+    fi
+
     log_msg "Preserved backups: $BACKUP_COUNT snapshot(s)"
     log_msg "In-flight transactions: $BACKUP_TXN_COUNT"
     log_msg "Orphan transactions: $BACKUP_ORPHAN_COUNT"
     if [ -n "$BACKUP_LAST_STABLE" ]; then
         log_msg "Last stable pointer: $BACKUP_LAST_STABLE"
+    fi
+    if [ "$APK_MIRROR_PRESENT" = "1" ]; then
+        if [ "$APK_MIRROR_SHA_PRESENT" = "1" ]; then
+            log_msg "Companion APK mirror: present ($APK_MIRROR_SIZE_BYTES bytes + .sha256)"
+        else
+            log_msg "Companion APK mirror: present ($APK_MIRROR_SIZE_BYTES bytes, no .sha256)"
+        fi
+    else
+        log_msg "Companion APK mirror: not present"
     fi
 else
     log_msg "No persistent backup directory found"
@@ -677,55 +486,48 @@ fi
 # ============================================================
 # [6] Save route_localnet before changing it
 # ============================================================
+# The kernel's `net.ipv4.conf.all.route_localnet` sysctl
+# controls whether the kernel accepts packets with a loopback
+# source address arriving on a non-loopback interface. Some
+# ROMs set it to 1 by default (usually for tethering or
+# hotspot functionality).
+#
+# The module's firewall rules rely on this sysctl being enabled
+# for DNAT'd DNS traffic to reach the loopback listener. On
+# uninstall, the original value must be restored.
 ORIGINAL_ROUTE_LOCALNET=""
 if command -v sysctl >/dev/null 2>&1; then
     ORIGINAL_ROUTE_LOCALNET=$(sysctl -n net.ipv4.conf.all.route_localnet 2>/dev/null | tr -d '\r\n ')
 fi
 
 # ============================================================
-# [7] Optionally load functions.sh
+# [7] Save the current EXIT trap (informational)
 # ============================================================
-# HARD-UNI-03: sourcing functions.sh runs its top-level
-# initialization (init_runtime_paths, bootstrap-cache setup),
-# which creates $RUN_DIR and .bootstrap_cache — files that
-# this script is about to delete. We therefore avoid sourcing
-# the file entirely, and instead detect its presence
-# opportunistically: if `aggressive_cleanup` is already
-# available as a function (only possible if the caller
-# explicitly defined it), use it; otherwise fall back to the
-# inline path. This preserves the caller's ability to provide
-# a custom cleanup without paying the side effects.
-#
-# In practice, when uninstall.sh is invoked by Magisk/KernelSU,
-# `aggressive_cleanup` is never pre-defined, so the inline path
-# is always taken. The check remains for manual invocation
-# scenarios where an operator may have sourced functions.sh
-# themselves before invoking this script.
-# ============================================================
+# uninstall.sh does NOT install its own EXIT trap. Any EXIT
+# trap the root manager may have installed remains in place —
+# the script does not clobber it.
 FUNCTIONS_LOADED=0
-if command -v aggressive_cleanup >/dev/null 2>&1; then
-    FUNCTIONS_LOADED=1
-    log_msg "aggressive_cleanup available in the current shell"
-else
-    log_msg "Using inline cleanup (functions.sh not pre-loaded)"
-fi
+log_msg "Using inline cleanup (self-contained uninstaller)"
 
 # ============================================================
-# [8] Internal fallback functions
+# [8] Internal cleanup functions (self-contained)
 # ============================================================
-
-# ============================================================
-# _inline_kill_all — terminate daemons and WAIT for exit
-# ============================================================
-# HARD-UNI-08: previously this function fired `pkill -9` and
-# returned immediately. The caller then ran `rm -rf $RUN_DIR`
-# in [13] while a process could still be in D-state (uninterruptible
-# sleep on I/O), which caused either a failed unlink, or the
-# process re-creating files inside a directory we believed to
-# be gone. We now poll `pgrep` for up to 3 seconds and only
-# proceed once both daemons have disappeared.
-# ============================================================
+# _inline_kill_all terminates daemons and WAITS for exit.
+#
+# Fires `pkill -9` for both daemons, then polls `pgrep` for up
+# to 3 seconds and only proceeds once both have disappeared.
+# This prevents a process in D-state (uninterruptible sleep on
+# I/O) from re-creating files inside a directory we believe to
+# be gone.
+#
+# The function ends by calling `fuser -k` on the DNS ports.
+# This is belt-and-suspenders: `fuser` catches the rare case
+# where a process is bound to 5354/udp or 5354/tcp but is not
+# named `dnscrypt-proxy`.
 _inline_kill_all() {
+    local _ki_wait=0
+    local _ki_alive=0
+
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-proxy 2>/dev/null
     fi
@@ -733,8 +535,6 @@ _inline_kill_all() {
         pkill -9 -x dnscrypt-webui 2>/dev/null
     fi
 
-    # HARD-UNI-08: wait for processes to actually exit.
-    _ki_wait=0
     while [ "$_ki_wait" -lt 3 ]; do
         _ki_alive=0
         if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
@@ -758,23 +558,38 @@ _inline_kill_all() {
     fi
 }
 
-# ============================================================
 # _inline_cleanup_firewall — orphan prevention
 # ============================================================
 # Strategy:
-#   1. Delete the DNSCRYPT_OUT / DNSCRYPT_OUT6 Custom Chains entirely
-#   2. Best-effort legacy cleanup (rules from older versions)
-#   3. No dependency on functions.sh (self-contained)
+#   1. Delete the DNSCRYPT_OUT / DNSCRYPT_OUT6 Custom Chains
+#      entirely.
+#   2. Best-effort legacy cleanup (rules from older versions).
+#   3. No dependency on functions.sh (self-contained).
 #
-# ⚠️ Synchronization note:
+# Synchronization note:
 #   This function removes the same SET of rules as:
 #     • customize.sh    : _inline_cleanup_firewall
 #     • post-fs-data.sh : inline_firewall_cleanup
+#     • functions.sh    : manage_firewall 0
 #   The files differ only in the comment tag applied to the
 #   loopback (127.0.0.1) rules during the best-effort legacy
-#   cleanup (see UNI-2). Any change to the RULES removed by
-#   this function MUST be applied consistently to all three.
-# ============================================================
+#   cleanup. Any change to the RULES removed by this function
+#   MUST be applied consistently to all four.
+#
+# Three backends, in order:
+#   1. nftables — delete the `dnscrypt_filter` table in all
+#      three families (inet, ip, ip6).
+#   2. iptables (IPv4) — remove the DNSCRYPT_OUT chain's jump
+#      rules, flush and delete the chain, then best-effort
+#      remove any legacy direct-DNAT rules and their RETURN
+#      siblings.
+#   3. ip6tables (IPv6) — same as (2), on the DNSCRYPT_OUT6
+#      chain.
+#
+# Every individual command redirects stderr to /dev/null and
+# never aborts the loop. A missing backend (no `nft` binary,
+# no IPv6 support) causes its block to be skipped without
+# error.
 _inline_cleanup_firewall() {
     # --- [1] nftables: delete entire table ---
     if command -v nft >/dev/null 2>&1; then
@@ -783,21 +598,17 @@ _inline_cleanup_firewall() {
         nft delete table ip6 dnscrypt_filter 2>/dev/null
     fi
 
-    # ============================================================
-    # [2] iptables (IPv4) — Custom Chain cleanup
-    # ============================================================
+    # --- [2] iptables (IPv4) — Custom Chain cleanup ---
     if command -v iptables >/dev/null 2>&1; then
         local _chain="DNSCRYPT_OUT"
 
-        # [2a] Remove jump rules from OUTPUT
         iptables -t nat -D OUTPUT -p udp --dport 53 -j "$_chain" --wait 3 2>/dev/null
         iptables -t nat -D OUTPUT -p tcp --dport 53 -j "$_chain" --wait 3 2>/dev/null
 
-        # [2b] Flush the chain itself
         iptables -t nat -F "$_chain" --wait 3 2>/dev/null
         iptables -t nat -X "$_chain" --wait 3 2>/dev/null
 
-        # [2c] Legacy cleanup
+        # Legacy cleanup
         iptables -t nat -D OUTPUT -p udp --dport 53 \
             -j DNAT --to-destination 127.0.0.1:5354 \
             -m comment --comment "dnscrypt_smart_filter" --wait 3 2>/dev/null
@@ -822,7 +633,6 @@ _inline_cleanup_firewall() {
         iptables -t nat -D OUTPUT -d 127.0.0.1 -p tcp --dport 53 \
             -j RETURN --wait 3 2>/dev/null
 
-        # UNI-3 fix: `_ip` is declared `local`.
         local _ip
         for _ip in 9.9.9.9 8.8.8.8 1.1.1.1 1.0.0.1 8.8.4.4 208.67.222.222 208.67.220.220; do
             iptables -t nat -D OUTPUT -d "$_ip" -p udp --dport 53 \
@@ -832,9 +642,7 @@ _inline_cleanup_firewall() {
         done
     fi
 
-    # ============================================================
-    # [3] ip6tables (IPv6) — Custom Chain cleanup
-    # ============================================================
+    # --- [3] ip6tables (IPv6) — Custom Chain cleanup ---
     if command -v ip6tables >/dev/null 2>&1; then
         local _chain6="DNSCRYPT_OUT6"
 
@@ -864,24 +672,27 @@ _inline_cleanup_firewall() {
 }
 
 # ============================================================
-# [9] v1.2.0 — Resolve transaction directories
+# [9] Resolve transaction directories
 # ============================================================
-# HARD-UNI-02 (was UNI-6): a txn-* directory with a missing or
-# empty .state file is now treated like state=START — renamed
-# to orphan-txn-* and preserved. Previously it was deleted,
-# which could lose data from a crash that occurred between
-# `mkdir` and `echo START > .state` in customize.sh.
+# Case handling:
+#   • "COMMIT"   — removed. The install succeeded; the
+#                  directory is a leftover from an interrupted
+#                  cleanup step, not user data.
+#   • "ROLLBACK" — removed. The rollback was applied; the
+#                  snapshot is no longer needed.
+#   • "START"    — renamed to orphan-txn-* and preserved.
+#   • ""/other   — renamed to orphan-txn-* and preserved.
+#                  Covers the crash-between-mkdir-and-echo case.
 #
-# HARD-UNI-01 (was UNI-5): the counters ORPHAN_TXN_CLEANED and
-# ORPHAN_TXN_RENAMED are exposed to the rest of the script, and
-# a derived variable BACKUP_ORPHAN_FINAL is computed just
-# before the final report to reflect the post-rename count.
+# The rename prefix is `orphan-` prepended to the original name
+# with the `txn-` prefix stripped:
+#   txn-20260101-120000-1234  →  orphan-20260101-120000-1234
+# This preserves the timestamp and PID from the original
+# transaction, which lets a user correlate an orphan with a
+# specific failed install in the log.
 #
-# HARD-UNI-09: the loop body is now a function using `local`
-# for its internal variables, matching the style already used
-# by _inline_cleanup_firewall. The counters are still global
-# because they must be readable by [17b], [18], and [19].
-# ============================================================
+# Counters ORPHAN_TXN_CLEANED and ORPHAN_TXN_RENAMED are global
+# (readable by [17b] and [18]).
 ORPHAN_TXN_CLEANED=0
 ORPHAN_TXN_RENAMED=0
 
@@ -909,8 +720,8 @@ _resolve_txn_dirs() {
             *)
                 # Covers:
                 #   • state = "START"   (customize.sh wrote START)
-                #   • state = ""        (HARD-UNI-02 — crash before
-                #                        writing state; preserve)
+                #   • state = ""        (crash before writing state;
+                #                        preserve)
                 #   • any unknown value (preserve defensively)
                 log_msg "⚠️ Unfinished/unknown transaction: $(basename "$_txn") [state=${_state:-<none>}]"
                 _safe_name="orphan-$(basename "$_txn" | sed 's/^txn-//')"
@@ -938,6 +749,17 @@ fi
 # ============================================================
 # [10] Cleanup any legacy backup directory (v1.0.0)
 # ============================================================
+# v1.0.0 created a backup at
+# /data/local/tmp/dnscrypt_backup_uninstall/ during uninstall.
+# That behavior was removed in v1.1.0, but the directory itself
+# is not removed by the root manager (it is outside the module
+# folder), so it survives every subsequent upgrade and
+# reinstall.
+#
+# This section removes that legacy directory if it exists. The
+# user's REAL backup (the persistent
+# /sdcard/dnscrypt-webui-backup/ tree) is completely separate
+# and is preserved by [17].
 LEGACY_BACKUP_REMOVED=0
 if [ -d "$LEGACY_BACKUP_DIR" ]; then
     if rm -rf "$LEGACY_BACKUP_DIR" 2>/dev/null; then
@@ -953,28 +775,74 @@ fi
 # ============================================================
 # [11] Main cleanup
 # ============================================================
-# HARD-UNI-04: the cleanup runs exactly ONCE. Previously the
-# inline path ran twice ("belt-and-suspenders"), duplicating
-# every iptables/nft delete call.
-# ============================================================
+# The cleanup runs exactly ONCE. The single invocation is:
+#
+#   • Inline: _inline_kill_all + _inline_cleanup_firewall.
+#
+# The inline path is the ONLY path — this script does not
+# source functions.sh (see the design note at the top of the
+# file).
+#
+# _inline_kill_all:
+#   - kills dnscrypt-proxy and dnscrypt-webui,
+#   - waits up to 3 s for both to exit,
+#   - fuser -k on the DNS ports.
+#
+# _inline_cleanup_firewall:
+#   - nftables: delete the dnscrypt_filter table,
+#   - iptables: flush/delete DNSCRYPT_OUT + legacy cleanup,
+#   - ip6tables: flush/delete DNSCRYPT_OUT6.
+#
+# The log line is emitted AFTER the cleanup completes, so a
+# `tail -1 dnscrypt_main.log` mid-uninstall shows whether the
+# process cleanup finished before the next section started.
 log_msg "🧹 Starting cleanup..."
-
-if [ "$FUNCTIONS_LOADED" = "1" ]; then
-    log_msg "Using aggressive_cleanup from the caller's shell"
-    aggressive_cleanup 2>/dev/null
-else
-    log_msg "Using inline fallback cleanup"
-    _inline_kill_all
-    _inline_cleanup_firewall
-fi
-
+_inline_kill_all
+_inline_cleanup_firewall
 log_msg "✅ Process & firewall cleanup completed"
 
 # ============================================================
 # [12] Reset DNS settings
 # ============================================================
+# Removes the module's changes to three system settings:
+#
+#   1. private_dns_mode
+#      The DNS-over-TLS setting in Android's network stack.
+#      The module sets it (or leaves it unset) at install time;
+#      the correct uninstall behavior is to DELETE the setting
+#      so Android falls back to its own default (AUTO).
+#
+#      The `settings` service is often not ready immediately
+#      after boot, so a bounded wait loop (up to 10 s) is
+#      attempted before the delete.
+#
+#   2. net.ipv4.conf.all.route_localnet
+#      The kernel sysctl that controls whether the kernel
+#      accepts packets with a loopback source address arriving
+#      on a non-loopback interface.
+#
+#      The original value was captured in [6] into
+#      ORIGINAL_ROUTE_LOCALNET. This section restores it.
+#
+#      If ORIGINAL_ROUTE_LOCALNET is empty (sysctl was not
+#      available at [6] time, or the read failed), the
+#      fallback is to set the value to 0.
+#
+#   3. ndc resolver flushdefaultif
+#      Flushes the DNS resolver cache for the default network
+#      interface. Without this flush, the system may continue
+#      using cached DNS answers obtained via the module's
+#      DNAT'd path.
+#
+#      The flush is logged on BOTH success and failure — a
+#      silent failure would leave the user with a hung
+#      resolver and no trace in the log.
+#
+# All three operations are best-effort: a failure at any step
+# is logged but does not abort the uninstall.
 log_msg "🔄 Resetting DNS settings..."
 
+# --- Wait for the settings service to become available ---
 _wait=0
 while [ "$_wait" -lt 10 ]; do
     if settings get global private_dns_mode >/dev/null 2>&1; then
@@ -988,12 +856,14 @@ if [ "$_wait" -ge 10 ]; then
     log_msg "⚠️ settings service not ready after 10s, attempting anyway..."
 fi
 
+# --- Reset private_dns_mode ---
 if settings delete global private_dns_mode 2>/dev/null; then
     log_msg "✅ private_dns_mode reset to AUTO"
 else
     log_msg "⚠️ Failed to reset private_dns_mode (continuing)"
 fi
 
+# --- Restore route_localnet ---
 if [ -n "$ORIGINAL_ROUTE_LOCALNET" ] && command -v sysctl >/dev/null 2>&1; then
     if sysctl -w "net.ipv4.conf.all.route_localnet=$ORIGINAL_ROUTE_LOCALNET" >/dev/null 2>&1; then
         log_msg "✅ route_localnet restored to $ORIGINAL_ROUTE_LOCALNET"
@@ -1007,7 +877,7 @@ else
     fi
 fi
 
-# HARD-UNI-10: log the ndc result on both success and failure.
+# --- Flush the DNS resolver cache ---
 if command -v ndc >/dev/null 2>&1; then
     if ndc resolver flushdefaultif 2>/dev/null; then
         log_msg "✅ DNS resolver flushed via ndc"
@@ -1021,6 +891,21 @@ log_msg "✅ DNS reset completed"
 # ============================================================
 # [13] Cleanup run/ files
 # ============================================================
+# The module's run directory is at $MODDIR/proxy/run/. It
+# holds:
+#   • dnscrypt.pid       — PID file of the DNS engine
+#   • webui.pid          — PID file of the WebUI
+#   • watchdog.pid       — PID file of the watchdog
+#   • dnscrypt.status    — user intent ("ON" / "OFF")
+#   • .watchdog_token    — 64-hex CSRF token shared with main.go
+#   • .bootstrap_cache   — cached TTL-5min bootstrap resolver list
+#   • update_progress.txt — progress file for /api?action=get_progress
+#
+# The whole directory is removed with a single `rm -rf`. The
+# success check is `[ ! -d "$RUN_DIR" ]` — it verifies the
+# directory is actually gone, rather than trusting `rm`'s exit
+# code. On some Android filesystems, `rm -rf` can return 0
+# even when a file inside the tree was not removed.
 log_msg "🗑️  Removing run/ files..."
 
 RUN_COUNT=0
@@ -1036,12 +921,27 @@ else
 fi
 
 # ============================================================
-# [14] Cleanup temporary runtime files (in /data/local/tmp)
+# [14] Cleanup runtime files (in /data/local/tmp)
 # ============================================================
+# ⚠️ IMPORTANT: this section removes `dnscrypt_main.log` and
+# then sets `LOG_DISABLED=1`. After this point, `log_msg()`
+# becomes a silent no-op — the file is NOT re-created by any
+# subsequent section.
+#
+# Categories of files removed:
+#   a) PID files (7 paths) — including .tmp sidecars and
+#      alternative naming conventions from older versions.
+#   b) STATUS + progress files (2 paths).
+#   c) Credentials files (2 paths).
+#   d) Log files (8 paths).
+#   e) Log rotation sidecars (patterns).
+#   f) Filter caches (patterns).
+#   g) Bootstrap cache (2 paths).
 log_msg "🗑️  Removing runtime files from /data/local/tmp..."
 
 RUNTIME_COUNT=0
 
+# --- (a) PID files ---
 for f in /data/local/tmp/dnscrypt.pid \
          /data/local/tmp/webui.pid \
          /data/local/tmp/watchdog.pid \
@@ -1054,6 +954,7 @@ for f in /data/local/tmp/dnscrypt.pid \
     fi
 done
 
+# --- (b) Status + progress files ---
 for f in /data/local/tmp/dnscrypt.status \
          /data/local/tmp/update_progress.txt; do
     if [ -f "$f" ]; then
@@ -1061,6 +962,7 @@ for f in /data/local/tmp/dnscrypt.status \
     fi
 done
 
+# --- (c) Credentials files ---
 for f in /data/local/tmp/dnscrypt_credentials.txt \
          /data/local/tmp/.dnscrypt_credentials_shown; do
     if [ -f "$f" ]; then
@@ -1068,6 +970,7 @@ for f in /data/local/tmp/dnscrypt_credentials.txt \
     fi
 done
 
+# --- (d) Log files ---
 for f in /data/local/tmp/dnscrypt_install.log \
          /data/local/tmp/dnscrypt-query.log \
          /data/local/tmp/dnscrypt-blocked.log \
@@ -1081,6 +984,7 @@ for f in /data/local/tmp/dnscrypt_install.log \
     fi
 done
 
+# --- (e) Log rotation sidecars ---
 for pattern in \
     "/data/local/tmp/dnscrypt_main.log.*.old" \
     "/data/local/tmp/dnscrypt_main.log.old" \
@@ -1094,6 +998,7 @@ for pattern in \
     done
 done
 
+# --- (f) Filter caches ---
 for pattern in \
     "/data/local/tmp/*.filtered" \
     "/data/local/tmp/*.filtered.count" \
@@ -1105,6 +1010,7 @@ for pattern in \
     done
 done
 
+# --- (g) Bootstrap cache (both locations) ---
 for f in "$RUN_DIR/.bootstrap_cache" \
          "/data/local/tmp/.bootstrap_cache"; do
     if [ -f "$f" ]; then
@@ -1112,16 +1018,41 @@ for f in "$RUN_DIR/.bootstrap_cache" \
     fi
 done
 
-log_msg "✅ Removed $RUNTIME_COUNT runtime files from /data/local/tmp"
+# ------------------------------------------------------------
+# Disable logging from this point forward.
+# The log file has just been removed above. Any subsequent
+# log_msg() call would re-create it — the LOG_DISABLED flag
+# short-circuits those calls.
+# ------------------------------------------------------------
+LOG_DISABLED=1
 
 # ============================================================
 # [15] Cleanup module configuration files
 # ============================================================
-log_msg "🗑️  Removing module configuration files..."
-
+# Removes every configuration and state file from
+# $BIN_DIR (the module's proxy/ subdirectory). After this
+# section, the directory should contain only:
+#   • The two Go binaries (dnscrypt-proxy, dnscrypt-webui).
+#   • Any per-architecture binaries not yet pruned.
+#
+# The root manager will remove the entire module folder after
+# this script exits, so the removal here is defensive.
+#
+# Five groups of files, each with its own loop and its own
+# counter increment (all accumulating into MODULE_COUNT):
+#   a) Profile + WebUI config
+#   b) Blocklist files
+#   c) Allowlist + denylist
+#   d) Auth files (legacy)
+#   e) Resolver lists
+#
+# install_app.sh is deliberately NOT in this list. It lives
+# inside the module folder, so the root manager deletes it
+# when the module folder is removed.
 MODULE_COUNT=0
 
 if [ -d "$BIN_DIR" ]; then
+    # --- (a) Profile + WebUI config ---
     for f in selected_profile.txt \
              webui.conf \
              webui.conf.tmp \
@@ -1132,6 +1063,7 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
+    # --- (b) Blocklist files ---
     for f in blocklist.txt \
              blocklist.txt.tmp \
              blocklist.txt.bak \
@@ -1149,6 +1081,7 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
+    # --- (c) Allowlist + denylist ---
     for f in allowlist.txt \
              allowlist.txt.tmp_write \
              denylist.txt \
@@ -1158,12 +1091,14 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
+    # --- (d) Auth files (legacy) ---
     for f in auth.json .auth_token; do
         if [ -f "$BIN_DIR/$f" ]; then
             rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
+    # --- (e) Resolver lists ---
     for f in public-resolvers.md \
              public-resolvers.md.minisig \
              relays.md \
@@ -1172,181 +1107,132 @@ if [ -d "$BIN_DIR" ]; then
             rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
-
-    log_msg "✅ Removed $MODULE_COUNT module config files"
-else
-    log_msg "⚠️ $BIN_DIR does not exist, skipping config cleanup"
 fi
 
 # ============================================================
 # [16] Remove module fingerprint and disable file
 # ============================================================
+# Two files in the module root:
+#
+#   • .module.fingerprint — a single-line marker written by
+#     customize.sh §[20]. Its content is
+#     `dnscrypt-proxy-webui-<version>`. Read by:
+#       - main.go:checkOldModules()  — to skip the current
+#                                       install when scanning.
+#       - main.go:removeModule()     — to refuse deletion of a
+#                                       folder without the
+#                                       fingerprint.
+#     Removing it prevents a partially-removed module folder
+#     from being mistaken for a valid install by a future
+#     upgrade.
+#
+#   • disable — the Magisk/KernelSU "module disabled" marker.
+#     Removing it is defensive.
+#
+# Both removals are best-effort.
 if [ -f "$MODDIR/.module.fingerprint" ]; then
     rm -f "$MODDIR/.module.fingerprint" 2>/dev/null
-    log_msg "✅ Fingerprint removed"
 fi
 
 if [ -f "$MODDIR/disable" ]; then
     rm -f "$MODDIR/disable" 2>/dev/null
-    log_msg "✅ disable file removed"
 fi
 
 # ============================================================
-# [16b] v1.2.0 — Remove recovery triggers
+# [16b] Remove recovery triggers
 # ============================================================
-# RECOVERY_TRIGGER_2 (/data/adb/dnscrypt-recovery) lives OUTSIDE
-# the module directory, so Magisk does NOT remove it when the
-# module is uninstalled.
+# Two recovery-trigger files exist:
 #
-# HARD-UNI-07 (was UNI-11): the reason for removing it here is
-# simply that the trigger's only meaning is "the NEXT install
-# should enter recovery mode". Once the module is gone, that
-# meaning is void.
+#   • RECOVERY_TRIGGER_1 = $MODDIR/recovery
+#     The in-module trigger. Removed here because if the
+#     module folder is left in place (partial uninstall, or
+#     reinstall-triggered race), a leftover trigger would
+#     spuriously enter recovery mode on the next install.
 #
-# HARD-UNI-13: RECOVERY_TRIGGER_1 ($MODDIR/recovery) is now
-# also removed explicitly here. The root manager deletes the
-# whole module folder after this script exits, so in the
-# normal path this is redundant — but if a reinstall is
-# triggered before the folder is fully removed, a lingering
-# RECOVERY_TRIGGER_1 would spuriously enter recovery mode on
-# the next install. Removing it here is cheap and closes that
-# race.
+#   • RECOVERY_TRIGGER_2 = /data/adb/dnscrypt-recovery
+#     The external trigger. This file lives OUTSIDE the module
+#     directory, so Magisk does NOT remove it when the module
+#     is uninstalled. Its only meaning is "the NEXT install
+#     should enter recovery mode". Once the module is gone,
+#     that meaning is void — so the file is removed here.
 #
-# v1.4.0 note: nothing here interacts with the companion APK.
-# The APK is inside $MODDIR/web/, which is deleted with the
-# module folder by the root manager.
-# ============================================================
+# Two separate flags track whether each file was actually
+# present and removed. [18] uses them to decide whether to
+# mention the removal in the summary.
 RECOVERY_TRIGGER_REMOVED=0
 RECOVERY_TRIGGER_INTERNAL_REMOVED=0
 
 if [ -f "$RECOVERY_TRIGGER_2" ]; then
     if rm -f "$RECOVERY_TRIGGER_2" 2>/dev/null; then
         RECOVERY_TRIGGER_REMOVED=1
-        log_msg "🗑️  Removed external recovery trigger: $RECOVERY_TRIGGER_2"
-    else
-        log_msg "⚠️ Failed to remove external recovery trigger: $RECOVERY_TRIGGER_2"
     fi
-else
-    log_msg "ℹ️ No external recovery trigger present"
 fi
 
 if [ -f "$RECOVERY_TRIGGER_1" ]; then
     if rm -f "$RECOVERY_TRIGGER_1" 2>/dev/null; then
         RECOVERY_TRIGGER_INTERNAL_REMOVED=1
-        log_msg "🗑️  Removed in-module recovery trigger: $RECOVERY_TRIGGER_1"
-    else
-        log_msg "⚠️ Failed to remove in-module recovery trigger: $RECOVERY_TRIGGER_1"
     fi
-else
-    log_msg "ℹ️ No in-module recovery trigger present"
 fi
 
 # ============================================================
-# [17] v1.2.0 — PRESERVE the persistent backup directory
+# [17] PRESERVE the persistent backup directory
 # ============================================================
-# HARD-UNI-11: emit the PRESERVED message only when the
-# directory actually exists. A fresh install (no backup dir)
-# previously printed "PRESERVED" for a directory that was
-# never created, which was misleading.
+# This section is the counterpart to [10]'s legacy cleanup.
+# Where [10] removes the v1.0.0 backup at
+# /data/local/tmp/dnscrypt_backup_uninstall/, [17] explicitly
+# PRESERVES the v1.2.0+ backup at /sdcard/dnscrypt-webui-backup/.
+#
+# The preservation is not implemented by an action — there is
+# no `mv` or `cp` here. The directory survives because NOTHING
+# in this script touches it.
+#
+# [18] reports what will survive, so the user sees the
+# preservation in the output before the script exits.
+#
+# The companion APK mirror at apk/ is inside this directory,
+# so it is preserved automatically.
 # ============================================================
-if [ -d "$PERSISTENT_BACKUP" ]; then
-    log_msg "💾 Persistent backup PRESERVED (not removed): $PERSISTENT_BACKUP"
-    if [ "$BACKUP_COUNT" -gt 0 ]; then
-        log_msg "   Snapshot count: $BACKUP_COUNT"
-    fi
-    if [ -n "$BACKUP_LAST_NAME" ]; then
-        log_msg "   Latest snapshot: $BACKUP_LAST_NAME"
-    fi
-    if [ -n "$BACKUP_LAST_STABLE" ]; then
-        log_msg "   Last stable: $BACKUP_LAST_STABLE"
-    fi
-else
-    log_msg "ℹ️ No persistent backup directory present (nothing to preserve)"
-fi
 
 # ============================================================
-# [17b] HARD-UNI-01 — Compute the FINAL orphan-txn count
+# [17b] Compute the FINAL orphan-txn count
 # ============================================================
-# The initial BACKUP_ORPHAN_COUNT (section [5b]) was captured
-# BEFORE [9] renamed any START/no-state transactions. The
-# final report must reflect the post-rename count, or the
-# user sees a stale zero while the log shows a rename.
-# ============================================================
+# The initial BACKUP_ORPHAN_COUNT ([5b]) was captured BEFORE
+# [9] renamed any START/no-state transactions. The final report
+# must reflect the post-rename count.
+#
+# Both consumers ([18] log and [18] user message) must use
+# BACKUP_ORPHAN_FINAL, never the raw BACKUP_ORPHAN_COUNT.
 BACKUP_ORPHAN_FINAL=$((BACKUP_ORPHAN_COUNT + ORPHAN_TXN_RENAMED))
 
 # ============================================================
-# [18] Final summary
+# [18] User-facing final message
 # ============================================================
-# HARD-UNI-12: the `$( ... && echo X || echo Y )` idiom has
-# been replaced with explicit if/else blocks. The old idiom
-# was fragile: if `echo` itself failed (closed stdout), the
-# `||` branch would fire and report the opposite of the truth.
-# ============================================================
-log_msg "════════════════════════════════════════════"
-
-if [ "$RUN_COUNT" -gt 0 ]; then
-    _run_status="removed"
-else
-    _run_status="not present"
-fi
-
-if [ "$LEGACY_BACKUP_REMOVED" = "1" ]; then
-    _legacy_status="removed"
-else
-    _legacy_status="not present"
-fi
-
-if [ "$RECOVERY_TRIGGER_REMOVED" = "1" ]; then
-    _recovery_status="removed"
-else
-    _recovery_status="not present"
-fi
-
-log_msg "✅ Uninstall completed successfully"
-log_msg "   • Root solution:            $ROOT_SOLUTION"
-log_msg "   • Profile at uninstall:     $ACTIVE_PROFILE"
-log_msg "   • run/ directory:           $_run_status"
-log_msg "   • Runtime files removed:    $RUNTIME_COUNT"
-log_msg "   • Module config files:      $MODULE_COUNT"
-log_msg "   • Firewall:                 Custom Chains removed (DNSCRYPT_OUT / DNSCRYPT_OUT6)"
-log_msg "   • Legacy rules:             cleaned (best-effort)"
-log_msg "   • route_localnet:           restored to ${ORIGINAL_ROUTE_LOCALNET:-0}"
-log_msg "   • Legacy backup dir:        $_legacy_status"
-log_msg "   • External recovery trigger: $_recovery_status"
-log_msg "   • Committed/rolled txns:    $ORPHAN_TXN_CLEANED removed"
-log_msg "   • Unfinished txns:          $ORPHAN_TXN_RENAMED preserved (renamed to orphan-txn-*)"
-if [ -d "$PERSISTENT_BACKUP" ]; then
-    log_msg "   • Persistent backup:        PRESERVED"
-    log_msg "     Path:                     $PERSISTENT_BACKUP"
-    log_msg "     Snapshots:                $BACKUP_COUNT"
-    if [ "$BACKUP_COUNT" -gt 0 ] && [ -n "$BACKUP_LAST_NAME" ]; then
-        log_msg "     Latest:                   $BACKUP_LAST_NAME"
-    fi
-    if [ -n "$BACKUP_LAST_STABLE" ]; then
-        log_msg "     Last stable:              $BACKUP_LAST_STABLE"
-    fi
-    # HARD-UNI-01: use the FINAL orphan-txn count, not the pre-rename one.
-    if [ "$BACKUP_ORPHAN_FINAL" -gt 0 ]; then
-        log_msg "     Orphan txn preserved:     $BACKUP_ORPHAN_FINAL"
-    fi
-else
-    log_msg "   • Persistent backup:        not present"
-fi
-log_msg "   • Note: no auto-backup was created (v1.1.0+ behavior)"
-log_msg "   • Note: the companion APK (web/app-debug.apk) is removed with the"
-log_msg "           module folder by the root manager — no action taken here."
-if [ -d "$PERSISTENT_BACKUP" ]; then
-    log_msg "   • Note: the backup directory can be removed manually:"
-    log_msg "           rm -rf $PERSISTENT_BACKUP"
-fi
-log_msg "════════════════════════════════════════════"
-
-# ============================================================
-# [19] User-facing final message (v1.2.0)
-# ============================================================
-# HARD-UNI-14: exit codes are documented at the bottom of this
-# message so a manual invocation can be scripted reliably.
-# ============================================================
+# The counterpart to the (removed) log-based summary. This
+# section prints a human-friendly message to stdout. The
+# Magisk/KernelSU manager captures this stdout and shows it
+# to the user after the uninstall completes.
+#
+# Three cases drive the message body:
+#
+#   Case A: backup dir exists AND has ≥ 1 snapshot
+#     → "Your settings have been PRESERVED" block, with the
+#       5 preserved config files listed by name, the APK
+#       mirror if present, and the manual removal command.
+#
+#   Case B: backup dir exists but is empty
+#     → "directory exists but contains no snapshots" notice.
+#
+#   Case C: backup dir does not exist
+#     → "No persistent backup was found" notice.
+#
+# Two optional blocks may be appended regardless of case:
+#   • Orphan transaction notice (if BACKUP_ORPHAN_FINAL > 0).
+#   • Recovery trigger notice (if either trigger was removed).
+#
+# Note: [14] set LOG_DISABLED=1. From that point on, log_msg
+# is a silent no-op. This section uses raw `echo` (unaffected
+# by LOG_DISABLED) and is therefore the canonical place for
+# user-facing output.
 echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  DNSCrypt Smart Filter — Uninstall Complete"
@@ -1364,9 +1250,38 @@ if [ -d "$PERSISTENT_BACKUP" ] && [ "$BACKUP_COUNT" -gt 0 ]; then
     if [ -n "$BACKUP_LAST_STABLE" ]; then
         echo "     Last stable: $BACKUP_LAST_STABLE"
     fi
+
+    if [ -n "$USER_FILES" ]; then
+        echo ""
+        echo "     Preserved files:"
+        for _uf in $USER_FILES; do
+            echo "       - $_uf"
+        done
+    fi
+
+    if [ "$APK_MIRROR_PRESENT" = "1" ]; then
+        echo ""
+        if [ "$APK_MIRROR_SHA_PRESENT" = "1" ]; then
+            echo "     APK mirror: $APK_MIRROR_DIR/"
+            echo "                 (${APK_MIRROR_SIZE_BYTES} bytes + .sha256)"
+        else
+            echo "     APK mirror: $APK_MIRROR_DIR/"
+            echo "                 (${APK_MIRROR_SIZE_BYTES} bytes)"
+        fi
+    fi
+
     echo ""
     echo "  ✅ If you reinstall the module later, your settings will"
     echo "     be restored automatically from this backup."
+    if [ "$APK_MIRROR_PRESENT" = "1" ]; then
+        echo ""
+        echo "  📱 The companion APK mirror is still available at:"
+        echo "     $APK_MIRROR_FILE"
+        if [ "$APK_MIRROR_SHA_PRESENT" = "1" ]; then
+            echo "     $APK_MIRROR_SHA_FILE"
+        fi
+        echo "     (find it via any file manager — no root needed)"
+    fi
     echo ""
     echo "  ⚠️  If you want to remove them manually:"
     echo "     su -c \"rm -rf $PERSISTENT_BACKUP\""
@@ -1383,8 +1298,13 @@ else
     echo "  so there is nothing to preserve."
 fi
 
-# HARD-UNI-01 + UNI-4: use the FINAL count, and explicitly
-# mention the START → orphan-txn rename for the user.
+# ------------------------------------------------------------------
+# Orphan transaction notice
+# ------------------------------------------------------------------
+# Uses the FINAL count (BACKUP_ORPHAN_FINAL) which includes any
+# txn-* directories that [9] renamed to orphan-txn-* during
+# this run.
+# ------------------------------------------------------------------
 if [ "$BACKUP_ORPHAN_FINAL" -gt 0 ]; then
     echo ""
     echo "  ⚠️  Unfinished transactions were PRESERVED:"
@@ -1403,6 +1323,9 @@ if [ "$BACKUP_ORPHAN_FINAL" -gt 0 ]; then
     echo "     su -c \"cat $PERSISTENT_BACKUP/orphan-txn-*/.state\""
 fi
 
+# ------------------------------------------------------------------
+# Recovery trigger notice
+# ------------------------------------------------------------------
 if [ "$RECOVERY_TRIGGER_REMOVED" = "1" ]; then
     echo ""
     echo "  ℹ️  A pending recovery trigger was removed:"
@@ -1416,13 +1339,50 @@ if [ "$RECOVERY_TRIGGER_INTERNAL_REMOVED" = "1" ]; then
     echo "     $RECOVERY_TRIGGER_1"
 fi
 
+# ------------------------------------------------------------------
+# Companion app notice
+# ------------------------------------------------------------------
 echo ""
-echo "  ℹ️  The optional companion Android app APK (v1.4.0) is not"
-echo "     touched by this script. If you installed the app"
-echo "     separately, it remains on your device."
+echo "  ℹ️  The companion Android app is not affected by this uninstall:"
+echo "       • The module-internal APK is removed with the module folder."
+echo "       • The /sdcard/.../apk/ mirror survives (see above)."
+echo "       • Any separately-installed companion app remains on your"
+echo "         device — uninstall it from Android Settings if desired."
+
+# ------------------------------------------------------------------
+# Cleanup notices
+# ------------------------------------------------------------------
+if [ "$RUN_COUNT" = "1" ]; then
+    echo ""
+    echo "  🧹 Runtime directory (run/) was removed."
+fi
+
+if [ "$LEGACY_BACKUP_REMOVED" = "1" ]; then
+    echo ""
+    echo "  🧹 Legacy v1.0.0 backup directory was removed:"
+    echo "     $LEGACY_BACKUP_DIR"
+fi
+
 echo ""
 echo "  Exit code: 0 (success)"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 
+# ============================================================
+# [19] Exit
+# ============================================================
+# No final `rm -f "$LOG_FILE"` is needed:
+#
+#   [14] removed $LOG_FILE and set LOG_DISABLED=1. From that
+#   point on, log_msg became a silent no-op, so [15]..[18] did
+#   NOT re-create the log file. The final state is the same as
+#   the original design (no residual log), achieved without
+#   the trailing `rm`.
+#
+# The exit code is 0 — the uninstall completed successfully.
+# Errors during the cleanup phases were logged and reported
+# above, but the script's contract is "best-effort teardown":
+# the root manager removes the module folder after this
+# script exits regardless of any individual cleanup step.
+# ============================================================
 exit 0
