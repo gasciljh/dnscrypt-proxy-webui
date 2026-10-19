@@ -1,88 +1,10 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.4.0 (Global Edition)
-     Last updated: 2026-10-08
+     Version: v1.5.0 (Global Edition)
+     Last updated: 2026-10-19
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-     ============================================================
-     Bilingual WebUI (English default / Arabic toggle).
-
-     Features:
-       • Login (POST-only, CSRF-protected)
-       • Service toggle/restart
-       • Blocklist profile selection
-       • Custom rules editor (Allowlist + Denylist)
-       • Runtime info (dynamic ports + profile + memory + backups)
-       • Diagnostic file viewer
-       • Live status via SSE
-       • PWA support (installable, offline-capable)
-       • Smart Edit Mode with draft auto-save and rollback
-       • Service Worker update banner
-       • Companion Android app (direct <a download> link)
-
-     v1.4.0 — Companion Android app integration:
-       • The install button is now a direct <a download> link
-         pointing at /app-debug.apk. No JavaScript prompt logic,
-         no beforeinstallprompt dependency, no modal.
-       • All iOS-specific PWA logic was removed (Android-only
-         project): isIOSDevice(), pwaStepIos1/2/3 translations,
-         and the iOS branches in getBrowserName() /
-         isBrowserSupported() / getPWAInstallSteps() /
-         showPWAInstructionsModal().
-       • The beforeinstallprompt listener chain and all related
-         state variables (deferredInstallPrompt, pwaInstalled,
-         pwaCapable) were removed — the button does not need them.
-       • The install button is always visible (no more dynamic
-         visibility based on standalone detection).
-
-     v1.4.0 — frontend audit clarifications (kept):
-       • IDX-A1 — the install button's aria-label is now i18n
-         driven (translation key `pwaInstallAriaLabel`), matching
-         the visible label's language.
-       • IDX-A2 — removed the redundant inline `display:inline-flex`
-         from the anchor element; the rule already lives in the
-         `.pwa-install-btn` CSS class.
-       • IDX-A3 — documented that `/app-debug.apk` is bypassed by
-         the Service Worker (see `web/sw.js` `shouldBypass()`
-         rule 9), so the browser's HTTP cache — with the
-         `Cache-Control: public, max-age=3600, immutable` header
-         set by `main.go` — is the primary and only storage layer
-         for the ~3 MB download.
-
-     v1.3.0 fixes (kept):
-       • Service Worker update banner loop fixed:
-           [Reload] now sends SKIP_WAITING to
-           swRegistration.waiting (the NEW worker), and reloads
-           on 'controllerchange'.
-       • storeToken() is a no-op shim (see §[3]).
-       • EventSource uses same-origin cookies implicitly.
-       • Language toggle restored (EN ↔ AR), preference
-         persisted in localStorage under 'dnscrypt-lang'.
-
-     v1.3.0 — POST-AUDIT FIXES (kept):
-       • IDX-1 — System Info panel renders the 7-field backups
-         object exposed by v1.3.0's main.go.
-       • IDX-2 — `.card` base rule added (was undefined).
-       • IDX-3 — countChanges() returns ≥ 1 when raw differs.
-       • IDX-4 — lang/dir set before first paint.
-       • IDX-5 — formatBytes() handles GB range.
-       • IDX-7 — swUpdateCheckInterval cleared before reload.
-       • IDX-8 — "Latest Date" row added.
-       • IDX-9 — enterEditMode() refuses without server hash.
-       • IDX-10 — handleSessionExpired() resets backoffs.
-       • IDX-11 — 3s fallback reload for SW controllerchange.
-       • IDX-12 — section header renamed [13.b] → [13b].
-       • IDX-13 — formatBytes() guards negative input.
-       • IDX-14 — dashboardLink fallback timer (8s).
-       • IDX-15 — setNetworkDownUI(false) restores text.
-       • IDX-16 — toast role="status" aria-live="polite".
-       • IDX-17 — custom modal primary action.
-       • IDX-18 — handleSessionExpired tears down progressPoller.
-       • IDX-19 — stopPolling clears dashboard fallback timer.
-       • IDX-20 — verifyFailures reset on session expiry.
-       • IDX-21 — Pragma + Expires meta added.
-       • IDX-22 — setNetworkDownUI(true) on SSE error.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -99,7 +21,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.4.0</title>
+    <title>DNSCrypt Proxy</title>
 
     <script>
       (function(){
@@ -369,7 +291,7 @@
         .custom-modal-box { background:var(--bg-card); border-radius:var(--radius); padding:28px 24px; max-width:400px; width:90%; border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.8); text-align:center; animation:modalIn 0.25s ease-out; }
         @keyframes modalIn { from{opacity:0;transform:scale(0.92) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
         .custom-modal-box h3 { color:var(--text); margin-bottom:12px; font-size:18px; }
-        .custom-modal-box p { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
+        .custom-modal-box #modalMessage { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
         .custom-modal-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
         .custom-modal-actions button { padding:10px 28px; border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; font-family:inherit; }
         .custom-modal-actions .modal-confirm { background:var(--danger); color:white; }
@@ -389,14 +311,32 @@
         button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
 
-        /* ===== v1.4.0 PWA Install Button (direct download) ===== */
-        .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; text-decoration:none; }
-        .pwa-install-btn:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(88,166,255,.4); }
+        .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; }
+        .pwa-install-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 24px rgba(88,166,255,.4); }
         .pwa-install-btn:active { transform:translateY(0); }
+        .pwa-install-btn:disabled { opacity:.55; cursor:not-allowed; transform:none; box-shadow:0 6px 18px rgba(88,166,255,.15); }
         .pwa-install-btn .pwa-install-icon { font-size:16px; line-height:1; }
         .pwa-install-btn .pwa-install-text { white-space:nowrap; }
         @keyframes pwaFade { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
 
+        .install-modal-box { max-width:500px; }
+        .install-modal-header { font-size:18px; font-weight:800; color:var(--primary); margin-bottom:6px; }
+        .install-modal-subtitle { font-size:13px; color:var(--text-muted); margin-bottom:18px; }
+        .install-option { background:rgba(0,0,0,0.25); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; text-align:right; }
+        [dir="ltr"] .install-option { text-align:left; }
+        .install-option-title { font-size:15px; font-weight:700; color:var(--text); margin-bottom:8px; }
+        .install-option-desc { font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:12px; }
+        .install-option-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .install-option-actions button { flex:1; padding:10px 14px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; font-family:inherit; transition:0.2s; border:none; min-width:120px; }
+        .install-btn-local { background:linear-gradient(135deg,var(--primary),#1f6feb); color:white; }
+        .install-btn-local:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(31,111,235,0.4); }
+        .install-btn-local:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+        .install-btn-github-page { background:rgba(139,148,158,0.15); border:1px solid rgba(139,148,158,0.3) !important; color:var(--text); }
+        .install-btn-github-page:hover { background:rgba(139,148,158,0.25); }
+        .install-btn-github-direct { background:linear-gradient(135deg,#238636,#2ea043); color:white; }
+        .install-btn-github-direct:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(35,134,54,0.4); }
+        .install-modal-cancel { width:100%; margin-top:6px; padding:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text-muted); border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; transition:0.2s; }
+        .install-modal-cancel:hover { background:rgba(248,81,73,0.1); border-color:rgba(248,81,73,0.3); color:var(--danger); }
     </style>
 </head>
 <body>
@@ -404,7 +344,7 @@
 <div id="customModal" class="custom-modal-overlay">
     <div class="custom-modal-box">
         <h3 id="modalTitle">Confirm</h3>
-        <p id="modalMessage">Are you sure?</p>
+        <div id="modalMessage">Are you sure?</div>
         <div class="custom-modal-actions">
             <button class="modal-cancel" id="modalCancelBtn">Cancel</button>
             <button class="modal-confirm" id="modalConfirmBtn">Confirm</button>
@@ -442,17 +382,17 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.4.0</span>
+                <span class="badge" id="versionBadge">v1.5.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
-            <a id="pwaInstallBtn" class="pwa-install-btn"
-               href="/app-debug.apk" download="DNS-Proxy.apk"
-               aria-label="Download companion Android app">
+            <button id="pwaInstallBtn" class="pwa-install-btn" type="button"
+                    data-mode="install"
+                    aria-label="Install companion Android app">
                 <span class="pwa-install-icon">📲</span>
                 <span class="pwa-install-text" id="pwaInstallText">Install App</span>
-            </a>
+            </button>
         </div>
 
         <div class="status-area" id="statusArea">
@@ -582,7 +522,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.4.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.5.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -617,10 +557,27 @@
 (function() {
     'use strict';
 
-    // ============================================================
-    // [1] Initial settings
-    // ============================================================
-    var VERSION = 'v1.4.0';
+// ============================================================
+// [1] Initial settings
+// ============================================================
+    var VERSION = 'v1.5.0';
+
+    var APP_GITHUB_PAGE_URL = 'https://github.com/gasciljh/dnscrypt-proxy-app';
+
+    function getCompanionApkUrl() {
+        var v = companionState && companionState.expected_version;
+        if (!v || v === 'unknown') {
+            if (runtimeInfoData && runtimeInfoData.app_version &&
+                runtimeInfoData.app_version !== 'unknown') {
+                v = runtimeInfoData.app_version;
+            }
+        }
+        if (!v || v === 'unknown') {
+            v = '1.0.0';
+        }
+        return 'https://github.com/gasciljh/dnscrypt-proxy-app/releases/download/v'
+            + v + '/app-debug.apk';
+    }
 
     var PORTS = {
         webui:     '9090',
@@ -630,7 +587,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.4.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -718,12 +675,28 @@
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
             pwaInstallBtn: 'Install App',
-            pwaInstallAriaLabel: 'Download companion Android app',
-            waitForContent: '⏳ Please wait for the content to load from the server'
+            pwaInstallAriaLabel: 'Install companion Android app',
+            pwaInstalled: 'Installed',
+            pwaUpdate: 'Update App',
+            installing: '⏳ Installing...',
+            installSuccess: '✅ Companion app installed',
+            installError: '❌ Install failed',
+            installRateLimited: '🚫 Too many install attempts. Try again in 15 minutes.',
+            installTokenError: '❌ Failed to get install token',
+            installManualDownload: '⬇️ Download manually',
+            waitForContent: '⏳ Please wait for the content to load from the server',
+            installChooseMethod: 'Choose install method for the companion app:',
+            installLocalTitle: '📦 Local install',
+            installLocalDesc: 'Installs the app directly via root.\nNo internet connection required.',
+            installLocalBtn: 'Install locally',
+            installGithubTitle: '🌐 Download from GitHub',
+            installGithubDesc: 'Downloads the app from the official page.\nRequires internet, then install it manually.',
+            installGithubBtnPage: '🌐 Open GitHub page',
+            installGithubBtnDirect: '🌐 Direct download from GitHub'
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.4.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -811,8 +784,24 @@
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
             pwaInstallBtn: 'ثبّت التطبيق',
-            pwaInstallAriaLabel: 'تحميل تطبيق أندرويد المرافق',
-            waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم'
+            pwaInstallAriaLabel: 'تثبيت تطبيق أندرويد المرافق',
+            pwaInstalled: 'مثبَّت',
+            pwaUpdate: 'تحديث التطبيق',
+            installing: '⏳ جاري التثبيت...',
+            installSuccess: '✅ تم تثبيت التطبيق بنجاح',
+            installError: '❌ فشل التثبيت',
+            installRateLimited: '🚫 محاولات تثبيت كثيرة. حاول بعد 15 دقيقة.',
+            installTokenError: '❌ فشل الحصول على رمز التثبيت',
+            installManualDownload: '⬇️ التنزيل يدويًا',
+            waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم',
+            installChooseMethod: 'اختر طريقة تثبيت التطبيق المرافق:',
+            installLocalTitle: '📦 التثبيت المحلي',
+            installLocalDesc: 'يُثبَّت التطبيق مباشرةً عبر root.\nلا يحتاج اتصالاً بالإنترنت.',
+            installLocalBtn: 'تثبيت محلي',
+            installGithubTitle: '🌐 التنزيل من GitHub',
+            installGithubDesc: 'يُنزَّل التطبيق من الصفحة الرسمية.\nيحتاج اتصالاً بالإنترنت، ثم ثبّته يدوياً.',
+            installGithubBtnPage: '🌐 فتح صفحة GitHub',
+            installGithubBtnDirect: '🌐 تنزيل مباشر من GitHub'
         }
     };
 
@@ -853,12 +842,36 @@
     var dashboardLinkFallbackTimer = null;
     var networkDownActive = false;
 
+    // Companion app state — single source of truth.
+    // companionInstallInFlight guards against a race: the explicit
+    // renderCompanionButton() calls in doCompanionInstall() act as a
+    // safety net if refreshCompanionState() fails (network / 401).
+    var COMPANION_CACHE_KEY = 'companion-state';
+    var companionState = {
+        installed: false,
+        version_name: '',
+        expected_version: ''
+    };
+    var companionInstallInFlight = false;
+
+    // installModalActive — set true by showInstallModal().
+    //
+    // While true, the shared backdrop-click handler in §[28]
+    // MUST NOT close the modal. Its only valid exits are its own
+    // buttons (each resets companionInstallInFlight). A backdrop
+    // close would strand the install button in a disabled state.
+    //
+    // INVARIANT: installModalActive === true ⇒ the install modal is
+    // the one currently visible. Enforced by resetting the flag in
+    // both closeConfirmModal() and showConfirmModal().
+    var installModalActive = false;
+
     var $ = function(id) { return document.getElementById(id); };
     function t(k) { return translations[currentLang][k] || k; }
 
-    // ============================================================
-    // [1b] Dashboard URL builder (respects custom ports)
-    // ============================================================
+// ============================================================
+// [1b] Dashboard URL builder (respects custom ports)
+// ============================================================
     function getDashboardUrl() {
         var hostname = window.location.hostname || '127.0.0.1';
 
@@ -881,9 +894,9 @@
         link.classList.remove('loading');
     }
 
-    // ============================================================
-    // [2] escapeHtml
-    // ============================================================
+// ============================================================
+// [2] escapeHtml
+// ============================================================
     function escapeHtml(s) {
         if (s === null || s === undefined) return '';
         return String(s)
@@ -896,16 +909,22 @@
             .replace(/\u2029/g, '&#8233;');
     }
 
-    // ============================================================
-    // [3] Token helpers — cookie-only
-    // ============================================================
+// ============================================================
+// [3] Token helpers — cookie-only
+// ============================================================
+    // Auth is cookie-only (HttpOnly `dnscrypt_session`). These are
+    // intentional no-ops kept for backward compatibility with the
+    // XHR helper's `Authorization: Bearer` code path, which is
+    // dormant because getStoredToken() always returns null.
+    // Do NOT add Bearer token support here — the server never
+    // issues one (see SECURITY.md §8.1).
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
     function clearStoredToken() { }
 
-    // ============================================================
-    // [4] Draft helpers
-    // ============================================================
+// ============================================================
+// [4] Draft helpers
+// ============================================================
     function getDraftKey(listType) { return 'dnscrypt-' + listType + '-draft'; }
     function saveDraft(listType, value) {
         try {
@@ -935,9 +954,9 @@
         return draft.value !== orig;
     }
 
-    // ============================================================
-    // [5] countChanges
-    // ============================================================
+// ============================================================
+// [5] countChanges
+// ============================================================
     function countChanges(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var original = originalValues[listType] || '';
@@ -955,9 +974,9 @@
         return total > 0 ? total : 1;
     }
 
-    // ============================================================
-    // [6] Draft auto-save
-    // ============================================================
+// ============================================================
+// [6] Draft auto-save
+// ============================================================
     function startDraftAutoSave(listType) {
         if (draftTimers[listType]) clearInterval(draftTimers[listType]);
         draftTimers[listType] = setInterval(function() {
@@ -986,9 +1005,9 @@
         }
     }
 
-    // ============================================================
-    // [7] FSM transition
-    // ============================================================
+// ============================================================
+// [7] FSM transition
+// ============================================================
     function transitionTo(listType, newState) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var btn = listType === 'allow' ? $('saveAllowBtn') : $('saveDenyBtn');
@@ -1035,9 +1054,9 @@
         }
     }
 
-    // ============================================================
-    // [8] Edit mode
-    // ============================================================
+// ============================================================
+// [8] Edit mode
+// ============================================================
     function handleEditBtnClick(listType) {
         if (editStates[listType] === EditState.VIEW) {
             enterEditMode(listType);
@@ -1105,983 +1124,1021 @@
         setRuleStatus(statusId, '', '');
     }
 
-    // ============================================================
-    // [9] SHA-256
-    // ============================================================
-    function sha256(text) {
-        if (!window.crypto || !window.crypto.subtle) {
-            return Promise.reject(new Error('SHA-256 not available'));
-        }
-        try {
-            var buf = new TextEncoder().encode(text);
-            return crypto.subtle.digest('SHA-256', buf).then(function(hash) {
-                return Array.from(new Uint8Array(hash))
-                    .map(function(b) { return b.toString(16).padStart(2, '0'); })
-                    .join('');
-            });
-        } catch (e) {
-            return Promise.reject(e);
-        }
-    }
-
+// ============================================================
+// [9] setRuleStatus
+// ============================================================
     function setRuleStatus(id, text, type) {
         var el = $(id); if (!el) return;
         el.textContent = text;
         el.className = 'rule-status' + (type ? ' ' + type : '');
     }
 
-    // ============================================================
-    // [10] Save with optimistic UI
-    // ============================================================
-    function saveWithOptimistic(listType) {
-        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
-        var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
-        var content = ta.value;
-        var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
-        var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
-        var originalValue = originalValues[listType];
+// ============================================================
+// [10] Save with optimistic UI
+// ============================================================
+// The new hash comes from the server response, not from a
+// client-side SHA-256 computation — crypto.subtle is unavailable
+// on non-secure contexts (LAN via BIND_ADDR=0.0.0.0 over HTTP).
+// The optimistic-concurrency protocol is unchanged: send the
+// previously-known hash as expected_hash; the server returns the
+// new hash.
+function saveWithOptimistic(listType) {
+    var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+    var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
+    var content = ta.value;
+    var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+    var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
+    var originalValue = originalValues[listType];
 
-        if (countChanges(listType) === 0) {
-            showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+    if (countChanges(listType) === 0) {
+        showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+        return;
+    }
+
+    rulesState[savingFlag] = true;
+    transitionTo(listType, EditState.VIEW);
+    setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
+
+    var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
+    var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
+                 encodeURIComponent(content) +
+                 '&expected_hash=' + hash;
+
+    xhrPost(url, params, function(err, data) {
+        rulesState[savingFlag] = false;
+
+        if (err || !data || data.status !== 'ok') {
+            ta.value = originalValue;
+            transitionTo(listType, EditState.ROLLBACK);
+            setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
+            showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
+            saveDraft(listType, content);
             return;
         }
 
-        rulesState[savingFlag] = true;
-        transitionTo(listType, EditState.VIEW);
-        setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
-
-        sha256(content).then(function(newHash) {
-            var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
-            var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
-                         encodeURIComponent(content) +
-                         '&expected_hash=' + hash;
-
-            xhrPost(url, params, function(err, data) {
-                rulesState[savingFlag] = false;
-
-                if (err || !data || data.status !== 'ok') {
-                    ta.value = originalValue;
-                    transitionTo(listType, EditState.ROLLBACK);
-                    setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
-                    showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
-                    saveDraft(listType, content);
-                    return;
-                }
-
-                if (listType === 'allow') {
-                    rulesState.serverAllowHash = data.hash || newHash;
-                } else {
-                    rulesState.serverDenyHash = data.hash || newHash;
-                }
-                clearDraft(listType);
-                originalValues[listType] = content;
-                var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
-                if (badge) badge.classList.remove('visible');
-                setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
-                showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
-                setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
-                setTimeout(loadProfile, 500);
-            });
-        }).catch(function() {
-            rulesState[savingFlag] = false;
-            ta.value = originalValue;
-            transitionTo(listType, EditState.ROLLBACK);
-            var errMsg = '❌ SHA-256 unavailable in browser — use modern Chrome/Edge/Firefox';
-            setRuleStatus(statusId, errMsg, 'error');
-            showMsg(errMsg, 'error', 5000);
-        });
-    }
-
-    function hasUnsavedChanges() {
-        return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
-               ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
-    }
-
-    // ============================================================
-    // [11] Keyboard shortcuts
-    // ============================================================
-    document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                saveWithOptimistic('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                saveWithOptimistic('deny');
-            }
+        var newHash = data.hash || '';
+        if (listType === 'allow') {
+            rulesState.serverAllowHash = newHash;
+        } else {
+            rulesState.serverDenyHash = newHash;
         }
-        if (e.key === 'Escape') {
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                cancelEdit('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                cancelEdit('deny');
+        clearDraft(listType);
+        originalValues[listType] = content;
+        var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
+        if (badge) badge.classList.remove('visible');
+        setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
+        showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
+        setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
+        setTimeout(loadProfile, 500);
+    });
+}
+
+function hasUnsavedChanges() {
+    return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
+           ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
+}
+
+// ============================================================
+// [11] Keyboard shortcuts
+// ============================================================
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+            saveWithOptimistic('allow');
+        } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+            saveWithOptimistic('deny');
+        }
+    }
+    if (e.key === 'Escape') {
+        if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+            cancelEdit('allow');
+        } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+            cancelEdit('deny');
+        }
+    }
+});
+
+// ============================================================
+// [12] Modal
+// ============================================================
+// Two flags must be reset whenever a generic confirm modal is
+// opened or closed:
+//
+//   installModalActive
+//     Prevents the shared backdrop-click handler in §[28] from
+//     closing the install-method modal. Its only valid exits are
+//     its own buttons — each resets companionInstallInFlight.
+//     A backdrop close would strand the install button in a
+//     disabled state.
+//
+//   companionInstallInFlight
+//     Guards the one-shot CSRF-token fetch in
+//     handleCompanionInstall(). If a generic confirm modal
+//     replaces the install modal (e.g. session-expired while
+//     installing), the flag must be cleared — otherwise the
+//     install button stays disabled after re-login.
+//
+// Resetting both in BOTH showConfirmModal() and
+// closeConfirmModal() enforces the invariant structurally:
+//   installModalActive === true ⇒ the install modal is the one
+//   currently visible.
+function showConfirmModal(message, callback, options) {
+    options = options || {};
+    _resetModalLayout();
+    installModalActive = false;
+    companionInstallInFlight = false;
+    $('modalMessage').textContent = message;
+    $('modalTitle').textContent = options.title || t('confirmTitle');
+    $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
+    $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+
+    var box = $('customModal').querySelector('.custom-modal-actions');
+    var existing = box.querySelector('.modal-primary');
+    if (existing) existing.remove();
+
+    if (options.primaryText && options.primaryCallback) {
+        var btn = document.createElement('button');
+        btn.className = 'modal-primary';
+        btn.textContent = options.primaryText;
+        btn.addEventListener('click', function() {
+            closeConfirmModal();
+            options.primaryCallback();
+        });
+        box.insertBefore(btn, box.firstChild);
+    }
+
+    $('customModal').style.display = 'flex';
+    pendingConfirmCallback = callback || function() { /* no-op */ };
+}
+function closeConfirmModal() {
+    $('customModal').style.display = 'none';
+    pendingConfirmCallback = null;
+    installModalActive = false;
+}
+
+// ============================================================
+// [13] Auth helpers
+// ============================================================
+function showAuthBadge() {
+    var b = $('authBadge');
+    if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
+}
+function hideAuthBadge() {
+    var b = $('authBadge');
+    if (b) b.style.display = 'none';
+}
+
+function setNetworkDownUI(isDown) {
+    var area = $('statusArea'), txt = $('statusText');
+    if (!area || !txt) return;
+    if (isDown) {
+        area.style.borderColor = 'rgba(210,153,34,0.4)';
+        txt.textContent = t('networkDown');
+        networkDownActive = true;
+    } else {
+        area.style.borderColor = '';
+        if (networkDownActive) {
+            if (currentStatus === 'ON') {
+                txt.textContent = t('statusOn');
+            } else if (currentStatus === 'OFF') {
+                txt.textContent = t('statusOff');
+            } else {
+                txt.textContent = t('statusChecking');
+            }
+            networkDownActive = false;
+        }
+    }
+}
+function updateStatsDisplay() {
+    var btEl = $('blockedToday');
+    if (btEl) {
+        var isPaused = (currentStatus !== 'ON');
+        var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
+        var rawLabel = t('blockedTodayLabel');
+        var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
+
+        var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
+        var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
+        var ledCls = isPaused ? 'led led-off' : 'led led-on';
+
+        btEl.innerHTML =
+            escapeHtml(icon) + ' ' +
+            escapeHtml(labelText) + ' ' +
+            escapeHtml(currentBlockedCount) +
+            '<span class="' + ledCls + '" aria-hidden="true"></span>' +
+            '<span class="stat-sub">' +
+            escapeHtml(before) + ' ' + escapeHtml(after) +
+            '</span>';
+
+        if (isPaused) btEl.classList.add('stat-paused');
+        else btEl.classList.remove('stat-paused');
+    }
+    $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
+}
+
+// ============================================================
+// [13b] SW Update handlers
+// ============================================================
+function showSWUpdateBanner() {
+    var banner = $('swUpdateBanner');
+    var txt = $('swUpdateText');
+    if (txt) txt.textContent = t('swUpdateAvailable');
+    if (banner) banner.style.display = 'flex';
+}
+
+function hideSWUpdateBanner() {
+    var banner = $('swUpdateBanner');
+    if (banner) banner.style.display = 'none';
+}
+
+function installControllerChangeHandler() {
+    if (controllerChangeHandlerInstalled) return;
+    if (!('serviceWorker' in navigator)) return;
+    controllerChangeHandlerInstalled = true;
+
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!pendingReload) return;
+        pendingReload = false;
+        if (swUpdateCheckInterval) {
+            clearInterval(swUpdateCheckInterval);
+            swUpdateCheckInterval = null;
+        }
+        window.location.reload();
+    });
+}
+
+function setupSWUpdateHandler() {
+    if (!('serviceWorker' in navigator)) return;
+
+    installControllerChangeHandler();
+
+    navigator.serviceWorker.addEventListener('message', function(event) {
+        if (!event.data) return;
+        if (event.data.type === 'UPDATE_AVAILABLE') {
+            if (event.data.waiting) {
+                showSWUpdateBanner();
             }
         }
     });
 
-    // ============================================================
-    // [12] Modal
-    // ============================================================
-    function showConfirmModal(message, callback, options) {
-        options = options || {};
-        $('modalMessage').textContent = message;
-        $('modalTitle').textContent = options.title || t('confirmTitle');
-        $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
-        $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
-
-        var box = $('customModal').querySelector('.custom-modal-actions');
-        var existing = box.querySelector('.modal-primary');
-        if (existing) existing.remove();
-
-        if (options.primaryText && options.primaryCallback) {
-            var btn = document.createElement('button');
-            btn.className = 'modal-primary';
-            btn.textContent = options.primaryText;
-            btn.addEventListener('click', function() {
-                closeConfirmModal();
-                options.primaryCallback();
-            });
-            box.insertBefore(btn, box.firstChild);
+    if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+    swUpdateCheckInterval = setInterval(function() {
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
         }
+    }, 3600000);
 
-        $('customModal').style.display = 'flex';
-        pendingConfirmCallback = callback;
-    }
-    function closeConfirmModal() {
-        $('customModal').style.display = 'none';
-        pendingConfirmCallback = null;
-    }
-
-    // ============================================================
-    // [13] Auth helpers
-    // ============================================================
-    function showAuthBadge() {
-        var b = $('authBadge');
-        if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
-    }
-    function hideAuthBadge() {
-        var b = $('authBadge');
-        if (b) b.style.display = 'none';
-    }
-
-    function setNetworkDownUI(isDown) {
-        var area = $('statusArea'), txt = $('statusText');
-        if (!area || !txt) return;
-        if (isDown) {
-            area.style.borderColor = 'rgba(210,153,34,0.4)';
-            txt.textContent = t('networkDown');
-            networkDownActive = true;
-        } else {
-            area.style.borderColor = '';
-            if (networkDownActive) {
-                if (currentStatus === 'ON') {
-                    txt.textContent = t('statusOn');
-                } else if (currentStatus === 'OFF') {
-                    txt.textContent = t('statusOff');
-                } else {
-                    txt.textContent = t('statusChecking');
-                }
-                networkDownActive = false;
-            }
+    setTimeout(function() {
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
         }
-    }
-    function updateStatsDisplay() {
-        var btEl = $('blockedToday');
-        if (btEl) {
-            var isPaused = (currentStatus !== 'ON');
-            var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
-            var rawLabel = t('blockedTodayLabel');
-            var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
+    }, 5000);
+}
 
-            var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
-            var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
-            var ledCls = isPaused ? 'led led-off' : 'led led-on';
+function bindSWUpdateButtons() {
+    var reloadBtn = $('swUpdateReloadBtn');
+    var closeBtn = $('swUpdateCloseBtn');
 
-            btEl.innerHTML =
-                escapeHtml(icon) + ' ' +
-                escapeHtml(labelText) + ' ' +
-                escapeHtml(currentBlockedCount) +
-                '<span class="' + ledCls + '" aria-hidden="true"></span>' +
-                '<span class="stat-sub">' +
-                escapeHtml(before) + ' ' + escapeHtml(after) +
-                '</span>';
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', function() {
+            if (pendingReload) return;
 
-            if (isPaused) btEl.classList.add('stat-paused');
-            else btEl.classList.remove('stat-paused');
-        }
-        $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
-    }
-
-    // ============================================================
-    // [13b] SW Update handlers
-    // ============================================================
-    function showSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        var txt = $('swUpdateText');
-        if (txt) txt.textContent = t('swUpdateAvailable');
-        if (banner) banner.style.display = 'flex';
-    }
-
-    function hideSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        if (banner) banner.style.display = 'none';
-    }
-
-    function installControllerChangeHandler() {
-        if (controllerChangeHandlerInstalled) return;
-        if (!('serviceWorker' in navigator)) return;
-        controllerChangeHandlerInstalled = true;
-
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            if (!pendingReload) return;
-            pendingReload = false;
-            if (swUpdateCheckInterval) {
-                clearInterval(swUpdateCheckInterval);
-                swUpdateCheckInterval = null;
+            if (!swRegistration) {
+                window.location.reload();
+                return;
             }
-            window.location.reload();
-        });
-    }
 
-    function setupSWUpdateHandler() {
-        if (!('serviceWorker' in navigator)) return;
-
-        installControllerChangeHandler();
-
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (!event.data) return;
-
-            if (event.data.type === 'UPDATE_AVAILABLE') {
-                if (event.data.waiting) {
-                    showSWUpdateBanner();
-                }
+            var waiting = swRegistration.waiting;
+            if (!waiting) {
+                window.location.reload();
+                return;
             }
-        });
 
-        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-        swUpdateCheckInterval = setInterval(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            pendingReload = true;
+            reloadBtn.disabled = true;
+
+            try {
+                waiting.postMessage({ type: 'SKIP_WAITING' });
+            } catch (e) {
+                pendingReload = false;
+                reloadBtn.disabled = false;
+                window.location.reload();
+                return;
             }
-        }, 3600000);
 
-        setTimeout(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-            }
-        }, 5000);
-    }
-
-    function bindSWUpdateButtons() {
-        var reloadBtn = $('swUpdateReloadBtn');
-        var closeBtn = $('swUpdateCloseBtn');
-
-        if (reloadBtn) {
-            reloadBtn.addEventListener('click', function() {
-                if (pendingReload) return;
-
-                if (!swRegistration) {
-                    window.location.reload();
-                    return;
-                }
-
-                var waiting = swRegistration.waiting;
-                if (!waiting) {
-                    window.location.reload();
-                    return;
-                }
-
-                pendingReload = true;
-                reloadBtn.disabled = true;
-
-                try {
-                    waiting.postMessage({ type: 'SKIP_WAITING' });
-                } catch (e) {
+            setTimeout(function() {
+                if (pendingReload) {
                     pendingReload = false;
-                    reloadBtn.disabled = false;
-                    window.location.reload();
-                    return;
-                }
-
-                setTimeout(function() {
-                    if (pendingReload) {
-                        pendingReload = false;
-                        if (swUpdateCheckInterval) {
-                            clearInterval(swUpdateCheckInterval);
-                            swUpdateCheckInterval = null;
-                        }
-                        window.location.reload();
+                    if (swUpdateCheckInterval) {
+                        clearInterval(swUpdateCheckInterval);
+                        swUpdateCheckInterval = null;
                     }
-                }, 3000);
-            });
-        }
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', hideSWUpdateBanner);
-        }
-    }
-
-    // ============================================================
-    // [13c] PWA Install Button (v1.4.0) — direct download
-    // ============================================================
-    // The install button is a plain <a download> link pointing at
-    // /app-debug.apk. No JavaScript prompt logic, no
-    // beforeinstallprompt dependency, no modal, no standalone
-    // detection. This removes the entire "smart & dynamic" code
-    // path introduced in v1.3.0.
-    //
-    // iOS-specific branches were removed in v1.4.0 (Android-only
-    // project). Browsers that do not support downloading the APK
-    // will show the standard browser "file not found" behavior
-    // if the asset is absent from the module ZIP.
-    //
-    // Caching note (IDX-A3):
-    //   The `/app-debug.apk` path is bypassed by the Service
-    //   Worker (see `web/sw.js` `shouldBypass()` rule 9). The
-    //   browser's own HTTP cache — driven by the
-    //   `Cache-Control: public, max-age=3600, immutable` header
-    //   set by `main.go` — is the primary and only storage layer
-    //   for the ~3 MB download. The SW does not cache the APK.
-    //
-    // Localization note (IDX-A1):
-    //   Both the visible label (`pwaInstallText`) and the
-    //   `aria-label` attribute are i18n-driven. See
-    //   `updateUIStrings()` below.
-    // ============================================================
-
-    // ============================================================
-    // [14] Runtime Info
-    // ============================================================
-    function loadRuntimeInfo() {
-        var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
-        if (!content) return;
-        if (card) card.style.display = 'block';
-        if (refreshBtn) refreshBtn.disabled = true;
-        content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
-
-        xhrGet('/api?action=runtime_info', function(err, data) {
-            if (refreshBtn) refreshBtn.disabled = false;
-            if (err || !data) {
-                content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
-                return;
-            }
-            runtimeInfoData = data;
-            runtimeInfoLoaded = true;
-
-            if (data.webui_port) {
-                PORTS.webui = String(data.webui_port);
-            }
-            if (data.dashboard_port) {
-                PORTS.dashboard = String(data.dashboard_port);
-                updateDashboardLink();
-            }
-
-            if (data.version && data.version !== 'dev') {
-                VERSION = data.version;
-                var badge = $('versionBadge');
-                if (badge) badge.textContent = VERSION;
-                var footer = $('footerVersion');
-                if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
-            }
-
-            if (data.project_url && data.project_url !== '') {
-                var link = $('footerProjectLink');
-                var linkText = $('footerProjectText');
-                if (link) {
-                    link.href = data.project_url;
-                    link.style.display = 'inline-flex';
+                    window.location.reload();
                 }
-                if (linkText) linkText.textContent = t('projectLink');
-            }
-
-            var memDisplay = 'unknown';
-            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-                memDisplay = String(data.memory_limit_mb) + ' MB';
-            }
-
-            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
-            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
-            var bkLatest    = bk.last_backup_name || t('riBackupNone');
-            var bkDate      = bk.last_backup      || t('riBackupNone');
-            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
-            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
-            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
-            var bkPath      = bk.path || t('riBackupDirMissing');
-
-            var html = '';
-            var items = [
-                { label: t('riVersion'), value: data.version || 'unknown' },
-                { label: t('riCommit'), value: data.commit || 'unknown' },
-                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
-                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
-                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
-                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
-                { label: t('riProfile'), value: data.profile_key || 'unknown' },
-                { label: t('riMemoryLimit'), value: memDisplay },
-                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
-                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
-                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
-                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
-                { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                { label: t('riBackupCount'), value: bkAvailable,
-                  warn: bkAvailable === '0' },
-                { label: t('riBackupLatest'), value: bkLatest,
-                  warn: !bk.last_backup_name },
-                { label: t('riBackupDate'), value: bkDate,
-                  warn: !bk.last_backup },
-                { label: t('riBackupLastStable'), value: bkLastStbl,
-                  warn: !bk.last_stable },
-                { label: t('riBackupInFlight'), value: bkInFlight,
-                  warn: parseInt(bkInFlight, 10) > 0 },
-                { label: t('riBackupOrphan'), value: bkOrphan,
-                  warn: parseInt(bkOrphan, 10) > 0 },
-                { label: t('riBackupPath'), value: bkPath }
-            ];
-            for (var i = 0; i < items.length; i++) {
-                var valHtml;
-                if (items[i].isLink && items[i].value !== 'unknown') {
-                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
-                } else {
-                    valHtml = escapeHtml(items[i].value);
-                }
-                var labelClass = 'ri-label';
-                if (items[i].warn) labelClass += ' ri-warn';
-                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
-            }
-            html += '<div class="ri-actions">'
-                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
-                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
-                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
-                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
-            content.innerHTML = html;
-
-            var copyBtn = $('riCopyBtn');
-            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
-            var rawBtn = $('riRawJsonBtn');
-            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+            }, 3000);
         });
     }
 
-    function copyRuntimeInfo() {
-        if (!runtimeInfoData) return;
-        var text = JSON.stringify(runtimeInfoData, null, 2);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
-                showMsg(t('riCopySuccess'), 'success', 1500);
-            }).catch(function() { _fallbackCopy(text); });
-        } else {
-            _fallbackCopy(text);
-        }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideSWUpdateBanner);
     }
-    function _fallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            document.execCommand('copy');
-            showMsg(t('riCopySuccess'), 'success', 1500);
-        } catch(e) {
-            showMsg(t('riCopyError'), 'error', 2000);
-        }
-        document.body.removeChild(ta);
-    }
-    function toggleRawJson() {
-        var el = $('riRawJson'), btn = $('riRawJsonBtn');
-        if (!el) return;
-        rawJsonVisible = !rawJsonVisible;
-        el.style.display = rawJsonVisible ? 'block' : 'none';
-        if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-    }
+}
 
-    // ============================================================
-    // [15] Log files
-    // ============================================================
-    function formatBytes(bytes) {
-        if (!bytes || bytes < 0) return '0 B';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    }
-    function formatMtime(mtime) {
-        var d = new Date(mtime * 1000);
-        var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
-        var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
-        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
-    }
-    function fileIcon(name) {
-        if (name.indexOf('query') !== -1) return '📊';
-        if (name.indexOf('blocked-ips') !== -1) return '🚫';
-        if (name.indexOf('blocked') !== -1) return '🔴';
-        if (name.indexOf('allowed') !== -1) return '🟢';
-        if (name.indexOf('proxy.log') !== -1) return '⚙️';
-        if (name.indexOf('install') !== -1) return '📦';
-        if (name.indexOf('credential') !== -1) return '🔐';
-        if (name.endsWith('.gz')) return '🗜️';
-        if (name.indexOf('.emergency.') !== -1) return '⚠️';
-        return '📄';
-    }
-    function loadLogFiles() {
-        var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
-        if (!card || !content) return;
-        card.style.display = 'block';
-        if (btn) btn.disabled = true;
-        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
-        xhrGet('/api?action=list_logs', function(err, data) {
-            if (btn) btn.disabled = false;
-            if (err || !data || !data.files) {
-                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
-                return;
-            }
-            logFilesData = data;
-            renderLogFiles();
-        });
-    }
-    function renderLogFiles() {
-        var content = $('diagFilesContent');
-        if (!content || !logFilesData || !logFilesData.files) return;
-        var active = [], archive = [], emergency = [], sensitive = [];
-        for (var i = 0; i < logFilesData.files.length; i++) {
-            var f = logFilesData.files[i];
-            switch (f.type) {
-                case 'active': active.push(f); break;
-                case 'archive': archive.push(f); break;
-                case 'emergency': emergency.push(f); break;
-                case 'sensitive': sensitive.push(f); break;
-            }
-        }
-        var html = '';
-        html += renderSection('🟢', t('dfActiveFiles'), active);
-        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
-        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
-        if (sensitive.length > 0) {
-            html += '<div class="df-section">';
-            html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
-            if (!sensitiveRevealed) {
-                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
-            } else {
-                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
-                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
-            }
-            html += '</div>';
-        }
-        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+// ============================================================
+// [13c] Companion Install Button
+// ============================================================
+// The install button opens the install-method modal (IDX-24).
+// See §[27b]/§[27c] for state and install flow.
 
-        content.querySelectorAll('[data-action]').forEach(function(el) {
-            var action = el.getAttribute('data-action');
-            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
-            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
-            else if (action === 'view-log') {
-                el.addEventListener('click', function() {
-                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-            else if (action === 'download-log') {
-                el.addEventListener('click', function() {
-                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-        });
-    }
-    function renderSection(icon, label, files) {
-        if (!files || files.length === 0) return '';
-        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
-        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
-        html += '</div>';
-        return html;
-    }
-    function renderFileRow(file, isSensitive) {
-        var sens = isSensitive ? '1' : '0';
-        return '<div class="df-file">'
-             + '<div class="df-file-info">'
-             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
-             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
-             + '</div>'
-             + '<div class="df-file-actions">'
-             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
-             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
-             + '</div></div>';
-    }
-    function revealSensitive() {
-        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
-            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
-        }, { title: '⚠️ ' + t('confirmTitle') });
-    }
-    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+// ============================================================
+// [14] Runtime Info
+// ============================================================
+function loadRuntimeInfo() {
+    var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
+    if (!content) return;
+    if (card) card.style.display = 'block';
+    if (refreshBtn) refreshBtn.disabled = true;
+    content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
 
-    function viewLogFile(name, isSensitive) {
-        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
-        title.textContent = name;
-        body.textContent = t('dfLoading');
-        warning.style.display = isSensitive ? 'block' : 'none';
-        warning.textContent = t('dfSensitiveWarning');
-        modal.style.display = 'flex';
-        currentViewerFile = { name: name, sensitive: isSensitive };
-        xhrGet(url, function(err, data) {
-            if (err || !data || data.status !== 'ok') {
-                body.textContent = t('dfFailedToLoad');
-                return;
-            }
-            var content = data.content || '';
-            if (data.truncated) content = t('dfTruncatedPrefix') + content;
-            body.textContent = content || t('dfEmpty');
-            body.scrollTop = body.scrollHeight;
-        });
-    }
-    function downloadLogFile(name, isSensitive) {
-        var url = '/api/download_log?file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        showMsg(t('dfDownloading'), 'info', 1500);
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.withCredentials = true;
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                var blob = new Blob([xhr.response]);
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-            }
-        };
-        xhr.send();
-    }
-    function downloadCurrentFile() {
-        if (!currentViewerFile) return;
-        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
-    }
-    function clearCurrentFile() {
-        if (!currentViewerFile) return;
-        var name = currentViewerFile.name;
-        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
-            if (!confirmed) return;
-            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
-                if (err || !data || data.status !== 'ok') {
-                    showMsg(t('fvClearError'), 'error', 3000);
-                    return;
-                }
-                showMsg(t('fvClearSuccess'), 'success', 2500);
-                closeFileViewer();
-                setTimeout(function() { loadLogFiles(); }, 500);
-            });
-        });
-    }
-    function closeFileViewer() {
-        $('fileViewerModal').style.display = 'none';
-        currentViewerFile = null;
-    }
-
-    // ============================================================
-    // [16] updateUIStrings
-    // ============================================================
-    function updateUIStrings() {
-        $('title').textContent = t('title');
-        $('subtitle').textContent = t('subtitle');
-        $('editorTitle').textContent = t('editorTitle');
-        var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
-        if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
-        else $('sourceCountText').textContent = t('sourceCount');
-        $('currentLabel').textContent = t('currentLabel');
-        $('applyText').textContent = t('apply');
-        $('syncText').textContent = t('sync');
-        $('forceRefreshText').textContent = t('forceRefresh');
-        $('logsText').textContent = t('logs');
-        $('clearLogsText').textContent = t('clearLogs');
-        $('closeLogsText').textContent = t('closeLogs');
-        $('logsModalTitle').textContent = t('logsModalTitle');
-        $('oldModulesTitle').textContent = t('oldModulesTitle');
-        $('dashboardLinkText').textContent = t('dashboardLinkText');
-        $('customRulesTitle').textContent = t('customRulesTitle');
-
-        var allowBadge = $('allowEditBadge');
-        if (allowBadge) allowBadge.textContent = t('editBadge');
-        var denyBadge = $('denyEditBadge');
-        if (denyBadge) denyBadge.textContent = t('editBadge');
-
-        var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
-        var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
-        $('saveAllowText').textContent = allowBtnText;
-        $('saveDenyText').textContent = denyBtnText;
-        $('cancelAllowBtn').textContent = t('cancelEdit');
-        $('cancelDenyBtn').textContent = t('cancelEdit');
-
-        var allowLabel = $('allowlistLabel');
-        if (allowLabel) {
-            var firstSpan = allowLabel.querySelector('span:first-child');
-            if (firstSpan) firstSpan.textContent = t('allowlistLabel');
-        }
-        var denyLabel = $('denylistLabel');
-        if (denyLabel) {
-            var firstSpan2 = denyLabel.querySelector('span:first-child');
-            if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
-        }
-
-        var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
-        var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-        var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
-        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
-        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
-        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
-        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
-        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
-        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
-
-        var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
-        var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
-
-        $('loginTitle').textContent = t('loginTitle');
-        $('usernameInput').placeholder = t('username');
-        $('passwordInput').placeholder = t('password');
-        $('loginBtn').textContent = t('loginBtn');
-        $('logoutBtn').textContent = t('logoutBtn');
-
-        var btn = $('toggleBtn');
-        if (currentStatus === 'ON') {
-            btn.textContent = t('toggleOff');
-            btn.className = 'btn-toggle';
-        } else if (currentStatus === 'OFF') {
-            btn.textContent = t('toggleOn');
-            btn.className = 'btn-toggle off-state';
-        }
-
-        $('restartBtn').title = t('restartBtn');
-        $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
-        var pwaTxt = $('pwaInstallText');
-        if (pwaTxt) pwaTxt.textContent = t('pwaInstallBtn');
-        var pwaLink = $('pwaInstallBtn');
-        if (pwaLink) pwaLink.setAttribute('aria-label', t('pwaInstallAriaLabel'));
-        updateStatsDisplay();
-        var ab = $('authBadge');
-        if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
-        if (logFilesData) renderLogFiles();
-    }
-
-    function toggleLanguage() {
-        currentLang = currentLang === 'ar' ? 'en' : 'ar';
-        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
-        document.documentElement.lang = currentLang;
-        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-        updateUIStrings();
-        if (appInitialized) {
-            loadProfile();
-            checkOldModules();
-            if (runtimeInfoLoaded) loadRuntimeInfo();
-        }
-    }
-
-    function showMsg(text, type, duration) {
-        duration = duration || 2000;
-        var m = $('msg');
-        m.textContent = text;
-        m.className = 'msg-float ' + (type || 'info');
-        m.style.display = 'block';
-        m.style.opacity = '1';
-        m.style.visibility = 'visible';
-        clearTimeout(m._timeout);
-        m._timeout = setTimeout(function() {
-            m.style.opacity = '0';
-            m.style.visibility = 'hidden';
-            setTimeout(function() { m.style.display = 'none'; }, 400);
-        }, duration);
-    }
-
-    // ============================================================
-    // [17] Login / Logout
-    // ============================================================
-    function performLogin() {
-        var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
-        if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
-        isLoginAttempt = true;
-        var btn = $('loginBtn');
-        btn.disabled = true;
-        btn.textContent = t('loggingIn');
-        fetch('/api/auth/login', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        }).then(function(r) {
-            return r.json().then(function(d) { return { status: r.status, data: d }; });
-        }).then(function(resp) {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            if (resp.status === 200 && resp.data.status === 'ok') {
-                $('passwordInput').value = '';
-                sessionExpiredShown = false;
-                if (resp.data.profile) renderProfileData(resp.data.profile);
-                if (resp.data.token) storeToken(resp.data.token);
-                closeConfirmModal();
-                showAuthBadge();
-                showMainScreen();
-                if (!appInitialized) {
-                    showMsg(t('welcomeMsg'), 'info', 4000);
-                    appInitialized = true;
-                }
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
-                verifyFailures = 0;
-                verifyBackoff = 3000;
-            } else if (resp.status === 429) {
-                showMsg(t('tooManyAttempts'), 'error', 5000);
-                isLoginAttempt = false;
-            } else {
-                showMsg(t('loginError'), 'error');
-                isLoginAttempt = false;
-            }
-        }).catch(function() {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            showMsg(t('networkError'), 'error');
-            isLoginAttempt = false;
-        });
-    }
-
-    function logout() {
-        if (hasUnsavedChanges()) {
-            showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
-                function(confirmed) {
-                    if (!confirmed) return;
-                    doLogout();
-                },
-                { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
-            );
+    xhrGet('/api?action=runtime_info', function(err, data) {
+        if (refreshBtn) refreshBtn.disabled = false;
+        if (err || !data) {
+            content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
             return;
         }
-        doLogout();
-    }
+        runtimeInfoData = data;
+        runtimeInfoLoaded = true;
 
-    function doLogout() {
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-            .catch(function() {})
-            .then(function() {
-                clearStoredToken();
-                clearDraft('allow');
-                clearDraft('deny');
-                if (sse) { sse.close(); sse = null; }
-                if (statusPollInterval) clearInterval(statusPollInterval);
-                if (statsInterval) clearInterval(statsInterval);
-                if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-                if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-                if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
-                location.reload();
+        if (data.webui_port) {
+            PORTS.webui = String(data.webui_port);
+        }
+        if (data.dashboard_port) {
+            PORTS.dashboard = String(data.dashboard_port);
+            updateDashboardLink();
+        }
+
+        if (data.version && data.version !== 'dev') {
+            VERSION = data.version;
+            document.title = 'DNSCrypt Proxy ' + VERSION;
+            var badge = $('versionBadge');
+            if (badge) badge.textContent = VERSION;
+            var footer = $('footerVersion');
+            if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
+        }
+
+        if (data.project_url && data.project_url !== '') {
+            var link = $('footerProjectLink');
+            var linkText = $('footerProjectText');
+            if (link) {
+                link.href = data.project_url;
+                link.style.display = 'inline-flex';
+            }
+            if (linkText) linkText.textContent = t('projectLink');
+        }
+
+        var memDisplay = 'unknown';
+        if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+            memDisplay = String(data.memory_limit_mb) + ' MB';
+        }
+
+        var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
+        var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
+        var bkLatest    = bk.last_backup_name || t('riBackupNone');
+        var bkDate      = bk.last_backup      || t('riBackupNone');
+        var bkLastStbl  = bk.last_stable      || t('riBackupNone');
+        var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
+        var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
+        var bkPath      = bk.path || t('riBackupDirMissing');
+
+        var html = '';
+        var items = [
+            { label: t('riVersion'), value: data.version || 'unknown' },
+            { label: t('riCommit'), value: data.commit || 'unknown' },
+            { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
+            { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
+            { label: t('riWebuiPort'), value: data.webui_port || '9090' },
+            { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+            { label: t('riProfile'), value: data.profile_key || 'unknown' },
+            { label: t('riMemoryLimit'), value: memDisplay },
+            { label: t('riRunDir'), value: data.run_dir || 'unknown' },
+            { label: t('riStatusFile'), value: data.status_file || 'unknown' },
+            { label: t('riPidFile'), value: data.pid_file || 'unknown' },
+            { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
+            { label: t('riLogFile'), value: data.log_file || 'unknown' },
+            { label: t('riBackupCount'), value: bkAvailable,
+              warn: bkAvailable === '0' },
+            { label: t('riBackupLatest'), value: bkLatest,
+              warn: !bk.last_backup_name },
+            { label: t('riBackupDate'), value: bkDate,
+              warn: !bk.last_backup },
+            { label: t('riBackupLastStable'), value: bkLastStbl,
+              warn: !bk.last_stable },
+            { label: t('riBackupInFlight'), value: bkInFlight,
+              warn: parseInt(bkInFlight, 10) > 0 },
+            { label: t('riBackupOrphan'), value: bkOrphan,
+              warn: parseInt(bkOrphan, 10) > 0 },
+            { label: t('riBackupPath'), value: bkPath }
+        ];
+        for (var i = 0; i < items.length; i++) {
+            var valHtml;
+            if (items[i].isLink && items[i].value !== 'unknown') {
+                valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+            } else {
+                valHtml = escapeHtml(items[i].value);
+            }
+            var labelClass = 'ri-label';
+            if (items[i].warn) labelClass += ' ri-warn';
+            html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+        }
+        html += '<div class="ri-actions">'
+             + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
+             + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
+             + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
+             + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+        content.innerHTML = html;
+
+        var copyBtn = $('riCopyBtn');
+        if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
+        var rawBtn = $('riRawJsonBtn');
+        if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+    });
+}
+
+function copyRuntimeInfo() {
+    if (!runtimeInfoData) return;
+    var text = JSON.stringify(runtimeInfoData, null, 2);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showMsg(t('riCopySuccess'), 'success', 1500);
+        }).catch(function() { _fallbackCopy(text); });
+    } else {
+        _fallbackCopy(text);
+    }
+}
+function _fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        showMsg(t('riCopySuccess'), 'success', 1500);
+    } catch(e) {
+        showMsg(t('riCopyError'), 'error', 2000);
+    }
+    document.body.removeChild(ta);
+}
+function toggleRawJson() {
+    var el = $('riRawJson'), btn = $('riRawJsonBtn');
+    if (!el) return;
+    rawJsonVisible = !rawJsonVisible;
+    el.style.display = rawJsonVisible ? 'block' : 'none';
+    if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+}
+
+// ============================================================
+// [15] Log files
+// ============================================================
+function formatBytes(bytes) {
+    if (!bytes || bytes < 0) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+function formatMtime(mtime) {
+    var d = new Date(mtime * 1000);
+    var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+    return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+}
+function fileIcon(name) {
+    if (name.indexOf('query') !== -1) return '📊';
+    if (name.indexOf('blocked-ips') !== -1) return '🚫';
+    if (name.indexOf('blocked') !== -1) return '🔴';
+    if (name.indexOf('allowed') !== -1) return '🟢';
+    if (name.indexOf('proxy.log') !== -1) return '⚙️';
+    if (name.indexOf('install') !== -1) return '📦';
+    if (name.indexOf('credential') !== -1) return '🔐';
+    if (name.endsWith('.gz')) return '🗜️';
+    if (name.indexOf('.emergency.') !== -1) return '⚠️';
+    return '📄';
+}
+function loadLogFiles() {
+    var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
+    if (!card || !content) return;
+    card.style.display = 'block';
+    if (btn) btn.disabled = true;
+    if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+    xhrGet('/api?action=list_logs', function(err, data) {
+        if (btn) btn.disabled = false;
+        if (err || !data || !data.files) {
+            content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+            return;
+        }
+        logFilesData = data;
+        renderLogFiles();
+    });
+}
+function renderLogFiles() {
+    var content = $('diagFilesContent');
+    if (!content || !logFilesData || !logFilesData.files) return;
+    var active = [], archive = [], emergency = [], sensitive = [];
+    for (var i = 0; i < logFilesData.files.length; i++) {
+        var f = logFilesData.files[i];
+        switch (f.type) {
+            case 'active': active.push(f); break;
+            case 'archive': archive.push(f); break;
+            case 'emergency': emergency.push(f); break;
+            case 'sensitive': sensitive.push(f); break;
+        }
+    }
+    var html = '';
+    html += renderSection('🟢', t('dfActiveFiles'), active);
+    html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+    html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+    if (sensitive.length > 0) {
+        html += '<div class="df-section">';
+        html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+        if (!sensitiveRevealed) {
+            html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+        } else {
+            for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+            html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+        }
+        html += '</div>';
+    }
+    content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+
+    content.querySelectorAll('[data-action]').forEach(function(el) {
+        var action = el.getAttribute('data-action');
+        if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+        else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+        else if (action === 'view-log') {
+            el.addEventListener('click', function() {
+                viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
             });
-    }
+        }
+        else if (action === 'download-log') {
+            el.addEventListener('click', function() {
+                downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+            });
+        }
+    });
+}
+function renderSection(icon, label, files) {
+    if (!files || files.length === 0) return '';
+    var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+    for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+    html += '</div>';
+    return html;
+}
+function renderFileRow(file, isSensitive) {
+    var sens = isSensitive ? '1' : '0';
+    return '<div class="df-file">'
+         + '<div class="df-file-info">'
+         + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+         + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+         + '</div>'
+         + '<div class="df-file-actions">'
+         + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+         + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+         + '</div></div>';
+}
+function revealSensitive() {
+    showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+        if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+    }, { title: '⚠️ ' + t('confirmTitle') });
+}
+function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
 
-    // ============================================================
-    // [18] verifyAuth with backoff
-    // ============================================================
-    function verifyAuth() {
-        xhrGet('/api?action=status', function(err, data) {
-            if (err) {
-                if (err.code === 401) {
-                    clearStoredToken();
-                    showLoginScreen();
-                    hideAuthBadge();
-                    if (isLoginAttempt) {
-                        showMsg(t('loginError'), 'error');
-                        isLoginAttempt = false;
-                    }
-                    verifyFailures = 0;
-                    verifyBackoff = 3000;
-                } else {
-                    verifyFailures++;
-                    setNetworkDownUI(true);
-                    if (verifyFailures === 1) {
-                        showMsg(t('networkError'), 'warning', 3000);
-                    }
-                    setTimeout(verifyAuth, verifyBackoff);
-                    verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
-                }
+function viewLogFile(name, isSensitive) {
+    var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+    if (isSensitive) url += '&confirm=1';
+    var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
+    title.textContent = name;
+    body.textContent = t('dfLoading');
+    warning.style.display = isSensitive ? 'block' : 'none';
+    warning.textContent = t('dfSensitiveWarning');
+    modal.style.display = 'flex';
+    currentViewerFile = { name: name, sensitive: isSensitive };
+    xhrGet(url, function(err, data) {
+        if (err || !data || data.status !== 'ok') {
+            body.textContent = t('dfFailedToLoad');
+            return;
+        }
+        var content = data.content || '';
+        if (data.truncated) content = t('dfTruncatedPrefix') + content;
+        body.textContent = content || t('dfEmpty');
+        body.scrollTop = body.scrollHeight;
+    });
+}
+function downloadLogFile(name, isSensitive) {
+    var url = '/api/download_log?file=' + encodeURIComponent(name);
+    if (isSensitive) url += '&confirm=1';
+    showMsg(t('dfDownloading'), 'info', 1500);
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.withCredentials = true;
+    xhr.responseType = 'blob';
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var blob = new Blob([xhr.response]);
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+        }
+    };
+    xhr.send();
+}
+function downloadCurrentFile() {
+    if (!currentViewerFile) return;
+    downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+}
+function clearCurrentFile() {
+    if (!currentViewerFile) return;
+    var name = currentViewerFile.name;
+    showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+        if (!confirmed) return;
+        xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+            if (err || !data || data.status !== 'ok') {
+                showMsg(t('fvClearError'), 'error', 3000);
                 return;
             }
-            verifyFailures = 0;
-            verifyBackoff = 3000;
+            showMsg(t('fvClearSuccess'), 'success', 2500);
+            closeFileViewer();
+            setTimeout(function() { loadLogFiles(); }, 500);
+        });
+    });
+}
+function closeFileViewer() {
+    $('fileViewerModal').style.display = 'none';
+    currentViewerFile = null;
+}
+
+// ============================================================
+// [16] updateUIStrings
+// ============================================================
+function updateUIStrings() {
+    $('title').textContent = t('title');
+    $('subtitle').textContent = t('subtitle');
+    $('editorTitle').textContent = t('editorTitle');
+    var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
+    if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
+    else $('sourceCountText').textContent = t('sourceCount');
+    $('currentLabel').textContent = t('currentLabel');
+    $('applyText').textContent = t('apply');
+    $('syncText').textContent = t('sync');
+    $('forceRefreshText').textContent = t('forceRefresh');
+    $('logsText').textContent = t('logs');
+    $('clearLogsText').textContent = t('clearLogs');
+    $('closeLogsText').textContent = t('closeLogs');
+    $('logsModalTitle').textContent = t('logsModalTitle');
+    $('oldModulesTitle').textContent = t('oldModulesTitle');
+    $('customRulesTitle').textContent = t('customRulesTitle');
+
+    var allowBadge = $('allowEditBadge');
+    if (allowBadge) allowBadge.textContent = t('editBadge');
+    var denyBadge = $('denyEditBadge');
+    if (denyBadge) denyBadge.textContent = t('editBadge');
+
+    var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
+    var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
+    $('saveAllowText').textContent = allowBtnText;
+    $('saveDenyText').textContent = denyBtnText;
+    $('cancelAllowBtn').textContent = t('cancelEdit');
+    $('cancelDenyBtn').textContent = t('cancelEdit');
+
+    var allowLabel = $('allowlistLabel');
+    if (allowLabel) {
+        var firstSpan = allowLabel.querySelector('span:first-child');
+        if (firstSpan) firstSpan.textContent = t('allowlistLabel');
+    }
+    var denyLabel = $('denylistLabel');
+    if (denyLabel) {
+        var firstSpan2 = denyLabel.querySelector('span:first-child');
+        if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
+    }
+
+    var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
+    var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+    var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
+    var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+    var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+    var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+    var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+    var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+    var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+    var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+    var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
+
+    $('loginTitle').textContent = t('loginTitle');
+    $('usernameInput').placeholder = t('username');
+    $('passwordInput').placeholder = t('password');
+    $('loginBtn').textContent = t('loginBtn');
+    $('logoutBtn').textContent = t('logoutBtn');
+
+    $('restartBtn').title = t('restartBtn');
+    $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+
+    // Every element whose text depends on BOTH the current
+    // language AND runtime state is re-rendered via a single
+    // entry point (renderAllDynamic). This removes the ~3 s
+    // delay on the status card and the revert-to-default bug
+    // on the companion button.
+    renderAllDynamic();
+
+    var ab = $('authBadge');
+    if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
+}
+
+// ============================================================
+// [16b] renderAllDynamic — single re-render entry point
+// ============================================================
+// Called from updateUIStrings() on every language toggle.
+// Re-renders every element whose visible text depends on BOTH
+// the current language AND runtime state, from cached state —
+// WITHOUT waiting for SSE / poll cycles.
+function renderAllDynamic() {
+    renderCompanionButton();
+
+    if (networkDownActive) {
+        setNetworkDownUI(true);
+        updateStatsDisplay();
+    } else if (currentStatus === 'ON' || currentStatus === 'OFF') {
+        updateStatusUI(currentStatus);
+    } else {
+        updateStatsDisplay();
+    }
+
+    if (logFilesData) renderLogFiles();
+
+    var dashText = $('dashboardLinkText');
+    if (dashText) dashText.textContent = t('dashboardLinkText');
+}
+
+function toggleLanguage() {
+    currentLang = currentLang === 'ar' ? 'en' : 'ar';
+    try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    updateUIStrings();
+    if (appInitialized) {
+        loadProfile();
+        checkOldModules();
+        if (runtimeInfoLoaded) loadRuntimeInfo();
+        refreshCompanionState();
+    }
+}
+
+function showMsg(text, type, duration) {
+    duration = duration || 2000;
+    var m = $('msg');
+    m.textContent = text;
+    m.className = 'msg-float ' + (type || 'info');
+    m.style.display = 'block';
+    m.style.opacity = '1';
+    m.style.visibility = 'visible';
+    clearTimeout(m._timeout);
+    m._timeout = setTimeout(function() {
+        m.style.opacity = '0';
+        m.style.visibility = 'hidden';
+        setTimeout(function() { m.style.display = 'none'; }, 400);
+    }, duration);
+}
+
+// ============================================================
+// [17] Login / Logout
+// ============================================================
+function performLogin() {
+    var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
+    if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
+    isLoginAttempt = true;
+    var btn = $('loginBtn');
+    btn.disabled = true;
+    btn.textContent = t('loggingIn');
+    fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p })
+    }).then(function(r) {
+        return r.json().then(function(d) { return { status: r.status, data: d }; });
+    }).then(function(resp) {
+        btn.disabled = false;
+        btn.textContent = t('loginBtn');
+        if (resp.status === 200 && resp.data.status === 'ok') {
+            $('passwordInput').value = '';
             sessionExpiredShown = false;
-            setNetworkDownUI(false);
-            showMainScreen();
+            if (resp.data.profile) renderProfileData(resp.data.profile);
+            if (resp.data.token) storeToken(resp.data.token);
+            closeConfirmModal();
             showAuthBadge();
+            showMainScreen();
             if (!appInitialized) {
                 showMsg(t('welcomeMsg'), 'info', 4000);
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
                 appInitialized = true;
             }
+            initSSE();
+            startPolling();
+            loadCustomRules();
+            loadRuntimeInfo();
+            loadLogFiles();
+            refreshCompanionState();
+            verifyFailures = 0;
+            verifyBackoff = 3000;
+        } else if (resp.status === 429) {
+            showMsg(t('tooManyAttempts'), 'error', 5000);
+            isLoginAttempt = false;
+        } else {
+            showMsg(t('loginError'), 'error');
+            isLoginAttempt = false;
+        }
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = t('loginBtn');
+        showMsg(t('networkError'), 'error');
+        isLoginAttempt = false;
+    });
+}
+
+function logout() {
+    if (hasUnsavedChanges()) {
+        showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
+            function(confirmed) {
+                if (!confirmed) return;
+                doLogout();
+            },
+            { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
+        );
+        return;
+    }
+    doLogout();
+}
+
+function doLogout() {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(function() {})
+        .then(function() {
+            clearStoredToken();
+            clearDraft('allow');
+            clearDraft('deny');
+            try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
+            if (sse) { sse.close(); sse = null; }
+            if (statusPollInterval) clearInterval(statusPollInterval);
+            if (statsInterval) clearInterval(statsInterval);
+            if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+            if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+            if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
+            location.reload();
         });
-    }
+}
 
-    function showLoginScreen() {
-        $('loginScreen').style.display = 'flex';
-        $('appContent').style.display = 'none';
-        $('logoutBtn').style.display = 'none';
-        hideAuthBadge();
-    }
-    function showMainScreen() {
-        $('loginScreen').style.display = 'none';
-        $('appContent').style.display = 'block';
-        $('logoutBtn').style.display = 'block';
-        showAuthBadge();
-        closeConfirmModal();
-        sessionExpiredShown = false;
-    }
-    function handleSessionExpired() {
-        if (sessionExpiredShown) return;
-        sessionExpiredShown = true;
-        var wasInitialized = appInitialized;
-        appInitialized = false;
-        clearStoredToken();
-
+// ============================================================
+// [18] verifyAuth with backoff
+// ============================================================
+function verifyAuth() {
+    xhrGet('/api?action=status', function(err, data) {
+        if (err) {
+            if (err.code === 401) {
+                clearStoredToken();
+                showLoginScreen();
+                hideAuthBadge();
+                if (isLoginAttempt) {
+                    showMsg(t('loginError'), 'error');
+                    isLoginAttempt = false;
+                }
+                verifyFailures = 0;
+                verifyBackoff = 3000;
+            } else {
+                verifyFailures++;
+                setNetworkDownUI(true);
+                if (verifyFailures === 1) {
+                    showMsg(t('networkError'), 'warning', 3000);
+                }
+                setTimeout(verifyAuth, verifyBackoff);
+                verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
+            }
+            return;
+        }
         verifyFailures = 0;
         verifyBackoff = 3000;
-        sseBackoff = 5000;
+        sessionExpiredShown = false;
+        setNetworkDownUI(false);
+        showMainScreen();
+        showAuthBadge();
+        if (!appInitialized) {
+            showMsg(t('welcomeMsg'), 'info', 4000);
+            initSSE();
+            startPolling();
+            loadCustomRules();
+            loadRuntimeInfo();
+            loadLogFiles();
+            appInitialized = true;
+        }
+        refreshCompanionState();
+    });
+}
 
-        if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
-        if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
-        if (sse) { sse.close(); sse = null; }
-        if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
-        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
-        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        showLoginScreen();
-        if (!wasInitialized) return;
-        showConfirmModal(t('sessionExpiredMsg'), function(ok) {
-            if (ok) $('usernameInput').focus();
-        }, {
-            title: t('sessionExpiredTitle'),
-            primaryText: t('sessionRelogin'),
-            primaryCallback: function() {
-                $('usernameInput').value = '';
-                $('passwordInput').value = '';
-                $('usernameInput').focus();
-            }
-        });
-    }
+function showLoginScreen() {
+    $('loginScreen').style.display = 'flex';
+    $('appContent').style.display = 'none';
+    $('logoutBtn').style.display = 'none';
+    hideAuthBadge();
+}
+function showMainScreen() {
+    $('loginScreen').style.display = 'none';
+    $('appContent').style.display = 'block';
+    $('logoutBtn').style.display = 'block';
+    showAuthBadge();
+    closeConfirmModal();
+    sessionExpiredShown = false;
+}
+function handleSessionExpired() {
+    if (sessionExpiredShown) return;
+    sessionExpiredShown = true;
+    var wasInitialized = appInitialized;
+    appInitialized = false;
+    clearStoredToken();
 
-    // ============================================================
-    // [19] xhrRequest
-    // ============================================================
+    verifyFailures = 0;
+    verifyBackoff = 3000;
+    sseBackoff = 5000;
+
+    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
+    if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
+    if (sse) { sse.close(); sse = null; }
+    if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+    if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+    if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+    showLoginScreen();
+    if (!wasInitialized) return;
+    showConfirmModal(t('sessionExpiredMsg'), function(ok) {
+        if (ok) $('usernameInput').focus();
+    }, {
+        title: t('sessionExpiredTitle'),
+        primaryText: t('sessionRelogin'),
+        primaryCallback: function() {
+            $('usernameInput').value = '';
+            $('passwordInput').value = '';
+            $('usernameInput').focus();
+        }
+    });
+}
+
+// ============================================================
+// [19] xhrRequest
+// ============================================================
     function getTimeoutForUrl(method, url) {
         if (method === 'POST' && url.indexOf('update_profile') !== -1) {
             return 310000;
+        }
+        // Companion install can take 60+ s on slow ROMs
+        // (5-level cascade + Play Protect + scanning).
+        if (url.indexOf('install_companion_app') !== -1) {
+            return 120000;
         }
         if (url.indexOf('toggle_service') !== -1 ||
             url.indexOf('restart_service') !== -1) {
             return 60000;
         }
         return 15000;
+    }
+
+    // isInstallFamilyUrl gates the session-expired modal in
+    // xhrRequest(). It MUST list only **token-consuming**
+    // endpoints:
+    //
+    //   • uninstall_companion_app — consumes a session; a 401
+    //     means the install-flow token expired.
+    //   • install_companion_app   — same.
+    //
+    // It MUST NOT list `install_token`:
+    //
+    //   • install_token **issues** tokens; it never consumes one.
+    //   • A 401 from install_token therefore means the **session**
+    //     expired (cookie/bearer), NOT the one-shot install token.
+    //   • Such a 401 MUST go through the standard session-expired
+    //     path (handleSessionExpired), exactly like every other
+    //     non-install endpoint. Suppressing it would leave the
+    //     user with an unresponsive install button and no
+    //     re-login prompt.
+    //
+    // O2: `uninstall_companion_app` contains `install_companion_app`
+    // as a substring, so the install_companion_app check would also
+    // match uninstall_companion_app URLs. Listed first for clarity.
+    function isInstallFamilyUrl(url) {
+        return url.indexOf('uninstall_companion_app') !== -1 ||
+               url.indexOf('install_companion_app') !== -1;
     }
 
     function xhrRequest(method, url, data, cb, retries, delay) {
@@ -2104,7 +2161,12 @@
                 } else if (xhr.status === 401) {
                     var e401 = new Error('HTTP 401'); e401.code = 401;
                     cb(e401, null);
-                    handleSessionExpired();
+                    // Suppress session-expired modal for
+                    // install-family URLs: 401 is a token-expiry
+                    // signal, not a session-expiry signal.
+                    if (!isInstallFamilyUrl(url)) {
+                        handleSessionExpired();
+                    }
                 } else if (xhr.status === 405) {
                     var e405 = new Error('HTTP 405');
                     e405.code = 405;
@@ -2119,6 +2181,9 @@
                     var e413 = new Error('HTTP 413'); e413.code = 413;
                     cb(e413, null);
                     showMsg('❌ File too large (> 5 MB)', 'error', 4000);
+                } else if (xhr.status === 429) {
+                    var e429 = new Error('HTTP 429'); e429.code = 429;
+                    cb(e429, null);
                 } else {
                     var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
                     cb(eN, null);
@@ -2137,11 +2202,18 @@
         sendRequest();
     }
     function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
-    function xhrPost(url, data, cb) { xhrRequest('POST', url, data, cb); }
+    function xhrPost(url, data, cb) {
+        // install_companion_app must NOT retry. The first request
+        // consumes the one-shot CSRF token; retrying produces
+        // "Invalid or expired install token" even when the first
+        // install is still in progress.
+        var retries = (url.indexOf('install_companion_app') !== -1) ? 0 : 3;
+        xhrRequest('POST', url, data, cb, retries);
+    }
 
-    // ============================================================
-    // [20] SSE with backoff
-    // ============================================================
+// ============================================================
+// [20] SSE with backoff
+// ============================================================
     function initSSE() {
         if (sse) { sse.close(); sse = null; }
         try {
@@ -2271,9 +2343,9 @@
         });
     }
 
-    // ============================================================
-    // [21] handleToggle
-    // ============================================================
+// ============================================================
+// [21] handleToggle
+// ============================================================
     function handleToggle() {
         if (isProcessing || isToggling) return;
         isToggling = true;
@@ -2293,9 +2365,9 @@
         });
     }
 
-    // ============================================================
-    // [22] handleRestart
-    // ============================================================
+// ============================================================
+// [22] handleRestart
+// ============================================================
     function handleRestart() {
         if (isProcessing || isToggling) return;
         showConfirmModal(t('restartConfirm'), function(confirmed) {
@@ -2349,9 +2421,9 @@
         setTimeout(function() { loadLogFiles(); checkComplete(); }, 700);
     }
 
-    // ============================================================
-    // [23] Profile management
-    // ============================================================
+// ============================================================
+// [23] Profile management
+// ============================================================
     function renderProfileData(data) {
         if (!data || !data.key) return;
         currentProfileKey = data.key;
@@ -2378,22 +2450,46 @@
             if (callback) callback();
         });
     }
+
+    // loadCustomRules — fetches rule content and hashes in
+    // parallel. The hashes come from /api?action=get_rules_state,
+    // not from client-side crypto.subtle (unavailable on
+    // non-secure contexts — LAN via BIND_ADDR=0.0.0.0 over HTTP).
     function loadCustomRules() {
-        xhrGet('/api?action=get_custom_rules', function(err, data) {
-            if (err || !data) return;
-            var allow = data.allowlist || '', deny = data.denylist || '';
+        var pending = 2;
+        var content = { allow: '', deny: '' };
+        var hashes = { allow: '', deny: '' };
+
+        function finish() {
+            pending--;
+            if (pending > 0) return;
+
             if (editStates.allow === EditState.VIEW) {
-                $('allowlistInput').value = allow;
-                originalValues.allow = allow;
+                $('allowlistInput').value = content.allow;
+                originalValues.allow = content.allow;
             }
             if (editStates.deny === EditState.VIEW) {
-                $('denylistInput').value = deny;
-                originalValues.deny = deny;
+                $('denylistInput').value = content.deny;
+                originalValues.deny = content.deny;
             }
-            Promise.all([sha256(allow), sha256(deny)]).then(function(hashes) {
-                rulesState.serverAllowHash = hashes[0];
-                rulesState.serverDenyHash = hashes[1];
-            }).catch(function() {});
+            rulesState.serverAllowHash = hashes.allow;
+            rulesState.serverDenyHash = hashes.deny;
+        }
+
+        xhrGet('/api?action=get_custom_rules', function(err, data) {
+            if (!err && data) {
+                content.allow = data.allowlist || '';
+                content.deny = data.denylist || '';
+            }
+            finish();
+        });
+
+        xhrGet('/api?action=get_rules_state', function(err, data) {
+            if (!err && data) {
+                hashes.allow = data.allowlist_hash || '';
+                hashes.deny = data.denylist_hash || '';
+            }
+            finish();
         });
     }
 
@@ -2405,7 +2501,21 @@
             return;
         }
         var name = select.options[select.selectedIndex].text;
-        showConfirmModal(t('applyConfirm') + '"' + name + '"?', function(confirmed) {
+        // L-5: warn about unsaved rule edits before the profile
+        // switch replaces the current blocklist.
+        //
+        // The warning is prepended to the SAME confirm dialog as
+        // the apply prompt, rather than opening a second modal.
+        // Rationale: showConfirmModal() now resets
+        // installModalActive and companionInstallInFlight on every
+        // call (BUG-1/BUG-3 invariant). Opening a second modal
+        // from inside the first would break that invariant mid-
+        // flow. Combining the two messages into one dialog keeps
+        // the state machine linear.
+        var warningPrefix = hasUnsavedChanges()
+            ? (t('unsavedWarning') + '\n\n')
+            : '';
+        showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
             isProcessing = true;
             $('applyBtn').disabled = true;
@@ -2504,9 +2614,10 @@
         });
     }
 
-    // ============================================================
-    // [24] Logs
-    // ============================================================
+
+// ============================================================
+// [24] Logs
+// ============================================================
     function showLogs() {
         if (isProcessing) return;
         var modal = $('logModal'), content = $('logContent');
@@ -2536,9 +2647,9 @@
         });
     }
 
-    // ============================================================
-    // [25] Old modules
-    // ============================================================
+// ============================================================
+// [25] Old modules
+// ============================================================
     function checkOldModules() {
         var card = $('oldModulesCard'), list = $('oldModulesList');
         card.style.display = 'none';
@@ -2604,9 +2715,9 @@
         });
     }
 
-    // ============================================================
-    // [26] Stats / Resources
-    // ============================================================
+// ============================================================
+// [26] Stats / Resources
+// ============================================================
     function fetchStatsAndResources() {
         xhrGet('/api?action=stats', function(err, data) {
             if (!err && data && data.blocked_today !== undefined) {
@@ -2632,9 +2743,9 @@
         fetchStatsAndResources();
     }
 
-    // ============================================================
-    // [27] beforeunload
-    // ============================================================
+// ============================================================
+// [27] beforeunload
+// ============================================================
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges()) {
             e.preventDefault();
@@ -2652,9 +2763,331 @@
         if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
     });
 
-    // ============================================================
-    // [28] bindEvents
-    // ============================================================
+// ============================================================
+// [27b] Companion app state + render
+// ============================================================
+// Two responsibilities, strictly separated:
+//   refreshCompanionState()  — writes companionState, calls
+//                              renderCompanionButton()
+//   renderCompanionButton()  — reads companionState + t(),
+//                              writes the DOM only
+//
+// This split is what fixes the language-toggle bug: a
+// language switch can call renderCompanionButton() without
+// clobbering the cached "Installed" / "Update App" state.
+    function _companionCacheWrite() {
+        try {
+            sessionStorage.setItem(COMPANION_CACHE_KEY, JSON.stringify(companionState));
+        } catch(e) {}
+    }
+
+    function _companionCacheRead() {
+        try {
+            var raw = sessionStorage.getItem(COMPANION_CACHE_KEY);
+            if (!raw) return;
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                companionState = {
+                    installed: parsed.installed === true,
+                    version_name: parsed.version_name || '',
+                    expected_version: parsed.expected_version || ''
+                };
+            }
+        } catch(e) {}
+    }
+
+    function refreshCompanionState() {
+        xhrGet('/api?action=companion_app_state', function(err, data) {
+            if (err || !data) return;
+            companionState = {
+                installed: (data.installed === true || data.installed === 'true'),
+                version_name: data.version_name || '',
+                expected_version: data.expected_version || ''
+            };
+            _companionCacheWrite();
+            renderCompanionButton();
+        });
+    }
+
+    // Pure renderer — reads companionState + current language.
+    // The ONLY function that mutates #pwaInstallText / #pwaInstallBtn
+    // (aside from doCompanionInstall()'s transient "Installing..."
+    // label, which is intentional).
+    function renderCompanionButton() {
+        var btn = $('pwaInstallBtn');
+        var txt = $('pwaInstallText');
+        if (!btn || !txt) return;
+
+        var icon = btn.querySelector('.pwa-install-icon');
+        var installed = companionState.installed;
+        var vname = companionState.version_name;
+        var expected = companionState.expected_version;
+
+        if (!installed) {
+            if (icon) icon.textContent = '\uD83D\uDCF2';           // 📲
+            txt.textContent = t('pwaInstallBtn');
+            btn.setAttribute('aria-label', t('pwaInstallAriaLabel'));
+            btn.dataset.mode = 'install';
+            btn.disabled = companionInstallInFlight;
+        } else if (vname && expected && vname === expected) {
+            if (icon) icon.textContent = '\u2705';                  // ✅
+            txt.textContent = t('pwaInstalled');
+            btn.setAttribute('aria-label', t('pwaInstalled'));
+            btn.dataset.mode = 'none';
+            btn.disabled = true;
+        } else {
+            if (icon) icon.textContent = '\uD83D\uDD04';           // 🔄
+            txt.textContent = t('pwaUpdate');
+            btn.setAttribute('aria-label', t('pwaUpdate'));
+            btn.dataset.mode = 'install';
+            btn.disabled = companionInstallInFlight;
+        }
+    }
+
+// ============================================================
+// [27c] Companion install flow
+// ============================================================
+// The install button is disabled while the one-shot CSRF
+// token is being fetched. companionInstallInFlight tracks
+// this state across every code path that could re-enable the
+// button (language toggle, verifyAuth re-entry, SSE-driven
+// renders). Every exit path resets the flag AND calls
+// renderCompanionButton() so the button reflects the current
+// state — not the transient "install in flight" state.
+    function handleCompanionInstall() {
+        var btn = $('pwaInstallBtn');
+        if (!btn || btn.dataset.mode === 'none') return;
+        if (btn.disabled || companionInstallInFlight) return;
+
+        companionInstallInFlight = true;
+        btn.disabled = true;
+
+        xhrGet('/api?action=install_token', function(err, data) {
+            if (err || !data || !data.token) {
+                companionInstallInFlight = false;
+                renderCompanionButton();
+                // A 401 from install_token means the SESSION
+                // expired — not the one-shot install token.
+                // install_token issues tokens; it never consumes
+                // one, so it is deliberately excluded from
+                // isInstallFamilyUrl(). xhrRequest() already
+                // called handleSessionExpired(), so showing
+                // installTokenError here would stack two modals.
+                if (err && err.code === 401) return;
+                showMsg(t('installTokenError'), 'error', 3000);
+                return;
+            }
+            var token = data.token;
+            // companionInstallInFlight stays true through the
+            // modal: the button remains disabled until either
+            // doCompanionInstall() resets it, or the user closes
+            // the modal via Cancel.
+            showInstallModal(token);
+        });
+    }
+
+    // Dedicated install-method modal with block layout.
+    //
+    // installModalActive is set true for the duration of the
+    // modal's lifetime. The shared backdrop-click handler in
+    // §[28] checks this flag before closing — a stray tap
+    // outside the modal MUST NOT dismiss it, because every
+    // valid exit path is responsible for resetting
+    // companionInstallInFlight. A backdrop close would strand
+    // the install button in a permanently disabled state.
+    function showInstallModal(token) {
+        var modal = $('customModal');
+        var box = modal.querySelector('.custom-modal-box');
+        box.classList.add('install-modal-box');
+
+        var html = ''
+            + '<div class="install-modal-header">\uD83D\uDCF2 ' + t('pwaInstallBtn') + '</div>'
+            + '<div class="install-modal-subtitle">' + t('installChooseMethod') + '</div>'
+
+            // Local install block
+            + '<div class="install-option">'
+            +   '<div class="install-option-title">' + t('installLocalTitle') + '</div>'
+            +   '<div class="install-option-desc">' + t('installLocalDesc').replace(/\n/g, '<br>') + '</div>'
+            +   '<div class="install-option-actions">'
+            +     '<button class="install-btn-local" id="installLocalBtn" type="button">' + t('installLocalBtn') + '</button>'
+            +   '</div>'
+            + '</div>'
+
+            // GitHub block
+            + '<div class="install-option">'
+            +   '<div class="install-option-title">' + t('installGithubTitle') + '</div>'
+            +   '<div class="install-option-desc">' + t('installGithubDesc').replace(/\n/g, '<br>') + '</div>'
+            +   '<div class="install-option-actions">'
+            +     '<button class="install-btn-github-page" id="installGithubPageBtn" type="button">' + t('installGithubBtnPage') + '</button>'
+            +     '<button class="install-btn-github-direct" id="installGithubBtnDirect" type="button">' + t('installGithubBtnDirect') + '</button>'
+            +   '</div>'
+            + '</div>'
+
+            + '<button class="install-modal-cancel" id="installCancelBtn" type="button">' + t('confirmCancel') + '</button>';
+
+        $('modalTitle').style.display = 'none';
+        $('modalMessage').style.display = 'none';
+        $('modalCancelBtn').style.display = 'none';
+        $('modalConfirmBtn').style.display = 'none';
+
+        var actionsBox = modal.querySelector('.custom-modal-actions');
+        actionsBox.style.display = 'none';
+
+        var msgEl = $('modalMessage');
+        // Reuse #modalMessage as host for the custom HTML.
+        msgEl.innerHTML = html;
+        msgEl.style.display = 'block';
+        msgEl.style.whiteSpace = 'normal';
+
+        modal.style.display = 'flex';
+        installModalActive = true;
+        // The install-modal owns its own action buttons. Every
+        // action path calls closeConfirmModal() explicitly and
+        // resets companionInstallInFlight.
+        pendingConfirmCallback = null;
+
+        // Wire up buttons. Every exit path resets both
+        // installModalActive and companionInstallInFlight.
+        var localBtn = $('installLocalBtn');
+        if (localBtn) localBtn.addEventListener('click', function() {
+            installModalActive = false;
+            closeConfirmModal();
+            doCompanionInstall(token);
+        });
+
+        var pageBtn = $('installGithubPageBtn');
+        if (pageBtn) pageBtn.addEventListener('click', function() {
+            window.open(APP_GITHUB_PAGE_URL, '_blank', 'noopener,noreferrer');
+            installModalActive = false;
+            companionInstallInFlight = false;
+            closeConfirmModal();
+            renderCompanionButton();
+        });
+
+        var directBtn = $('installGithubBtnDirect');
+        if (directBtn) directBtn.addEventListener('click', function() {
+            // Built dynamically from companionState.expected_version
+            // (SSOT from proxy/app-apk.version) — never hardcoded.
+            window.open(getCompanionApkUrl(), '_blank', 'noopener,noreferrer');
+            installModalActive = false;
+            companionInstallInFlight = false;
+            closeConfirmModal();
+            renderCompanionButton();
+        });
+
+        var cancelBtn = $('installCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', function() {
+            installModalActive = false;
+            companionInstallInFlight = false;
+            closeConfirmModal();
+            renderCompanionButton();
+        });
+    }
+
+    // Restore the standard modal layout after the install modal.
+    // Called from showConfirmModal() at the start of every
+    // confirm dialog. Idempotent: safe to call even when the
+    // standard layout is already in place.
+    function _resetModalLayout() {
+        var modal = $('customModal');
+        var box = modal.querySelector('.custom-modal-box');
+        box.classList.remove('install-modal-box');
+        $('modalTitle').style.display = '';
+        $('modalMessage').style.display = '';
+        $('modalMessage').style.whiteSpace = 'pre-wrap';
+        $('modalCancelBtn').style.display = '';
+        $('modalConfirmBtn').style.display = '';
+        var actionsBox = modal.querySelector('.custom-modal-actions');
+        actionsBox.style.display = '';
+    }
+
+    // doCompanionInstall() distinguishes three failure shapes:
+    //
+    //   429 → rate limit (per-IP, 5 / 15 min)
+    //   401 → token expired (one-shot CSRF, 60 s TTL)
+    //   other → generic install failure
+    //
+    // The 401 branch renders t('installTokenError') — NOT
+    // t('installError') — matching docs/REFERENCE.md §2.4.6 and
+    // CHANGELOG.md's IDX-401-DISTINCT entry. A 401 from this
+    // endpoint is a token-expiry signal, not a session-expiry
+    // signal; the session-expired modal is already suppressed
+    // upstream in xhrRequest() via isInstallFamilyUrl().
+    function doCompanionInstall(token) {
+        var txt = $('pwaInstallText');
+        var btn = $('pwaInstallBtn');
+        if (btn) btn.disabled = true;
+        if (txt) txt.textContent = t('installing');
+
+        xhrPost('/api/install_companion_app',
+            'token=' + encodeURIComponent(token),
+            function(err, data) {
+                // Reset the in-flight flag on every exit path.
+                companionInstallInFlight = false;
+
+                if (err || !data) {
+                    if (err && err.code === 429) {
+                        showMsg(t('installRateLimited'), 'error', 4000);
+                    } else if (err && err.code === 401) {
+                        showMsg(t('installTokenError'), 'error', 4000);
+                    } else {
+                        showMsg(t('installError'), 'error', 4000);
+                    }
+                    renderCompanionButton();
+                    refreshCompanionState();
+                    return;
+                }
+
+                if (data.status === 'ok') {
+                    showMsg(t('installSuccess'), 'success', 3000);
+                    renderCompanionButton();
+                    refreshCompanionState();
+                    return;
+                }
+
+                // Failure — offer manual download as fallback.
+                var msg = data.message_ar && currentLang === 'ar'
+                    ? data.message_ar
+                    : (data.message_en || data.message || t('installError'));
+                var hint = data.hint_ar && currentLang === 'ar'
+                    ? data.hint_ar
+                    : (data.hint_en || '');
+
+                var fullMsg = '\u274C ' + msg;
+                if (hint) fullMsg += '\n\n\uD83D\uDCA1 ' + hint;
+
+                // Passing null as the callback is safe.
+                // showConfirmModal() installs a no-op fallback so
+                // the Cancel / Confirm / backdrop listeners always
+                // call closeConfirmModal().
+                showConfirmModal(fullMsg, null, {
+                    title: t('installError'),
+                    primaryText: t('installManualDownload'),
+                    primaryCallback: function() {
+                        window.location.href = '/app-debug.apk';
+                    }
+                });
+                renderCompanionButton();
+                refreshCompanionState();
+            }
+        );
+    }
+
+// ============================================================
+// [28] bindEvents
+// ============================================================
+// The three modal listeners always call closeConfirmModal(),
+// even when pendingConfirmCallback is null. Combined with
+// the no-op fallback installed by showConfirmModal(), this
+// guarantees that Cancel, Confirm, and backdrop clicks
+// always dismiss the dialog.
+//
+// The backdrop-click handler is guarded by installModalActive:
+// when the install-method modal is open, a stray click outside
+// the modal MUST NOT close it. Its own buttons are the only
+// paths that reset companionInstallInFlight. A backdrop close
+// would strand the install button in a permanently disabled
+// state until page reload.
     function bindEvents() {
         $('langToggle').addEventListener('click', toggleLanguage);
         $('logoutBtn').addEventListener('click', logout);
@@ -2663,6 +3096,11 @@
         $('passwordInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') performLogin();
         });
+
+        var _pwaBtn = $('pwaInstallBtn');
+        if (_pwaBtn) {
+            _pwaBtn.addEventListener('click', handleCompanionInstall);
+        }
 
         $('toggleBtn').addEventListener('click', handleToggle);
         $('restartBtn').addEventListener('click', handleRestart);
@@ -2711,34 +3149,48 @@
         var diagHeader = $('diagFilesHeader');
         diagHeader.addEventListener('click', function() { diagCard.classList.toggle('open'); });
 
+        // Always close, regardless of callback.
         $('modalConfirmBtn').addEventListener('click', function() {
-            if (pendingConfirmCallback) { pendingConfirmCallback(true); closeConfirmModal(); }
+            if (pendingConfirmCallback) pendingConfirmCallback(true);
+            closeConfirmModal();
         });
         $('modalCancelBtn').addEventListener('click', function() {
-            if (pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+            if (pendingConfirmCallback) pendingConfirmCallback(false);
+            closeConfirmModal();
         });
         $('customModal').addEventListener('click', function(e) {
-            if (e.target === this && pendingConfirmCallback) { pendingConfirmCallback(false); closeConfirmModal(); }
+            if (e.target !== this) return;
+            // The install-method modal holds an in-flight one-shot
+            // CSRF token. Its own buttons are the only valid exits.
+            // A backdrop close would leave companionInstallInFlight
+            // true and permanently disable the install button.
+            if (installModalActive) return;
+            if (pendingConfirmCallback) pendingConfirmCallback(false);
+            closeConfirmModal();
         });
     }
 
-    // ============================================================
-    // [29] Boot
-    // ============================================================
+// ============================================================
+// [29] Boot
+// ============================================================
+// installControllerChangeHandler() is invoked from
+// setupSWUpdateHandler() below — no direct call here.
     function boot() {
         document.documentElement.lang = currentLang;
         document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
 
         updateDashboardLink();
 
+        // Paint the correct companion label from sessionStorage
+        // BEFORE the first async XHR so a hard reload (F5) does
+        // not flash "Install App" over the cached "Installed"
+        // state.
+        _companionCacheRead();
+        renderCompanionButton();
+
         updateUIStrings();
         bindEvents();
         bindSWUpdateButtons();
-
-        // v1.4.0 — install button is a direct <a download> link
-        // pointing at /app-debug.apk. No JavaScript logic needed.
-        // The anchor's `aria-label` is set from translations in
-        // updateUIStrings() (IDX-A1).
 
         var dashLink = $('dashboardLink');
         if (dashLink) {
@@ -2749,8 +3201,6 @@
         }
 
         if ('serviceWorker' in navigator) {
-            installControllerChangeHandler();
-
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
                 swRegistration = reg;
 

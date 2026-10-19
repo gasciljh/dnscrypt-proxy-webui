@@ -1,7 +1,7 @@
 # ============================================================
-# DNSCrypt Smart Filter – Dependabot Configuration
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — Dependabot Configuration
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,7 +12,8 @@
 #   Automatically updates dependencies and opens PRs for upgrades.
 #
 # Benefits:
-#   • Immediate security updates (CVEs in GitHub Actions)
+#   • Immediate security updates (CVEs in GitHub Actions and
+#     the single external Go dependency)
 #   • Periodic updates (weekly for Actions, monthly for Go)
 #   • Automatic PRs with changelog + release notes
 #   • Fully customizable
@@ -21,29 +22,37 @@
 #   Dependabot works for free only on public repositories.
 #   For private repositories: GitHub Advanced Security is required.
 #
+# ============================================================
 # Ecosystem coverage:
-#   ┌───────────────┬──────────────┬───────────────────┐
-#   │ Ecosystem        │ Directory      │ Schedule             │
-#   ├───────────────┼──────────────┼───────────────────┤
-#   │ github-actions   │ /              │ weekly Mon 06:00 UTC │
-#   │ gomod            │ /proxy         │ monthly Mon 06:00    │
-#   │ devcontainers    │ /              │ monthly Mon 06:00    │
-#   └───────────────┴──────────────┴───────────────────┘
+# ============================================================
+#   ┌──────────────────┬──────────────┬──────────────────────┐
+#   │ Ecosystem        │ Directory    │ Schedule             │
+#   ├──────────────────┼──────────────┼──────────────────────┤
+#   │ github-actions   │ /            │ weekly  Mon 06:00 UTC│
+#   │ gomod            │ /proxy       │ monthly Mon 06:00    │
+#   │ devcontainers    │ /            │ monthly Mon 06:00    │
+#   └──────────────────┴──────────────┴──────────────────────┘
 #
+# ============================================================
 # Schedule rationale:
-#   • github-actions → weekly. Actions are frequently updated for
-#     security reasons (e.g. actions/checkout deprecates old Node
-#     runtimes). Weekly keeps the repository current without
-#     excessive noise.
+# ============================================================
+#   • github-actions → weekly. Actions are frequently updated
+#     for security reasons (e.g. actions/checkout deprecates
+#     old Node runtimes). Weekly keeps the repository current
+#     without excessive noise.
 #
-#   • gomod → monthly. Go rarely needs updates — the project uses
-#     only the standard library, so go.mod has no dependencies.
-#     This section is forward-looking: if a package is added in
-#     the future (e.g. golang.org/x/sys), Dependabot will handle
-#     it automatically.
+#   • gomod → monthly. The project has exactly ONE external Go
+#     dependency since v1.4.1 (stable since v1.5.0):
+#       github.com/cyphar/filepath-securejoin v0.7.0
+#     Pinned per ADR-0002. Monthly is more than sufficient.
+#     If the pin is ever bumped, Dependabot opens a PR; the
+#     maintainer must review it before merging (upgrades to
+#     the dependency require re-reading the upstream changelog
+#     and, per ADR-0002, may need a new ADR if the version
+#     jump is significant).
 #
 #   • devcontainers → monthly. Dev container features change
-#     infrequently. Monthly is more than enough.
+#     infrequently.
 #
 #   Why not daily?
 #     • Too much review noise.
@@ -51,29 +60,34 @@
 #     • Weekly / monthly is the right balance for a solo
 #       maintainer with a small codebase.
 #
+# ============================================================
 # Grouped updates:
+# ============================================================
 #   Each ecosystem groups its minor/patch updates into a single
-#   PR. Example: instead of 5 separate PRs (one per Action), you
-#   get one PR titled "Bump 5 github-actions dependencies".
+#   PR. Example: instead of 5 separate PRs (one per Action),
+#   you get one PR titled "Bump 5 github-actions dependencies".
 #
 #   Benefits:
 #     • Less review noise.
 #     • Faster merge cycle.
 #     • Easier to track in the PR list.
 #
-#   Caveat: if one update in the group has a problem, it must be
-#   isolated manually (edit the PR or revert the group and re-run).
+#   Caveat: if one update in the group has a problem, it must
+#   be isolated manually.
 #
+# ============================================================
 # open-pull-requests-limit:
+# ============================================================
 #   • Actions: 5 PRs max
 #   • Go: 3 PRs
 #   • Devcontainers: 2 PRs
 #
-#   When the limit is reached, Dependabot stops opening new PRs
-#   until some are merged or closed. This prevents the PR list
-#   from being flooded during a burst of updates.
+#   When the limit is reached, Dependabot stops opening new
+#   PRs until some are merged or closed.
 #
+# ============================================================
 # target-branch decision:
+# ============================================================
 #   All three ecosystems target `main` directly (not `develop`).
 #
 #   Rationale:
@@ -83,174 +97,108 @@
 #     • Dependency PRs are small and low-risk; they can go
 #       straight to the stable branch.
 #
-#   ⚠️ Policy note: this is an EXPLICIT EXCEPTION to the general
-#      rule in README.md §Development ("Never commit to `main`
-#      directly — open a PR against `develop`"). The exception
-#      is scoped to automation only — human contributors must
-#      still open PRs against `develop`.
-#
-#      If the README is updated in a future release, its
-#      "Branching" paragraph should mention this exception
-#      explicitly, so that a reader does not see a contradiction
-#      between the two files.
+#   ⚠️ Policy note: this is an EXPLICIT EXCEPTION to the
+#      general rule in README.md §Development ("Never commit
+#      to `main` directly — open a PR against `develop`"). The
+#      exception is scoped to automation only — human
+#      contributors must still open PRs against `develop`.
 #
 #   This is also consistent with the branch model in
-#   docs/adr/0001-two-branch-model.md, which allows
+#   docs/adr/0001-release-workflow.md, which allows
 #   non-feature PRs (like dependency bumps) to target `main`.
 #
-# ⚠️ If the project grows to multiple maintainers or the
-#    codebase expands significantly, consider switching the
-#    target-branch to `develop` for consistency with the
-#    feature/fix workflow.
+#   ⚠️ ADR-0002 compliance: any *new* external Go dependency
+#      requires its own ADR before a Dependabot PR that adds
+#      it can be merged. A bump of an existing dependency
+#      (e.g. filepath-securejoin v0.7.0 → v0.8.0) does not
+#      require an ADR, but does require reading the upstream
+#      changelog.
 #
+# ============================================================
 # Labels applied to each PR:
+# ============================================================
 #   • "dependencies"  — always
 #   • Ecosystem label — "github-actions" / "go" / "devcontainer"
 #   • "ci"            — Actions only (since they affect CI)
 #
+# ============================================================
 # Commit message prefixes:
+# ============================================================
 #   • ci(scope)    — for Actions
 #   • build(scope) — for Go modules
 #   • chore(scope) — for dev containers
 #
-#   This aligns with Conventional Commits and keeps the commit
-#   log scannable.
+#   This aligns with Conventional Commits.
 #
 # ============================================================
 # v1.1.0 changes (kept):
-#   • Version bumped to v1.1.0 (documentation only — no behavior
-#     changes since v1.0.0).
-#   • Added an "Ecosystem coverage" table for quick scanning.
-#   • Added a "Schedule rationale" section explaining why each
-#     ecosystem has its chosen cadence.
-#   • Added a "Grouped updates" section with benefits and caveats.
-#   • Added a "target-branch decision" section clarifying why
-#     main is targeted and referencing ADR-0001.
-#   • Moved the long inline comments from the YAML body into the
-#     header to keep the file itself short and readable.
+#   • Added "Ecosystem coverage" table, "Schedule rationale",
+#     "Grouped updates", and "target-branch decision" sections.
+#
+# v1.2.0 changes (kept):
+#   • No new package ecosystems.
+#   • Added "What Dependabot does NOT track" section.
+#   • Global English edition.
+#
+# v1.2.0 — POST-AUDIT FIXES (kept):
+#   • DB-1 — clarified the target-branch exception.
+#
+# v1.3.0 — No changes (kept):
+#   • The v1.3.0 release did not touch dependency manifests.
+#
+# v1.4.0 — Companion Android app integration (kept):
+#   • DB-V14-01 — no new ecosystem; companion APK is fetched
+#     from a separate repo.
+#   • DB-V14-02 — proxy/app-apk.version added to the
+#     "does NOT track" section.
+#   • DB-V14-03 — HARD-DEP-01 documented in the header.
+#   • DB-V14-04 — cross-references extended.
 #
 # ============================================================
-# v1.2.0 changes:
-#   • Version bumped to v1.2.0 (documentation only — no behavior
-#     changes to any of the three ecosystems).
-#   • No new package ecosystems were added. The v1.2.0 release is
-#     a data-preservation release; it introduces new shell logic
-#     (the 10 defensive layers in proxy/*.sh) and new documentation
-#     (docs/BACKUP.md, docs/EMERGENCY.md, docs/UPGRADE.md §3.1),
-#     but does NOT add any new external dependency.
-#   • Confirmed: proxy/go.mod still declares `go 1.22` and no
-#     external modules. Therefore the `gomod` section below is
-#     still forward-looking (no actual updates to fetch).
-#   • Confirmed: proxy/dnscrypt-proxy.version stays at `2.1.18`.
-#     Dependabot does NOT track this file — it is a project-owned
-#     single source of truth for the DNS engine version, managed
-#     by scripts/fetch_dns_binaries.sh. It is updated manually
-#     when the upstream dnscrypt-proxy project ships a new
-#     release (see docs/DNS_BINARIES.md §10).
-#   • Added a "What Dependabot does NOT track" section below,
-#     listing the three files that look like dependencies but
-#     are actually project-owned:
-#       - proxy/dnscrypt-proxy.version (DNS engine version)
-#       - VERSION (module version)
-#       - module.prop (Magisk version + versionCode)
-#   • Cross-referenced docs/BACKUP.md and docs/EMERGENCY.md for
-#     readers who land here from a data-preservation context.
-#   • Global English edition: all comments and messages are
-#     English-only. No Arabic strings exist in this file.
-#
+# v1.5.0 — Global Edition
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-# A pre-release audit of this file found NO implementation
-# issues. The YAML body, the schedules, the grouping rules,
-# the labels, the commit-message prefixes, and the
-# `target-branch: main` settings are all correct and
-# internally consistent.
+#   🆕 DB-V15-01 — **Correction of a stale claim.** The
+#      "Current state" comments under the gomod section
+#      previously stated that `go.mod` contained "no external
+#      dependencies" and that `go.sum` was "absent". Both
+#      claims were accurate for v1.0.0 through v1.3.0, but
+#      became FALSE in v1.4.1 (interim, unreleased, go.mod-only)
+#      and have been false ever since.
 #
-# One documentation-only clarification was added:
+#      Actual current state (v1.5.0):
+#        • go.mod contains one external dependency:
+#            require github.com/cyphar/filepath-securejoin v0.7.0
+#        • go.sum is present and pins:
+#            – filepath-securejoin v0.7.0
+#            – 4 test-only transitive dependencies
+#              (testify, go-spew, go-difflib, yaml.v3)
 #
-#   🔧 DB-1 — The "target-branch decision" section stated
-#     that targeting `main` "is consistent with the project's
-#     documented policy that `main` accepts PRs from
-#     `release/*` and `hotfix/*` only — except for automation
-#     that explicitly opts into main." That phrasing was
-#     slightly stronger than what the current README actually
-#     documents: README.md §Development says only "Never
-#     commit to `main` directly — open a PR against
-#     `develop`", without listing automation as an exception.
-#     The section now:
-#       • Frames the Dependabot behavior explicitly as an
-#         EXCEPTION to the README's general rule.
-#       • Cross-references docs/adr/0001 (two-branch model).
-#       • Recommends that a future README update mention the
-#         exception explicitly, so the two files do not
-#         appear to contradict each other.
-#     No behavior change. No YAML change.
+#      See ADR-0002 for the rationale and the compliance rule
+#      that governs future additions.
 #
-# ============================================================
-# v1.3.0 — No changes to the Dependabot configuration
-# ============================================================
-#   The v1.3.0 release is primarily a feature release (PWA
-#   install button, live status LED, DNS auto-start after
-#   boot). All three changes are client-side or shell-side:
-#     • PWA install button  → web/index.html (client-side)
-#     • Live status LED     → web/index.html (client-side)
-#     • DNS auto-start fix  → proxy/service.sh (shell)
+#   🆕 DB-V15-02 — Added `go.sum` to the "What Dependabot does
+#      NOT track" section. `go.sum` is a checksum manifest, not
+#      a package manifest — Dependabot never opens a PR against
+#      it directly. Bumps to the underlying module are made by
+#      Dependabot via `go.mod`, and `go.sum` is regenerated by
+#      `go mod tidy`. The explicit mention prevents a future
+#      reader from expecting Dependabot to touch `go.sum`.
 #
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
+#   🆕 DB-V15-03 — ADR-0002 compliance note added to the
+#      "target-branch decision" section and to the gomod
+#      section. Every new external Go dependency requires its
+#      own ADR before the corresponding Dependabot PR can be
+#      merged.
 #
-#   This file (dependabot.yml) was NOT modified in v1.3.0. Its
-#   scope is dependency updates for three ecosystems
-#   (github-actions, gomod, devcontainers), none of which were
-#   affected by the v1.3.0 changes. No new Go import was added,
-#   no new GitHub Action was referenced, and no dev container
-#   feature was introduced. The three ecosystem entries, the
-#   schedules, the grouping rules, and the ignore patterns are
-#   all unchanged from v1.2.0.
+#   🆕 DB-V15-04 — Cross-references extended with ADR-0002.
+#      The "How Dependabot interacts with the release process"
+#      section now also mentions ADR-0002 as the authoritative
+#      source for the external-dependency policy.
 #
-#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13.
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   🆕 DB-V14-01 — No new package ecosystem is added. The
-#     companion Android app (`web/app-debug.apk`) is fetched
-#     from a SEPARATE repository (gasciljh/dnscrypt-proxy-app)
-#     at release time by `scripts/fetch_app_apk.sh`. It has no
-#     dependency manifest in this repository, and its version
-#     is tracked by `proxy/app-apk.version` — a project-owned
-#     file, not a package manifest.
-#
-#     Dependabot therefore does NOT track the companion APK.
-#     The existing three ecosystems (github-actions, gomod,
-#     devcontainers) remain unchanged.
-#
-#   🆕 DB-V14-02 — `proxy/app-apk.version` is added to the
-#     "What Dependabot does NOT track" section below, alongside
-#     `proxy/dnscrypt-proxy.version`, `VERSION`, and `module.prop`.
-#     This prevents a future reader (or a security auditor) from
-#     mistakenly expecting Dependabot to bump the companion app.
-#
-#   🆕 DB-V14-03 — The inline `HARD-DEP-01` marker near the
-#     `ignore:` block under the github-actions ecosystem is
-#     now ALSO documented here in the header. Prior revisions
-#     referenced HARD-DEP-01 only inline, which was
-#     inconsistent with the project convention (every other
-#     `HARD-*` identifier in the module is documented in its
-#     file's header). See the block below for the full
-#     rationale.
-#
-#   🆕 DB-V14-04 — The "How Dependabot interacts with the
-#     release process" section now cross-references
-#     `docs/DNS_BINARIES.md` in addition to `docs/BACKUP.md`
-#     and `docs/EMERGENCY.md`, matching the reference list
-#     that the v1.4.0 release adds to other files.
-#
+#   ⚠️ No YAML body changes were necessary for v1.5.0 — the
+#      three ecosystem entries, the schedules, the grouping
+#      rules, the ignore patterns, the reviewers, and the
+#      labels are all correct for the current state.
 # ============================================================
 # HARD-DEP-01 — Major-version guard for github-actions
 # ============================================================
@@ -258,61 +206,62 @@
 #   did NOT exist on GitHub (actions/checkout@v7,
 #   actions/upload-artifact@v7, softprops/action-gh-release@v3,
 #   github/codeql-action@v4). This matches the v1.1.0 incident
-#   documented in `release.yml` as HARD-REL-13 and in
-#   `ci.yml` as HARD-CI-01: speculative major-version
-#   references that break the workflow if they do not exist.
+#   documented in release.yml as HARD-REL-13 and in ci.yml as
+#   HARD-CI-01.
 #
-#   FIX: the github-actions ecosystem now carries an `ignore:`
-#   block that excludes `version-update:semver-major` for the
-#   four affected dependency names:
+#   FIX: the github-actions ecosystem carries an `ignore:` block
+#   that excludes `version-update:semver-major` for:
 #
 #     • actions/*                   (checkout, setup-go, ...)
 #     • softprops/action-gh-release
 #     • github/codeql-action
 #     • nttld/setup-ndk
 #
-#   Patch and minor updates are still proposed — only MAJOR
-#   bumps are blocked, because those are the ones that can
-#   introduce breaking changes without warning.
+#   Patch and minor updates are still proposed.
 #
 #   Major-version bumps should be applied manually after
-#   reviewing the upstream changelog. The `dependabot.yml`
-#   file is the correct place for this guard (not each
-#   workflow file), because the guard applies to every
-#   workflow that references the affected Actions.
+#   reviewing the upstream changelog.
 # ============================================================
 # What Dependabot does NOT track:
 # ============================================================
-# There are four files in this repository that contain a
-# "version" string but are NOT dependency manifests. Dependabot
-# will never open a PR against them. This is intentional.
+# There are FIVE files in this repository that contain a
+# "version" string (or a checksum) but are NOT dependency
+# manifests. Dependabot will never open a PR against them.
+# This is intentional.
 #
 #   1. proxy/dnscrypt-proxy.version
 #      ─ The upstream dnscrypt-proxy version (e.g. "2.1.18").
-#      ─ Managed by scripts/fetch_dns_binaries.sh, which reads
-#        it as the Single Source of Truth.
+#      ─ Managed by scripts/fetch_dns_binaries.sh.
 #      ─ Updated manually when the upstream DNSCrypt project
-#        ships a new release. See docs/DNS_BINARIES.md §10.
+#        ships a new release. See docs/REFERENCE.md §6.
 #
-#   2. proxy/app-apk.version  (v1.4.0)
-#      ─ The companion Android app version (e.g. "1.0.0", no "v").
-#      ─ Managed by scripts/fetch_app_apk.sh, which reads it as
-#        the Single Source of Truth.
+#   2. proxy/app-apk.version
+#      ─ The companion Android app version (e.g. "1.0.0").
+#      ─ Managed by scripts/fetch_app_apk.sh.
 #      ─ Updated manually when the companion app project
 #        (gasciljh/dnscrypt-proxy-app) ships a new release.
 #
 #   3. VERSION
-#      ─ The module version (e.g. "v1.4.0").
+#      ─ The module version (e.g. "v1.5.0").
 #      ─ Managed by scripts/release.sh (and release-patch.sh).
 #      ─ Updated automatically at each release.
 #
 #   4. module.prop
 #      ─ The Magisk / KernelSU module definition.
-#      ─ Contains `version=v1.4.0` and `versionCode=1040000`.
+#      ─ Contains `version=v1.5.0` and `versionCode=1050000`.
 #      ─ Both fields are updated together by scripts/release.sh.
 #
+#   5. proxy/go.sum  (v1.5.0 — DB-V15-02)
+#      ─ The checksum manifest for the single external Go
+#        dependency (filepath-securejoin v0.7.0) and its four
+#        test-only transitive dependencies.
+#      ─ Regenerated by `go mod tidy` whenever `go.mod` changes.
+#      ─ Dependabot never edits `go.sum` directly — it edits
+#        `go.mod`, and `go.sum` follows. Any manual edit is
+#        rejected by `go mod verify`.
+#
 # If you ever see a Dependabot PR that touches one of these
-# four files, it is a false positive. Close the PR and open an
+# five files, it is a false positive. Close the PR and open an
 # Issue — the .github/dependabot.yml configuration may need a
 # `directory` / `package-ecosystem` adjustment.
 #
@@ -324,14 +273,13 @@ version: 2
 # [1] GitHub Actions
 # ============================================================
 # Most important for security: outdated Actions may contain
-# known vulnerabilities (e.g. arbitrary code execution via a
-# compromised release, deprecated Node runtime).
+# known vulnerabilities.
 #
 # Covered files:
 #   • .github/workflows/ci.yml
 #   • .github/workflows/codeql.yml
 #   • .github/workflows/release.yml
-#   • .github/workflows/upgrade-test.yml   ← v1.2.0
+#   • .github/workflows/upgrade-test.yml
 #   • any new workflow
 #
 # Example automatic PR:
@@ -347,14 +295,7 @@ updates:
       timezone: "Etc/UTC"
     open-pull-requests-limit: 5
     ignore:
-      # HARD-DEP-01: see the header block with the full
-      # rationale (v1.4.0). Dependabot repeatedly proposed
-      # major versions that do not exist on GitHub Actions
-      # (checkout@v7, upload-artifact@v7, action-gh-release@v3,
-      # codeql-action@v4). This matches the v1.1.0 incident
-      # documented in release.yml as HARD-REL-13 and in ci.yml
-      # as HARD-CI-01. Block ONLY major-version updates. Patch
-      # and minor updates are still proposed (they are safe).
+      # HARD-DEP-01: see the header block for the full rationale.
       - dependency-name: "actions/*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "softprops/action-gh-release"
@@ -376,8 +317,6 @@ updates:
       prefix-development: "ci"
       include: "scope"
     target-branch: "main"
-    # Group all GitHub Actions updates into a single PR
-    # (reduces noise, simplifies review)
     groups:
       github-actions:
         patterns:
@@ -386,38 +325,35 @@ updates:
           - "minor"
           - "patch"
 
-  # ============================================================
-  # [2] Go Modules (proxy/go.mod)
-  # ============================================================
-  # The project currently uses stdlib only (no external
-  # dependencies). This section is useful if dependencies are
-  # added in the future.
-  #
-  # Current state:
-  #   • go.mod: contains `module dnscrypt-webui` + `go 1.22`
-  #   • go.sum: absent (no dependencies)
-  #
-  # v1.2.0 note:
-  #   The v1.2.0 data-preservation release adds no new imports
-  #   to main.go. All new code (createAutoBackup, notifications,
-  #   cleanupOldTransactions) uses only the Go standard library
-  #   (os, filepath, strings, fmt, time) — all already imported
-  #   in v1.1.0. The dependency-free policy is preserved.
-  #
-  # v1.4.0 note:
-  #   The v1.4.0 release does not add any new import either.
-  #   The CodeQL path-injection fix in `removeModule` uses
-  #   `path/filepath` (already imported). The companion APK
-  #   integration does not touch Go code.
-  #
-  # Future benefit:
-  #   • If a package is added (e.g. golang.org/x/sys), Dependabot
-  #     keeps it up to date.
-  #   • Detects CVEs in newly added dependencies.
-  #
-  # Example automatic PR:
-  #   "build(deps): bump golang.org/x/sys from v0.5.0 to v0.6.0"
-  # ============================================================
+# ============================================================
+# [2] Go Modules (proxy/go.mod)
+# ============================================================
+# CORRECTED in v1.5.0 (DB-V15-01). The project has exactly
+# ONE external Go dependency since v1.4.1 (stable since
+# v1.5.0):
+#
+#   require github.com/cyphar/filepath-securejoin v0.7.0
+#
+# Pinned per ADR-0002. Introduced to close two CodeQL
+# `go/path-injection` alerts in `removeModule`.
+#
+# Current state:
+#   • go.mod: `module dnscrypt-webui`
+#              + `go 1.22`
+#              + `require github.com/cyphar/filepath-securejoin v0.7.0`
+#   • go.sum: present — pins v0.7.0 + 4 test-only transitive deps
+#             (testify, go-spew, go-difflib, yaml.v3).
+#
+# ADR-0002 compliance:
+#   • A BUMP of this dependency (e.g. v0.7.0 → v0.8.0) does NOT
+#     require a new ADR, but does require reading the upstream
+#     changelog before merging the Dependabot PR.
+#   • A NEW external dependency requires its own ADR before the
+#     corresponding Dependabot PR can be merged.
+#
+# Example automatic PR:
+#   "build(deps): bump filepath-securejoin from v0.7.0 to v0.7.1"
+# ============================================================
   - package-ecosystem: "gomod"
     directory: "/proxy"
     schedule:
@@ -438,7 +374,6 @@ updates:
       prefix-development: "build"
       include: "scope"
     target-branch: "main"
-    # Group all Go updates into one PR (monthly)
     groups:
       go-minor-patch:
         patterns:
@@ -449,31 +384,27 @@ updates:
     # Ignore major updates automatically — reviewed manually as
     # they may break compatibility.
     #
-    # Example: golang.org/x/sys v0.x → v1.x is a breaking change
-    # and should be reviewed before merging.
+    # Example: filepath-securejoin v0.x → v1.x is a breaking
+    # change and should be reviewed before merging. Per ADR-0002,
+    # a significant version jump may also require a new ADR.
     ignore:
       - dependency-name: "*"
         update-types:
           - "version-update:semver-major"
 
-  # ============================================================
-  # [3] Dev Containers (devcontainer.json features)
-  # ============================================================
-  # File: .devcontainer/devcontainer.json
-  #
-  # Covered features:
-  #   • ghcr.io/devcontainers/features/go
-  #   • ghcr.io/devcontainers/features/github-cli
-  #   • ghcr.io/devcontainers/features/common-utils
-  #
-  # Note:
-  #   Dependabot has supported the `devcontainers` ecosystem
-  #   since 2023. If issues arise, this section can be removed
-  #   without affecting the other two.
-  #
-  # Example automatic PR:
-  #   "chore(devcontainer): bump devcontainers/features/go"
-  # ============================================================
+# ============================================================
+# [3] Dev Containers (devcontainer.json features)
+# ============================================================
+# File: .devcontainer/devcontainer.json
+#
+# Covered features:
+#   • ghcr.io/devcontainers/features/go
+#   • ghcr.io/devcontainers/features/github-cli
+#   • ghcr.io/devcontainers/features/common-utils
+#
+# Example automatic PR:
+#   "chore(devcontainer): bump devcontainers/features/go"
+# ============================================================
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
@@ -505,17 +436,15 @@ updates:
 # For CVE fixes specifically, the maintainer may choose to
 # immediately cut a PATCH release with scripts/release-patch.sh
 # rather than waiting for the next scheduled release. See
-# docs/RELEASE_PROCESS.md §2.3 for the PATCH release flow.
+# docs/CONTRIBUTING.md §13 (Hotfix Flow) for the PATCH release flow.
 #
-# v1.2.0 cross-references:
-#   • docs/BACKUP.md       — backup system reference
-#   • docs/EMERGENCY.md    — emergency recovery guide
-#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
-#
-# v1.4.0 cross-references:
-#   • docs/DNS_BINARIES.md — DNS binaries (Level 4)
-#   • docs/BACKUP.md       — backup system reference
-#   • docs/EMERGENCY.md    — emergency recovery guide
+# Cross-references:
+#   • docs/adr/0002-external-dependency.md
+#                              — external-dependency policy
+#   • docs/REFERENCE.md §6     — DNS binaries (Level 4)
+#   • docs/REFERENCE.md §4     — backup system reference
+#   • docs/GUIDE.md §8         — emergency recovery guide
+#   • docs/GUIDE.md §5         — upgrade paths
 #
 # ============================================================
 # How to verify the configuration
@@ -523,18 +452,14 @@ updates:
 #
 # 1. On GitHub:
 #    Settings → Code security and analysis
-#    → Dependabot version updates: Enabled ✅
+#    → Dependabot version updates: Enabled
 #
 # 2. In the Dependabot tab:
 #    Insights → Dependency graph → Dependabot
-#    Shows:
-#      • last scan
-#      • discovered dependencies
-#      • open PRs
+#    Shows: last scan, discovered dependencies, open PRs
 #
 # 3. Manual trigger:
 #    Actions → Dependabot Updates → "Check for updates"
-#    (available after the first scheduled run)
 #
 # 4. Validate the file locally:
 #    python3 -c "import yaml; yaml.safe_load(open('.github/dependabot.yml'))"

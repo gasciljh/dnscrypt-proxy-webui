@@ -1,78 +1,12 @@
 #!/usr/bin/env bash
 # ============================================================
-# DNSCrypt Smart Filter – devcontainer setup
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# DNSCrypt Smart Filter — devcontainer setup
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 DC-V14-01 — No configuration change. The devcontainer
-#     setup does not build the companion Android app APK. That
-#     APK lives in a separate repository (gasciljh/dnscrypt-proxy-app)
-#     and is fetched by scripts/fetch_app_apk.sh at release time.
-#
-#   📱 DC-V14-02 — Version bump v1.2.0 → v1.4.0 (skipping
-#     v1.3.0, which did not affect the devcontainer — see the
-#     v1.3.0 block below for the rationale).
-#
-#   📱 DC-V14-03 — No new tool is added for the CodeQL
-#     `go/path-injection` fix in `main.go::removeModule`, or for
-#     the iOS PWA logic removal in `web/index.html`. Both are
-#     pure source-level edits covered by the existing toolchain
-#     (Go, shellcheck, shfmt, golangci-lint).
-# ============================================================
-# v1.3.0 — No changes to the devcontainer setup
-# ============================================================
-#   📌 The v1.3.0 release did not touch this file.
-#
-#   The v1.3.0 release added three runtime changes:
-#     • PWA install button (client-side, web/index.html)
-#     • Live status LED (client-side, web/index.html)
-#     • DNS auto-start fix (shell-side, proxy/service.sh)
-#
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
-#
-#   Why this file was NOT modified:
-#     • The devcontainer setup installs DEVELOPMENT tools
-#       (shellcheck, shfmt, golangci-lint, staticcheck,
-#       actionlint, pre-commit, yamllint, markdownlint,
-#       detect-secrets). None of these tools is required for,
-#       or interacts with, the v1.3.0 runtime changes.
-#     • The v1.3.0 server-side refinements are pure source
-#       edits in Go and shell files, all of which are already
-#       covered by the installed toolchain:
-#         - `main.go` (SNAP-*)  → gofmt, go vet, golangci-lint
-#         - `functions.sh`, `service.sh` (ROT-*) → bash -n,
-#           shellcheck, shfmt
-#     • No new tool, no version bump of an existing tool, and
-#       no new configuration key is required.
-#
-#   Therefore the entire setup script is byte-for-byte identical
-#   between v1.2.0 and v1.3.0. See CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13 for the full delta.
-# ============================================================
-# Cross-references:
-# ============================================================
-#   • .devcontainer/devcontainer.json — postCreateCommand
-#   • .github/workflows/ci.yml        — CI matrix
-#   • .github/workflows/upgrade-test.yml
-#                                     — 42-scenario matrix
-#   • .pre-commit-config.yaml         — pre-commit hooks
-#   • docs/BACKUP.md                  — backup reference
-#   • docs/EMERGENCY.md               — recovery guide
-#   • docs/ARCHITECTURE.md §4.13      — v1.3.0 server-side
-#   • CHANGELOG.md §[v1.3.0], §[v1.4.0]
-# ============================================================
-# ============================================================
-# Purpose:
-#   Runs automatically after the devcontainer is created
-#   (postCreateCommand). Installs all tools required for
-#   development and building.
+# Runs automatically after the devcontainer is created
+# (postCreateCommand). Installs all tools required for
+# development and building.
 #
 # Features:
 #   • Idempotent — safe to run more than once
@@ -86,126 +20,55 @@
 #   • shfmt                 (Shell formatting)
 #   • golangci-lint v2.5.0  (Go linting)
 #   • staticcheck           (Go static analysis)
-#   • gosec                 (Go security)
+#   • gosec                 (Go security, optional)
 #   • actionlint            (GitHub Actions linting)
 #   • python3 + pip
 #   • detect-secrets        (secret scanning)
 #   • pre-commit            (Git hooks)
 #   • yamllint              (YAML linting)
-#   • markdownlint          (Markdown linting)
+#   • markdownlint          (if npm is available)
 #
-# Expected duration:
-#   ~2–4 minutes (depending on network speed)
+# Expected duration: ~2–4 minutes (network-dependent)
 #
-# ============================================================
-# Tool install chain (7 phases):
-# ============================================================
-#   ┌───┬────────────────────────────────────────┐
-#   │ # │ Phase                                          │
-#   ├───┼────────────────────────────────────────┤
-#   │ 1 │ apt update                                     │
-#   │ 2 │ Basic tools (via apt)                          │
-#   │ 3 │ Shell tools (shellcheck, shfmt)                │
-#   │ 4 │ Go tools (golangci-lint, staticcheck, ...)     │
-#   │ 5 │ Python tools (pip, pre-commit, yamllint, ...)  │
-#   │ 6 │ Android NDK check (optional)                   │
-#   │ 7 │ Project setup (permissions, pre-commit)        │
-#   └───┴────────────────────────────────────────┘
+# Install chain (7 phases):
+#   1. apt update
+#   2. Basic tools (via apt)
+#   3. Shell tools (shellcheck, shfmt)
+#   4. Go tools (golangci-lint, staticcheck, gosec, actionlint)
+#   5. Python tools (pip, pre-commit, yamllint, detect-secrets)
+#   6. Android NDK check (optional)
+#   7. Project setup (permissions, pre-commit hooks)
 #
-#   Each phase prints a header (─────) so the log is scannable.
-#   Every tool install is wrapped in a `command -v` check, so
-#   re-running the script only installs what is missing.
+# Idempotency: each tool install is wrapped in a
+# `command -v` check, so re-running installs only what is
+# missing. Individual tool failures are logged as warnings and
+# do not abort the script — a partial toolchain is still usable.
 #
-# ============================================================
-# golangci-lint v2 — path note:
-# ============================================================
-#   golangci-lint changed its module path between v1 and v2:
-#     • v1:  github.com/golangci/golangci-lint/cmd/golangci-lint
-#     • v2:  github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+# v1.5.0 additions:
+#   • No new tool is required. v1.5.0 adds boot-mini.sh
+#     (Layer 0) and install_app.sh (companion install) —
+#     both covered by the existing toolchain.
 #
-#   This script installs v2 (the current major), using the v2
-#   module path. The install flow is:
-#     1. Detect existing golangci-lint.
-#     2. If version starts with "v2.", keep it.
-#     3. Otherwise remove the old binary and reinstall.
-#     4. Install via `go install .../v2/cmd/...@v2.5.0`.
-#     5. Fallback to install.sh from the v2 branch if go install
-#        fails (e.g. proxy issues on CI).
-#     6. Symlink into /usr/local/bin for compatibility.
+#   ⚠️ The 10 defensive layers (v1.2.0) and the companion
+#      install cascade (v1.5.0) CANNOT be fully tested in a
+#      dev container. They require a real Android device (or
+#      emulator with root) because they depend on:
+#        - SELinux contexts (restorecon / chcon)
+#        - Magisk / KernelSU / APatch
+#        - /sdcard/ mounts
+#        - Boot lifecycle (post-fs-data, service, boot_completed)
+#      The CI job that covers the runtime scenarios is
+#      .github/workflows/upgrade-test.yml (manual trigger).
 #
-#   The version check uses `grep -qE '^v?2\.'` on the output of
-#   `golangci-lint --version` — the v2 release line prints a
-#   leading "v2." (with the "v" prefix). This is deliberate: it
-#   rejects both v1 (e.g. "1.55.0") and unversioned builds.
-#
-# ============================================================
-# Idempotency behavior:
-# ============================================================
-#   The script is safe to run multiple times. For each tool:
-#     • If already installed at the correct version → skip.
-#     • If installed at a wrong/old version → reinstall.
-#     • If not installed → install.
-#     • If install fails → warn and continue (except golangci-lint,
-#       which is considered critical — but even then, a warning is
-#       logged and the script continues to the final verification).
-#
-#   The script does NOT fail the devcontainer on individual tool
-#   failures. A partial toolchain is still usable — the missing
-#   tool will show as ✗ in the final table, and the developer can
-#   re-run `bash .devcontainer/setup.sh` after fixing the network.
-#
-# ============================================================
-# v1.1.0 additions (kept in v1.2.0):
-# ============================================================
-#   • Version bumped to v1.1.0 (documentation only — no behavior
-#     changes since v1.0.0).
-#   • Added a "Tool install chain" table summarizing the 7 phases.
-#   • Added a "golangci-lint v2 — path note" section explaining
-#     the module path change between v1 and v2, the version check
-#     regex, and the fallback install path.
-#   • Added an "Idempotency behavior" section documenting what
-#     happens when the script is re-run with partial state.
-#   • Confirmed all log messages and comments are English.
-#
-# ============================================================
-# v1.2.0 additions:
-# ============================================================
-#   • Version bumped to v1.2.0 (documentation only — no behavior
-#     changes since v1.1.0).
-#   • The v1.2.0 release is a data-preservation release. It adds
-#     no new dependencies, no new build steps, and no new tools
-#     to the project. Therefore setup.sh requires NO changes to
-#     remain compatible with v1.2.0.
-#
-#   • Confirmed: the 10 defensive layers introduced by v1.2.0
-#     live in shell scripts and in main.go. They use only the
-#     tools already present in this dev environment:
-#       - bash / sh            (already in the base image)
-#       - coreutils            (already in the base image)
-#       - sha256sum            (already in the base image via coreutils)
-#       - jq                   (installed in phase 2)
-#       - restorecon / chcon   (NOT tested in devcontainer — see note below)
-#       - Go stdlib only       (main.go additions use no new deps)
-#
-#   • IMPORTANT: testing the 10 layers requires a real Android
-#     device or an emulator with root. A dev container cannot
-#     simulate:
-#       - SELinux contexts (restorecon / chcon)
-#       - Magisk/KernelSU/APatch root managers
-#       - /sdcard/ mounts
-#       - Boot lifecycle (post-fs-data, service, boot_completed)
-#     The CI job that covers the runtime scenarios is
-#     .github/workflows/upgrade-test.yml (manual trigger).
-#     The static-only validation runs in ci.yml → backup-smoke-test.
-#
-#   • Cross-referenced the following documents for readers who
-#     land here from a data-preservation context:
-#       - docs/BACKUP.md      (backup system reference)
-#       - docs/EMERGENCY.md   (emergency recovery guide)
-#     These describe RUNTIME behavior on a device, not dev tooling.
-#
-#   • All comments and messages are English-only (global edition).
-#     No Arabic strings exist in this file.
+# Cross-references:
+#   • .devcontainer/devcontainer.json  — postCreateCommand
+#   • .github/workflows/ci.yml         — CI matrix
+#   • .github/workflows/upgrade-test.yml — 42-scenario matrix
+#   • .pre-commit-config.yaml          — pre-commit hooks
+#   • docs/REFERENCE.md §4             — backup reference
+#   • docs/GUIDE.md §8                 — recovery guide
+#   • docs/REFERENCE.md §3             — v1.3.0 SNAP-*/ROT-*
+#   • CHANGELOG.md                     — version history
 # ============================================================
 
 set -euo pipefail

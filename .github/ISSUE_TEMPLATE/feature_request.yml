@@ -1,129 +1,41 @@
 # ============================================================
-# DNSCrypt Smart Filter – Feature Request Template
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — Feature Request Template
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# GitHub Issue Forms (YAML-based) — the modern standard
+# GitHub Issue Forms (YAML-based)
 # Reference: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
 # ============================================================
 # Cross-references:
-# ============================================================
 #   • .github/ISSUE_TEMPLATE/bug_report.yml        — bug report form
 #   • .github/ISSUE_TEMPLATE/config.yml            — templates config
 #   • .github/PULL_REQUEST_TEMPLATE.md             — PR template
 #   • .github/PULL_REQUEST_TEMPLATE/release.md     — release PR template
-#   • docs/ROADMAP.md                              — v1.5.0 + v2.0.0
-#   • docs/BACKUP.md                               — backup system (v1.2.0)
-#   • docs/EMERGENCY.md                            — recovery (v1.2.0)
-#   • docs/UPGRADE.md §3.x                         — upgrade paths
-#   • docs/ARCHITECTURE.md §4.13                   — v1.3.0 refinements
+#   • docs/ROADMAP.md                              — v1.6.0 + v2.0.0
+#   • docs/REFERENCE.md §4                         — backup system (v1.2.0)
+#   • docs/GUIDE.md §8                             — recovery (v1.2.0)
+#   • docs/GUIDE.md §5                             — upgrade paths
+#   • docs/REFERENCE.md §3                         — v1.3.0 SNAP-*/ROT-*
 #   • docs/adr/README.md                           — ADR system
-#   • docs/HALL_OF_FAME.md                         — badges
-#   • docs/COMPATIBILITY.md                        — device matrix
+#   • docs/CONTRIBUTING.md §14                     — recognition badges
+#   • docs/REFERENCE.md §5                         — device/ROM matrix
 #   • CHANGELOG.md                                 — version history
 #   • gasciljh/dnscrypt-proxy-app                  — companion repo (v1.4.0)
 # ============================================================
-# v1.4.0 additions:
-#   • Pre-flight checklist now also references v1.4.0 concepts:
-#     companion Android app, iOS removal, and CodeQL hardening.
+# v1.5.0 additions:
+#   • Version bumped to v1.5.0 (skipping v1.4.0 which is now
+#     documented in CHANGELOG).
+#   • All links updated to the consolidated documentation.
 #   • New request_type option:
-#       - "📱 Companion app / native client (v1.4.0)"
-#   • New request_type option:
-#       - "📲 PWA / install experience (v1.3.0)"
-#   • New "willing_to_contribute" option:
-#       - "📱 I can help with the companion app (v1.4.0)"
-#   • ROADMAP reference updated: v1.5.0 and v2.0.0 are now the
-#     currently-tracked future versions (v1.3.0 and v1.4.0 have
+#       - "📲 Companion install flow (v1.5.0)"
+#   • New willing_to_contribute option:
+#       - "📲 I can help with the companion install flow (v1.5.0)"
+#   • ROADMAP reference updated to v1.6.0 and v2.0.0 (v1.5.0
 #     shipped).
-#   • References section extended with the companion app repo.
-#   • MAIN-01 (v1.4.0, source-level): `main.go` now loads
-#     `LOG_LEVEL` immediately after `initPaths()`. This is
-#     transparent to feature requests, but any proposal that
-#     depends on the WebUI's startup log ordering should be
-#     aware of the fix.
-#
-# ============================================================
-# v1.3.0 additions (extended in this revision):
-# ============================================================
-#   • Pre-flight checklist now references docs/BRANCHING.md and
-#     docs/RELEASE_PROCESS.md for process-related ideas.
-#   • ROADMAP reference updated to mention v1.4.0 and v2.0.0 as
-#     the currently-tracked future versions (this was the state
-#     at the time of the v1.3.0 release).
-#
-#   Server-side refinements (backup layer):
-#     The v1.3.0 release ALSO refined snapshot-detection and
-#     rotation semantics that underpin the persistent backup
-#     system. Three identifiers (used in CHANGELOG.md [v1.3.0]
-#     and docs/ARCHITECTURE.md §4.13):
-#
-#       🔧 SNAP-MANIFEST — `main.go:buildBackupInfo()` detects
-#         a snapshot by `.manifest.json` presence, not by name
-#         pattern.
-#
-#       🔧 SNAP-MTIME — `last_backup_name` is selected by
-#         mtime, descending (with a name-based fallback).
-#
-#       🔧 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT —
-#         `functions.sh:rotate_backups()` uses the same
-#         detection + sort, plus two protected targets
-#         (`.last_stable` + newest install snapshot).
-#
-#   ⚠️ Impact on THIS file:
-#     The v1.3.0 release did NOT add or remove any request_type
-#     option. But proposals that **touch the backup layer** (the
-#     "💾 Backup / data preservation improvement (v1.2.0)"
-#     option) now need to be aware of the v1.3.0 semantics:
-#       • Any new snapshot-producing path MUST write a
-#         `.manifest.json` file (SNAP-MANIFEST).
-#       • Any new rotation logic MUST sort by mtime
-#         (SNAP-MTIME / ROT-MTIME), not by name.
-#       • The `.last_stable` target and the newest install
-#         snapshot MUST be protected from pruning (ROT-PROTECT).
-#     The "Data-preservation impact" section below is the right
-#     place to discuss this.
-#
-# ============================================================
-# v1.2.0 additions (carried forward):
-#   • Version bumped to v1.2.0.
-#   • Pre-flight checklist now also requires checking:
-#       - docs/BACKUP.md      (backup system reference)
-#       - docs/EMERGENCY.md   (emergency recovery guide)
-#     Any feature that touches user data, backups, or
-#     restoration MUST be discussed in light of these two
-#     documents first.
-#   • Added a new "Data-preservation impact" section with four
-#     options to declare how the proposal interacts with the
-#     10 defensive layers:
-#       - No interaction
-#       - Extends existing layer(s)
-#       - Adds a new layer (11th)
-#       - Changes existing behavior (needs a migration path)
-#   • Added "Data Guardian (v1.2.0)" to the "willing to
-#     contribute" options.
-#   • The "Request type" dropdown gained a new option:
-#       - "💾 Backup / data preservation improvement (v1.2.0)"
-#   • All text is English-only (global edition).
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still applies):
-# ============================================================
-#   🔧 ISS-5 — The last item of the "Pre-flight checks" section
-#     asked the proposer to confirm that their idea "aligns with
-#     the project philosophy (Zero-Telemetry, Localhost-Only,
-#     Data-Preservation-First)". The first two terms are defined
-#     in README.md and ARCHITECTURE.md §1.2. The third —
-#     "Data-Preservation-First" — appears nowhere else in the
-#     project. A proposer who searches for it would find no
-#     definition, which makes the checkbox effectively
-#     un-answerable.
-#
-#     The term has been replaced with a lowercase descriptive
-#     phrase — "user-data preservation" — which conveys the same
-#     intent (respect for the 10 defensive layers) without
-#     inventing a capitalized proper noun.
+#   • §17 references extended with the consolidated docs and
+#     the three ADRs.
 # ============================================================
 
 name: ✨ Feature Request
@@ -134,9 +46,9 @@ assignees:
   - gasciljh
 
 body:
-  # ============================================================
-  # [1] Initial warning
-  # ============================================================
+# ============================================================
+# [1] Initial warning
+# ============================================================
   - type: markdown
     attributes:
       value: |
@@ -145,9 +57,9 @@ body:
         Before you continue, make sure that you:
 
         - Read [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md)
-        - Read [docs/FAQ.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md)
-        - Read [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) (v1.2.0)
-        - Read [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) (v1.2.0)
+        - Read [docs/GUIDE.md §10 (FAQ)](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#10-faq)
+        - Read [docs/REFERENCE.md §4 (Backup)](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system)
+        - Read [docs/GUIDE.md §8 (Emergency Recovery)](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery)
         - Checked [docs/adr/](https://github.com/gasciljh/dnscrypt-proxy-webui/tree/main/docs/adr) for existing architectural decisions
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue) and [Discussions](https://github.com/gasciljh/dnscrypt-proxy-webui/discussions)
         - The feature aligns with the [project philosophy](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/README.md)
@@ -164,14 +76,14 @@ body:
         > - If your idea **touches user data, backups, or restoration**,
         >   fill in the "Data-preservation impact" section below.
         >   v1.2.0 encodes a strict contract here — see
-        >   [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md).
+        >   [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system).
         > - If your idea **touches the companion Android app** (v1.4.0),
         >   note that it lives in a **separate repository**
         >   ([gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)).
 
-  # ============================================================
-  # [2] Pre-flight checks
-  # ============================================================
+# ============================================================
+# [2] Pre-flight checks
+# ============================================================
   - type: checkboxes
     id: preflight
     attributes:
@@ -191,9 +103,9 @@ body:
         - label: This idea aligns with the project philosophy (Zero-Telemetry, Localhost-Only, user-data preservation)
           required: true
 
-  # ============================================================
-  # [3] Request type
-  # ============================================================
+# ============================================================
+# [3] Request type
+# ============================================================
   - type: dropdown
     id: request_type
     attributes:
@@ -213,14 +125,15 @@ body:
         - 💾 Backup / data preservation improvement (v1.2.0)
         - 📲 PWA / install experience (v1.3.0)
         - 📱 Companion app / native client (v1.4.0)
+        - 📲 Companion install flow (v1.5.0)
         - 📋 ADR proposal (reverses or amends an existing decision)
         - 🔄 Other
     validations:
       required: true
 
-  # ============================================================
-  # [4] Problem statement
-  # ============================================================
+# ============================================================
+# [4] Problem statement
+# ============================================================
   - type: textarea
     id: problem
     attributes:
@@ -236,9 +149,9 @@ body:
     validations:
       required: true
 
-  # ============================================================
-  # [5] Proposed solution
-  # ============================================================
+# ============================================================
+# [5] Proposed solution
+# ============================================================
   - type: textarea
     id: solution
     attributes:
@@ -260,9 +173,9 @@ body:
     validations:
       required: true
 
-  # ============================================================
-  # [6] Alternatives considered
-  # ============================================================
+# ============================================================
+# [6] Alternatives considered
+# ============================================================
   - type: textarea
     id: alternatives
     attributes:
@@ -282,9 +195,9 @@ body:
     validations:
       required: true
 
-  # ============================================================
-  # [7] Benefits
-  # ============================================================
+# ============================================================
+# [7] Benefits
+# ============================================================
   - type: textarea
     id: benefits
     attributes:
@@ -299,9 +212,9 @@ body:
     validations:
       required: true
 
-  # ============================================================
-  # [8] Use cases
-  # ============================================================
+# ============================================================
+# [8] Use cases
+# ============================================================
   - type: textarea
     id: use_cases
     attributes:
@@ -328,9 +241,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [9] Suggested priority
-  # ============================================================
+# ============================================================
+# [9] Suggested priority
+# ============================================================
   - type: dropdown
     id: priority
     attributes:
@@ -345,9 +258,9 @@ body:
     validations:
       required: true
 
-  # ============================================================
-  # [10] Data-preservation impact (v1.2.0)
-  # ============================================================
+# ============================================================
+# [10] Data-preservation impact (v1.2.0)
+# ============================================================
   - type: markdown
     attributes:
       value: |
@@ -367,9 +280,9 @@ body:
         > If your proposal adds or modifies a snapshot-producing
         > path, or changes how rotation selects candidates, you
         > must align with these rules — see
-        > [docs/ARCHITECTURE.md §4.13](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ARCHITECTURE.md).
+        > [docs/REFERENCE.md §3](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#3-data-flow--internals).
         >
-        > See [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md)
+        > See [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system)
         > for the full reference.
 
   - type: dropdown
@@ -377,7 +290,7 @@ body:
     attributes:
       label: 💾 How does this proposal interact with the 10 defensive layers?
       description: |
-        The 10 layers are documented in docs/BACKUP.md §1.3.
+        The 10 layers are documented in docs/REFERENCE.md §4.
         Choose the option that best describes your proposal.
       options:
         - 'No interaction — the proposal does not touch user data, backups, or restore logic'
@@ -415,9 +328,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [11] Willing to contribute?
-  # ============================================================
+# ============================================================
+# [11] Willing to contribute?
+# ============================================================
   - type: dropdown
     id: willing_to_contribute
     attributes:
@@ -432,13 +345,14 @@ body:
         - 📖 I can help with documentation
         - 💾 I can help with backup testing across devices (v1.2.0)
         - 📱 I can help with the companion app (v1.4.0)
+        - 📲 I can help with the companion install flow (v1.5.0)
         - 👀 Sadly no — I leave it to the maintainer
     validations:
       required: false
 
-  # ============================================================
-  # [12] Mockups / Screenshots
-  # ============================================================
+# ============================================================
+# [12] Mockups / Screenshots
+# ============================================================
   - type: textarea
     id: mockups
     attributes:
@@ -450,9 +364,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [13] Examples from other projects (optional)
-  # ============================================================
+# ============================================================
+# [13] Examples from other projects (optional)
+# ============================================================
   - type: textarea
     id: examples
     attributes:
@@ -466,9 +380,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [14] ADR-related features
-  # ============================================================
+# ============================================================
+# [14] ADR-related features
+# ============================================================
   - type: markdown
     attributes:
       value: |
@@ -512,9 +426,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [15] Technical considerations
-  # ============================================================
+# ============================================================
+# [15] Technical considerations
+# ============================================================
   - type: textarea
     id: technical_notes
     attributes:
@@ -537,9 +451,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [16] Additional context
-  # ============================================================
+# ============================================================
+# [16] Additional context
+# ============================================================
   - type: textarea
     id: additional
     attributes:
@@ -554,9 +468,9 @@ body:
     validations:
       required: false
 
-  # ============================================================
-  # [17] Final confirmation
-  # ============================================================
+# ============================================================
+# [17] Final confirmation
+# ============================================================
   - type: checkboxes
     id: final_confirmation
     attributes:
@@ -569,9 +483,9 @@ body:
         - label: I am ready to accept rejection of the feature if it does not align with the project philosophy
           required: true
 
-  # ============================================================
-  # [18] References (footer)
-  # ============================================================
+# ============================================================
+# [18] References (footer)
+# ============================================================
   - type: markdown
     attributes:
       value: |
@@ -579,12 +493,12 @@ body:
 
         ## 📚 References
 
-        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.5.0 and v2.0.0 are the currently-tracked future versions
-        - [docs/BACKUP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md) — backup system reference (v1.2.0 + v1.3.0 rotation semantics)
-        - [docs/EMERGENCY.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md) — emergency recovery guide (v1.2.0)
-        - [docs/UPGRADE.md §3.1](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/UPGRADE.md) — v1.1.0 → v1.2.0 upgrade path
-        - [docs/ARCHITECTURE.md §4.13](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ARCHITECTURE.md) — v1.3.0 server-side refinements (SNAP-*/ROT-*)
-        - [docs/HALL_OF_FAME.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/HALL_OF_FAME.md) — Data Guardian badge (v1.2.0) + Memory Architect badge (v1.1.0)
+        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.6.0 and v2.0.0 are the currently-tracked future versions
+        - [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system) — backup system reference (v1.2.0 + v1.3.0 rotation semantics)
+        - [docs/GUIDE.md §8](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery) — emergency recovery guide (v1.2.0)
+        - [docs/GUIDE.md §5](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#5-update) — upgrade path (v1.0.0 → v1.5.0)
+        - [docs/REFERENCE.md §3](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#3-data-flow--internals) — v1.3.0 server-side refinements (SNAP-*/ROT-*)
+        - [docs/CONTRIBUTING.md §14](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/CONTRIBUTING.md#14-recognition) — recognition badges (Data Guardian v1.2.0 + Memory Architect v1.1.0)
         - [docs/adr/README.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md) — ADR system and index
         - [Companion app repository](https://github.com/gasciljh/dnscrypt-proxy-app) — separate repo (v1.4.0)
-        - [CHANGELOG.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md) — version history (v1.0.0 → v1.4.0)
+        - [CHANGELOG.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md) — version history (v1.0.0 → v1.5.0)

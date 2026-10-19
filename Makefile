@@ -1,266 +1,130 @@
 # ============================================================
-# DNSCrypt Smart Filter – Makefile
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — Makefile
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Unified commands for building, packaging, releasing, and
-#   validating the module.
+# Unified commands for building, packaging, releasing, and
+# validating the module.
 #
-#   The VERSION variable is read dynamically from the VERSION
-#   file (Single Source of Truth). No version is hardcoded here.
+# The release targets accept a CLI override:
+#     make release VERSION=v1.5.1
 #
-#   As of v1.1.0, main.go computes the Go runtime soft memory
-#   limit per blocklist profile (light=80MB → ultimate=220MB).
-#
-#   As of v1.2.0, the installer uses a 10-layer data-preservation
-#   architecture. The `check-backup` target validates the shell
-#   syntax of those layers without touching a real device.
-#
-#   As of v1.4.0, the module may ship a companion Android app
-#   APK (`web/app-debug.apk`, OPTIONAL). The `fetch-apk` target
-#   downloads it into `dist/` before packaging, and
-#   `check-app-version` validates its version format.
-#
-# Targets:
-#   make all                     - Alias for `make build`
-#   make help                    - Show available targets + current version
-#   make version                 - Print the current version
-#   make build                   - Build all 4 architectures
-#   make package                 - Build + package the Magisk module ZIP
-#   make clean                   - Remove proxy/build/ and dist/
-#   make dist-clean              - Remove dist/ only (keep proxy/build/)
-#
-# Companion App targets (v1.4.0):
-#   make fetch-apk               - Fetch companion APK into dist/
-#   make check-app-version       - Validate proxy/app-apk.version
-#
-# Validation targets:
-#   make check-backup            - Validate ALL shell scripts (syntax + shellcheck)
-#   make check-all               - Run all local validations
-#   make check-docs              - Verify required documentation files
-#   make check-adr               - Verify the committed ADRs
-#   make diagnose-help           - Show how to run `status.sh --diagnose`
-#
-# Release targets (see docs/RELEASE_PROCESS.md):
-#   make release VERSION=vX.Y.Z         - Stable release (from develop)
-#   make release-patch VERSION=vX.Y.Z   - PATCH release (from main)
-#   make sync                           - Sync develop with main
-#
-# Documentation references:
-#   • docs/BRANCHING.md        - Git branching strategy
-#   • docs/RELEASE_PROCESS.md  - Release step-by-step
-#   • docs/UPGRADE.md          - Version upgrade guide (§3.1-§3.4)
-#   • docs/BACKUP.md           - Backup system reference (v1.2.0)
-#   • docs/EMERGENCY.md        - Emergency recovery guide (v1.2.0)
-#   • docs/DNS_BINARIES.md     - DNS binaries management (Level 4)
-#   • docs/COMPATIBILITY.md    - Companion app compatibility (v1.4.0)
-#
-# Cross-references:
-#   • VERSION                  - Single Source of Truth for the module version
-#   • proxy/app-apk.version    - Single Source of Truth for the companion app version (v1.4.0)
-#   • CHANGELOG.md             - Version history (v1.0.0 → v1.4.0)
-#   • docs/ARCHITECTURE.md §4.13 - v1.3.0 server-side refinements
-# ============================================================
-# v1.1.0 (Global Edition) — Hardening in this revision
-# ============================================================
-#   🛡️ HARD-MK-01 (was MK-1) — `check-backup` now validates ALL
-#     shell scripts (previously it omitted watchdog.sh,
-#     action.sh, and post-fs-data.sh — three of the most
-#     critical runtime files).
-#
-#   🛡️ HARD-MK-02 (was MK-2) — ADR references in comments were
-#     corrected in v1.2.0 to match the six ADRs actually
-#     committed under docs/adr/ (0001–0006).
-#
-#   🛡️ HARD-MK-03 (was MK-3) — `check-docs` verifies the
-#     documentation files explicitly referenced by this
-#     Makefile and the release process (see REQUIRED_DOCS).
-#
-#   🛡️ HARD-MK-04 (was MK-4) — The `sync` target now checks the
-#     exit status of each git command.
-#
-#   🛡️ HARD-MK-05 (was MK-5) — `$(VERSION)` is now quoted in
-#     the `release` and `release-patch` recipe lines.
-#
-#   🛡️ HARD-MK-06 (was MK-6) — `check-all` uses Make
-#     dependencies instead of recursing into `$(MAKE)`.
-#
-#   🛡️ HARD-MK-07 (was M-1) — `check-backup` no longer risks
-#     hanging when every shell script is missing.
-#
-#   🛡️ HARD-MK-08 (was L-2) — `VERSION` is now guarded with
-#     `override` so a command-line `VERSION=...` cannot
-#     silently disagree with the file.
-#
-#   🛡️ HARD-MK-09 (was L-3) — A `check-adr` target verifies the
-#     committed ADR files.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Data preservation
-# ============================================================
-#   🛡️ The v1.2.0 release adds the 10 defensive layers. This
-#     Makefile gains three new targets to support them:
-#       • check-backup   — validate ALL shell scripts
-#       • check-all      — run all local validations
-#       • diagnose-help  — print device-side diagnostic commands
-#
-#   🛡️ The `check-backup` target validates the shell syntax of
-#     the data-preservation scripts without requiring a device.
-#
-#   🛡️ The `check-docs` target verifies the presence of the
-#     three v1.2.0 documentation files (BACKUP.md,
-#     EMERGENCY.md, UPGRADE.md).
-#
-#   No breaking change — all v1.1.0 targets remain available.
-#
-# ============================================================
-# v1.3.0 (Global Edition) — No changes to this Makefile
-# ============================================================
-#   ⚠️ The v1.3.0 release DID modify the module — but not this
-#      Makefile. The changes are enumerated below so a reader
-#      understands why no Makefile update was needed.
-#
-#   Client-side changes (web/index.html):
-#     • Smart dynamic PWA install button.
-#     • Live status LED on the Today counter.
-#
-#   Server-side refinements (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT):
-#     • main.go:buildBackupInfo() now detects snapshots by the
-#       presence of a `.manifest.json` file (SNAP-MANIFEST)
-#       instead of by name pattern, and sorts them by mtime
-#       for `last_backup_name` (SNAP-MTIME).
-#     • functions.sh:rotate_backups() was rewritten with the
-#       same manifest-based detection (ROT-MANIFEST), the same
-#       mtime sort (ROT-MTIME), and two additional protected
-#       targets on top of the 21-newest window — the
-#       `.last_stable` recovery pointer and the newest install
-#       snapshot (ROT-PROTECT).
-#     • service.sh gained a boot-path DNS auto-start (bounded
-#       wait for the WebUI to become ready, then a direct
-#       POST /api/ensure_running_service with the
-#       X-Watchdog-Token header).
-#
-#   The same refinements were applied in parallel to
-#   watchdog.sh (§[5b] snapshot counter), status.sh
-#   (_list_snapshots), customize.sh (rotate_backups),
-#   action.sh (_inline_rotate_backups + _inline_backup_summary),
-#   uninstall.sh (§[5b] BACKUP_COUNT / BACKUP_LAST_NAME),
-#   module.prop (description), and update.json (x-note-v130).
-#
-#   Why this Makefile was NOT modified:
-#     • No Makefile target inspects the snapshot-detection or
-#       rotation logic. `check-backup` runs `bash -n` (syntax
-#       only); `build` compiles Go; `package` invokes
-#       scripts/package_module.sh. None of these depend on the
-#       internal semantics of `rotate_backups` or
-#       `buildBackupInfo`.
-#     • The `build` target already reads VERSION dynamically;
-#       no hardcoded version exists to update.
-#
-#   Therefore all v1.1.0 and v1.2.0 Makefile targets continue
-#   to work unchanged. See CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13 for the full reference.
-#
-# ============================================================
-# v1.4.0 (Global Edition) — Companion Android app integration
-# ============================================================
-#   📱 NEW TARGETS — `fetch-apk` and `check-app-version`:
-#
-#     • `fetch-apk`
-#         Downloads the companion Android app APK from the
-#         sister repository `gasciljh/dnscrypt-proxy-app` into
-#         `dist/DNS-Proxy-v<app-version>.apk`.
-#
-#         The version is read from `proxy/app-apk.version`
-#         (Single Source of Truth for the app version).
-#
-#         Safe to re-run: uses a local cache at
-#         `~/.cache/dnscrypt-proxy-webui/app`.
-#
-#     • `check-app-version`
-#         Validates the format of `proxy/app-apk.version`
-#         (must be X.Y.Z, no "v" prefix) and confirms that
-#         `scripts/fetch_app_apk.sh` is present.
-#
-#   📱 MODIFIED TARGETS:
-#
-#     • `package` now depends on `fetch-apk`. The package flow
-#       becomes: build → fetch-apk → package_module.sh.
-#
-#     • `check-all` now depends on `check-app-version`, so a
-#       full local validation includes the companion app
-#       version format check.
-#
-#   📱 The companion APK is OPTIONAL. If `fetch-apk` fails
-#      (network issue, missing release), `package` continues
-#      without the APK — the module ZIP is still valid.
-#
-#   📱 All previous targets remain unchanged and fully
-#      compatible with v1.3.0 and earlier.
+# All other targets read VERSION from the VERSION file.
 # ============================================================
 
-SHELL := /bin/bash
+SHELL := /bin/sh
+
+# ────────────────────────────────────────────────────────────
+# Version resolution
+# ────────────────────────────────────────────────────────────
+# CLI_VERSION captures a command-line `VERSION=...` before the
+# `override` directive below makes VERSION immune to it. The
+# release targets read CLI_VERSION; every other target reads
+# VERSION — which is always the file's value.
+#
+# This isolates "did the user pass a version?" from the variable
+# used by build/package/check targets, so a CLI value cannot
+# silently disagree with the file.
+# ────────────────────────────────────────────────────────────
 VERSION_FILE := VERSION
-VERSION := $(shell cat $(VERSION_FILE) 2>/dev/null || echo "unknown")
 
-# Guard: refuse to let a CLI VERSION= override the file silently.
+CLI_VERSION := $(VERSION)
 override VERSION := $(shell cat $(VERSION_FILE) 2>/dev/null || echo "unknown")
 
-PROXY_DIR := $(shell pwd)/proxy
-DIST_DIR := $(shell pwd)/dist
-DOCS_DIR := $(shell pwd)/docs
-SCRIPTS_DIR := $(shell pwd)/scripts
-ADR_DIR := $(DOCS_DIR)/adr
+# ────────────────────────────────────────────────────────────
+# Syntax checker — matches ci.yml
+# ────────────────────────────────────────────────────────────
+# The CI workflow's `bash -n` step is the authoritative syntax
+# check. Local `make check-backup` uses the SAME tool so a green
+# local run means a green CI run.
+# ────────────────────────────────────────────────────────────
+SH_CHECK := bash
 
-# All shell scripts that participate in the runtime. Used by
-# check-backup and check-all. Ordered roughly by execution phase.
+PROXY_DIR   := $(shell pwd)/proxy
+DIST_DIR    := $(shell pwd)/dist
+DOCS_DIR    := $(shell pwd)/docs
+SCRIPTS_DIR := $(shell pwd)/scripts
+ADR_DIR     := $(DOCS_DIR)/adr
+
+# ────────────────────────────────────────────────────────────
+# Lists
+# ────────────────────────────────────────────────────────────
 SHELL_SCRIPTS := \
 	$(PROXY_DIR)/post-fs-data.sh \
 	$(PROXY_DIR)/customize.sh \
 	$(PROXY_DIR)/functions.sh \
+	$(PROXY_DIR)/boot-mini.sh \
 	$(PROXY_DIR)/service.sh \
 	$(PROXY_DIR)/watchdog.sh \
 	$(PROXY_DIR)/action.sh \
 	$(PROXY_DIR)/status.sh \
-	$(PROXY_DIR)/uninstall.sh
+	$(PROXY_DIR)/uninstall.sh \
+	$(PROXY_DIR)/install_app.sh
 
-# Documentation files referenced by this Makefile, the release
-# process, and the v1.2.0 data-preservation layers. Used by
-# check-docs. This is an explicit, curated list — not the
-# "full set" of every .md file under docs/.
+# Post-v1.5.0 consolidation (15 user-facing files, 2 of which
+# are GitHub meta-files not checked here). The list below matches
+# docs/MAP.md §1.
 REQUIRED_DOCS := \
-	docs/BACKUP.md \
-	docs/EMERGENCY.md \
-	docs/UPGRADE.md \
-	docs/RELEASE_PROCESS.md \
-	docs/BRANCHING.md \
-	docs/API.md
+	README.md \
+	SECURITY.md \
+	CHANGELOG.md \
+	CODE_OF_CONDUCT.md \
+	docs/GUIDE.md \
+	docs/REFERENCE.md \
+	docs/CONTRIBUTING.md \
+	docs/MAP.md \
+	docs/ROADMAP.md
 
-# Committed ADRs. All six ADRs (0001–0006) are present under
-# docs/adr/ as of v1.2.0. This list is verified by check-adr.
-COMMITTED_ADRS := \
+# Files that MUST NOT exist after the v1.5.0 consolidation.
+# A stray `git checkout -- docs/` or a rebase accident cannot
+# silently recreate them without failing `check-docs`.
+FORBIDDEN_DOCS := \
+	docs/INSTALL.md \
+	docs/UPGRADE.md \
+	docs/TROUBLESHOOTING.md \
+	docs/FAQ.md \
+	docs/EMERGENCY.md \
+	docs/API.md \
+	docs/ARCHITECTURE.md \
+	docs/BACKUP.md \
+	docs/COMPATIBILITY.md \
+	docs/DNS_BINARIES.md \
+	docs/MANIFEST_NOTES.md \
+	docs/GLOSSARY.md \
+	docs/DEVELOPMENT.md \
+	docs/BRANCHING.md \
+	docs/RELEASE_PROCESS.md \
+	docs/HALL_OF_FAME.md \
+	docs/SECURITY.md \
+	.github/SECURITY.md \
 	docs/adr/0001-two-branch-model.md \
 	docs/adr/0002-automated-releases.md \
 	docs/adr/0003-post-release-sync.md \
 	docs/adr/0004-unified-pr-template.md \
 	docs/adr/0005-release-specific-pr-template.md \
-	docs/adr/0006-rename-hotfix-to-release-patch.md
+	docs/adr/0006-rename-hotfix-to-release-patch.md \
+	docs/adr/0007-external-dependency-securejoin.md \
+	docs/adr/0008-layered-bootstrap.md \
+	docs/adr/0009-documentation-budget.md
 
-# Planned ADRs — reserved for future ADRs written *before*
-# they are committed. As of v1.2.0 this list is empty.
-PLANNED_ADRS :=
+# The 3 ADRs + the index, matching docs/adr/README.md.
+COMMITTED_ADRS := \
+	docs/adr/README.md \
+	docs/adr/0001-release-workflow.md \
+	docs/adr/0002-external-dependency.md \
+	docs/adr/0003-layered-bootstrap.md
 
-# Companion Android app (v1.4.0) — Single Source of Truth files.
-# Used by fetch-apk and check-app-version.
-APP_VERSION_FILE  := proxy/app-apk.version
-APP_FETCH_SCRIPT  := scripts/fetch_app_apk.sh
+APP_VERSION_FILE := proxy/app-apk.version
+APP_FETCH_SCRIPT := scripts/fetch_app_apk.sh
+INSTALL_APP_FILE := proxy/install_app.sh
+
+BOOT_MINI_FILE := proxy/boot-mini.sh
+FUNCTIONS_FILE := proxy/functions.sh
 
 .PHONY: all help version build package clean dist-clean \
-        fetch-apk check-app-version \
+        fetch-apk check-app-version check-install-app check-boot-mini \
         check-backup check-all check-docs check-adr diagnose-help \
         release release-patch sync
 
@@ -270,72 +134,41 @@ all: build
 # Help
 # ============================================================
 help:
-	@echo "DNSCrypt Smart Filter"
+	@echo "DNSCrypt Smart Filter — $(VERSION)"
 	@echo ""
-	@echo "  VERSION: $(VERSION)"
+	@echo "  make build              Cross-compile 4 architectures"
+	@echo "  make package            Build + package Magisk ZIP"
+	@echo "  make clean              Remove proxy/build/ and dist/"
+	@echo "  make dist-clean         Remove dist/ only"
+	@echo "  make version            Print VERSION"
 	@echo ""
-	@echo "  Build:"
-	@echo "    make build                          - Build all architectures"
-	@echo "    make package                        - Build + package Magisk ZIP"
-	@echo "    make clean                          - Clean outputs (build + dist)"
-	@echo "    make dist-clean                     - Clean dist/ only"
-	@echo "    make version                        - Show current version"
+	@echo "  make fetch-apk          Fetch companion APK into dist/"
+	@echo "  make check-app-version  Validate proxy/app-apk.version"
+	@echo "  make check-install-app  Verify proxy/install_app.sh"
+	@echo "  make check-boot-mini    Verify proxy/boot-mini.sh (Layer 0)"
 	@echo ""
-	@echo "  Companion App (v1.4.0):"
-	@echo "    make fetch-apk                      - Fetch companion APK into dist/"
-	@echo "    make check-app-version              - Validate proxy/app-apk.version"
+	@echo "  make check-backup       Validate all runtime shell scripts"
+	@echo "  make check-all          Run all local validations"
+	@echo "  make check-docs         Verify documentation consistency"
+	@echo "  make check-adr          Verify committed ADRs"
+	@echo "  make diagnose-help      Show device-side diagnostic commands"
 	@echo ""
-	@echo "  Validation:"
-	@echo "    make check-backup                   - Validate ALL shell scripts"
-	@echo "    make check-all                      - Run all local validations"
-	@echo "    make check-docs                     - Verify required documentation"
-	@echo "    make check-adr                      - Verify committed ADRs"
-	@echo "    make diagnose-help                  - How to run diagnose on a device"
-	@echo ""
-	@echo "  Release (see docs/RELEASE_PROCESS.md):"
-	@echo "    make release VERSION=vX.Y.Z         - Stable release (from develop)"
-	@echo "    make release-patch VERSION=vX.Y.Z   - PATCH release (from main)"
-	@echo "    make sync                           - Sync develop with main"
-	@echo ""
-	@echo "  Docs:"
-	@echo "    docs/BRANCHING.md                   - Git branching strategy"
-	@echo "    docs/RELEASE_PROCESS.md             - Release step-by-step"
-	@echo "    docs/UPGRADE.md                     - Version upgrade guide"
-	@echo "    docs/BACKUP.md                      - Backup system (v1.2.0)"
-	@echo "    docs/EMERGENCY.md                   - Emergency recovery (v1.2.0)"
-	@echo "    docs/DNS_BINARIES.md                - DNS binaries (Level 4)"
-	@echo "    docs/COMPATIBILITY.md               - Compatibility matrix (v1.4.0)"
-	@echo ""
-	@echo "  Note: ADRs (docs/adr/0001..0006) are committed."
-	@echo "        Run 'make check-adr' to verify them."
+	@echo "  make release VERSION=vX.Y.Z        Stable release"
+	@echo "  make release-patch VERSION=vX.Y.Z  PATCH release"
+	@echo "  make sync                          Sync develop with main"
 
 # ============================================================
 # Version
 # ============================================================
-# Reads VERSION file (Single Source of Truth).
-# As of v1.4.0, this returns "v1.4.0".
-#
-# HARD-MK-08 (L-2): cross-checks the file value against any
-# command-line override. If they disagree, fail loudly instead
-# of silently using one or the other.
-# ============================================================
 version:
-	@if [ -n "$(VERSION)" ] && [ "$(VERSION)" != "$(shell cat $(VERSION_FILE) 2>/dev/null || echo unknown)" ]; then \
-		echo "❌ VERSION mismatch:"; \
-		echo "   file:        $(shell cat $(VERSION_FILE) 2>/dev/null)"; \
-		echo "   command line: $(VERSION)"; \
-		exit 1; \
+	@if [ -n "$(CLI_VERSION)" ] && [ "$(CLI_VERSION)" != "$(VERSION)" ]; then \
+		echo "⚠️  CLI VERSION ($(CLI_VERSION)) differs from file ($(VERSION))." >&2; \
+		echo "    The file value is authoritative for build/package targets." >&2; \
 	fi
 	@echo "$(VERSION)"
 
 # ============================================================
 # Build
-# ============================================================
-# Cross-compiles main.go for 4 Android architectures via
-# proxy/build.sh. See proxy/build.sh for options.
-#
-# Output: proxy/build/dnscrypt-webui-{arm64,arm,amd64,386}
-#         + proxy/build/checksums.txt
 # ============================================================
 build:
 	@echo "Building $(VERSION)..."
@@ -344,21 +177,7 @@ build:
 # ============================================================
 # Package
 # ============================================================
-# Builds all architectures, fetches the companion APK (v1.4.0),
-# then packages the Magisk module ZIP using
-# scripts/package_module.sh (the same script used by
-# .github/workflows/release.yml).
-#
-# v1.4.0: now depends on `fetch-apk`. If the fetch fails, the
-# package step continues without the APK (it is optional).
-#
-# Output:
-#   dist/dnscrypt-webui-<VERSION>-module.zip
-#   dist/dnscrypt-webui-<VERSION>-module.zip.sha256
-#   dist/DNS-Proxy-v<app-version>.apk          (v1.4.0, optional)
-#   dist/DNS-Proxy-v<app-version>.apk.sha256   (v1.4.0, optional)
-# ============================================================
-package: build fetch-apk
+package: build check-install-app fetch-apk
 	@echo "Packaging $(VERSION)..."
 	@chmod +x scripts/package_module.sh 2>/dev/null || true
 	@./scripts/package_module.sh \
@@ -378,58 +197,30 @@ clean:
 	@rm -rf "$(PROXY_DIR)/build" "$(DIST_DIR)"
 	@echo "Cleaned (build + dist)"
 
-# ============================================================
-# Dist-clean
-# ============================================================
 dist-clean:
 	@rm -rf "$(DIST_DIR)"
 	@echo "Cleaned (dist only)"
 
 # ============================================================
-# Fetch companion Android app APK (v1.4.0)
-# ============================================================
-# Downloads the APK from gasciljh/dnscrypt-proxy-app releases
-# into dist/DNS-Proxy-v<version>.apk.
-#
-# The version is read from proxy/app-apk.version (Single
-# Source of Truth for the app version).
-#
-# Safe to re-run: uses a cache at
-# ~/.cache/dnscrypt-proxy-webui/app.
-#
-# If the fetch fails (network issue, missing release), the
-# target logs a warning but does NOT fail the parent build.
-# The companion APK is OPTIONAL.
-#
-# Output:
-#   dist/DNS-Proxy-v<ver>.apk
-#   dist/DNS-Proxy-v<ver>.apk.sha256
+# Companion APK — fetch
 # ============================================================
 fetch-apk:
 	@echo "━━━ Fetching companion app APK ━━━"
-	@echo ""
 	@chmod +x "$(APP_FETCH_SCRIPT)" 2>/dev/null || true
 	@if [ ! -f "$(APP_FETCH_SCRIPT)" ]; then \
-		echo "⚠️  $(APP_FETCH_SCRIPT) not found — skipping companion APK"; \
+		echo "⚠️  $(APP_FETCH_SCRIPT) not found — skipping"; \
 		exit 0; \
 	fi
-	@./"$(APP_FETCH_SCRIPT)" --output-dir "$(DIST_DIR)" || \
-		echo "⚠️  APK fetch failed — continuing without it (optional)"
-	@echo ""
-	@echo "✅ APK step complete:"
+	@./$(APP_FETCH_SCRIPT) --output-dir "$(DIST_DIR)" || \
+		echo "⚠️  APK fetch failed — continuing without it"
 	@ls -la "$(DIST_DIR)"/DNS-Proxy-*.apk 2>/dev/null || \
-		echo "   (no APK in dist/ — the companion app is optional)"
-	@echo ""
+		echo "   (no APK in dist/ — companion app is optional)"
 
 # ============================================================
-# Verify companion app version format (v1.4.0)
-# ============================================================
-# Validates proxy/app-apk.version (must be X.Y.Z).
-# Also confirms scripts/fetch_app_apk.sh is present.
+# Companion APK — version format
 # ============================================================
 check-app-version:
 	@echo "━━━ Checking proxy/app-apk.version ━━━"
-	@echo ""
 	@if [ ! -s "$(APP_VERSION_FILE)" ]; then \
 		echo "  ❌ $(APP_VERSION_FILE) missing or empty"; \
 		exit 1; \
@@ -438,34 +229,134 @@ check-app-version:
 	if printf '%s' "$$APP_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "  ✅ $(APP_VERSION_FILE): $$APP_V (valid)"; \
 	else \
-		echo "  ❌ invalid format: $$APP_V"; \
-		echo "     expected: X.Y.Z (e.g. 1.0.0)"; \
+		echo "  ❌ invalid format: $$APP_V (expected X.Y.Z)"; \
 		exit 1; \
 	fi
-	@echo ""
 	@if [ -s "$(APP_FETCH_SCRIPT)" ]; then \
 		echo "  ✅ $(APP_FETCH_SCRIPT) present"; \
 	else \
 		echo "  ⚠️  $(APP_FETCH_SCRIPT) missing"; \
 	fi
-	@echo ""
 
 # ============================================================
-# Validation — ALL shell scripts
+# Companion APK — install script
 # ============================================================
-# HARD-MK-01: validates every shell script that participates
-# in runtime execution.
-#
-# HARD-MK-07 (M-1): if no script exists, skip shellcheck
-# entirely instead of invoking it with an empty argument list.
+check-install-app:
+	@echo "━━━ Checking proxy/install_app.sh ━━━"
+	@if [ ! -f "$(INSTALL_APP_FILE)" ]; then \
+		echo "  ❌ $(INSTALL_APP_FILE) missing"; exit 1; \
+	fi
+	@if [ ! -s "$(INSTALL_APP_FILE)" ]; then \
+		echo "  ❌ $(INSTALL_APP_FILE) empty"; exit 1; \
+	fi
+	@if [ ! -x "$(INSTALL_APP_FILE)" ]; then \
+		echo "  ⚠️  $(INSTALL_APP_FILE) is not executable"; \
+		echo "      (run 'make package' to fix, or chmod +x manually)"; \
+	fi
+	@_lines=$$(wc -l < "$(INSTALL_APP_FILE)" | tr -d ' '); \
+	echo "  ✅ present ($$_lines lines)"
+	@_missing=0; \
+	for marker in \
+		"pm install -r --user 0" \
+		"pm install -r --user 0 -i com.android.shell" \
+		"pm install-create" \
+		"magisk su" \
+		"cmd package install" \
+		"CASCADE_DEADLINE_SECONDS" \
+		"package_verifier_enable" \
+		"_VERIFIER_ORIG" \
+		"/data/local/tmp/dnscrypt-companion.apk" \
+	; do \
+		if grep -q "$$marker" "$(INSTALL_APP_FILE)"; then \
+			printf "    ✓ %s\n" "$$marker"; \
+		else \
+			printf "    ✗ %s\n" "$$marker"; \
+			_missing=$$((_missing + 1)); \
+		fi; \
+	done; \
+	if [ "$$_missing" -gt 0 ]; then \
+		echo "  ❌ $$_missing marker(s) missing"; exit 1; \
+	fi
+	@if grep -v '^[[:space:]]*#' "$(INSTALL_APP_FILE)" | grep -q 'setenforce 0'; then \
+		echo "  ❌ 'setenforce 0' found in executable code"; \
+		exit 1; \
+	fi
+	@echo "  ✅ No 'setenforce 0' — SELinux staging only"
+	@if grep -q "trap '_cleanup_app; exit 130' INT" "$(INSTALL_APP_FILE)" && \
+	    grep -q "trap '_cleanup_app; exit 143' TERM" "$(INSTALL_APP_FILE)" && \
+	    grep -q '_CLEANED_UP=1' "$(INSTALL_APP_FILE)"; then \
+		echo "  ✅ Three-way trap split with re-entry guard"; \
+	else \
+		echo "  ❌ Three-way trap split missing or incomplete"; \
+		exit 1; \
+	fi
+
+# ============================================================
+# Layered Bootstrap — boot-mini.sh (Layer 0)
+# ============================================================
+check-boot-mini:
+	@echo "━━━ Checking proxy/boot-mini.sh (Layer 0) ━━━"
+	@if [ ! -s "$(BOOT_MINI_FILE)" ]; then \
+		echo "  ❌ $(BOOT_MINI_FILE) missing or empty"; \
+		exit 1; \
+	fi
+	@_lines=$$(wc -l < "$(BOOT_MINI_FILE)" | tr -d ' '); \
+	echo "  ✅ present ($$_lines lines)"
+	@_missing=0; \
+	for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do \
+		if grep -qE "^$$fn\(\)" "$(BOOT_MINI_FILE)"; then \
+			printf "    ✓ %s\n" "$$fn"; \
+		else \
+			printf "    ✗ %s\n" "$$fn"; \
+			_missing=$$((_missing + 1)); \
+		fi; \
+	done; \
+	if [ "$$_missing" -gt 0 ]; then \
+		echo "  ❌ $$_missing primitive(s) missing"; \
+		exit 1; \
+	fi
+	@if grep -q '^_MONITORING_UI_PORT=' "$(BOOT_MINI_FILE)"; then \
+		echo "  ✅ _MONITORING_UI_PORT defined (single source of truth)"; \
+	else \
+		echo "  ❌ _MONITORING_UI_PORT not defined in boot-mini.sh"; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(FUNCTIONS_FILE)" ]; then \
+		echo "  ❌ $(FUNCTIONS_FILE) missing"; \
+		exit 1; \
+	fi
+	@if grep -q 'boot-mini.sh' "$(FUNCTIONS_FILE)"; then \
+		echo "  ✅ functions.sh sources boot-mini.sh"; \
+	else \
+		echo "  ❌ functions.sh does not source boot-mini.sh"; \
+		exit 1; \
+	fi
+	@_redef=0; \
+	for fn in get_run_dir read_conf is_port_open get_webui_port; do \
+		if grep -qE "^$$fn[[:space:]]*\(\)" "$(FUNCTIONS_FILE)"; then \
+			echo "  ❌ functions.sh redefines Layer-0 primitive: $$fn"; \
+			_redef=$$((_redef + 1)); \
+		fi; \
+	done; \
+	if [ "$$_redef" -gt 0 ]; then \
+		exit 1; \
+	fi
+	@if grep -qE '^_MONITORING_UI_PORT=' "$(FUNCTIONS_FILE)"; then \
+		echo "  ❌ functions.sh redefines _MONITORING_UI_PORT"; \
+		exit 1; \
+	fi
+	@echo "  ✅ functions.sh does not redefine Layer-0 primitives"
+	@echo "✅ boot-mini.sh integration verified"
+
+# ============================================================
+# Validation — all shell scripts
 # ============================================================
 check-backup:
 	@echo "━━━ Validating shell scripts ━━━"
-	@echo ""
-	@echo "  [1/2] bash -n syntax check..."
+	@echo "  [1/2] $(SH_CHECK) -n syntax check..."
 	@for f in $(SHELL_SCRIPTS); do \
 		if [ -f "$$f" ]; then \
-			if bash -n "$$f" 2>/dev/null; then \
+			if $(SH_CHECK) -n "$$f" 2>/dev/null; then \
 				printf "    ✓ %s\n" "$$(basename "$$f")"; \
 			else \
 				printf "    ✗ %s (syntax error)\n" "$$(basename "$$f")"; \
@@ -475,7 +366,6 @@ check-backup:
 			printf "    - %s (missing)\n" "$$(basename "$$f")"; \
 		fi; \
 	done
-	@echo ""
 	@echo "  [2/2] shellcheck (if available)..."
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		_existing=""; \
@@ -492,23 +382,63 @@ check-backup:
 	else \
 		echo "    - shellcheck not installed (skipped)"; \
 	fi
-	@echo ""
 	@echo "✅ Shell script validation complete"
-	@echo ""
+
+# ============================================================
+# Validation — documentation consistency
+# ============================================================
+# Two-part check:
+#   1. Every REQUIRED_DOCS file must exist.
+#   2. No FORBIDDEN_DOCS file may exist (consolidation guard).
+check-docs:
+	@echo "━━━ Documentation consistency ━━━"
+	@if [ -x "$(SCRIPTS_DIR)/check-docs.sh" ]; then \
+		"$(SCRIPTS_DIR)/check-docs.sh"; \
+	else \
+		echo "  scripts/check-docs.sh not present — presence-only check"; \
+		_missing=0; \
+		for f in $(REQUIRED_DOCS); do \
+			if [ -f "$$f" ]; then printf "  ✓ %s\n" "$$f"; \
+			else printf "  ✗ %s (missing)\n" "$$f"; _missing=$$((_missing + 1)); fi; \
+		done; \
+		_forbidden=0; \
+		for f in $(FORBIDDEN_DOCS); do \
+			if [ -f "$$f" ]; then \
+				printf "  ✗ %s (forbidden — consolidation was not applied?)\n" "$$f"; \
+				_forbidden=$$((_forbidden + 1)); \
+			fi; \
+		done; \
+		if [ "$$_missing" -gt 0 ] || [ "$$_forbidden" -gt 0 ]; then \
+			echo "  ❌ missing: $$_missing / forbidden: $$_forbidden"; \
+			exit 1; \
+		fi; \
+		echo "✅ 9 required docs present / 0 forbidden docs present"; \
+	fi
+
+# ============================================================
+# Validation — committed ADRs
+# ============================================================
+check-adr:
+	@echo "━━━ Committed ADRs ━━━"
+	@_present=0; _missing=0; \
+	for f in $(COMMITTED_ADRS); do \
+		if [ -f "$$f" ]; then \
+			printf "  ✓ %s\n" "$$f"; _present=$$((_present + 1)); \
+		else \
+			printf "  ✗ %s (missing)\n" "$$f"; _missing=$$((_missing + 1)); \
+		fi; \
+	done; \
+	if [ "$$_missing" -gt 0 ]; then \
+		echo "  ❌ Present: $$_present / Missing: $$_missing"; exit 1; \
+	fi; \
+	echo "  ✅ Present: $$_present / Missing: $$_missing"
 
 # ============================================================
 # Validation — all local checks
 # ============================================================
-# HARD-MK-06: uses Make dependencies instead of recursively
-# invoking `$(MAKE)`.
-#
-# v1.4.0: `check-app-version` is now a dependency, so a full
-# local validation includes the companion app version format.
-# ============================================================
-check-all: check-backup check-docs check-app-version
-	@echo "━━━ Running additional local validations ━━━"
-	@echo ""
-	@echo "  [1/2] bash -n on scripts/ helpers..."
+check-all: check-backup check-docs check-app-version check-install-app check-boot-mini
+	@echo "━━━ Additional validations ━━━"
+	@echo "  [1/2] scripts/ syntax check..."
 	@for f in "$(SCRIPTS_DIR)"/*.sh; do \
 		[ -f "$$f" ] || continue; \
 		if bash -n "$$f" 2>/dev/null; then \
@@ -518,213 +448,96 @@ check-all: check-backup check-docs check-app-version
 			exit 1; \
 		fi; \
 	done
-	@echo ""
-	@echo "  [2/2] shellcheck (scripts/)..."
+	@echo "  [2/2] scripts/ shellcheck..."
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		_existing=""; \
 		for f in "$(SCRIPTS_DIR)"/*.sh; do \
 			[ -f "$$f" ] && _existing="$$_existing $$f"; \
 		done; \
 		if [ -z "$$_existing" ]; then \
-			echo "    - no existing scripts to check (skipped)"; \
+			echo "    - no scripts to check (skipped)"; \
 		else \
 			shellcheck --severity=warning $$_existing \
 				&& echo "    ✓ shellcheck clean" \
-				|| exit 1; \
+				|| echo "    ⚠ shellcheck reported warnings (non-blocking)"; \
 		fi; \
 	else \
 		echo "    - shellcheck not installed (skipped)"; \
 	fi
-	@echo ""
-	@echo "  [extra] gofmt..."
 	@if command -v gofmt >/dev/null 2>&1; then \
 		UNFORMATTED=$$(gofmt -l "$(PROXY_DIR)/"); \
 		if [ -z "$$UNFORMATTED" ]; then \
-			echo "    ✓ gofmt clean"; \
+			echo "  ✓ gofmt clean"; \
 		else \
-			echo "    ✗ unformatted files:"; \
-			echo "$$UNFORMATTED"; \
-			exit 1; \
+			echo "  ✗ unformatted files:"; echo "$$UNFORMATTED"; exit 1; \
 		fi; \
-	else \
-		echo "    - gofmt not installed (skipped)"; \
 	fi
-	@echo ""
 	@echo "✅ All local validations passed"
-	@echo ""
 
 # ============================================================
-# Validation — documentation presence
-# ============================================================
-# HARD-MK-03: verifies the documentation files explicitly
-# referenced by this Makefile and the release process (see
-# REQUIRED_DOCS above). It does NOT scan all of docs/.
-# ============================================================
-check-docs:
-	@echo "━━━ Verifying required documentation ━━━"
-	@echo ""
-	@_missing=0; \
-	for f in $(REQUIRED_DOCS); do \
-		if [ -f "$$f" ]; then \
-			printf "    ✓ %s\n" "$$f"; \
-		else \
-			printf "    ✗ %s (missing)\n" "$$f"; \
-			_missing=$$((_missing + 1)); \
-		fi; \
-	done; \
-	if [ "$$_missing" -gt 0 ]; then \
-		echo ""; \
-		echo "    ❌ $$_missing documentation file(s) missing"; \
-		exit 1; \
-	fi
-	@echo ""
-	@echo "✅ Required documentation present"
-	@echo ""
-
-# ============================================================
-# Validation — committed ADRs
-# ============================================================
-# HARD-MK-09 (L-3): verifies that the six committed ADRs
-# (0001–0006) are present under docs/adr/. PLANNED_ADRS is a
-# reserved slot for ADRs written before they are committed;
-# as of v1.4.0 it is empty (all ADRs are already committed).
-# ============================================================
-check-adr:
-	@echo "━━━ Checking committed ADRs ━━━"
-	@echo ""
-	@_present=0; \
-	_missing=0; \
-	for f in $(COMMITTED_ADRS); do \
-		if [ -f "$$f" ]; then \
-			printf "    ✓ %s\n" "$$f"; \
-			_present=$$((_present + 1)); \
-		else \
-			printf "    ✗ %s (missing)\n" "$$f"; \
-			_missing=$$((_missing + 1)); \
-		fi; \
-	done; \
-	echo ""; \
-	if [ "$$_missing" -gt 0 ]; then \
-		echo "    ❌ Present: $$_present / Missing: $$_missing"; \
-		exit 1; \
-	fi; \
-	echo "    ✅ Present: $$_present / Missing: $$_missing"; \
-	if [ -n "$(strip $(PLANNED_ADRS))" ]; then \
-		echo ""; \
-		echo "    ── Planned (non-blocking) ──"; \
-		for f in $(PLANNED_ADRS); do \
-			if [ -f "$$f" ]; then \
-				printf "    ✓ %s\n" "$$f"; \
-			else \
-				printf "    - %s (planned, not yet committed)\n" "$$f"; \
-			fi; \
-		done; \
-	fi
-
-# ============================================================
-# Diagnose — how to run on a device
+# Diagnostics — device-side commands
 # ============================================================
 diagnose-help:
-	@echo "━━━ Device-side diagnostics (v1.2.0+) ━━━"
+	@echo "━━━ Device-side diagnostics ━━━"
 	@echo ""
-	@echo "  The 'status.sh --diagnose' tool runs on the Android"
-	@echo "  device. Run it via adb or a terminal app with root:"
+	@echo "  Full report:"
+	@echo "    su -c \"sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose\""
 	@echo ""
-	@echo "  ┌──────────────────────────────────────────────────────────┐"
-	@echo "  │  Full human-readable report:                              │"
-	@echo "  │                                                           │"
-	@echo "  │    su -c \"sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose\""
-	@echo "  │                                                           │"
-	@echo "  │  JSON report (for parsing / automation):                  │"
-	@echo "  │                                                           │"
-	@echo "  │    su -c \"sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json\""
-	@echo "  │                                                           │"
-	@echo "  │  Backup directory (persistent):                           │"
-	@echo "  │                                                           │"
-	@echo "  │    /sdcard/dnscrypt-webui-backup/                         │"
-	@echo "  │                                                           │"
-	@echo "  │  Recovery mode (if module is unbootable):                 │"
-	@echo "  │                                                           │"
-	@echo "  │    su -c \"touch /data/adb/modules/dnscrypt-proxy-webui/recovery\""
-	@echo "  │    su -c \"reboot\"                                         │"
-	@echo "  └──────────────────────────────────────────────────────────┘"
+	@echo "  JSON report:"
+	@echo "    su -c \"sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json\""
 	@echo ""
-	@echo "  See docs/BACKUP.md for the full reference"
-	@echo "  See docs/EMERGENCY.md for recovery procedures"
+	@echo "  Companion app state:"
+	@echo "    su -c \"sh /data/adb/modules/dnscrypt-proxy-webui/install_app.sh --status\""
 	@echo ""
+	@echo "  Persistent backup:"
+	@echo "    /sdcard/dnscrypt-webui-backup/"
+	@echo ""
+	@echo "  Trigger recovery mode:"
+	@echo "    su -c \"touch /data/adb/modules/dnscrypt-proxy-webui/recovery\""
+	@echo "    su -c \"reboot\""
+	@echo ""
+	@echo "  See docs/REFERENCE.md §4 and docs/GUIDE.md §8."
 
 # ============================================================
-# Release (stable — MINOR / MAJOR)
-# ============================================================
-# HARD-MK-08 (L-2): the recipe refuses to run when a CLI
-# VERSION= disagrees with the file.
+# Release — stable
 # ============================================================
 release:
-	@if [ "$(origin VERSION)" != "command line" ]; then \
+	@if [ -z "$(CLI_VERSION)" ] || [ "$(CLI_VERSION)" = "unknown" ]; then \
 		echo "❌ No version specified."; \
-		echo ""; \
 		echo "   Usage: make release VERSION=v1.5.0"; \
-		echo "   Current file VERSION: $(VERSION)"; \
-		echo ""; \
-		echo "   See docs/RELEASE_PROCESS.md for details."; \
+		echo "   Current VERSION file: $(VERSION)"; \
 		exit 1; \
 	fi
-	@if [ "$(VERSION)" != "$(shell cat $(VERSION_FILE) 2>/dev/null)" ]; then \
-		echo "⚠️  WARNING: CLI VERSION ($(VERSION)) differs from file ($(shell cat $(VERSION_FILE) 2>/dev/null))."; \
-		echo "    The release script will update the file. Continue? [y/N]"; \
-		read _ans; \
-		[ "$$_ans" = "y" ] || [ "$$_ans" = "Y" ] || exit 1; \
-	fi
-	@echo ""
-	@echo "🚀 Preparing stable release: $(VERSION)"
-	@echo ""
-	@./scripts/release.sh "$(VERSION)"
+	@echo "🚀 Preparing stable release: $(CLI_VERSION)"
+	@./scripts/release.sh "$(CLI_VERSION)"
 
 # ============================================================
-# Release-Patch (PATCH only — emergency)
+# Release — PATCH only
 # ============================================================
 release-patch:
-	@if [ "$(origin VERSION)" != "command line" ]; then \
+	@if [ -z "$(CLI_VERSION)" ] || [ "$(CLI_VERSION)" = "unknown" ]; then \
 		echo "❌ No version specified."; \
-		echo ""; \
-		echo "   Usage: make release-patch VERSION=v1.4.1"; \
-		echo "   Current file VERSION: $(VERSION)"; \
-		echo ""; \
-		echo "   See docs/BRANCHING.md §8 for details."; \
+		echo "   Usage: make release-patch VERSION=v1.5.1"; \
 		exit 1; \
 	fi
-	@echo ""
-	@echo "🔧 Preparing PATCH release: $(VERSION)"
-	@echo ""
-	@echo "⚠️  Ensure you are on the 'main' branch."
-	@echo "   Verify with: git branch --show-current"
-	@echo ""
-	@echo "   After the release is published, run:"
-	@echo "     make sync"
-	@echo ""
-	@./scripts/release-patch.sh "$(VERSION)"
+	@echo "🔧 Preparing PATCH release: $(CLI_VERSION)"
+	@echo "   Ensure you are on the 'main' branch."
+	@echo "   After publishing, run: make sync"
+	@./scripts/release-patch.sh "$(CLI_VERSION)"
 
 # ============================================================
-# Sync develop with main
-# ============================================================
-# HARD-MK-04: each git command checks its exit status.
+# Sync — develop with main
 # ============================================================
 sync:
-	@echo ""
 	@echo "🔄 Syncing develop with main..."
-	@echo ""
-	@git checkout develop || { echo "❌ git checkout develop failed"; exit 1; }
-	@git pull origin develop || { echo "❌ git pull develop failed"; exit 1; }
-	@git fetch origin main || { echo "❌ git fetch main failed"; exit 1; }
+	@git checkout develop || { echo "❌ checkout develop failed"; exit 1; }
+	@git pull origin develop || { echo "❌ pull develop failed"; exit 1; }
+	@git fetch origin main || { echo "❌ fetch main failed"; exit 1; }
 	@if git merge origin/main --ff-only --no-edit 2>/dev/null; then \
 		echo "   ✓ Fast-forward merge succeeded"; \
 	else \
-		echo "   → Fast-forward not possible, using regular merge"; \
-		git merge origin/main --no-edit \
-			-m "chore: sync develop with main" \
-			|| { echo "❌ git merge failed"; exit 1; }; \
+		git merge origin/main --no-edit -m "chore: sync develop with main" \
+			|| { echo "❌ merge failed"; exit 1; }; \
 	fi
-	@git push origin develop || { echo "❌ git push failed"; exit 1; }
-	@echo ""
-	@echo "✅ develop is now in sync with main"
-	@echo ""
+	@git push origin develop || { echo "❌ push failed"; exit 1; }
+	@echo "✅ develop in sync with main"

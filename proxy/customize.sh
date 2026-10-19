@@ -1,507 +1,120 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
 # ============================================================
-# DNSCrypt Smart Filter – customize.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — customize.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Magisk / KernelSU / APatch installer script.
-#
-#   Responsibilities (v1.2.0 — data-preservation hardened):
-#     • Verify installation environment (MODPATH security)
-#     • Detect architecture (arm64 / arm / x86_64 / x86)
-#     • Detect root solution (Magisk / KernelSU / APatch)
-#     • Detect recovery mode (trigger file)
-#     • Stop old processes on upgrade
-#     • Clean firewall state (Custom Chains + legacy)
-#     • Multi-source user-data discovery (Layer 1)
-#     • Persistent backup to /sdcard (Layer 2)
-#     • Integrity verification with SHA256 (Layer 3)
-#     • Transactional atomic upgrade with rollback (Layer 4)
-#     • Root-solution-aware candidate paths (Layer 5)
-#     • SELinux context preservation (Layer 6)
-#     • Recovery mode restoration (Layer 7 — snapshot-and-reapply)
-#     • Config migrations between versions (Layer 8)
-#     • Extract module files
-#     • Restore user settings with verification
-#     • Validate critical files
-#     • Copy the correct binaries for the current architecture
-#     • Create secure run/ directory (0700)
-#     • Write webui.conf with Port Guard (reject 8080 + collisions)
-#     • Generate secure credentials for the monitoring_ui
-#     • Pre-generate the watchdog token (matches main.go)
-#     • Set permissions
-#     • Write the module fingerprint
-#     • Log upgrade history (Layer 10)
-#     • Rotate old backups (Layer 9)
-#
-# User settings preserved on every upgrade (5 files):
-#   • webui.conf
-#   • dnscrypt-proxy.toml
-#   • selected_profile.txt
-#   • allowlist.txt
-#   • denylist.txt
-#
-# ============================================================
-# v1.2.0 — ROOT CAUSE FIX
-# ============================================================
-# v1.1.0 had a critical data-loss bug in section [8]. The
-# original check was:
-#
-#     if [ -d "$_EXISTING_MODULE" ] && [ "$_EXISTING_MODULE" != "$MODPATH" ]; then
-#         UPGRADE_DETECTED=1
-#     fi
-#
-# On an in-place upgrade, `$_EXISTING_MODULE == $MODPATH`, so the
-# second condition was false and the upgrade was NOT detected.
-# Result: the 5 user config files were silently lost.
-#
-# The fix: replace "detect if this is an upgrade" with
-# "search for user data everywhere". If any valid source is
-# found, restore from it — regardless of whether the installer
-# was invoked as an upgrade or not.
-#
-# ============================================================
-# v1.2.0 — Recovery mode fix (snapshot-and-reapply)
-# ============================================================
-# The recovery mode flow (triggered by the presence of a
-# `recovery` file) executes in this order:
-#
-#   [8a]  Restore 5 user files from a snapshot into
-#         $MODPATH/proxy/                       ✅ all 5
-#   [9]   unzip -o "$ZIPFILE" 'proxy/*' ... -d "$MODPATH"
-#         → OVERWRITES webui.conf and dnscrypt-proxy.toml
-#           with the ZIP's default copies        ❌ 2 lost
-#   [9c]  Skipped when RECOVERY_MODE=1
-#
-# The fix: every file restored in [8a] is ALSO copied to
-# $MODPATH/.recovery_snapshot/, and section [9b2] re-applies
-# them AFTER [9] (unzip) and [9b] (file moves), and BEFORE [9c].
-#
-# Why this approach (snapshot + re-apply) is preferred over
-# filtering the unzip argument list:
-#   • It does NOT depend on knowing what the ZIP contains.
-#   • It keeps the extraction logic of [9] untouched, so the
-#     normal-install path is byte-for-byte identical.
-#   • The snapshot dir is $MODPATH/.recovery_snapshot/ (dot-
-#     prefixed, cleaned up in [9b2]) so it never appears in
-#     the final module layout.
-#
-# ============================================================
-# v1.2.0 — Post-audit corrections (historical)
-# ============================================================
-# This file carries three identifier families that were added
-# across successive audit passes. The inventory below is the
-# AUTHORITATIVE list of identifiers actually present in the
-# file. It was corrected during the v1.4.0 release audit to
-# include the CSH-17, CSH-18, and CSH-19 identifiers that had
-# been added in the v1.4.0 revision but not yet reflected in
-# the count.
-#
-# Identifier inventory in THIS file (31 total):
-#
-#   • CSH-1, CSH-2, CSH-3, CSH-4, CSH-5, CSH-6,
-#     CSH-11, CSH-13                              (8)
-#       — original post-audit corrections
-#
-#   • CSH-14, CSH-15, CSH-16                      (3)
-#       — corrections added in the v1.2.0 revision
-#         (§[8b] watchdog path, §[9c] critical-file
-#          strictness, §[24] merged recovery block)
-#
-#   • CSH-17, CSH-18, CSH-19                      (3)
-#       — corrections added in the v1.4.0 revision
-#         (§[9] optional companion APK, version bump,
-#          and the v1.3.0 documentation-sync correction
-#          for rotate_backups)
-#
-#   • DOC-1, DOC-2                                (2)
-#       — documentation fixes
-#
-#   • FSH-8                                       (1)
-#       — cross-reference to functions.sh
-#
-#   • BUG-CS-A, BUG-CS-B, BUG-CS-C, BUG-CS-D      (4)
-#       — bug fixes in the persistent-backup layer
-#
-#   • HARD-CS-01 … HARD-CS-10                    (10)
-#       — hardening fixes
-#
-# NOTE ON IDENTIFIER GAPS:
-#   CSH-7, CSH-8, CSH-9, CSH-10, and CSH-12 were NEVER
-#   assigned in this file. They are historical gaps that
-#   appeared because the numbering was drafted before the
-#   final audit pass consolidated several entries. They are
-#   documented here explicitly so that future auditors do not
-#   assume the file is missing five fixes — the fixes exist,
-#   they simply carry the identifiers listed above.
-#
-# NOTE ON THE COUNT HISTORY:
-#   The v1.2.0 revision declared "31 total" while listing
-#   only 28 entries (8 + 3 + 2 + 1 + 4 + 10). That arithmetic
-#   error was corrected to "28 total" in an earlier pass.
-#   The v1.4.0 revision added CSH-17, CSH-18, and CSH-19 —
-#   the count is now correctly "31 total", matching the
-#   number that was accidentally correct in the original
-#   v1.2.0 header.
-#
-# ------------------------------------------------------------
-# Original post-audit corrections (CSH-1..CSH-13, partial):
-# ------------------------------------------------------------
-#
-#   🔧 CSH-1 — `_inline_cleanup_firewall` leaked `_ip` to the
-#     global scope (variable was not declared `local`). Now
-#     declared `local` to prevent accidental contamination.
-#
-#   🔧 CSH-2 — Section [24] (final summary) printed
-#     "Upgrade: YES (0 files restored)" when RECOVERY_MODE=1.
-#     Now prints an explicit "Recovery: restored from snapshot"
-#     line in that case.
-#
-#   🔧 CSH-3 — `log_upgrade` was called unconditionally, even
-#     on a fresh install. Now called only when there is
-#     something meaningful to log (SOURCE_VERSION or
-#     FOUND_SOURCE non-empty).
-#
-#   🔧 CSH-4 — `log_upgrade` used `jq ... > "$tmp" && mv ...`,
-#     so when jq failed the tmp file was left on disk. Now uses
-#     an explicit if/else with rm -f on the failure path.
-#
-#   🔧 CSH-5 — Section [9b2] removed the recovery snapshot dir
-#     even when re-application had partially failed. Now
-#     preserves the snapshot dir when `_reapplied` is less
-#     than `_snapshotted`.
-#
-#   🔧 CSH-6 — `_snapshotted` was set in [8a] but never
-#     consumed. It is now used in [9b2].
-#
-#   🔧 CSH-11 — `copy_with_context` silently swallowed cp's
-#     stderr. cp's stderr is now appended to $INSTALL_LOG.
-#
-#   🔧 CSH-13 — The comment on the TXN_ID / BACKUP_TIMESTAMP
-#     relationship said "millisecond-level drift"; both values
-#     use second precision. Wording corrected.
-#
-# ------------------------------------------------------------
-# Documentation fixes:
-# ------------------------------------------------------------
-#
-#   🔧 DOC-1 — The persistent backup root is now chmod 0700
-#     (best-effort — see comment in [8c]).
-#
-#   🔧 DOC-2 — The embedded README.md now matches the actual
-#     rotation policy: "the 21 newest snapshots by directory
-#     name".
-#
-#   🔧 FSH-8 — The embedded README.md now documents
-#     `.last_auto_backup` and `.pending_notification`.
-#
-# ------------------------------------------------------------
-# Bug fixes in the persistent-backup layer:
-# ------------------------------------------------------------
-#
-# 🔧 BUG-CS-A — create_persistent_backup previously returned
-#     success even when 0 files were copied. `.last_stable`
-#     then pointed to an empty snapshot, and the summary
-#     printed "integrity verified" on a directory that
-#     contained only `.manifest.json` with `files_count: 0`.
-#
-#     FIX: When `count == 0`:
-#       • The partially-created target directory is removed.
-#       • The function returns 1.
-#       • The caller ([8d]) does NOT set PERSISTENT_BACKUP_OK.
-#       • `.last_stable` is NOT updated.
-#       • `current/` is NOT touched.
-#
-# ------------------------------------------------------------
-# 🔧 BUG-CS-B — `current/` was updated with a non-atomic
-#     `rm -rf` + `mkdir` + copy sequence. A crash or OOM kill
-#     between `rm -rf` and the copy would leave `current/`
-#     empty or partial.
-#
-#     FIX: The update now uses a temporary directory plus an
-#     atomic `mv`:
-#       1. Populate `.current.tmp.$$` from the new snapshot.
-#       2. `mv current .current.old.$$` (if it exists).
-#       3. `mv .current.tmp.$$ current`.
-#       4. Remove `.current.old.$$` on success.
-#       5. On step-3 failure, restore `.current.old.$$` back
-#          to `current` (rollback).
-#     If the script dies at any point, `current/` is either the
-#     old snapshot, the new one, or the old one still sitting
-#     under `.current.old.$$` — never empty.
-#
-# ------------------------------------------------------------
-# 🔧 BUG-CS-C — The snapshot directory name was
-#     `$BACKUP_TIMESTAMP-$MODULE_VERSION`, where
-#     `$BACKUP_TIMESTAMP` has second precision. Two installs
-#     within the same second produced the same directory, so
-#     the second install silently overwrote the first's
-#     manifest.
-#
-#     FIX: The snapshot directory name now includes the
-#     installer PID:
-#       `$BACKUP_TIMESTAMP-$MODULE_VERSION-$$`
-#     The rotation regex `^[0-9]{8}-[0-9]{6}-` still matches,
-#     so existing tools keep working. `.last_stable` stores the
-#     full name.
-#
-# ------------------------------------------------------------
-# 🔧 BUG-CS-D — Watchdog token was generated only by `main.go`
-#     on first startup. If a user disabled the WebUI but kept
-#     the watchdog active, watchdog.sh could not authenticate
-#     `ensure_running_service`.
-#
-#     FIX: Section [19b] pre-generates the token during install
-#     so it is ready before the first WebUI start and before
-#     watchdog.sh ever runs.
-#
-# ------------------------------------------------------------
-# Hardening fixes (HARD-CS-01 … HARD-CS-10):
-# ------------------------------------------------------------
-#
-# 🛡️ HARD-CS-01 — The final summary in [24] reported "not
-#     created (source empty or disk full)" for a fresh install
-#     (no source at all). That is misleading. A dedicated
-#     message is now printed for the fresh-install case, and a
-#     separate flag tracks whether the integrity check was
-#     actually verified (not merely advisory).
-#
-# 🛡️ HARD-CS-02 — Port validation printed "resetting to 9090"
-#     for any invalid PORT, but never included the offending
-#     value. The message now includes the original value for
-#     diagnostics.
-#
-# 🛡️ HARD-CS-03 — `log_upgrade` used `mktemp` for the jq temp
-#     file. On Android, `mktemp` may return a path on a
-#     different filesystem than the backup dir, so the final
-#     `mv` could fail with EXDEV. The temp file is now created
-#     inside `$PERSISTENT_BACKUP` so the rename is always
-#     same-filesystem.
-#
-# 🛡️ HARD-CS-04 — The `_count` variable used during source
-#     discovery was a global (no `local` was possible since it
-#     sits at the script top level). It has been renamed to
-#     `_found_count` to avoid any collision with shell-builtin
-#     or Magisk-provided variables.
-#
-# 🛡️ HARD-CS-05 — `write_manifest` embedded `$source` verbatim
-#     into JSON. If the source path ever contained a quote or
-#     backslash, the manifest would be invalid.
-#
-#     REVISED (v1.4.0): the same minimal JSON escaper is now
-#     applied to ALL FOUR string fields that reach the JSON
-#     output — `version`, `timestamp`, `source`, and
-#     `root_solution` — matching the canonical
-#     `functions.sh:write_manifest` behaviour, which already
-#     escapes all four. The three newly-escaped fields come
-#     from controlled sources today (module.prop, date, and a
-#     hard-coded enum), but escaping them costs nothing and
-#     closes the door on future drift.
-#
-# 🛡️ HARD-CS-06 — `create_persistent_backup` silently returned
-#     1 when `mkdir -p` failed. The failure is now logged to
-#     `$INSTALL_LOG` before returning.
-#
-# 🛡️ HARD-CS-07 — Section [24] reported `$FOUND_FILE_COUNT` as
-#     if it were the backup file count. It is actually the
-#     SOURCE file count. The label is now "source files" to
-#     avoid confusion with the backup's own `files_count`
-#     (from the manifest).
-#
-# 🛡️ HARD-CS-08 — `rotate_backups` did not verify that the
-#     backup directory was readable before globbing. A
-#     directory with bad permissions would produce an empty
-#     `ls` result and silently skip rotation. The readability
-#     check is now explicit.
-#
-# 🛡️ HARD-CS-09 — In recovery mode, the pre-extraction
-#     snapshot in [8a] used raw `cp -f` instead of
-#     `copy_with_context`. On FUSE-mounted `/sdcard` the
-#     distinction is irrelevant, but inside `$MODPATH` it is
-#     not. `copy_with_context` is now used consistently.
-#
-# 🛡️ HARD-CS-10 — When `RECOVERY_TRIGGER_2`
-#     (`/data/adb/dnscrypt-recovery`) fired but no valid restore
-#     source could be located, the code set RECOVERY_MODE=0 and
-#     continued. The trigger files were left on disk, so the
-#     next reboot would re-enter recovery mode repeatedly. They
-#     are now removed on the "no source" path as well.
-#
-# ------------------------------------------------------------
-# Corrections added in the v1.2.0 revision (CSH-14..CSH-16):
-# ------------------------------------------------------------
-#
-# 🔧 CSH-14 — Section [8b] located the watchdog PID file via a
-#     HARD-CODED path (`$_EXISTING_MODULE/proxy/run/watchdog.pid`)
-#     in addition to `/data/local/tmp/watchdog.pid`. If the
-#     module was installed under a different module-ID, the
-#     PID file was never found and the watchdog process kept
-#     running with a stale state file. The loop now ALSO checks
-#     `$MODPATH/proxy/run/watchdog.pid`, which is the path
-#     owned by the module currently being installed.
-#
-# 🔧 CSH-15 — Section [9c] allowed a SINGLE silent file
-#     restore failure to proceed (`-ge 2` was the abort
-#     threshold). This could silently drop `webui.conf` or
-#     `dnscrypt-proxy.toml`. The restore loop now flags
-#     CRITICAL_RESTORE_FAILED whenever either of those two
-#     files fails verification, and aborts (with rollback)
-#     immediately on any critical failure — regardless of the
-#     total failure count.
-#
-# 🔧 CSH-16 — Section [24] contained TWO consecutive
-#     `if [ "$RECOVERY_MODE" = "1" ]` blocks. The second was a
-#     post-recovery banner; the first was a status line. They
-#     are now merged into a single if/elif/else chain so the
-#     summary is printed exactly once and reads coherently.
-#
-# ============================================================
-# v1.3.0 — Server-side refinement: rotate_backups() rewrite
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   However, the rotation logic in this installer's §[22b]
-#   `rotate_backups()` function was ALSO refined in v1.3.0 to
-#   match the canonical implementation in `functions.sh`.
-#   Earlier revisions of this header incorrectly claimed
-#   "no changes to the installer" and "byte-for-byte identical
-#   between v1.2.0 and v1.3.0" — those claims were inaccurate
-#   and are corrected in the v1.4.0 revision (see CSH-19 below).
-#
-#   The v1.3.0 rotation refinement is documented under three
-#   identifiers (also used in CHANGELOG.md and in
-#   docs/ARCHITECTURE.md §4.13.2):
-#
-#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
-#     A directory is treated as a snapshot iff it contains a
-#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
-#     and `orphan-txn-*/`.
-#
-#     Before v1.3.0: only directories whose name matched the
-#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
-#     custom-named snapshots were silently skipped.
-#
-#   🔧 ROT-MTIME — mtime sort.
-#     Candidates are ordered by mtime (numeric, descending),
-#     not by lexicographic directory name. Robust against
-#     clock drift and against manual renames. Aligns
-#     `rotate_backups` with the `runtime_info.backups` API
-#     (which uses the same mtime sort since v1.3.0 — see
-#     SNAP-MTIME in proxy/main.go).
-#
-#   🔧 ROT-PROTECT — protected rotation targets.
-#     Two additional snapshots are preserved on top of the
-#     21-newest window:
-#       • The `.last_stable` target (recovery pointer).
-#       • The newest install snapshot (name matches
-#         `-v<digit>`).
-#     Without these protections, the 21-newest window could
-#     silently evict the exact snapshot that recovery mode
-#     or rollback depends on.
-#
-#   All other v1.2.0 installer logic (the 10 defensive layers)
-#   remains byte-for-byte identical between v1.2.0 and v1.3.0.
-#
-#   See CHANGELOG.md v1.3.0 section, and
-#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
-# ============================================================
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 CSH-17 — The module ZIP may now contain
-#     `web/app-debug.apk` (the companion Android app). The
-#     file is OPTIONAL: it is staged by `.github/workflows/release.yml`
-#     via `scripts/fetch_app_apk.sh` before packaging. Local
-#     developer builds may omit it entirely.
-#
-#     Handling (no code change required):
-#       • Section [9] `unzip 'web/*'` extracts it automatically
-#         (the glob crosses path separators).
-#       • Section [10] critical-file check does NOT include it
-#         (an absent APK is not a fatal error).
-#       • Section [19] `set_perm_recursive` applies 0644 to it
-#         like every other web file.
-#       • `proxy/main.go` serves it at `/app-debug.apk` and
-#         returns 404 when the file is absent.
-#
-#   📱 CSH-18 — Version bump v1.3.0 → v1.4.0.
-#     The `--version` flag now reports v1.4.0. No behavior
-#     changes to the install pipeline itself.
-#
-#   📚 CSH-19 — Documentation-sync correction for v1.3.0.
-#     The v1.3.0 block above was previously inaccurate: it
-#     claimed "no changes to the installer" and "byte-for-byte
-#     identical between v1.2.0 and v1.3.0", while §[22b]
-#     `rotate_backups()` in fact contained the v1.3.0 rotation
-#     logic (manifest-based detection, mtime sort, protected
-#     targets — the ROT-MANIFEST / ROT-MTIME / ROT-PROTECT
-#     identifiers shared with functions.sh).
-#
-#     The v1.3.0 block has been rewritten to describe the
-#     actual behaviour, and §[22b] has gained a doc-block that
-#     explains the v1.3.0 semantics and the reasons for them,
-#     in line with the same correction applied to
-#     `functions.sh` (FSH-18) and to `service.sh` (SVC-V14-03).
-#
-#     No code in `customize.sh` changed between v1.3.0 and
-#     v1.4.0 — this is a documentation-only correction. The
-#     version header on line 4 is bumped to v1.4.0 for
-#     traceability, consistent with the other module files.
-#
-# ============================================================
-# POSIX note on `local`:
-#   This script uses `local` inside multiple helper functions
-#   (get_module_version, _inline_cleanup_firewall,
-#    copy_with_context, write_manifest, verify_backup_integrity,
-#    create_persistent_backup, read_toml_credentials, and
-#    others). The `local` keyword is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
+# Magisk / KernelSU / APatch installer script.
+#
+# Responsibilities:
+#   • Verify installation environment (MODPATH security)
+#   • Detect architecture, root solution, recovery mode
+#   • Multi-source user-data discovery
+#   • Persistent backup to /sdcard
+#   • Integrity verification with SHA256
+#   • Transactional atomic upgrade with rollback
+#   • Root-solution-aware candidate paths
+#   • SELinux context preservation
+#   • Recovery mode restoration
+#   • Config migrations between versions
+#   • Backup rotation + upgrade history
+#   • Extract module files, restore user settings
+#   • Generate credentials, set permissions, fingerprint
+#   • Mirror companion APK to /sdcard (best-effort)
+#
+# The 5 user files preserved on every upgrade:
+#   webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
+#   allowlist.txt, denylist.txt.
+#
+# Recovery mode is triggered by the presence of a `recovery`
+# file ($MODPATH/recovery) or /data/adb/dnscrypt-recovery. On
+# trigger, the 5 user files are restored from a snapshot and
+# re-applied AFTER §[9] unzip overwrites them.
+#
+# Language policy: English only (Global edition).
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path (temporary)
+# [1] Module path + version
 # ============================================================
-
-# v1.2.0: --version flag (checked before any argument parsing)
-case "${1:-}" in
-	--version)
-		echo "$0: v1.4.0"
-		exit 0
-		;;
-esac
-
+# MODDIR resolution: caller-supplied, then $0-derived.
+# Runs before --version so the version can be read from disk.
 MODDIR=${0%/*}
 [ "$MODDIR" = "." ] && MODDIR=$(pwd)
 case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
 
+# get_module_version — reads `version=` from module.prop.
+#
+# Search order (highest priority first):
+#   1. $MODDIR/module.prop         — installed module
+#   2. $ZIPFILE                    — during install (SKIPUNZIP=1)
+#   3. hardcoded fallback
+#
+# The ZIPFILE lookup uses `unzip -p` (pipe to stdout) so no
+# temporary file is created.
+get_module_version() {
+    local v
+
+    if [ -f "$MODDIR/module.prop" ]; then
+        v=$(grep "^version=" "$MODDIR/module.prop" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+
+    if [ -n "${ZIPFILE:-}" ] && [ -f "$ZIPFILE" ] && command -v unzip >/dev/null 2>&1; then
+        v=$(unzip -p "$ZIPFILE" module.prop 2>/dev/null | grep "^version=" | head -n 1 | cut -d= -f2- | tr -d '\r ')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+
+    printf 'v0.0.0-unknown'
+}
+
+case "${1:-}" in
+    --version)
+        echo "$0: $(get_module_version)"
+        exit 0
+        ;;
+esac
+
 # --- MODPATH check ---
+# Set by Magisk / KernelSU / APatch at install time.
 if [ -z "$MODPATH" ]; then
-    abort "❌ Please install via Magisk Manager or KernelSU!"
+    echo "❌ Please install via Magisk Manager or KernelSU!" >&2
+    exit 1
 fi
 
-# --- Security check: MODPATH must be inside /data/adb ---
+# --- Security: MODPATH must be inside /data/adb ---
 case "$MODPATH" in
     /data/adb/*) ;;
     *)
-        abort "❌ SECURITY: MODPATH '$MODPATH' is outside /data/adb. Installation aborted."
+        echo "❌ SECURITY: MODPATH '$MODPATH' is outside /data/adb. Installation aborted." >&2
+        exit 1
         ;;
 esac
 
 if [ ! -d "$MODPATH" ]; then
-    abort "❌ MODPATH '$MODPATH' does not exist or is not a directory."
+    echo "❌ MODPATH '$MODPATH' does not exist or is not a directory." >&2
+    exit 1
+fi
+
+# --- abort wrapper ---
+# Magisk/KernelSU provide `abort`; a manual invocation does not.
+# The wrapper guarantees a consistent error path in both cases.
+if ! command -v abort >/dev/null 2>&1; then
+    abort() {
+        echo "$1" >&2
+        exit 1
+    }
 fi
 
 # shellcheck disable=SC2034
@@ -510,110 +123,126 @@ SKIPUNZIP=1
 # ============================================================
 # [2] Constants
 # ============================================================
-_MONITORING_UI_PORT="8080"
+# Reserved port for dnscrypt-proxy's monitoring_ui.
+#
+# ⚠️ Must match boot-mini.sh:_MONITORING_UI_PORT. This is the
+#    ONLY legitimate duplicate: customize.sh runs before the
+#    module is extracted, so boot-mini.sh is not on disk yet.
+_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
 
-# Path of previously installed module (for reference only — v1.2.0
-# no longer relies on this alone for upgrade detection)
+# Reference path of a previously installed module.
 _EXISTING_MODULE="/data/adb/modules/dnscrypt-proxy-webui"
 
-# --- v1.2.0 — Layer 2: persistent backup location ---
+# Persistent backup location.
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 
-# --- v1.2.0 — user data files (single source of truth) ---
+# The 5 user data files (single source of truth).
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- v1.2.0 — Layer 7: recovery mode trigger files ---
+# Recovery mode trigger files.
 RECOVERY_TRIGGER_1="$MODPATH/recovery"
 RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
 
-# --- v1.2.0 — recovery snapshot (survives [9] unzip) ---
+# Recovery snapshot directory. Survives §[9] unzip because it
+# lives inside $MODPATH (which §[9] does not clean).
 RECOVERY_SNAPSHOT_DIR="$MODPATH/.recovery_snapshot"
 
 # ============================================================
-# [3] Check required tools
+# [3] Required and optional tools
 # ============================================================
-for tool in unzip sed tr date grep head cut awk find; do
+for tool in unzip sed tr date grep head cut awk find chmod chown; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         abort "❌ Required tool '$tool' not found. Installation aborted."
     fi
 done
 
-# md5sum is optional (has fallback)
 HAS_MD5SUM=0
-if command -v md5sum >/dev/null 2>&1; then
-    HAS_MD5SUM=1
-fi
+command -v md5sum >/dev/null 2>&1 && HAS_MD5SUM=1
 
-# sha256sum is optional but STRONGLY recommended (Layer 3)
 HAS_SHA256=0
-if command -v sha256sum >/dev/null 2>&1; then
-    HAS_SHA256=1
-fi
+command -v sha256sum >/dev/null 2>&1 && HAS_SHA256=1
 
-# restorecon / chcon (Layer 6)
 HAS_RESTORECON=0
-if command -v restorecon >/dev/null 2>&1; then
-    HAS_RESTORECON=1
-fi
+command -v restorecon >/dev/null 2>&1 && HAS_RESTORECON=1
 
 HAS_CHCON=0
-if command -v chcon >/dev/null 2>&1; then
-    HAS_CHCON=1
-fi
+command -v chcon >/dev/null 2>&1 && HAS_CHCON=1
 
-# jq (optional — used for .upgrade_history.json)
 HAS_JQ=0
-if command -v jq >/dev/null 2>&1; then
-    HAS_JQ=1
-fi
+command -v jq >/dev/null 2>&1 && HAS_JQ=1
 
 # ============================================================
-# [3b] Extract module.prop early
+# [3b] Extract module.prop + boot-mini.sh, then source Layer 0
 # ============================================================
+# Both files are extracted early:
+#   • module.prop  — so get_module_version() has a source.
+#   • boot-mini.sh — so the Layer-0 primitives are available
+#     before [4b]..[8]. Failure to extract is non-fatal: the
+#     installer continues with fallbacks.
 if [ -n "$ZIPFILE" ] && [ -f "$ZIPFILE" ]; then
-    unzip -o "$ZIPFILE" 'module.prop' -d "$MODPATH" >/dev/null 2>&1 || true
+    unzip -o "$ZIPFILE" 'module.prop' 'boot-mini.sh' -d "$MODPATH" >/dev/null 2>&1 || true
+fi
+
+if [ -f "$MODPATH/boot-mini.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$MODPATH/boot-mini.sh" 2>/dev/null || true
 fi
 
 # ============================================================
-# [4] Read version from module.prop
+# [4] Read module version
 # ============================================================
-get_module_version() {
-    local vf="$MODPATH/module.prop"
-    if [ -f "$vf" ]; then
-        local v
-        v=$(grep "^version=" "$vf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
-        if [ -n "$v" ]; then
-            printf '%s' "$v"
-            return 0
-        fi
-    fi
-    printf 'v0.0.0-unknown'
-}
-
 MODULE_VERSION="$(get_module_version)"
 
-# Extract versionCode for verification
+# versionCode is logged for traceability; the root manager uses
+# it for update detection.
 MODULE_VERSION_CODE=""
 if [ -f "$MODPATH/module.prop" ]; then
     MODULE_VERSION_CODE=$(grep "^versionCode=" "$MODPATH/module.prop" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
 fi
 
 # ============================================================
-# [4b] v1.2.0 — Layer 5: detect root solution
+# [4b] Detect root solution
 # ============================================================
+# Detects the ACTIVE root solution. On a dual-root device (e.g.
+# KernelSU installed over a leftover Magisk tree, or vice versa)
+# a simple early-return ordering could pick the wrong one.
+#
+# Strategy: score each candidate, return the highest.
+#   • Environment variable set → +2 (strong signal: the manager
+#                                  injected its own env)
+#   • Directory exists         → +1 (weak signal: could be a
+#                                  stale leftover from a previous
+#                                  install)
+#
+# Ties (equal scores) are broken by precedence:
+#   KernelSU > APatch > Magisk
+#
+# A score of 0 for every candidate → "unknown".
 detect_root_solution() {
-    if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
+    local ksu=0 apatch=0 magisk=0
+
+    [ -n "${KSU_VER:-}" ]   && ksu=$((ksu + 2))
+    [ -d "/data/adb/ksu" ]  && ksu=$((ksu + 1))
+
+    [ -n "${APATCH:-}" ]      && apatch=$((apatch + 2))
+    [ -d "/data/adb/ap" ]     && apatch=$((apatch + 1))
+
+    [ -n "${MAGISK_VER_CODE:-}" ] && magisk=$((magisk + 2))
+    [ -d "/data/adb/magisk" ]     && magisk=$((magisk + 1))
+
+    if [ "$ksu" -gt 0 ] && [ "$ksu" -ge "$apatch" ] && [ "$ksu" -ge "$magisk" ]; then
         echo "kernelsu"
         return 0
     fi
-    if [ -n "${APATCH:-}" ] || [ -d "/data/adb/ap" ]; then
+    if [ "$apatch" -gt 0 ] && [ "$apatch" -ge "$magisk" ]; then
         echo "apatch"
         return 0
     fi
-    if [ -n "${MAGISK_VER_CODE:-}" ] || [ -d "/data/adb/magisk" ]; then
+    if [ "$magisk" -gt 0 ]; then
         echo "magisk"
         return 0
     fi
+
     echo "unknown"
 }
 
@@ -625,7 +254,7 @@ ROOT_SOLUTION=$(detect_root_solution)
 ui_print "╔══════════════════════════════════════════╗"
 ui_print "║  🛡️  DNSCrypt Smart Filter               ║"
 printf "║      %-32s ║\n" "$MODULE_VERSION"
-ui_print "║      Global edition (EN + AR)            ║"
+ui_print "║      Global edition (bilingual WebUI)    ║"
 ui_print "╚══════════════════════════════════════════╝"
 ui_print ""
 
@@ -649,31 +278,40 @@ ui_print "- 🔐 Root solution: $ROOT_SOLUTION"
 echo "Architecture: $ARCH" >> "$INSTALL_LOG"
 
 # ============================================================
-# [7] Firewall cleanup helper
+# [7] Firewall cleanup
 # ============================================================
+# Best-effort removal of the DNAT rules installed by previous
+# versions. Runs before any new firewall state is installed, so
+# an upgrade from a version with different rules does not leave
+# orphans behind.
+#
+# The rule set removed here MUST be functionally equivalent to
+# functions.sh:manage_firewall 0, uninstall.sh:_inline_cleanup_firewall,
+# and post-fs-data.sh:inline_firewall_cleanup. All four remove the
+# same set of rules; they differ only in the comment tag applied
+# to the loopback rules during best-effort legacy cleanup.
+#
+# The legacy RETURN rules for the pre-v1.2.0 default bootstrap
+# set are best-effort: they are removed so that an upgrade from
+# a version that used the old list does not leave orphans.
 _inline_cleanup_firewall() {
-    # --- [1] nftables: delete entire table ---
+    # --- nftables: delete the entire table ---
     if command -v nft >/dev/null 2>&1; then
         nft delete table inet dnscrypt_filter 2>/dev/null
         nft delete table ip dnscrypt_filter 2>/dev/null
         nft delete table ip6 dnscrypt_filter 2>/dev/null
     fi
 
-    # ============================================================
-    # [2] iptables (IPv4) — Custom Chain cleanup
-    # ============================================================
+    # --- iptables (IPv4) ---
     if command -v iptables >/dev/null 2>&1; then
         local _chain="DNSCRYPT_OUT"
 
-        # [2a] Remove jump rules
         iptables -t nat -D OUTPUT -p udp --dport 53 -j "$_chain" --wait 3 2>/dev/null
         iptables -t nat -D OUTPUT -p tcp --dport 53 -j "$_chain" --wait 3 2>/dev/null
-
-        # [2b] Flush the chain
         iptables -t nat -F "$_chain" --wait 3 2>/dev/null
         iptables -t nat -X "$_chain" --wait 3 2>/dev/null
 
-        # [2c] Legacy cleanup — older versions
+        # Tagged variants
         iptables -t nat -D OUTPUT -p udp --dport 53 \
             -j DNAT --to-destination 127.0.0.1:5354 \
             -m comment --comment "dnscrypt_smart_filter" --wait 3 2>/dev/null
@@ -681,13 +319,13 @@ _inline_cleanup_firewall() {
             -j DNAT --to-destination 127.0.0.1:5354 \
             -m comment --comment "dnscrypt_smart_filter" --wait 3 2>/dev/null
 
+        # Untagged variants
         iptables -t nat -D OUTPUT -p udp --dport 53 \
             -j DNAT --to-destination 127.0.0.1:5354 --wait 3 2>/dev/null
         iptables -t nat -D OUTPUT -p tcp --dport 53 \
             -j DNAT --to-destination 127.0.0.1:5354 --wait 3 2>/dev/null
 
-        # Legacy RETURN rules (best-effort for known IPs)
-        # CSH-1 fix: `_ip` is now declared `local`.
+        # Legacy RETURN rules for known bootstrap IPs
         local _ip
         for _ip in 127.0.0.1 9.9.9.9 8.8.8.8 1.1.1.1 1.0.0.1 8.8.4.4 208.67.222.222 208.67.220.220; do
             iptables -t nat -D OUTPUT -d "$_ip" -p udp --dport 53 \
@@ -697,19 +335,15 @@ _inline_cleanup_firewall() {
         done
     fi
 
-    # ============================================================
-    # [3] ip6tables (IPv6) — Custom Chain cleanup
-    # ============================================================
+    # --- ip6tables (IPv6) ---
     if command -v ip6tables >/dev/null 2>&1; then
         local _chain6="DNSCRYPT_OUT6"
 
         ip6tables -t nat -D OUTPUT -p udp --dport 53 -j "$_chain6" --wait 3 2>/dev/null
         ip6tables -t nat -D OUTPUT -p tcp --dport 53 -j "$_chain6" --wait 3 2>/dev/null
-
         ip6tables -t nat -F "$_chain6" --wait 3 2>/dev/null
         ip6tables -t nat -X "$_chain6" --wait 3 2>/dev/null
 
-        # Legacy
         ip6tables -t nat -D OUTPUT -p udp --dport 53 \
             -j DNAT --to-destination "[::1]:5354" \
             -m comment --comment "dnscrypt_smart_filter" --wait 3 2>/dev/null
@@ -732,8 +366,13 @@ _inline_cleanup_firewall() {
 }
 
 # ============================================================
-# [7b] v1.2.0 — Layer 6: copy with SELinux context preservation
+# [7b] SELinux-aware file copy
 # ============================================================
+# Copies a single file and preserves its SELinux context.
+# Preference: restorecon → chcon → no-op.
+# Applies chmod 0600 (owner-only).
+#
+# Functional behaviour matches functions.sh:copy_with_context.
 copy_with_context() {
     local src="$1"
     local dst="$2"
@@ -755,17 +394,26 @@ copy_with_context() {
 }
 
 # ============================================================
-# [8] v1.2.0 -- Layer 1: content-based multi-source discovery
+# [8] Multi-source discovery of user data
 # ============================================================
-# Identify the module by CONTENT (module.prop id field), not
-# by folder name. Handles renames, case variations, and stale
+# Identifies the module by CONTENT (module.prop `id=`), not by
+# folder name. Handles renames, case variations, and stale
 # coexisting copies across all root-solution roots.
 #
-# When multiple candidates exist, the HIGHEST VERSION wins
-# (score = files*1e6 + major*1e4 + minor*100 + patch), so a
-# stale v1.0.0 folder does not beat an active v1.1.0 folder.
-# ============================================================
-
+# Score formula (highest wins):
+#   score = files * 1,000,000
+#         + major *    10,000
+#         + minor *       100
+#         + patch
+#
+# Intent: a source with MORE user files ALWAYS wins over one
+# with fewer, regardless of version. Ties on file count are
+# broken by version.
+#
+# Tie-breaker: identical scores → the candidate whose PARENT
+# directory is literally named `dnscrypt-proxy-webui` wins.
+# This prefers the canonical module folder over an update
+# staging folder.
 CANDIDATE_SOURCES=""
 MODULE_ID="dnscrypt-proxy-webui"
 
@@ -804,7 +452,8 @@ for candidate in $CANDIDATE_SOURCES; do
     _m_dir=$(dirname "$candidate")
     _ver="0.0.0"
 
-    # manifest.json fallback (backup snapshots have no module.prop)
+    # Manifest takes priority over module.prop — backup
+    # snapshots have no module.prop.
     if [ -f "$candidate/.manifest.json" ]; then
         _ver=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$candidate/.manifest.json" 2>/dev/null | \
                head -1 | sed 's/.*"\([^"]*\)"$/\1/')
@@ -856,8 +505,28 @@ else
 fi
 
 # ============================================================
-# [8a] v1.2.0 — Layer 7: recovery mode check
+# [8a] Recovery mode
 # ============================================================
+# Triggered by the presence of either:
+#   • $MODPATH/recovery               (in-module trigger)
+#   • /data/adb/dnscrypt-recovery     (external trigger)
+#
+# Restore source priority:
+#   1. `.last_stable` pointer — last known-good snapshot.
+#   2. `current/` live snapshot — newest successful install.
+#   3. FOUND_SOURCE — best in-place candidate from [8].
+#
+# When active:
+#   • The 5 files are restored into $MODPATH/proxy/ AND also
+#     snapshotted into $RECOVERY_SNAPSHOT_DIR (so they can be
+#     re-applied AFTER [9] unzip overwrites them).
+#   • [9c] is skipped (restore already happened).
+#   • [9b2] re-applies the snapshot after [9] and [9b].
+#
+# Both trigger files are removed on successful restore.
+#
+# If no source is available: log a warning, remove the trigger
+# files, proceed with a normal install.
 RECOVERY_MODE=0
 RESTORE_SOURCE=""
 _snapshotted=0
@@ -894,9 +563,6 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
         ui_print "  ⚠️  Cannot recover — normal install will proceed"
         echo "⚠️ Recovery: no source found" >> "$INSTALL_LOG"
         RECOVERY_MODE=0
-        # HARD-CS-10: remove the trigger files even when no source
-        # was found. Otherwise the module re-enters recovery mode
-        # on every reboot with no chance of success.
         rm -f "$RECOVERY_TRIGGER_1" 2>/dev/null
         rm -f "$RECOVERY_TRIGGER_2" 2>/dev/null
     else
@@ -911,9 +577,6 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
                 if copy_with_context "$RESTORE_SOURCE/$_f" "$BIN_DIR/$_f"; then
                     _restored=$((_restored + 1))
                     ui_print "  ✓ Restored: $_f"
-                    # HARD-CS-09: use copy_with_context for the
-                    # snapshot too, for consistency with the
-                    # restore path.
                     if copy_with_context "$RESTORE_SOURCE/$_f" "$RECOVERY_SNAPSHOT_DIR/$_f"; then
                         _snapshotted=$((_snapshotted + 1))
                     fi
@@ -937,15 +600,18 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
 fi
 
 # ============================================================
-# [8b] v1.2.0 — silent upgrade cleanup
+# [8b] Silent upgrade cleanup
 # ============================================================
-# CSH-14 fix: the watchdog PID search now also checks
-# `$MODPATH/proxy/run/watchdog.pid`. The previous version only
-# checked /data/local/tmp and the HARD-CODED module path
-# ($_EXISTING_MODULE). If the module was installed under a
-# different module-ID, the running watchdog process was never
-# found and kept running with a stale state file.
-# ============================================================
+# Kills any running instance before [9] overwrites binaries in
+# use, and so the new version starts clean.
+#
+# Processes killed:
+#   • dnscrypt-proxy — DNS engine
+#   • dnscrypt-webui — WebUI
+#   • Watchdog — via PID files in known locations
+#
+# KILLED_COUNT is accumulated so [25] can warn the user that a
+# reboot is required to restore DNS.
 KILLED_COUNT=0
 
 if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
@@ -979,45 +645,22 @@ ui_print "- 🔥 Firewall rules cleaned"
 echo "Firewall cleanup attempted (Custom Chain + Legacy)" >> "$INSTALL_LOG"
 
 # ============================================================
-# [8c] v1.2.0 — Layer 4: begin transactional upgrade
+# [8c] Begin transactional upgrade
 # ============================================================
 # A transaction directory is created BEFORE any backup or
 # installation step. It survives a failed install and allows
 # rollback on the next run.
 #
-# Directory layout:
+# Layout:
 #   $PERSISTENT_BACKUP/txn-<timestamp>-<pid>/
 #   ├── .state          ("START" | "COMMIT" | "ROLLBACK")
 #   ├── .pid            (installer PID)
 #   └── <user files>    (snapshot for rollback)
 #
-# ⚠️ v1.2.0 FIX (Issue #1 + Issue #9):
-#   The TXN_ID and BACKUP_TIMESTAMP share the SAME timestamp
-#   (both use `date +%Y%m%d-%H%M%S`, second precision), BUT
-#   they use DIFFERENT final paths:
-#     • Transaction  → txn-<timestamp>-<pid>/
-#     • Backup       → <timestamp>-<version>-<pid>/
-#
-#   Previous versions had a bug where `commit_transaction`
-#   tried to `mv` the TXN directory to the SAME path as the
-#   permanent backup, causing a collision.
-#
-# BUG-CS-C (this revision):
-#   The snapshot directory name now includes the installer PID
-#   (`-$$`). Two concurrent or sequential installs within the
-#   same wall-clock second produce DISTINCT directories. The
-#   rotation regex `^[0-9]{8}-[0-9]{6}-` still matches the new
-#   name, so no existing tool breaks.
-#
-# DOC-1 (this revision):
-#   The persistent backup root is now chmod 0700 (best-effort).
-#   On Android's /sdcard FUSE mount, chmod is typically ignored
-#   — the effective protection remains the per-file chmod 0600
-#   applied by copy_with_context.
-# ============================================================
+# TXN_ID and BACKUP_DIR_NAME share the same timestamp but use
+# DIFFERENT final paths, preventing a collision when both try
+# to `mv` to the same destination.
 BACKUP_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-
-# BUG-CS-C fix: include PID in the snapshot directory name.
 BACKUP_DIR_NAME="${BACKUP_TIMESTAMP}-${MODULE_VERSION}-$$"
 BACKUP_DIR="$PERSISTENT_BACKUP/$BACKUP_DIR_NAME"
 
@@ -1028,6 +671,8 @@ TXN_ACTIVE=0
 mkdir -p "$PERSISTENT_BACKUP" 2>/dev/null
 chmod 0700 "$PERSISTENT_BACKUP" 2>/dev/null || true
 
+# begin_transaction — creates the transaction directory and
+# writes its initial state (START) and PID.
 begin_transaction() {
     if mkdir -p "$TXN_DIR" 2>/dev/null; then
         echo "START" > "$TXN_DIR/.state" 2>/dev/null
@@ -1039,17 +684,33 @@ begin_transaction() {
     return 1
 }
 
+# commit_transaction — marks the transaction as committed.
+#
+# A failed COMMIT write leaves TXN_ACTIVE=1, so [23] does not
+# delete the transaction directory.
 commit_transaction() {
     if [ "$TXN_ACTIVE" != "1" ] || [ ! -f "$TXN_DIR/.state" ]; then
         TXN_ACTIVE=0
         return 0
     fi
 
-    echo "COMMIT" > "$TXN_DIR/.state" 2>/dev/null
+    if ! echo "COMMIT" > "$TXN_DIR/.state" 2>/dev/null; then
+        echo "  ⚠️ commit_transaction: cannot write COMMIT state" >> "$INSTALL_LOG"
+        return 1
+    fi
+
     TXN_ACTIVE=0
     return 0
 }
 
+# rollback_transaction — restores user files from the
+# transaction snapshot and marks the transaction as rolled
+# back.
+#
+# The file copies happen FIRST, then the state file is written.
+# A failed ROLLBACK write is logged but does not abort — the
+# state file remaining at START is handled correctly by
+# uninstall.sh (rename to orphan-txn-*, preserve).
 rollback_transaction() {
     [ -d "$TXN_DIR" ] || return 0
 
@@ -1068,7 +729,10 @@ rollback_transaction() {
         fi
     done
 
-    echo "ROLLBACK" > "$TXN_DIR/.state" 2>/dev/null
+    if ! echo "ROLLBACK" > "$TXN_DIR/.state" 2>/dev/null; then
+        echo "  ⚠️ rollback_transaction: cannot write ROLLBACK state" >> "$INSTALL_LOG"
+    fi
+
     ui_print "  → Rolled back $_rolled file(s)"
     TXN_ACTIVE=0
 }
@@ -1084,61 +748,36 @@ if [ -n "$FOUND_SOURCE" ] && [ "$RECOVERY_MODE" != "1" ]; then
 fi
 
 # ============================================================
-# [8d] v1.2.0 — Layer 2 + 3: persistent backup + integrity
+# [8d] Persistent backup + integrity verification
 # ============================================================
-# Take a snapshot of the found source into:
-#   1. The transaction directory (for rollback — Layer 4)
-#   2. $PERSISTENT_BACKUP/<timestamp>-<version>-<pid>/ (permanent)
-#   3. $PERSISTENT_BACKUP/current/                (live snapshot)
+# Snapshots the found source into:
+#   1. The transaction directory (for rollback)
+#   2. $PERSISTENT_BACKUP/<timestamp>-<version>-<pid>/
+#   3. $PERSISTENT_BACKUP/current/ (live snapshot)
 #
-# Then verify integrity via SHA256 (Layer 3).
+# Then verifies integrity via SHA256.
 #
-# ⚠️ v1.2.0 FIX (Issue #1):
-#   The permanent backup path uses `$BACKUP_DIR_NAME` (with PID
-#   suffix) and the transaction path uses `txn-...-$$`. These
-#   are ALWAYS different. No collision is possible.
+# When RECOVERY_MODE=1: we do NOT create a new backup from
+# FOUND_SOURCE — the user's data was corrupted, and FOUND_SOURCE
+# points to that corrupted data.
 #
-# ⚠️ v1.2.0 FIX (Issue B — Recovery mode):
-#   When RECOVERY_MODE=1, we do NOT create a new backup from
-#   FOUND_SOURCE. Rationale: in recovery mode, the user's data
-#   was corrupted, and FOUND_SOURCE points to that corrupted
-#   data. Creating a backup from it would REPLACE a good
-#   backup with a bad one.
-#
-# ------------------------------------------------------------
-# 🔧 BUG-CS-A: create_persistent_backup now returns 1 when 0
-#     files were copied. The caller then does NOT set
-#     PERSISTENT_BACKUP_OK, `.last_stable` is NOT updated, and
-#     `current/` is NOT touched.
-#
-# 🔧 BUG-CS-B: `current/` is updated via an atomic tmp-dir +
-#     mv sequence.
-#
-# 🛡️ HARD-CS-05 (REVISED v1.4.0): the minimal JSON escaper is
-#     now applied to ALL FOUR string fields that reach the JSON
-#     output — `version`, `timestamp`, `source`, and
-#     `root_solution` — matching the canonical
-#     `functions.sh:write_manifest` behaviour, which already
-#     escapes all four.
-# ------------------------------------------------------------
+# `current/` is updated via an atomic tmp-dir + mv sequence:
+# a reader sees either the OLD current/ (complete) or the NEW
+# current/ (complete) — never a partial mix.
 
-# json_escape: escape backslash, double-quote, and control
-# characters that would break the manifest JSON if they ever
-# appeared in a string field. filenames in USER_FILES are
-# hard-coded and safe, but the source path is user-controllable,
-# and escaping every field costs nothing.
+# json_escape — escape backslash, double-quote, and C0 control
+# characters that would break the manifest JSON.
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\010\013\014\016-\037'
 }
 
+# write_manifest <target_dir> <source> <count>
 write_manifest() {
     local target_dir="$1"
     local source="$2"
     local count="$3"
     local manifest="$target_dir/.manifest.json"
 
-    # HARD-CS-05 (v1.4.0): escape all four string fields, in
-    # parity with functions.sh:write_manifest.
     local version_escaped
     version_escaped=$(json_escape "$MODULE_VERSION")
     local timestamp_escaped
@@ -1176,12 +815,23 @@ EOF
     return 0
 }
 
+# verify_backup_integrity <dir>
+#
+# Validates every user file in the given directory:
+#   • Non-empty
+#   • Size < 10 MB
+#   • SHA256 matches the manifest (when jq/awk/sha256 available)
+#
+# Returns 0 if clean, 1 if any warnings were detected.
+#
+# If the manifest is missing or sha256sum is unavailable, the
+# function degrades to a size-only check — those two facilities
+# are OPTIONAL on Android builds without GNU coreutils.
 verify_backup_integrity() {
     local dir="$1"
     local manifest="$dir/.manifest.json"
 
     [ -f "$manifest" ] || return 0
-
     [ "$HAS_SHA256" = "1" ] || return 0
 
     local errors=0
@@ -1250,17 +900,17 @@ verify_backup_integrity() {
     [ "$errors" -eq 0 ]
 }
 
-# --- create_persistent_backup ---
+# create_persistent_backup — three outputs, in order:
+#   1. The permanent snapshot directory ($BACKUP_DIR).
+#   2. A .manifest.json inside it (via write_manifest).
+#   3. An atomic update of $PERSISTENT_BACKUP/current/.
 #
-# BUG-CS-A fix: return 1 when 0 files were copied.
-# BUG-CS-B fix: atomic update of current/.
-# HARD-CS-06 fix: log the mkdir failure.
+# Returns 1 when 0 files were copied — the caller then does
+# NOT set PERSISTENT_BACKUP_OK.
 create_persistent_backup() {
     local source="$1"
     local target_dir="$BACKUP_DIR"
 
-    # HARD-CS-06: log the failure before returning so the
-    # installer log always shows why the backup was skipped.
     if ! mkdir -p "$target_dir" 2>/dev/null; then
         echo "  ❌ create_persistent_backup: cannot create $target_dir" >> "$INSTALL_LOG"
         return 1
@@ -1276,7 +926,7 @@ create_persistent_backup() {
         fi
     done
 
-    # BUG-CS-A fix — bail out on an empty snapshot.
+    # Bail out on an empty snapshot.
     if [ "$count" -eq 0 ]; then
         echo "  ❌ create_persistent_backup: 0 files copied from $source" >> "$INSTALL_LOG"
         rm -rf "$target_dir" 2>/dev/null
@@ -1285,19 +935,14 @@ create_persistent_backup() {
 
     write_manifest "$target_dir" "$source" "$count"
 
-    # ------------------------------------------------------------
-    # BUG-CS-B fix — atomic update of current/
-    # ------------------------------------------------------------
-    # Steps:
+    # ----------------------------------------------------------
+    # Atomic update of current/:
     #   1. Populate .current.tmp.$$ from the new snapshot.
     #   2. Rename current/ to .current.old.$$ (if it exists).
     #   3. Rename .current.tmp.$$ to current/.
     #   4. Remove .current.old.$$ on success.
-    #   5. On step-3 failure, restore .current.old.$$ back to
-    #      current/.
-    # The script can die at any point without ever leaving
-    # current/ empty or partial.
-    # ------------------------------------------------------------
+    #   5. On step-3 failure, restore .current.old.$$ back.
+    # ----------------------------------------------------------
     local current_tmp="$PERSISTENT_BACKUP/.current.tmp.$$"
     local current_old="$PERSISTENT_BACKUP/.current.old.$$"
 
@@ -1331,7 +976,6 @@ create_persistent_backup() {
     if mv -f "$current_tmp" "$PERSISTENT_BACKUP/current" 2>/dev/null; then
         rm -rf "$current_old" 2>/dev/null
     else
-        # Rollback: restore the previous current/.
         if [ -d "$current_old" ]; then
             mv -f "$current_old" "$PERSISTENT_BACKUP/current" 2>/dev/null
         fi
@@ -1373,7 +1017,7 @@ elif [ -n "$FOUND_SOURCE" ]; then
     fi
 fi
 
-# --- Verify integrity (with REAL SHA256 comparison) ---
+# --- Verify integrity (with SHA256 comparison) ---
 if [ "$PERSISTENT_BACKUP_OK" = "1" ]; then
     if verify_backup_integrity "$PERSISTENT_BACKUP_DIR"; then
         ui_print "- Backup integrity: ✅ verified (SHA256)"
@@ -1386,6 +1030,20 @@ fi
 # ============================================================
 # [9] Extract module files from ZIP
 # ============================================================
+# SKIPUNZIP=1 was set in [1], so Magisk does NOT extract
+# anything on its own — the entire extraction is controlled by
+# this single `unzip` invocation.
+#
+# `install_app.sh` (CSH-22 fix) is part of this list. Before
+# v1.5.0, the file was packaged but not extracted, so
+# getInstallScript() in main.go resolved a non-existent path.
+#
+# `boot-mini.sh` is required since v1.5.0 Phase 0 — functions.sh
+# sources it at load time.
+#
+# On failure, the transaction is rolled back and the install
+# aborts — the user is not left with a partially-installed
+# module.
 ui_print ""
 ui_print "- 📂 Extracting module files..."
 
@@ -1401,7 +1059,9 @@ if ! unzip -o "$ZIPFILE" \
     'status.sh' \
     'uninstall.sh' \
     'functions.sh' \
+    'boot-mini.sh' \
     'watchdog.sh' \
+    'install_app.sh' \
     'index.html' \
     'dashboard.html' \
     'manifest.json' \
@@ -1424,8 +1084,19 @@ if [ "$EXTRACT_FAILED" = "1" ]; then
 fi
 
 # ============================================================
-# [9b] Move HTML/JSON/JS/SVG/PNG/ICO files to web/ directory
+# [9b] Move HTML/JSON/JS/SVG/PNG/ICO files to web/
 # ============================================================
+# The ZIP stores web assets at the ZIP root; the final module
+# layout places them under $MODPATH/web/. This section performs
+# the move after [9] extraction has placed them in $MODPATH.
+#
+# The move is idempotent: a file already in web/ from a
+# previous install is simply not found at the root.
+#
+# A failed `mv` is logged explicitly. Without the check, a
+# silent failure would surface later as "Missing critical files:
+# web/index.html" in [10] — harder to diagnose than the actual
+# cause.
 for f in \
     index.html \
     dashboard.html \
@@ -1441,16 +1112,33 @@ for f in \
     favicon.ico \
     offline.html; do
     if [ -f "$MODPATH/$f" ]; then
-        mv -f "$MODPATH/$f" "$MODPATH/web/"
-        echo "  Moved $f to web/" >> "$INSTALL_LOG"
+        if mv -f "$MODPATH/$f" "$MODPATH/web/" 2>/dev/null; then
+            echo "  Moved $f to web/" >> "$INSTALL_LOG"
+        else
+            echo "  ⚠️ Failed to move $f to web/" >> "$INSTALL_LOG"
+        fi
     fi
 done
 
 ui_print "  ✅ Files extracted"
 
 # ============================================================
-# [9b2] v1.2.0 — post-extraction recovery restoration
+# [9b2] Post-extraction recovery restoration
 # ============================================================
+# In recovery mode ([8a]), the 5 user config files were
+# restored into $BIN_DIR and ALSO snapshotted into
+# $RECOVERY_SNAPSHOT_DIR. The snapshot exists because [9]'s
+# unzip overwrites webui.conf and dnscrypt-proxy.toml with the
+# ZIP's default copies, losing the recovery data.
+#
+# This section re-applies the snapshot AFTER the unzip and the
+# file moves, and BEFORE [9c] (which is skipped in recovery
+# mode anyway).
+#
+# The snapshot directory is removed ONLY when the number of
+# files actually re-applied equals the number that was
+# snapshotted. On a partial re-application, the snapshot is
+# PRESERVED so the user can complete the recovery manually.
 BIN_DIR="$MODPATH/proxy"
 
 if [ "$RECOVERY_MODE" = "1" ] && [ -d "$RECOVERY_SNAPSHOT_DIR" ]; then
@@ -1489,18 +1177,29 @@ if [ "$RECOVERY_MODE" = "1" ] && [ -d "$RECOVERY_SNAPSHOT_DIR" ]; then
 fi
 
 # ============================================================
-# [9c] v1.2.0 — restore user settings with verification
+# [9c] Restore user settings with verification
 # ============================================================
-# CSH-15 fix: the previous version only aborted when the total
-# failure count reached 2. A single failed restoration of a
-# critical file (webui.conf or dnscrypt-proxy.toml) was allowed
-# to proceed silently, potentially leaving the user without
-# their configured WebUI port / credentials.
+# Copies the 5 user config files from the discovered source
+# (FOUND_SOURCE, [8]) into the module's proxy/ directory.
+# This is the NORMAL upgrade path — it does not run in
+# recovery mode, because [8a] + [9b2] already restored the
+# files.
 #
-# The loop now tracks CRITICAL_RESTORE_FAILED. Any failure on
-# one of the two critical files triggers an immediate rollback
-# and abort — regardless of the total failure count.
-# ============================================================
+# Critical failure: any failure on `webui.conf` or
+# `dnscrypt-proxy.toml` triggers an immediate rollback and
+# abort.
+#
+# Non-critical failures accumulate in RESTORE_FAILED_COUNT;
+# two or more trigger a rollback.
+#
+# Blocklist reuse (nested block):
+#   When FOUND_SOURCE has restored the 5 config files, we ALSO
+#   try to reuse the blocklist from any available source.
+#   Rationale: FOUND_SOURCE may be `backup/current/`, which
+#   deliberately excludes blocklists (they are
+#   re-downloadable). Without this reuse, [17] would create
+#   empty placeholder files and force the user to press
+#   "Apply" in the WebUI on every upgrade.
 RESTORED_COUNT=0
 RESTORE_FAILED_COUNT=0
 CRITICAL_RESTORE_FAILED=0
@@ -1544,12 +1243,7 @@ elif [ -n "$FOUND_SOURCE" ]; then
     if [ "$RESTORED_COUNT" -gt 0 ]; then
         ui_print "  ✅ Restored $RESTORED_COUNT user config file(s)"
 
-        # -- v1.2.1 blocklist reuse: search all candidates --
-        # Priority 1: FOUND_SOURCE. If FOUND_SOURCE lacks the
-        # blocklist (e.g. backup/current excludes it by design),
-        # fall back to any module folder with a non-empty
-        # blocklist. Prevents [17] from creating empty files and
-        # forcing manual "Apply" in the WebUI on every upgrade.
+        # Blocklist reuse: search all candidates.
         for _bl in blocklist.raw blocklist.txt; do
             _dst="$MODPATH/proxy/$_bl"
             [ -f "$_dst" ] && [ -s "$_dst" ] && continue
@@ -1595,8 +1289,25 @@ elif [ -n "$FOUND_SOURCE" ]; then
 fi
 
 # ============================================================
-# [9d] v1.2.0 — Layer 8: config migrations
+# [9d] Config migrations
 # ============================================================
+# Migrates the user's config files from the source version to
+# the current version. The source version is read from the
+# manifest (preferred) or from module.prop (fallback).
+#
+# Version-specific migrations:
+#
+#   v1.0.0 → v1.2.0:
+#     Adds MEMORY_LIMIT_HINT=auto to webui.conf if missing.
+#
+#   v1.1.0..v1.5.0 → v1.5.0:
+#     No changes needed. Every config field added between
+#     v1.1.0 and v1.5.0 is OPTIONAL.
+#
+#   unknown / empty source version:
+#     The config is used as-is.
+#
+# The migration is SKIPPED in recovery mode.
 read_source_version() {
     local src="$1"
 
@@ -1668,7 +1379,7 @@ migrate_config() {
             ui_print "- 🔄 Migration: $SOURCE_VERSION → $MODULE_VERSION"
             migrate_v1_0_0_to_v1_2_0
             ;;
-        "v1.1.0"|"v1.2.0"|"v1.3.0"|"v1.4.0")
+        "v1.1.0"|"v1.2.0"|"v1.3.0"|"v1.4.0"|"v1.5.0")
             ui_print "- 🔄 Migration: no changes needed ($SOURCE_VERSION → $MODULE_VERSION)"
             ;;
         "")
@@ -1686,15 +1397,28 @@ fi
 # ============================================================
 # [10] Verify critical files
 # ============================================================
+# install_app.sh is a REQUIRED file:
+#   • Drives the one-tap companion app install.
+#   • Staged at the ZIP root by the packaging script.
+#   • A properly built ZIP always contains it.
+#
+# boot-mini.sh is REQUIRED since v1.5.0 Phase 0:
+#   • Provides the Layer-0 primitives that functions.sh
+#     sources at load time.
+#
+# On any missing file: the transaction is rolled back and the
+# install aborts with the exact list of missing paths.
 MISSING=""
 [ ! -f "$MODPATH/module.prop" ]         && MISSING="$MISSING module.prop"
 [ ! -f "$MODPATH/service.sh" ]          && MISSING="$MISSING service.sh"
 [ ! -f "$MODPATH/functions.sh" ]        && MISSING="$MISSING functions.sh"
+[ ! -f "$MODPATH/boot-mini.sh" ]        && MISSING="$MISSING boot-mini.sh"
 [ ! -f "$MODPATH/watchdog.sh" ]         && MISSING="$MISSING watchdog.sh"
 [ ! -f "$MODPATH/post-fs-data.sh" ]     && MISSING="$MISSING post-fs-data.sh"
 [ ! -f "$MODPATH/action.sh" ]           && MISSING="$MISSING action.sh"
 [ ! -f "$MODPATH/status.sh" ]           && MISSING="$MISSING status.sh"
 [ ! -f "$MODPATH/uninstall.sh" ]        && MISSING="$MISSING uninstall.sh"
+[ ! -f "$MODPATH/install_app.sh" ]      && MISSING="$MISSING install_app.sh"
 [ ! -f "$MODPATH/web/index.html" ]      && MISSING="$MISSING web/index.html"
 [ ! -f "$MODPATH/web/dashboard.html" ]  && MISSING="$MISSING web/dashboard.html"
 [ ! -f "$MODPATH/web/manifest.json" ]   && MISSING="$MISSING web/manifest.json"
@@ -1711,12 +1435,18 @@ ui_print "  ✅ Critical files validated"
 # ============================================================
 # [10b] Verify PNG/ICO files (optional — warning only)
 # ============================================================
+# These files are OPTIONAL: the PWA install button falls back
+# to the SVG icons when the PNG variants are absent. A missing
+# PNG is therefore a cosmetic warning, not an install failure.
+#
+# offline.html is listed here too: the Service Worker degrades
+# gracefully when the file is absent.
 PNG_MISSING=""
-[ ! -f "$MODPATH/web/icon-192.png" ]        && PNG_MISSING="$PNG_MISSING icon-192.png"
-[ ! -f "$MODPATH/web/icon-512.png" ]        && PNG_MISSING="$PNG_MISSING icon-512.png"
+[ ! -f "$MODPATH/web/icon-192.png" ]         && PNG_MISSING="$PNG_MISSING icon-192.png"
+[ ! -f "$MODPATH/web/icon-512.png" ]         && PNG_MISSING="$PNG_MISSING icon-512.png"
 [ ! -f "$MODPATH/web/apple-touch-icon.png" ] && PNG_MISSING="$PNG_MISSING apple-touch-icon.png"
-[ ! -f "$MODPATH/web/favicon.ico" ]         && PNG_MISSING="$PNG_MISSING favicon.ico"
-[ ! -f "$MODPATH/web/offline.html" ]        && PNG_MISSING="$PNG_MISSING offline.html"
+[ ! -f "$MODPATH/web/favicon.ico" ]          && PNG_MISSING="$PNG_MISSING favicon.ico"
+[ ! -f "$MODPATH/web/offline.html" ]         && PNG_MISSING="$PNG_MISSING offline.html"
 
 if [ -n "$PNG_MISSING" ]; then
     ui_print "  ⚠️ Some asset files missing:$PNG_MISSING"
@@ -1728,8 +1458,68 @@ else
 fi
 
 # ============================================================
+# [10c] Mirror companion APK to /sdcard/
+# ============================================================
+# The companion APK (web/app-debug.apk) and its .sha256 sidecar
+# are mirrored to /sdcard/dnscrypt-webui-backup/apk/ so that:
+#   1. Users WITHOUT root can find the APK via a file manager
+#      (/sdcard is world-readable; /data/adb is not).
+#   2. The APK survives module uninstall.
+#   3. A future reinstall can fall back to the mirrored copy.
+#
+# Best-effort: if /sdcard is not mounted or not writable, a
+# warning is logged and the install continues.
+#
+# The mirror directory is EXCLUDED from rotation by both an
+# explicit name skip AND the manifest check (no .manifest.json).
+APK_MIRROR_DIR="$PERSISTENT_BACKUP/apk"
+APK_SRC="$MODPATH/web/app-debug.apk"
+SHA_SRC="$MODPATH/web/app-debug.apk.sha256"
+
+_apk_mirrored=0
+_sha_mirrored=0
+
+if [ -f "$APK_SRC" ] && [ -s "$APK_SRC" ]; then
+    if mkdir -p "$APK_MIRROR_DIR" 2>/dev/null; then
+        if cp -f "$APK_SRC" "$APK_MIRROR_DIR/app-debug.apk" 2>/dev/null; then
+            chmod 0644 "$APK_MIRROR_DIR/app-debug.apk" 2>/dev/null
+            _apk_mirrored=1
+        fi
+
+        if [ -f "$SHA_SRC" ] && [ -s "$SHA_SRC" ]; then
+            if cp -f "$SHA_SRC" "$APK_MIRROR_DIR/app-debug.apk.sha256" 2>/dev/null; then
+                chmod 0644 "$APK_MIRROR_DIR/app-debug.apk.sha256" 2>/dev/null
+                _sha_mirrored=1
+            fi
+        fi
+    fi
+fi
+
+if [ "$_apk_mirrored" = "1" ]; then
+    ui_print "  ✅ Companion APK mirrored: $APK_MIRROR_DIR"
+    echo "APK mirror: $APK_MIRROR_DIR (sha=$_sha_mirrored)" >> "$INSTALL_LOG"
+else
+    ui_print "  ⚠️  Companion APK mirror skipped (best-effort)"
+    echo "APK mirror: skipped (source missing or /sdcard unwritable)" >> "$INSTALL_LOG"
+fi
+
+# ============================================================
 # [11] Select binaries for architecture
 # ============================================================
+# The module ZIP ships per-architecture binaries in $BIN_DIR/.
+# This section picks the right pair for the device's ABI,
+# copies each to its canonical name, and removes the
+# per-architecture copies.
+#
+# ABI aliasing:
+#   arm64-v8a / aarch64*  → arm64 binaries
+#   armeabi-v7a / arm*    → arm binaries
+#   x86_64*               → x86_64 (amd64) binaries
+#   i686 / x86*           → x86 (386) binaries
+#
+# The `rm -f "$BIN_DIR"/dnscrypt-proxy-*` pattern deliberately
+# requires a trailing dash, so `dnscrypt-proxy.toml` and the
+# final binaries themselves are NOT matched.
 case "$ARCH" in
     arm64-v8a*|aarch64*)
         DNS_BIN="dnscrypt-proxy-arm64"
@@ -1777,10 +1567,7 @@ cp -f "$BIN_DIR/$WEB_BIN" "$BIN_DIR/dnscrypt-webui" || {
 }
 echo "✅ Binaries copied: $DNS_BIN, $WEB_BIN" >> "$INSTALL_LOG"
 
-# Remove the per-architecture copies; keep only the canonical
-# `dnscrypt-proxy` and `dnscrypt-webui`. The glob deliberately
-# requires a trailing dash after the name, so `dnscrypt-proxy.toml`
-# and the final binaries themselves are NOT matched.
+# Remove per-architecture copies; keep only the canonical names.
 rm -f "$BIN_DIR"/dnscrypt-proxy-* "$BIN_DIR"/dnscrypt-webui-* 2>/dev/null
 rm -f "$BIN_DIR/main.go" "$BIN_DIR/build.sh" 2>/dev/null
 
@@ -1790,6 +1577,22 @@ ui_print ""
 # ============================================================
 # [12] Create secure run/ directory
 # ============================================================
+# The run/ directory is created with mode 0700 and owned by
+# root. It holds all runtime state:
+#   • dnscrypt.pid      — PID file of the DNS engine
+#   • webui.pid         — PID file of the WebUI
+#   • watchdog.pid      — PID file of the watchdog
+#   • dnscrypt.status   — user intent: "ON" / "OFF"
+#   • .watchdog_token   — 64-hex CSRF token shared with main.go
+#   • .bootstrap_cache  — cached bootstrap resolver list
+#   • update_progress.txt — progress file
+#
+# Migration: PID files from the legacy /data/local/tmp location
+# are dropped (they are transient), but `dnscrypt.status` is
+# PRESERVED if it exists — it carries the user's ON/OFF intent
+# across the upgrade. If the copy fails (e.g. disk full,
+# permission error), the source is kept so the intent is not
+# lost.
 RUN_DIR="$BIN_DIR/run"
 
 ui_print "- 🔧 Creating secure run/ directory..."
@@ -1806,12 +1609,21 @@ chmod 0700 "$RUN_DIR" 2>/dev/null
 chown 0:0 "$RUN_DIR" 2>/dev/null
 
 # --- Migrate status file only from /data/local/tmp ---
+# The source is deleted ONLY when the copy into $RUN_DIR
+# actually succeeded (or when a fresh copy already exists at
+# the destination). A failed copy leaves the source intact.
+_STATUS_PRESERVED=0
 for f in dnscrypt.pid webui.pid watchdog.pid dnscrypt.status; do
     OLD_FILE="/data/local/tmp/$f"
     NEW_FILE="$RUN_DIR/$f"
     if [ -f "$OLD_FILE" ] && [ ! -f "$NEW_FILE" ]; then
         if [ "$f" = "dnscrypt.status" ]; then
-            cp -f "$OLD_FILE" "$NEW_FILE" 2>/dev/null
+            if cp -f "$OLD_FILE" "$NEW_FILE" 2>/dev/null; then
+                echo "  Migrated $f to $RUN_DIR" >> "$INSTALL_LOG"
+            else
+                echo "  ⚠️ Failed to migrate $f — keeping /tmp copy" >> "$INSTALL_LOG"
+                _STATUS_PRESERVED=1
+            fi
         fi
     fi
 done
@@ -1819,7 +1631,9 @@ done
 rm -f /data/local/tmp/dnscrypt.pid 2>/dev/null
 rm -f /data/local/tmp/webui.pid 2>/dev/null
 rm -f /data/local/tmp/watchdog.pid 2>/dev/null
-rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+if [ "$_STATUS_PRESERVED" = "0" ]; then
+    rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+fi
 
 ui_print "  ✅ run/ directory created (0700)"
 ui_print "  ✅ Migrated status files"
@@ -1829,6 +1643,16 @@ ui_print ""
 # ============================================================
 # [13] Old modules (runtime detection)
 # ============================================================
+# Stale module folders are detected at RUNTIME by main.go's
+# `checkOldModules()`. This section only logs a hint about
+# what kind of install this is:
+#
+#   • Recovery mode  — the user explicitly triggered recovery.
+#   • Upgrade        — a source was found in [8].
+#   • Fresh install  — no source found.
+#
+# The actual disable-other-folders logic lives in [23b], which
+# runs AFTER the module's own content is fully installed.
 if [ "$RECOVERY_MODE" = "1" ]; then
     ui_print "- Recovery mode: old modules will be detected at runtime"
     echo "Old modules: runtime detection (recovery mode)" >> "$INSTALL_LOG"
@@ -1845,16 +1669,35 @@ ui_print ""
 ui_print "- ⚙️  Creating configuration files..."
 
 # ============================================================
-# [14] Port validation — v1.2.0 collision-safe
+# [14] Port validation — collision-safe
 # ============================================================
+# Determines the final WebUI and Dashboard ports that will be
+# written to webui.conf, applying three rules:
+#
+#   1. Range check: 1 <= port <= 65535.
+#   2. Reserved-port check: port 8080 is rejected.
+#   3. Distinctness: PORT must differ from DASHBOARD_PORT.
+#
+# Existing values are read from a webui.conf that may have
+# been restored by [9c]. Invalid existing values fall back to
+# the defaults (9090 / 9091) with a warning message.
+#
+# Leading zeros are stripped before the range check: some
+# shells interpret "090" as octal 72 in arithmetic contexts,
+# which would pass a bogus port to the socket layer.
 validate_port() {
     local port="$1"
 
     echo "$port" | grep -qE '^[0-9]+$' || return 1
-    [ "$port" -ge 1 ] || return 1
-    [ "$port" -le 65535 ] || return 1
 
-    if [ "$port" = "$_MONITORING_UI_PORT" ]; then
+    local clean
+    clean=$(printf '%s' "$port" | sed 's/^0*//')
+    [ -z "$clean" ] && clean="0"
+
+    [ "$clean" -ge 1 ] || return 1
+    [ "$clean" -le 65535 ] || return 1
+
+    if [ "$clean" = "$_MONITORING_UI_PORT" ]; then
         return 1
     fi
 
@@ -1873,7 +1716,6 @@ if [ -f "$BIN_DIR/webui.conf" ]; then
     if validate_port "$EXISTING_PORT"; then
         TEMP_PORT="$EXISTING_PORT"
     else
-        # HARD-CS-02: include the offending value in the message.
         if [ "$EXISTING_PORT" = "$_MONITORING_UI_PORT" ]; then
             ui_print "  ⚠️ PORT=$EXISTING_PORT conflicts with [monitoring_ui], resetting to 9090"
         else
@@ -1932,8 +1774,12 @@ if [ "$TEMP_PORT" = "$TEMP_DASHBOARD_PORT" ]; then
 fi
 
 # ============================================================
-# [15] Write webui.conf file
+# [15] Write webui.conf
 # ============================================================
+# Writes a fresh webui.conf using the values resolved in [14].
+# The write is atomic: a `.tmp` file is written first, then
+# moved into place. If either step fails, the transaction is
+# rolled back and the install aborts.
 if ! cat > "$BIN_DIR/webui.conf.tmp" << EOF
 # ============================================================
 # DNSCrypt WebUI & Dashboard Configuration
@@ -1989,8 +1835,22 @@ ui_print "  ✅ webui.conf (WebUI: $TEMP_PORT, Dashboard: $TEMP_DASHBOARD_PORT, 
 echo "✅ webui.conf created (PORT=$TEMP_PORT, DASHBOARD_PORT=$TEMP_DASHBOARD_PORT)" >> "$INSTALL_LOG"
 
 # ============================================================
-# [16] Check if port is in use
+# [16] Port in use check
 # ============================================================
+# Best-effort informational check whether another process is
+# already listening on the WebUI port. The install does NOT
+# abort if the port is busy — the user may have another
+# process temporarily holding the port, and main.go's own
+# startup will detect and log the conflict.
+#
+# Three detection methods, in order of preference:
+#   1. `ss`       — the modern tool.
+#   2. `netstat`  — the older tool.
+#   3. /proc/net/tcp — the direct kernel view.
+#
+# The trailing space in ":$hex_port " prevents ":1F90" from
+# matching ":1F90A" (a different, longer port whose prefix
+# happens to equal ours).
 port_in_use=0
 if command -v ss >/dev/null 2>&1; then
     ss -tuln 2>/dev/null | grep -q ":$TEMP_PORT " && port_in_use=1
@@ -1998,7 +1858,7 @@ elif command -v netstat >/dev/null 2>&1; then
     netstat -tuln 2>/dev/null | grep -q ":$TEMP_PORT " && port_in_use=1
 elif [ -f /proc/net/tcp ]; then
     hex_port=$(printf "%04X" "$TEMP_PORT")
-    grep -qi ":$hex_port" /proc/net/tcp 2>/dev/null && port_in_use=1
+    grep -qi ":$hex_port " /proc/net/tcp 2>/dev/null && port_in_use=1
 fi
 
 if [ $port_in_use -eq 1 ]; then
@@ -2009,6 +1869,12 @@ fi
 # ============================================================
 # [17] Create default config files (only if missing)
 # ============================================================
+# After [9c]'s restore attempt, the module's proxy/ directory
+# should contain the 5 user config files. Any file that is
+# still missing at this point is created with a safe default.
+#
+# The `[ ! -f ]` guard makes this section idempotent: an
+# upgrade that restored the file in [9c] leaves it untouched.
 [ ! -f "$BIN_DIR/selected_profile.txt" ] && printf "pro\n" > "$BIN_DIR/selected_profile.txt"
 [ ! -f "$BIN_DIR/blocklist.txt" ] && : > "$BIN_DIR/blocklist.txt"
 [ ! -f "$BIN_DIR/blocklist.raw" ] && : > "$BIN_DIR/blocklist.raw"
@@ -2028,12 +1894,87 @@ ui_print "  ✅ Default config files created"
 # ============================================================
 # [18] Generate secure login credentials
 # ============================================================
+# Ensures the `[monitoring_ui]` section of dnscrypt-proxy.toml
+# contains a non-default username/password pair.
+#
+# Trigger for regeneration:
+#   • Either credential is missing, OR
+#   • The credentials are the well-known default `admin`/`admin`.
+#
+# Preservation:
+#   If both credentials exist AND are not `admin`/`admin`, the
+#   section is left untouched. The credentials file at
+#   /data/local/tmp/dnscrypt_credentials.txt is regenerated
+#   from the existing values so the user always has a fresh
+#   copy.
+#
+# Verification:
+#   After writing the new credentials, both are read back and
+#   compared. Any mismatch aborts the install and rolls back
+#   the transaction — a silent credential-replacement failure
+#   would leave the user locked out of their own WebUI.
+#
+# Fallback warning:
+#   When /dev/urandom is unavailable (extremely rare on Android),
+#   the fallback credentials are derived from the epoch time and
+#   are therefore predictable. A warning is shown to the user
+#   and logged so they know to change the password immediately.
 ui_print ""
 ui_print "- 🔐 Generating secure credentials..."
 
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
 
+# parse_toml_value — extract a value from a TOML right-hand side.
+#
+# Quoted values (single or double) are returned verbatim between
+# the delimiters — a '#' inside the quotes is NOT a comment.
+# This is the TOML spec behavior: comments are only recognized
+# outside of strings.
+#
+# Unquoted values have their inline " #" comment stripped and
+# surrounding whitespace trimmed.
+parse_toml_value() {
+    local s="$1"
+    [ -z "$s" ] && return 0
+    s=$(printf '%s' "$s" | sed 's/^[[:space:]]*//')
+
+    case "$s" in
+        \"*)
+            printf '%s' "$s" | sed 's/^"//; s/".*//'
+            return 0
+            ;;
+    esac
+
+    case "$s" in
+        \'*)
+            printf '%s' "$s" | sed "s/^'//; s/'.*//"
+            return 0
+            ;;
+    esac
+
+    case "$s" in
+        *" #"*) s="${s%% #*}" ;;
+    esac
+    printf '%s' "$s" | sed 's/[[:space:]]*$//'
+    return 0
+}
+
+# read_toml_credentials — extract `username` and `password`
+# from the `[monitoring_ui]` section of $TOML_FILE.
+#
+# Output: two lines on stdout — username, then password. Both
+# are empty strings if the file, section, or fields are
+# missing.
+#
+# The parser is section-restricted: any `username`/`password`
+# pair in any OTHER section is deliberately ignored.
+#
+# NOTE: this parser is intentionally duplicated in three files
+# (functions.sh, customize.sh, install_app.sh). Each file must
+# be independently sourceable at different stages of the module
+# lifecycle, so the duplication is deliberate. Any behavioral
+# change MUST be applied to all three.
 read_toml_credentials() {
     local user="" pass=""
 
@@ -2076,13 +2017,7 @@ read_toml_credentials() {
                 key=$(printf '%s' "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
                 val=$(printf '%s' "$trimmed" | sed 's/^[^=]*=//')
-                val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-
-                case "$val" in
-                    *" #"*) val="${val%% #*}" ;;
-                esac
-                val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                val=$(printf '%s' "$val" | sed "s/^['\"]//;s/['\"]$//")
+                val=$(parse_toml_value "$val")
 
                 case "$key" in
                     username) user="$val" ;;
@@ -2113,14 +2048,20 @@ if [ -f "$TOML_FILE" ]; then
     fi
 
     if [ "$NEED_NEW_CREDS" = "1" ]; then
+        # Username: 8 alphanumeric chars from /dev/urandom, or
+        # "admin_" + last 8 chars of the current epoch.
         NEW_USER=""
         if [ -r /dev/urandom ]; then
             NEW_USER="admin_$(tr -dc 'a-z0-9' < /dev/urandom 2>/dev/null | head -c 8)"
         fi
         if [ -z "$NEW_USER" ] || [ "$NEW_USER" = "admin_" ] || [ "${#NEW_USER}" -lt 8 ]; then
             NEW_USER="admin_$(date +%s | tail -c 9)"
+            ui_print "  ⚠️ /dev/urandom unavailable — using fallback username"
+            echo "⚠️ Fallback username generated (predictable — change immediately)" >> "$INSTALL_LOG"
         fi
 
+        # Password: 24 alphanumeric chars from /dev/urandom, or
+        # "Auto_<epoch>_<hash prefix>".
         NEW_PASS=""
         if [ -r /dev/urandom ]; then
             NEW_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom 2>/dev/null | head -c 24)
@@ -2133,6 +2074,8 @@ if [ -f "$TOML_FILE" ]; then
             else
                 NEW_PASS="Auto_$(date +%s)_$(hostname 2>/dev/null || echo safe)_$RANDOM"
             fi
+            ui_print "  ⚠️ /dev/urandom unavailable — using fallback password"
+            echo "⚠️ Fallback password generated (predictable — change immediately)" >> "$INSTALL_LOG"
         fi
 
         cp -f "$TOML_FILE" "$TOML_FILE.bak" 2>/dev/null
@@ -2140,6 +2083,8 @@ if [ -f "$TOML_FILE" ]; then
         sed -i "s|^[[:space:]]*username[[:space:]]*=[[:space:]]*['\"].*['\"]|  username = '$NEW_USER'|" "$TOML_FILE"
         sed -i "s|^[[:space:]]*password[[:space:]]*=[[:space:]]*['\"].*['\"]|  password = '$NEW_PASS'|" "$TOML_FILE"
 
+        # Verification — read both fields back and compare. Any
+        # mismatch is fatal.
         _verify=$(read_toml_credentials)
         VERIFY_USER=$(printf '%s' "$_verify" | sed -n '1p')
         VERIFY_PASS=$(printf '%s' "$_verify" | sed -n '2p')
@@ -2165,6 +2110,7 @@ if [ -f "$TOML_FILE" ]; then
 
         rm -f "$TOML_FILE.bak"
 
+        # Write the credentials file (atomic).
         if ! cat > "${CRED_FILE}.tmp" << EOF
 # ============================================================
 # DNSCrypt Smart Filter – Login Credentials
@@ -2198,6 +2144,7 @@ EOF
 
         echo "✅ Credentials generated successfully" >> "$INSTALL_LOG"
     else
+        # Credentials already exist and are not the default.
         ui_print "  ℹ️  Using existing credentials from TOML"
 
         if ! cat > "${CRED_FILE}.tmp" << EOF
@@ -2224,6 +2171,13 @@ fi
 # ============================================================
 # [19] Set permissions
 # ============================================================
+# Applies the module's canonical permission set:
+#   • All files under $MODPATH: 0755 dirs / 0644 files
+#   • The two binaries: 0755.
+#   • All shell scripts at the module root: 0755.
+#   • All web assets under $MODPATH/web: 0644.
+#   • webui.conf and dnscrypt-proxy.toml: 0600.
+#   • run/: 0700, owned by root:root.
 ui_print "- 🔒 Setting permissions..."
 
 set_perm_recursive "$MODPATH" 0 0 0755 0644 2>/dev/null || true
@@ -2231,7 +2185,7 @@ set_perm_recursive "$MODPATH" 0 0 0755 0644 2>/dev/null || true
 chmod 0755 "$BIN_DIR/dnscrypt-proxy" 2>/dev/null
 chmod 0755 "$BIN_DIR/dnscrypt-webui" 2>/dev/null
 
-for s in service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh watchdog.sh; do
+for s in service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh boot-mini.sh watchdog.sh install_app.sh; do
     [ -f "$MODPATH/$s" ] && chmod 0755 "$MODPATH/$s"
 done
 
@@ -2252,21 +2206,18 @@ chown 0:0 "$RUN_DIR" 2>/dev/null
 ui_print "  ✅ Permissions set"
 
 # ============================================================
-# [19b] v1.2.0 — Watchdog token (BUG-CS-D fix)
+# [19b] Watchdog token
 # ============================================================
 # Pre-generate the watchdog token that main.go and watchdog.sh
 # share. Writing it here means the token is available even
-# before the first WebUI startup, and even if the user disables
-# the WebUI while keeping the watchdog active.
+# before the first WebUI startup.
 #
-# The token is 64 hex chars (32 bytes / 256 bits). It is written
+# The token is 64 hex chars (32 bytes / 256 bits). Written
 # with the standard "tmp + mv" atomic pattern. If the write
-# fails, main.go will regenerate the token on first startup —
-# so a failure here is non-fatal.
+# fails, main.go will regenerate the token on first startup.
 #
 # File:   $RUN_DIR/.watchdog_token (mode 0600)
 # Header: X-Watchdog-Token (constant-time compared by main.go)
-# ============================================================
 WATCHDOG_TOKEN_FILE="$RUN_DIR/.watchdog_token"
 TOKEN=""
 
@@ -2275,10 +2226,6 @@ if [ -r /dev/urandom ]; then
 fi
 
 if [ -z "$TOKEN" ] || [ "${#TOKEN}" -lt 32 ]; then
-    # Fallback: derive from date + PID + RANDOM. Not
-    # cryptographically strong, but main.go accepts any 32+
-    # char token that matches the file, and this fallback is
-    # only used on devices without /dev/urandom (essentially none).
     if [ "$HAS_SHA256" = "1" ]; then
         TOKEN=$(printf '%s-%s-%s' "$(date +%s%N 2>/dev/null || date +%s)" "$$" "$RANDOM" | \
                 sha256sum 2>/dev/null | awk '{print $1}')
@@ -2305,11 +2252,23 @@ fi
 # ============================================================
 # [20] Write module fingerprint
 # ============================================================
+# A single-line marker that identifies this module folder as
+# belonging to DNSCrypt Smart Filter. Read by:
+#   • main.go:checkOldModules()  — to skip the current install.
+#   • main.go:removeModule()     — to refuse deletion of a
+#                                   folder without the
+#                                   fingerprint.
+#   • customize.sh [8] discovery — as a secondary signal.
+#
+# Format: `<id>-<version>`.
 printf "dnscrypt-proxy-webui-%s\n" "$MODULE_VERSION" > "$MODPATH/.module.fingerprint"
 
 # ============================================================
-# [21] Compute expected memory limit (v1.1.0+)
+# [21] Compute expected memory limit
 # ============================================================
+# Displays the memory limit that main.go WILL apply at runtime
+# based on the selected profile. This is a HINT only — main.go
+# is the authority (via debug.SetMemoryLimit).
 SELECTED_PROFILE="pro"
 if [ -f "$BIN_DIR/selected_profile.txt" ]; then
     _sp=$(cat "$BIN_DIR/selected_profile.txt" 2>/dev/null | tr -d '\r\n ')
@@ -2328,8 +2287,19 @@ case "$SELECTED_PROFILE" in
 esac
 
 # ============================================================
-# [22] v1.2.0 — Layer 10: log upgrade history
+# [22] Log upgrade history
 # ============================================================
+# Records every successful install in a machine-readable log
+# under the persistent backup directory.
+#
+# Two formats:
+#   • .upgrade_history.json — used when `jq` is available.
+#   • .upgrade_history.txt  — fallback, one line per install.
+#
+# The jq temp file is created INSIDE $PERSISTENT_BACKUP so the
+# final `mv` is on the same filesystem. On Android, `mktemp`
+# may return a path under /data while the backup lives on
+# /sdcard (FUSE) — a cross-device mv would fail with EXDEV.
 log_upgrade() {
     local history="$PERSISTENT_BACKUP/.upgrade_history.json"
     local files_count="$FOUND_FILE_COUNT"
@@ -2341,10 +2311,6 @@ log_upgrade() {
     if [ "$HAS_JQ" = "1" ]; then
         [ -f "$history" ] || echo '{"upgrades":[]}' > "$history"
 
-        # HARD-CS-03: place the jq temp file inside the backup
-        # directory so the final mv is same-filesystem. On
-        # Android, `mktemp` may return a path on /data while
-        # the backup lives on /sdcard (FUSE), causing EXDEV.
         local tmp
         tmp="$PERSISTENT_BACKUP/.upgrade_history.tmp.$$"
 
@@ -2373,14 +2339,14 @@ log_upgrade() {
 }
 
 # --- Write the .last_stable pointer ---
-# BUG-CS-C: use the full BACKUP_DIR_NAME (with PID suffix).
-# BUG-CS-A: only update when PERSISTENT_BACKUP_OK=1, which now
-# correctly means ">= 1 file was actually written".
+# Uses the full BACKUP_DIR_NAME (with PID suffix). Only updated
+# when PERSISTENT_BACKUP_OK=1, which means ">= 1 file was
+# actually written".
 if [ "$PERSISTENT_BACKUP_OK" = "1" ]; then
     echo "$BACKUP_DIR_NAME" > "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null
 fi
 
-# --- Log the upgrade (CSH-3: only when meaningful) ---
+# --- Log the upgrade (only when meaningful) ---
 if [ -n "$SOURCE_VERSION" ] || [ -n "$FOUND_SOURCE" ] || [ "$RECOVERY_MODE" = "1" ]; then
     log_upgrade
 fi
@@ -2413,6 +2379,7 @@ Five user config files (only these):
 - `.pending_notification`         — transient; read+deleted by main.go at boot
 - `.upgrade_history.json`         — full upgrade log (JSON, when jq is available)
 - `.upgrade_history.txt`          — fallback log when jq is unavailable
+- `apk/`                          — mirrored companion APK + .sha256
 - `README.md`                     — this file
 
 ## Retention
@@ -2425,7 +2392,9 @@ additional protected targets that are never pruned:
 
 Older snapshots are pruned automatically. The `current/` directory
 and any `txn-*` / `orphan-txn-*` transaction directories are exempt
-from rotation.
+from rotation. The `apk/` mirror is also exempt — it lacks a
+`.manifest.json`, so the manifest-based snapshot detection
+(ROT-MANIFEST) never counts it as a snapshot.
 
 ## Manual Restore
 
@@ -2449,45 +2418,41 @@ The `current/` directory and `.last_stable` file are essential for
 automatic recovery. If you delete them, the module can still be
 reinstalled, but the emergency recovery path will not work.
 
-See docs/BACKUP.md for the full reference.
-See docs/EMERGENCY.md for recovery procedures.
+See docs/REFERENCE.md §4 for the full reference.
+See docs/GUIDE.md §8 for recovery procedures.
 EOF
     chmod 0644 "$PERSISTENT_BACKUP/README.md" 2>/dev/null
 fi
 
 # ============================================================
-# [22b] v1.2.0 — Layer 9: rotate backups
+# [22b] Rotate backups
 # ============================================================
 # Mirrors the canonical functions.sh:rotate_backups using the
-# SAME v1.3.0 rotation semantics (ROT-MANIFEST + ROT-MTIME +
-# ROT-PROTECT). The three identifiers are shared with
-# CHANGELOG.md and docs/ARCHITECTURE.md §4.13.2.
+# SAME rotation semantics:
 #
-#   ROT-MANIFEST — a directory is treated as a snapshot iff it
-#     contains a `.manifest.json` file. Excludes current/,
-#     txn-*/, and orphan-txn-*/ by name.
+#   • ROT-MANIFEST — a directory is treated as a snapshot iff
+#     it contains a `.manifest.json` file.
 #
-#   ROT-MTIME — candidates are sorted by mtime (numeric,
-#     descending, `sort -rn -k1,1`), not by directory name.
+#   • ROT-MTIME — candidates are sorted by mtime (numeric,
+#     descending, `LC_ALL=C sort -rn -k1,1`), not by directory
+#     name.
 #
-#   ROT-PROTECT — two additional targets are preserved on top
+#   • ROT-PROTECT — two additional targets are preserved on top
 #     of the 21-newest window:
 #       • the `.last_stable` target (recovery pointer);
 #       • the newest install snapshot (name matching `-v<digit>`).
 #
-# ⚠️ CSH-19 (v1.4.0): this function contained the v1.3.0 rotation
-# logic before this revision, but its doc-block was missing and
-# the file header claimed "no changes to the installer" for
-# v1.3.0. Both have been corrected in v1.4.0. See the file header
-# for the full rationale.
+# Canonical status: THIS is a mirrored copy. The reference
+# implementation lives in `functions.sh:rotate_backups`. Any
+# change there MUST be applied here as well — the installer
+# runs before the module is extracted and cannot source that
+# file.
 #
-# Note: this installer-side rotation is only invoked once, at
-# install time. The canonical `functions.sh:rotate_backups` runs
-# at boot (from service.sh) and after every pre-critical backup
-# (from main.go). All three implementations share the same
-# semantics — see SVC-FIX-L4 / §[5d] of service.sh and the
-# parallel function in functions.sh.
-# ============================================================
+# The `apk/` mirror subfolder is preserved by TWO independent
+# mechanisms:
+#   1. The `case` statement explicitly skips `apk/` by name.
+#   2. The ROT-MANIFEST check requires a `.manifest.json` inside
+#      the candidate directory — `apk/` has none.
 rotate_backups() {
     local keep="${1:-21}"
 
@@ -2497,10 +2462,6 @@ rotate_backups() {
         return 0
     }
 
-    # v1.3.0 — Professional rotation (parity with functions.sh)
-    #   ROT-MANIFEST: detect by .manifest.json presence.
-    #   ROT-MTIME:    order by mtime, descending.
-    #   ROT-PROTECT:  preserve .last_stable target + newest install.
     local _protected=""
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
         _protected=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
@@ -2513,7 +2474,7 @@ rotate_backups() {
             _d="${_d%/}"
             [ -d "$_d" ] || continue
             case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
+                current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
             _mt=$(stat -c %Y "$_d" 2>/dev/null) \
@@ -2521,7 +2482,7 @@ rotate_backups() {
                 || _mt=0
             case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
             printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1
+        done | LC_ALL=C sort -rn -k1,1
     )
 
     [ -z "$_list" ] && return 0
@@ -2575,6 +2536,20 @@ fi
 # ============================================================
 # [23] Commit the transaction + cleanup TXN_DIR
 # ============================================================
+# Two cleanup paths:
+#
+#   1. TXN_ACTIVE=1 → the install reached this point normally.
+#      `commit_transaction` writes COMMIT, then clears the
+#      flag. On success, remove the transaction directory.
+#
+#   2. TXN_ACTIVE=0 → the install either never created a
+#      transaction or already committed it.
+#
+# If `commit_transaction` fails to write the COMMIT state file,
+# it returns 1 and leaves TXN_ACTIVE=1. The [23] cleanup block
+# does NOT run, so the transaction directory survives with its
+# state file still saying START. The next uninstall.sh call will
+# rename it to `orphan-txn-*` and preserve it.
 if [ "$TXN_ACTIVE" = "1" ]; then
     if commit_transaction; then
         ui_print "- ✅ Transaction committed"
@@ -2587,6 +2562,9 @@ if [ "$TXN_ACTIVE" = "0" ] && [ -d "$TXN_DIR" ]; then
     rm -rf "$TXN_DIR" 2>/dev/null
 fi
 
+# cleanup_old_transactions removes leftover COMMIT'd txn
+# directories from previous installs that failed between the
+# commit write and their own cleanup step.
 cleanup_old_transactions() {
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
@@ -2608,7 +2586,7 @@ cleanup_old_transactions() {
 cleanup_old_transactions
 
 # ============================================================
-# [23b] v1.2.0 -- disable stale module folders
+# [23b] Disable stale module folders
 # ============================================================
 # Mark every other folder with id=dnscrypt-proxy-webui (not
 # $MODPATH, not $FOUND_SOURCE's parent) as disabled by touching
@@ -2619,7 +2597,22 @@ cleanup_old_transactions
 #   * Non-destructive: data is preserved.
 #   * Safe: no recursive deletion.
 #   * Discovery still sees them as fallback sources.
-# ============================================================
+#
+# Two skip rules:
+#
+#   1. Skip folders whose BASENAME matches $MODPATH's basename.
+#      Rationale: Magisk replaces same-named module folders at
+#      boot, so a folder with the same basename but a different
+#      root is the update-staging directory for THIS install.
+#
+#   2. Skip folders whose parsed version is >= our version.
+#      Rationale: a same-id folder with a higher or equal
+#      version is either a concurrent install in progress or a
+#      partially-updated tree. Disabling it could break the
+#      other install.
+#
+# The version comparison uses the same score formula as [8]'s
+# discovery: major*10000 + minor*100 + patch.
 if [ -n "$FOUND_SOURCE" ]; then
     _src_dir=$(dirname "$FOUND_SOURCE")
     _target_basename=$(basename "$MODPATH")
@@ -2637,8 +2630,6 @@ if [ -n "$FOUND_SOURCE" ]; then
             [ "$_m" = "$MODPATH" ] && continue
 
             _m_name=$(basename "$_m")
-            # v1.2.1 smart disable: skip folders with same basename
-            # as $MODPATH (Magisk replaces them at boot).
             [ "$_m_name" = "$_target_basename" ] && continue
 
             [ -f "$_m/module.prop" ] || continue
@@ -2646,7 +2637,6 @@ if [ -n "$FOUND_SOURCE" ]; then
             _mid=$(printf "%s" "$_mid" | tr -d "\r ")
             [ "$_mid" = "$MODULE_ID" ] || continue
 
-            # v1.2.1 smart disable: skip folders whose version >= ours.
             _m_ver=$(grep '^version=' "$_m/module.prop" | head -1 | cut -d= -f2-)
             _m_ver=$(printf "%s" "$_m_ver" | tr -d "v\r ")
             _m_vmaj=$(echo "$_m_ver" | cut -d. -f1); case "$_m_vmaj" in ""|*[!0-9]*) _m_vmaj=0 ;; esac
@@ -2672,12 +2662,8 @@ fi
 # ============================================================
 # [24] Display final summary
 # ============================================================
-# CSH-16 fix: the previous version had TWO consecutive
-# `if [ "$RECOVERY_MODE" = "1" ]` blocks — one for the banner,
-# one for the status line. They are now merged into a single
-# if/elif/else chain so the summary is printed exactly once
-# and reads coherently.
-# ============================================================
+# A single if/elif/else chain so the summary is printed exactly
+# once and reads coherently.
 ui_print ""
 ui_print "╔══════════════════════════════════════════╗"
 ui_print "║  ✅ Installation Complete                ║"
@@ -2703,9 +2689,6 @@ ui_print "  🔌 Bind: $TEMP_BIND_ADDR"
 ui_print "  🧠 Memory limit: ~$EXPECTED_MEM_LIMIT (profile: $SELECTED_PROFILE)"
 ui_print ""
 
-# HARD-CS-01 + HARD-CS-07: distinguish the three outcomes clearly
-# and label the file count as "source files" so it is not
-# confused with the backup manifest's own files_count.
 if [ "$PERSISTENT_BACKUP_OK" = "1" ]; then
     ui_print "  💾 Backup: $PERSISTENT_BACKUP_DIR"
     if [ "$BACKUP_INTEGRITY_VERIFIED" = "1" ]; then
@@ -2720,16 +2703,35 @@ elif [ -n "$FOUND_SOURCE" ]; then
 else
     ui_print "  💾 Backup: not created (fresh install — no user data yet)"
 fi
+
+if [ "$_apk_mirrored" = "1" ]; then
+    ui_print "  📱 Companion APK mirror: $APK_MIRROR_DIR"
+    if [ "$_sha_mirrored" = "1" ]; then
+        ui_print "     (APK + .sha256 sidecar)"
+    else
+        ui_print "     (APK only — .sha256 not in module ZIP)"
+    fi
+fi
+
 ui_print ""
 ui_print "  ℹ️  Next steps:"
 ui_print "    1. Reboot your device"
 ui_print "    2. Open the WebUI and login with the credentials above"
 ui_print "    3. Choose a blocklist profile and press Apply"
+ui_print "    4. (Optional) Install the companion app:"
+ui_print "       WebUI header → Install App → Install locally"
 ui_print ""
 
 # ============================================================
 # [25] Reboot warning
 # ============================================================
+# If [8b] killed any running process, the DNS engine is now
+# stopped. The kernel may have cached DNS state pointing at the
+# old resolver, and Android's network stack may not re-read the
+# new configuration until a full reboot.
+#
+# The warning is only shown when KILLED_COUNT > 0 — i.e. when
+# an actual upgrade over a running module occurred.
 if [ "$KILLED_COUNT" -gt 0 ]; then
     ui_print ""
     ui_print "╔══════════════════════════════════════════╗"

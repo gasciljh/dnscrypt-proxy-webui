@@ -2,23 +2,25 @@
 # shellcheck shell=ksh
 # shellcheck disable=SC2059  # printf color codes are trusted constants
 # ============================================================
-# DNSCrypt Smart Filter – status.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — status.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Display the current status of the DNSCrypt Smart Filter module.
+# Display the current status of the DNSCrypt Smart Filter
+# module.
 #
-# Modes (v1.2.0):
+# Modes:
 #   status.sh                Full display (default)
 #   status.sh --short        Short display (OK / STOPPED / ...)
 #   status.sh --json         JSON output
 #   status.sh --check        Single-line core summary
-#   status.sh --verbose      Extended display (adds ports + config file paths)
-#   status.sh --diagnose     Full diagnostic report (v1.2.0)
+#   status.sh --verbose      Extended display (adds ports +
+#                            config file paths)
+#   status.sh --diagnose     Full diagnostic report
 #   status.sh --help         Show help
+#   status.sh --version      Show version
 #
 # Exit codes:
 #   0 = everything running
@@ -26,270 +28,47 @@
 #   2 = partial (only one service running)
 #   3 = module disabled
 #
-# Reports:
-#   • DNS Engine  (port 5354/UDP)
-#   • WebUI       (port from webui.conf)
-#   • Dashboard   (port from webui.conf)
-#   • Watchdog    (PID file + process verification)
-#   • STATUS_FILE (user intent — may differ from actual state)
-#   • Active profile + blocklist entry count
-#   • Expected memory limit (v1.1.0 — display-only hint)
-#   • Blocklist stats (raw + filtered)
-#   • Configuration (AUTO_RESTART_*, BIND_ADDR, IPv6)
-#   • Runtime directory
-#   • Backup status (v1.2.0 — Layer 10)
-#   • Pending notification (v1.2.0)
-#   • Recovery mode state (v1.2.0)
-#   • Orphan transactions (v1.2.0)
-#
 # Design:
-#   • Loads functions.sh if available; otherwise uses inline
-#     fallbacks (is_port_open, read_conf, read_webui_port, ...)
-#   • The wrapper for is_ipv6_available delegates directly to
-#     _inline_is_ipv6_available to avoid infinite recursion.
-#     (The v1.0.0 development cycle hit a self-referencing bug
-#      that caused a SIGSEGV after ~18,000 iterations. The fix
-#      is preserved here as a documented invariant.)
-#
-# v1.1.0 additions (kept):
-#   • JSON mode: profile.key + profile.memory_limit_mb
-#   • Full mode: "Profile & Memory" section
-#   • --check mode: PROFILE= and MEM= fields
-#   • --verbose mode: additional ports + config file paths
-#   • Self-contained profile memory hint
-#
-# v1.2.0 additions:
-#   • --diagnose mode (Layer 10 — Observability)
-#   • JSON mode: backups object with full metadata
-#   • Default mode: "Backup & Recovery" section
-#   • --check mode: BACKUP= field (last backup age)
-#   • --verbose mode: full backup listing + orphan txns
-#
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 STS-1 — Removed the broken `s/\b/\\b/g` sed rule from
-#     `esc_json`. In sed, `\b` is a word-boundary anchor, not a
-#     backspace character; the rule was corrupting every string
-#     field in the JSON output.
-#   🔧 STS-2 — `date -d "@epoch"` has a working fallback using
-#     `date -r "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME"`.
-#   🔧 STS-3 — Removed the no-op `--force` flag.
-#   🔧 STS-4 — Corrected the `--verbose` help text.
-#   🔧 STS-5 — Corrected the `--check` help text.
-#   🔧 STS-6 — Removed the unused `VERBOSE_EXTRA` variable.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening in this revision
-# ============================================================
-#   🛡️ HARD-STS-01 — `--diagnose` now includes missing user data
-#     files in the "critical issues" tally. Previously, the
-#     final diagnosis could print "✅ All systems operational"
-#     even when some of the 5 user data files were missing,
-#     because `_health_issues` only counted DNS/WebUI/config
-#     problems. `_ud_missing` is now promoted from a display-only
-#     counter to a full member of the health-issue tally.
-#
-#   🛡️ HARD-STS-02 — `--diagnose` validates `_auto_now` before
-#     the arithmetic on `.last_auto_backup`. Previously, an
-#     empty result from `date +%s` (very early boot) would
-#     produce `_auto_age = -(_auto_mtime)`, a large negative
-#     number. `format_age` handled the negative case, but the
-#     inconsistency with the rest of the script (which validates
-#     `_now` in [7c]) was a latent bug. Parity is now enforced.
-#
-#   🛡️ HARD-STS-03 — `format_age(0)` now returns "0s ago" instead
-#     of "N/A". A snapshot created in the same second as the
-#     report should read as "just now", not as "not available".
-#
-#   🛡️ HARD-STS-04 — `--json` mode now emits `null` for empty
-#     PIDs (`dns_engine.pid`, `webui.pid`, `watchdog.pid`) and
-#     for an empty `backups.last_backup`. The JSON schema is
-#     now consistent: any absent string field is `null`.
-#
-#   🛡️ HARD-STS-05 — Renamed the local variable `BACKUP_LAST_ISO`
-#     to `BACKUP_LAST_HUMAN`. The original name implied an ISO
-#     8601 timestamp, but the value is `date '+%Y-%m-%d %H:%M'`.
-#
-#   🛡️ HARD-STS-06 — Mode flags are now validated for conflicts.
-#     Passing two or more of `--short`, `--check`, `--json`,
-#     `--diagnose` in a single invocation is now a hard error
-#     with a clear message, instead of a silent race in which
-#     the last-checked mode won. `--verbose` is treated as a
-#     modifier for the default mode and cannot be combined with
-#     any of the primary modes.
-#
-#   🛡️ HARD-STS-07 — The snapshot-listing logic used by
-#     `--diagnose` and `--verbose` has been extracted into a
-#     single helper `_list_snapshots`. The two modes now share
-#     a single source of truth for enumeration, sort order,
-#     and filtering.
-#
-#   🛡️ HARD-STS-08 — `[7c]` now uses the shared `_list_snapshots`
-#     helper for the count and the newest-name lookups. This
-#     eliminates three inline copies of the same glob+sort
-#     pipeline that could drift out of sync in future edits.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Cross-file parity fixes (this revision)
-# ============================================================
-#   🔧 STS-7 — `_inline_read_port` now strips leading zeros before
-#     range checking, mirroring HARD-SVC-02 in service.sh. Without
-#     this, `PORT=090` was interpreted as octal (72) by mksh and
-#     then written to a port that could not bind.
-#
-#   🔧 STS-8 — `_inline_is_port_open` now falls back to `netstat`
-#     when `ss` is unavailable, mirroring HARD-SVC-03 in service.sh
-#     and HARD-WD-02 in watchdog.sh. Older Android devices without
-#     `ss` previously had to rely on /proc/net/* only.
-#
-#   🔧 STS-9 — Removed the `|| echo "0"` suffix from the two
-#     `grep -cE` calls in `--diagnose` and `--verbose`. `grep -c`
-#     always prints a count (0 on no match), so the fallback
-#     produced the literal string "0\n0", which broke `printf`
-#     table alignment. Counts are now normalised via an explicit
-#     `[ -z ... ] && ... = 0` guard.
-#
-#   🔧 STS-10 — Removed the redundant `sed 's/  */ /g'` stage from
-#     `esc_json`. The stage collapsed legitimate runs of spaces
-#     inside values (e.g. paths with embedded double-spaces). The
-#     `tr '\n' ' '` stage alone is sufficient to flatten newlines.
-#
-#   🔧 STS-11 — The snapshot enumeration loops in `--diagnose`
-#     and `--verbose` now feed the shared helper's output via a
-#     here-document instead of a pipe. The pipe placed the loop
-#     body in a subshell, so the in-loop `_bk_i` counter was lost
-#     after the loop (harmless today, but a latent trap for any
-#     future code that needs the final count).
-#
-# ============================================================
-# Coordination with main.go:
-#   • The memory limit shown here is a HINT. main.go is the
-#     authority for debug.SetMemoryLimit().
-#   • The profile value is read from selected_profile.txt,
-#     matching main.go's readSelectedProfile().
-#   • The backups directory is written by:
-#       - main.go:createAutoBackup (pre-critical)
-#       - service.sh:auto_backup_if_needed (periodic)
-#       - customize.sh (during install)
-#   • The txn-* directories are managed by customize.sh and
-#     cleaned up by:
-#       - customize.sh (self cleanup after COMMIT)
-#       - main.go:cleanupOldTransactions (at startup)
-#       - service.sh (via do_cleanup_transactions at boot)
-#
-# ============================================================
-# v1.3.0 — Server-side refinement: snapshot detection
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   However, the snapshot enumeration pipeline in this script
-#   (§[7c] `_list_snapshots`) was ALSO refined in v1.3.0 to
-#   match the canonical implementations in `functions.sh`,
-#   `main.go`, `service.sh`, and `watchdog.sh`. Earlier
-#   revisions of this header incorrectly claimed "no changes
-#   to the status display" and "byte-for-byte identical
-#   between v1.2.0 and v1.3.0" — those claims were inaccurate
-#   and are corrected in the v1.4.0 revision (see STS-V14-03
-#   below).
-#
-#   The v1.3.0 refinement is documented under two identifiers
-#   (also used in CHANGELOG.md and docs/ARCHITECTURE.md §4.13.1):
-#
-#   🔧 SNAP-MANIFEST — manifest-based snapshot detection.
-#     A directory is treated as a snapshot iff it contains a
-#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
-#     and `orphan-txn-*/`.
-#
-#     Before v1.3.0: only directories whose name matched the
-#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
-#     custom-named snapshots were silently skipped.
-#
-#   🔧 SNAP-MTIME — mtime sort.
-#     Candidates are ordered by mtime (numeric, descending),
-#     not by lexicographic directory name. Robust against
-#     clock drift and manual renames. Aligns `status.sh`'s
-#     `_list_snapshots` with the `runtime_info.backups` API
-#     (which uses the same mtime sort since v1.3.0).
-#
-#   All other v1.2.0 diagnostic modes (--short, --check,
-#   --json, --verbose, --diagnose) remain byte-for-byte
-#   identical between v1.2.0 and v1.3.0.
-#
-#   See CHANGELOG.md v1.3.0 section, and
-#   docs/ARCHITECTURE.md §4.13.1 and §11.31–§11.32.
-# ============================================================
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 STS-V14-01 — No behavior change. The companion app
-#     APK (web/app-debug.apk) is not touched by status.sh. Its
-#     install state is entirely the user's concern.
-#
-#   📱 STS-V14-02 — Version bump v1.3.0 → v1.4.0.
-#     The `--version` output now reports v1.4.0. No behavior
-#     changes to the status display.
-#
-#   📚 STS-V14-03 — Documentation-sync correction for v1.3.0.
-#     The v1.3.0 block above and the two doc-blocks that precede
-#     `_list_snapshots()` were previously inaccurate. They
-#     claimed "no changes to the status display" and "sorted
-#     by directory name (stable across rsync and other
-#     operations that may change mtimes)", while the v1.3.0
-#     code in `_list_snapshots` in fact:
-#       • Detects snapshots by `.manifest.json` presence
-#         (SNAP-MANIFEST).
-#       • Sorts candidates by mtime, descending (SNAP-MTIME).
-#
-#     This revision corrects both blocks so they reflect the
-#     actual v1.3.0 implementation. No code in this file
-#     changed between v1.3.0 and v1.4.0 — this is a
-#     documentation-only correction. The version header on
-#     line 4 is bumped to v1.4.0 for traceability, in line
-#     with the other module files.
-#
-#     See CHANGELOG.md v1.4.0 section and
-#     docs/ARCHITECTURE.md §4.13.
-#
-# ============================================================
-# POSIX note on `local`:
-#   This script uses `local` for all internal variables (see
-#   the _inline_* helper functions below). The `local` keyword
-#   is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
-#
-#   The same POSIX note appears (identically) in:
-#     • functions.sh
-#     • action.sh
-#     • service.sh
-#     • watchdog.sh
-#   Any change to this note MUST be applied consistently to
-#   all five files.
+#   • This is a DIAGNOSTIC tool. It MUST always produce a
+#     report, even when functions.sh is unavailable or
+#     corrupt — a broken module is precisely when the user
+#     needs this tool most.
+#   • Sources functions.sh when available for accurate data
+#     (is_dnscrypt_running, is_webui_running, get_dashboard_port).
+#   • Falls back to inline primitives when functions.sh fails.
+#   • Version is read dynamically from module.prop (SSOT).
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path
+# [1] Module path + version
 # ============================================================
-
-# v1.2.0: --version flag (checked before any argument parsing)
-case "${1:-}" in
-	--version)
-		echo "$0: v1.4.0"
-		exit 0
-		;;
-esac
-
 MODDIR=${0%/*}
 [ "$MODDIR" = "." ] && MODDIR=$(pwd)
 case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
+
+get_module_version() {
+    local vf="$MODDIR/module.prop"
+    if [ -f "$vf" ]; then
+        local v
+        v=$(grep "^version=" "$vf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+    printf 'v0.0.0-unknown'
+}
+
+MODULE_VERSION="$(get_module_version)"
+
+case "${1:-}" in
+    --version)
+        echo "$0: $MODULE_VERSION"
+        exit 0
+        ;;
+esac
 
 # ============================================================
 # [2] Default paths (reconfigured after loading functions.sh)
@@ -306,47 +85,24 @@ CONF_FILE="$BIN_DIR/webui.conf"
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 SELECTED_FILE="$BIN_DIR/selected_profile.txt"
 
-# --- v1.2.0 — Data preservation paths ---
+# --- Data preservation paths ---
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 LAST_AUTO_BACKUP_MARKER="$PERSISTENT_BACKUP/.last_auto_backup"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- v1.2.0 — Recovery mode trigger files ---
+# --- Recovery mode trigger files ---
 RECOVERY_TRIGGER_1="$MODDIR/recovery"
 RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
 
-# ============================================================
-# [2b] Shared constant
-# ============================================================
-_MONITORING_UI_PORT="8080"
+# --- Reserved port (finalized after loading functions.sh) ---
+_MONITORING_UI_PORT=""
 
 # ============================================================
-# [3] Read module version
+# [3] Parse command-line arguments
 # ============================================================
-get_module_version() {
-    local vf="$MODDIR/module.prop"
-    if [ -f "$vf" ]; then
-        local v
-        v=$(grep "^version=" "$vf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
-        if [ -n "$v" ]; then
-            printf '%s' "$v"
-            return 0
-        fi
-    fi
-    printf 'v0.0.0-unknown'
-}
-
-MODULE_VERSION="$(get_module_version)"
-
-# ============================================================
-# [4] Parse command-line arguments
-# ============================================================
-# HARD-STS-06: primary modes are mutually exclusive and
-# `--verbose` is a modifier for the default mode only. Any
-# conflicting combination is a hard error.
-# ============================================================
+# Primary modes are mutually exclusive; --verbose is a modifier only.
 SHORT_MODE=0
 JSON_MODE=0
 CHECK_MODE=0
@@ -374,14 +130,11 @@ Usage:
   status.sh --help/-h       Show this help
 
 Mode rules:
-  • Primary modes --short, --check, --json, --diagnose are mutually
-    exclusive. Selecting two or more in one invocation is a hard
-    error.
-  • --verbose is a modifier for the default (no-primary-mode) display.
-    It cannot be combined with any primary mode.
-
-  Summary: at most ONE of {--short, --check, --json, --diagnose},
-           and --verbose only combines with the default mode.
+  • Primary modes --short, --check, --json, --diagnose are
+    mutually exclusive. Selecting two or more in one
+    invocation is a hard error.
+  • --verbose is a modifier for the default (no-primary-mode)
+    display. It cannot be combined with any primary mode.
 
 Exit codes:
   0 = everything running
@@ -400,7 +153,7 @@ EOF
     esac
 done
 
-# --- HARD-STS-06: enforce mutual exclusivity ---
+# Enforce mutual exclusivity.
 _mode_count=0
 _mode_list=""
 [ "$SHORT_MODE" = "1" ]    && { _mode_count=$((_mode_count + 1)); _mode_list="$_mode_list --short"; }
@@ -423,12 +176,16 @@ if [ "$VERBOSE_MODE" = "1" ] && [ "$_mode_count" -gt 0 ]; then
 fi
 
 # ============================================================
-# [5] Load functions.sh
+# [4] Load functions.sh (sources boot-mini.sh)
 # ============================================================
+# Lenient: a functions.sh that exists but fails to source does
+# NOT abort status.sh. The script falls through to the inline
+# fallbacks in [5] and continues to produce a report.
 FUNCTIONS_LOADED=0
 if [ -f "$MODDIR/functions.sh" ]; then
     # shellcheck disable=SC1090
     . "$MODDIR/functions.sh" 2>/dev/null
+
     if command -v is_port_open >/dev/null 2>&1; then
         FUNCTIONS_LOADED=1
 
@@ -438,9 +195,15 @@ if [ -f "$MODDIR/functions.sh" ]; then
     fi
 fi
 
+# Finalize _MONITORING_UI_PORT: prefer the value from
+# boot-mini.sh (via functions.sh); fall back to 8080.
+_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
+
 # ============================================================
-# [6] Internal fallback
+# [5] Inline fallbacks
 # ============================================================
+# status.sh keeps a full fallback set — a broken module is
+# precisely when the user needs this tool most.
 _FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
@@ -466,11 +229,9 @@ if [ "$FUNCTIONS_LOADED" = "0" ]; then
     WATCHDOG_PID_FILE="$_FB_RUN_DIR/watchdog.pid"
 fi
 
-# --- inline: is_port_open ---
-# STS-8: netstat is used as a secondary fallback when `ss` is
-# unavailable. This mirrors HARD-SVC-03 (service.sh) and
-# HARD-WD-02 (watchdog.sh) so all three call sites agree on how
-# a listening socket is detected.
+# Three probes: /proc/net → ss → netstat.
+# The trailing space in ":$hex_port " prevents :1F90 from
+# matching :1F90A.
 _inline_is_port_open() {
     local port="$1"
     local proto="${2:-tcp}"
@@ -510,7 +271,6 @@ _inline_is_port_open() {
     return 1
 }
 
-# --- inline: read_conf ---
 _inline_read_conf() {
     local conf="$1"
     local key="$2"
@@ -533,11 +293,8 @@ _inline_read_conf() {
     printf "%s" "$default"
 }
 
-# --- inline: read_port with Port Guard ---
-# STS-7: leading zeros are stripped before range checking. The
-# shell interprets `090` as octal 72 in some builds, which would
-# pass a bogus port to the socket layer. This mirrors
-# HARD-SVC-02 in service.sh.
+# Leading zeros stripped before range check (some shells
+# interpret 090 as octal 72).
 _inline_read_port() {
     local conf="$1"
     local key="$2"
@@ -545,12 +302,10 @@ _inline_read_port() {
     local val val_clean
     val=$(_inline_read_conf "$conf" "$key" "$default")
 
-    # Strip leading zeros; an all-zero value collapses to "0".
     val_clean=$(printf '%s' "$val" | sed 's/^0*//')
     [ -z "$val_clean" ] && val_clean="0"
 
     if echo "$val_clean" | grep -qE '^[0-9]+$' && [ "$val_clean" -ge 1 ] && [ "$val_clean" -le 65535 ]; then
-        # Port Guard: reject 8080 (reserved for monitoring_ui)
         if [ "$val_clean" = "$_MONITORING_UI_PORT" ]; then
             printf "%s" "$default"
             return 0
@@ -561,7 +316,7 @@ _inline_read_port() {
     printf "%s" "$default"
 }
 
-# --- inline: is_ipv6_available ---
+# /proc/net/if_inet6 lists one line per interface with an IPv6 address.
 _inline_is_ipv6_available() {
     if [ ! -f /proc/net/if_inet6 ]; then
         return 1
@@ -574,7 +329,8 @@ _inline_is_ipv6_available() {
     return 0
 }
 
-# --- inline: get_profile_memory_hint (v1.1.0) ---
+# Display-only — main.go is the authority. Table matches
+# main.go:memoryLimitForProfile and functions.sh:get_profile_memory_hint.
 _inline_get_profile_memory_hint() {
     local profile="pro"
 
@@ -600,21 +356,19 @@ _inline_get_profile_memory_hint() {
 }
 
 # ============================================================
-# [7] Unified wrappers
-# ============================================================
-# Note on is_ipv6_available:
-#   The v1.0.0 development cycle hit a self-referencing bug
-#   that caused a SIGSEGV after ~18,000 iterations. The fix
-#   (preserved here as an invariant) is to delegate directly
-#   to _inline_is_ipv6_available whenever functions.sh does
-#   not provide an authoritative is_ipv6_available.
+# [6] Unified wrappers
 # ============================================================
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_tcp_open()           { is_port_open "$1" tcp; }
     is_udp_open()           { is_port_open "$1" udp; }
-    read_conf()             { get_conf_value "$1" "$2" "$3"; }
+    read_conf()             { read_conf "$1" "$2" "$3"; }
     read_webui_port()       { get_webui_port "$CONF_FILE" 2>/dev/null; }
-    read_dashboard_port()   { get_dashboard_port "$CONF_FILE" 2>/dev/null; }
+
+    if command -v get_dashboard_port >/dev/null 2>&1; then
+        read_dashboard_port() { get_dashboard_port "$CONF_FILE" 2>/dev/null; }
+    else
+        read_dashboard_port() { _inline_read_port "$CONF_FILE" "DASHBOARD_PORT" "9091"; }
+    fi
 
     if command -v is_ipv6_available >/dev/null 2>&1; then
         ipv6_available()    { is_ipv6_available; }
@@ -638,7 +392,7 @@ else
 fi
 
 # ============================================================
-# [7b] Profile resolver (v1.1.0)
+# [7] Profile resolver
 # ============================================================
 PROFILE_KEY=""
 PROFILE_NAME="unknown"
@@ -655,7 +409,6 @@ if [ -f "$SELECTED_FILE" ]; then
         *)        PROFILE_NAME="$PROFILE_KEY" ;;
     esac
 else
-    # File missing → main.go defaults to "pro"
     PROFILE_KEY="pro"
     PROFILE_NAME="PRO"
 fi
@@ -664,60 +417,17 @@ MEMORY_HINT=$(mem_hint 2>/dev/null)
 [ -z "$MEMORY_HINT" ] && MEMORY_HINT="80 MB (pro)"
 
 # ============================================================
-# [7c] v1.2.0 — Backup resolver
+# [7b] Backup resolver
 # ============================================================
-# HARD-STS-08: the snapshot enumeration pipeline is now
-# expressed via the shared helper `_list_snapshots`, defined
-# just below. This keeps the detection rule, the exclusion
-# rules (current/, txn-*, orphan-txn-*), and the sort order
-# in a single place.
+# SNAP-MANIFEST: a directory is a snapshot iff it contains
+# .manifest.json. Sort: mtime descending. Excludes current/,
+# txn-*, orphan-txn-*, .restore_snap.*, apk/.
 #
-# v1.3.0 (STS-V14-03): the detection rule is manifest-based
-# (SNAP-MANIFEST) and the sort order is mtime descending
-# (SNAP-MTIME) — matching main.go, functions.sh, service.sh,
-# and watchdog.sh. Custom-named snapshots (e.g. produced by an
-# older customize.sh that used a different naming scheme, or
-# by a manual `action.sh --backup`) are visible as long as
-# they carry a `.manifest.json`.
-#
-# Snapshot names created by the current toolchain follow
-# `<YYYYMMDD>-<HHMMSS>-` (which the sort regex of the other
-# scripts still relies on), but the status.sh detection is
-# manifest-based and does NOT depend on the name pattern.
-# ============================================================
-
-# ------------------------------------------------------------
-# _list_snapshots [limit]
-# ------------------------------------------------------------
-# Prints one snapshot directory name per line, newest first.
-#
-# v1.3.0 — detection and ordering (parity with functions.sh,
-# main.go, service.sh, and watchdog.sh):
-#   • SNAP-MANIFEST: a directory is treated as a snapshot iff
-#     it contains a `.manifest.json` file. This makes
-#     custom-named snapshots (e.g. "pre-v130-manual-...")
-#     visible to the enumeration, and hides arbitrary
-#     directories that happen to match the timestamp pattern
-#     but lack a manifest.
-#   • SNAP-MTIME: candidates are ordered by mtime (numeric,
-#     descending, `sort -rn -k1,1`), not by lexicographic
-#     directory name. Robust against clock drift and manual
-#     renames.
-#
-# Excludes: current/, txn-*, orphan-txn-* (by name).
-#
-# When `limit` is provided and positive, prints at most that
-# many entries.
-#
-# Note (L-5): `_list_snapshots 0` and `_list_snapshots` (with
-# no argument) both print the full list. The distinction between
-# "unlimited" and "limit = 0" is intentional and documented.
-# ------------------------------------------------------------
+# Subshell isolation prevents cd/loop vars from leaking.
 _list_snapshots() {
     local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
-    # v1.3.0 — manifest-based detection + mtime sorting
     local list
     list=$(
         cd "$PERSISTENT_BACKUP" 2>/dev/null || exit 0
@@ -725,7 +435,7 @@ _list_snapshots() {
             _d="${_d%/}"
             [ -d "$_d" ] || continue
             case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
+                current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
             _mt=$(stat -c %Y "$_d" 2>/dev/null) \
@@ -733,7 +443,7 @@ _list_snapshots() {
                 || _mt=0
             case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
             printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1 | awk '{print $2}'
+        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
     )
 
     [ -z "$list" ] && return 0
@@ -745,94 +455,11 @@ _list_snapshots() {
     fi
 }
 
-BACKUP_COUNT=0
-BACKUP_TXN_COUNT=0
-BACKUP_ORPHAN_COUNT=0
-BACKUP_LAST_TIME=""
-BACKUP_LAST_EPOCH=0
-BACKUP_LAST_AGE_SEC=0
-BACKUP_LAST_NAME=""
-BACKUP_LAST_STABLE=""
-BACKUP_STATUS="missing"
-
-if [ -d "$PERSISTENT_BACKUP" ]; then
-    BACKUP_STATUS="empty"
-
-    # --- Count snapshots (HARD-STS-08: shared helper) ---
-    _bk_count=$( _list_snapshots | wc -l | tr -d ' ' )
-    [ -z "$_bk_count" ] && _bk_count=0
-    BACKUP_COUNT="$_bk_count"
-
-    # --- Count in-flight transactions ---
-    _txn_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d txn-*/ 2>/dev/null | \
-        wc -l | tr -d ' ')
-    [ -z "$_txn_count" ] && _txn_count=0
-    BACKUP_TXN_COUNT="$_txn_count"
-
-    # --- Count orphan transactions ---
-    _orphan_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-        ls -1d orphan-txn-*/ 2>/dev/null | \
-        wc -l | tr -d ' ')
-    [ -z "$_orphan_count" ] && _orphan_count=0
-    BACKUP_ORPHAN_COUNT="$_orphan_count"
-
-    if [ "$BACKUP_COUNT" -gt 0 ]; then
-        BACKUP_STATUS="ok"
-
-        # Newest snapshot name (HARD-STS-08: shared helper)
-        BACKUP_LAST_NAME=$( _list_snapshots 1 )
-
-        # Get its epoch + human time
-        if [ -n "$BACKUP_LAST_NAME" ] && [ -d "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" ]; then
-            BACKUP_LAST_EPOCH=$(stat -c %Y "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
-                || BACKUP_LAST_EPOCH=$(stat -f %m "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
-                || BACKUP_LAST_EPOCH=0
-
-            # Numeric validation
-            if ! echo "$BACKUP_LAST_EPOCH" | grep -qE '^[0-9]+$'; then
-                BACKUP_LAST_EPOCH=0
-            fi
-
-            if [ "$BACKUP_LAST_EPOCH" -gt 0 ]; then
-                # STS-2 fix: use the DIRECTORY as the reference file
-                # for `date -r`. The previous attempt passed the
-                # epoch number where a file path is expected, so the
-                # fallback never worked on any platform. The primary
-                # path (`date -d @epoch`) works on GNU coreutils but
-                # not on Android's toybox.
-                BACKUP_LAST_TIME=$(date -d "@$BACKUP_LAST_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null)
-                if [ -z "$BACKUP_LAST_TIME" ]; then
-                    BACKUP_LAST_TIME=$(date -r "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" '+%Y-%m-%d %H:%M' 2>/dev/null)
-                fi
-                [ -z "$BACKUP_LAST_TIME" ] && BACKUP_LAST_TIME="unknown"
-
-                _now=$(date +%s)
-                if echo "$_now" | grep -qE '^[0-9]+$'; then
-                    BACKUP_LAST_AGE_SEC=$((_now - BACKUP_LAST_EPOCH))
-                fi
-            fi
-        fi
-    fi
-
-    # --- Read .last_stable if present ---
-    if [ -f "$LAST_STABLE_FILE" ]; then
-        BACKUP_LAST_STABLE=$(cat "$LAST_STABLE_FILE" 2>/dev/null | tr -d '\r\n ')
-    fi
-fi
-
-# ============================================================
-# format_age (HARD-STS-03 — 0 seconds = "0s ago")
-# ============================================================
-# L-2 note: the regex `^-?[0-9]+$` also accepts the string "00".
-# This is intentional — a value of exactly "00" is treated as
-# zero seconds, which is a valid age and should print "0s ago".
-# ============================================================
+# Exactly 0 returns "0s ago" (not "N/A") — distinguishes
+# "created this second" from "age unknown". "N/A" for empty /
+# non-numeric / negative input.
 format_age() {
     local sec="$1"
-    # Only reject NEGATIVE ages. An age of exactly 0 is valid
-    # (a snapshot created in the same second as the report) and
-    # should read as "0s ago", not "N/A".
     if [ -z "$sec" ] || ! echo "$sec" | grep -qE '^-?[0-9]+$' || [ "$sec" -lt 0 ]; then
         printf "N/A"
         return
@@ -848,10 +475,77 @@ format_age() {
     fi
 }
 
+# --- Collect backup state ---
+BACKUP_COUNT=0
+BACKUP_TXN_COUNT=0
+BACKUP_ORPHAN_COUNT=0
+BACKUP_LAST_TIME=""
+BACKUP_LAST_EPOCH=0
+BACKUP_LAST_AGE_SEC=0
+BACKUP_LAST_NAME=""
+BACKUP_LAST_STABLE=""
+BACKUP_STATUS="missing"
+
+if [ -d "$PERSISTENT_BACKUP" ]; then
+    BACKUP_STATUS="empty"
+
+    _bk_count=$( _list_snapshots | wc -l | tr -d ' ' )
+    [ -z "$_bk_count" ] && _bk_count=0
+    BACKUP_COUNT="$_bk_count"
+
+    _txn_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
+        ls -1d txn-*/ 2>/dev/null | \
+        wc -l | tr -d ' ')
+    [ -z "$_txn_count" ] && _txn_count=0
+    BACKUP_TXN_COUNT="$_txn_count"
+
+    _orphan_count=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
+        ls -1d orphan-txn-*/ 2>/dev/null | \
+        wc -l | tr -d ' ')
+    [ -z "$_orphan_count" ] && _orphan_count=0
+    BACKUP_ORPHAN_COUNT="$_orphan_count"
+
+    if [ "$BACKUP_COUNT" -gt 0 ]; then
+        BACKUP_STATUS="ok"
+
+        BACKUP_LAST_NAME=$( _list_snapshots 1 )
+
+        if [ -n "$BACKUP_LAST_NAME" ] && [ -d "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" ]; then
+            BACKUP_LAST_EPOCH=$(stat -c %Y "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
+                || BACKUP_LAST_EPOCH=$(stat -f %m "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
+                || BACKUP_LAST_EPOCH=0
+
+            if ! echo "$BACKUP_LAST_EPOCH" | grep -qE '^[0-9]+$'; then
+                BACKUP_LAST_EPOCH=0
+            fi
+
+            if [ "$BACKUP_LAST_EPOCH" -gt 0 ]; then
+                # Use the directory as the reference file for
+                # `date -r` — `date -d @epoch` works on GNU
+                # coreutils but not Android's toybox.
+                BACKUP_LAST_TIME=$(date -d "@$BACKUP_LAST_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null)
+                if [ -z "$BACKUP_LAST_TIME" ]; then
+                    BACKUP_LAST_TIME=$(date -r "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" '+%Y-%m-%d %H:%M' 2>/dev/null)
+                fi
+                [ -z "$BACKUP_LAST_TIME" ] && BACKUP_LAST_TIME="unknown"
+
+                _now=$(date +%s)
+                if echo "$_now" | grep -qE '^[0-9]+$'; then
+                    BACKUP_LAST_AGE_SEC=$((_now - BACKUP_LAST_EPOCH))
+                fi
+            fi
+        fi
+    fi
+
+    if [ -f "$LAST_STABLE_FILE" ]; then
+        BACKUP_LAST_STABLE=$(cat "$LAST_STABLE_FILE" 2>/dev/null | tr -d '\r\n ')
+    fi
+fi
+
 BACKUP_LAST_AGE=$(format_age "$BACKUP_LAST_AGE_SEC")
 
 # ============================================================
-# [7d] v1.2.0 — Pending notification + recovery mode
+# [7c] Pending notification + recovery mode
 # ============================================================
 PENDING_NOTIFY_CONTENT=""
 if [ -f "$PENDING_NOTIFY_FILE" ]; then
@@ -866,12 +560,16 @@ fi
 # ============================================================
 # [8] Collect data
 # ============================================================
+
+# [8a] Ports
 PORT=$(read_webui_port)
 DASHBOARD_PORT=$(read_dashboard_port)
 [ -z "$PORT" ] && PORT="9090"
 [ -z "$DASHBOARD_PORT" ] && DASHBOARD_PORT="9091"
 
-# --- DNS Engine ---
+# [8b] DNS Engine status
+# Prefer functions.sh's is_dnscrypt_running (PID + comm + port
+# cross-check). Fallback: pgrep -x + is_udp_open 5354.
 DNS_RUNNING="NO"
 if [ "$FUNCTIONS_LOADED" = "1" ] && command -v is_dnscrypt_running >/dev/null 2>&1; then
     if is_dnscrypt_running; then
@@ -883,7 +581,7 @@ else
     fi
 fi
 
-# --- WebUI ---
+# [8c] WebUI status
 WEBUI_RUNNING="NO"
 if [ "$FUNCTIONS_LOADED" = "1" ] && command -v is_webui_running >/dev/null 2>&1; then
     if is_webui_running "$PORT"; then
@@ -895,13 +593,13 @@ else
     fi
 fi
 
-# --- Status file ---
+# [8d] User intent (STATUS_FILE)
 STATUS_FROM_FILE="UNKNOWN"
 if [ -f "$STATUS_FILE" ]; then
     STATUS_FROM_FILE=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
 fi
 
-# --- Blocklist stats ---
+# [8e] Blocklist stats
 BLOCKLIST_COUNT="0"
 BLOCKLIST_SIZE="0"
 if [ -f "$BLOCKLIST_FILE" ]; then
@@ -920,26 +618,27 @@ if [ -f "$RAW_BLOCKLIST_FILE" ]; then
     [ -z "$RAW_BLOCKLIST_SIZE" ] && RAW_BLOCKLIST_SIZE="0"
 fi
 
+# [8f] Last blocklist update time
 LAST_UPDATE="unknown"
 if [ -f "$BLOCKLIST_FILE" ]; then
     LAST_UPDATE=$(date -r "$BLOCKLIST_FILE" '+%Y-%m-%d %H:%M' 2>/dev/null)
     [ -z "$LAST_UPDATE" ] && LAST_UPDATE="unknown"
 fi
 
-# --- Disabled ---
+# [8g] Module disabled?
 IS_DISABLED="NO"
 [ -f "$MODDIR/disable" ] && IS_DISABLED="YES"
 
-# --- AUTO_RESTART config ---
+# [8h] Auto-restart configuration
 AUTO_DNS=$(read_conf "$CONF_FILE" "AUTO_RESTART_DNS" "1")
 AUTO_WEBUI=$(read_conf "$CONF_FILE" "AUTO_RESTART_WEBUI" "1")
 case "$AUTO_DNS"   in 0|1) ;; *) AUTO_DNS="1"   ;; esac
 case "$AUTO_WEBUI" in 0|1) ;; *) AUTO_WEBUI="1" ;; esac
 
-# --- BIND_ADDR ---
+# [8i] BIND_ADDR
 BIND_ADDR=$(read_conf "$CONF_FILE" "BIND_ADDR" "127.0.0.1")
 
-# --- Watchdog ---
+# [8j] Watchdog status
 WATCHDOG_RUNNING="NO"
 WATCHDOG_PID=""
 if [ -f "$WATCHDOG_PID_FILE" ]; then
@@ -947,7 +646,7 @@ if [ -f "$WATCHDOG_PID_FILE" ]; then
     if [ -n "$wd_pid" ] && kill -0 "$wd_pid" 2>/dev/null; then
         wd_comm=$(cat "/proc/$wd_pid/comm" 2>/dev/null)
         case "$wd_comm" in
-            sh|ash|bash|busybox|*sh)
+            sh|ash|bash|mksh|busybox|*sh)
                 WATCHDOG_RUNNING="YES"
                 WATCHDOG_PID="$wd_pid"
                 ;;
@@ -955,20 +654,20 @@ if [ -f "$WATCHDOG_PID_FILE" ]; then
     fi
 fi
 
-# --- IPv6 ---
+# [8k] IPv6 availability
 IPV6_AVAILABLE="NO"
 if ipv6_available; then
     IPV6_AVAILABLE="YES"
 fi
 
-# --- Active RUN_DIR ---
+# [8l] Active run directory
 if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
     ACTIVE_RUN_DIR="$RUN_DIR_ACTIVE"
 else
     ACTIVE_RUN_DIR=$(dirname "$STATUS_FILE")
 fi
 
-# --- PIDs ---
+# [8m] PIDs
 DNS_PID=""
 if [ -f "$PID_FILE" ]; then
     DNS_PID=$(cat "$PID_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -985,7 +684,7 @@ if [ -f "$WEBUI_PID_FILE" ]; then
     fi
 fi
 
-# --- Root solution (v1.2.0) ---
+# [8n] Root solution
 detect_root_solution() {
     if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
         printf "KernelSU"
@@ -1005,22 +704,12 @@ detect_root_solution() {
 ROOT_SOLUTION=$(detect_root_solution)
 
 # ============================================================
-# [9] esc_json
+# [9] JSON escaping helpers
 # ============================================================
-# STS-1 fix: the sed rule `s/\b/\\b/g` has been REMOVED. In
-# sed, `\b` is a word-boundary anchor, not a backspace
-# character, so the rule was replacing every word boundary with
-# the literal two-character sequence `\b`. That corrupted every
-# string field in the JSON output. Backspace (\x08) does not
-# appear in any of the values this function is used on, so no
-# replacement is needed for it.
-#
-# STS-10 fix: the trailing `sed 's/  */ /g'` stage has been
-# REMOVED. It collapsed legitimate runs of spaces inside values
-# (e.g. paths or names that contain embedded double-spaces).
-# The `tr '\n' ' '` stage alone is sufficient to flatten
-# newlines into single spaces.
-# ============================================================
+# Minimal JSON string escaper. In sed, `\b` is a word-boundary
+# anchor (not backspace), so a `s/\b/\\b/g` rule would corrupt
+# every string field. Backspace does not appear in any value
+# this function is used on — no replacement needed.
 esc_json() {
     if [ -z "$1" ]; then
         printf ''
@@ -1035,15 +724,7 @@ esc_json() {
     ' | tr '\n' ' '
 }
 
-# ============================================================
-# [9b] HARD-STS-04 — JSON helpers for nullable string fields
-# ============================================================
-# _json_str <value>
-#   Emits the value as a JSON string. If the value is empty,
-#   emits the literal `null`. This gives a consistent schema
-#   for all string fields that may legitimately be absent
-#   (PIDs, last-backup name, etc.).
-# ------------------------------------------------------------
+# Empty → literal `null`; non-empty → quoted JSON string.
 _json_str() {
     if [ -z "$1" ]; then
         printf 'null'
@@ -1055,6 +736,10 @@ _json_str() {
 # ============================================================
 # [10] Quick check mode (single line)
 # ============================================================
+# Eight pipe-separated fields for shell scripting:
+#   <version> | DNS=<UP|DOWN> | WEBUI=<UP|DOWN> |
+#   PROFILE=<key> | MEM=<hint> | ENTRIES=<count> |
+#   BACKUP=<count>snap/<age> | RUNDIR=<path>[ DISABLED]
 if [ "$CHECK_MODE" = "1" ]; then
     dns_str="DNS=$( [ "$DNS_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
     webui_str="WEBUI=$( [ "$WEBUI_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
@@ -1083,21 +768,18 @@ fi
 # ============================================================
 # [11] JSON mode
 # ============================================================
+# Hand-formatted (no jq dependency). Nullable fields use
+# `_json_str` (emits literal `null` for empty values, not "").
 if [ "$JSON_MODE" = "1" ]; then
     CHECKED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)
 
-    # Extract numeric part of memory hint for machine-readable use
     MEM_MB=$(printf '%s' "$MEMORY_HINT" | grep -oE '^[0-9]+' || echo "0")
 
-    # HARD-STS-05: rename — this is not ISO 8601, it is a human
-    # timestamp from `date '+%Y-%m-%d %H:%M'`.
     BACKUP_LAST_HUMAN=""
     if [ -n "$BACKUP_LAST_TIME" ] && [ "$BACKUP_LAST_TIME" != "unknown" ]; then
         BACKUP_LAST_HUMAN="$BACKUP_LAST_TIME"
     fi
 
-    # HARD-STS-04: nullable fields are emitted via _json_str so
-    # that empty values become `null`, not `""`.
     cat << EOF
 {
   "version": "$(esc_json "$MODULE_VERSION")",
@@ -1167,6 +849,7 @@ fi
 # ============================================================
 # [12] Short mode
 # ============================================================
+# One word on stdout: OK / DNS_ONLY / WEBUI_ONLY / STOPPED / DISABLED.
 if [ "$SHORT_MODE" = "1" ]; then
     if [ "$IS_DISABLED" = "YES" ]; then
         echo "DISABLED"
@@ -1187,29 +870,11 @@ if [ "$SHORT_MODE" = "1" ]; then
 fi
 
 # ============================================================
-# [13] v1.2.0 — Diagnose mode
+# [13] Diagnose mode
 # ============================================================
-# Full diagnostic report for troubleshooting:
-#   • Header (module + system)
-#   • Root solution
-#   • Service status
-#   • User data files (presence + metadata)
-#   • Available backups (list + sizes)
-#   • In-flight transactions (txn-*)
-#   • Orphan transactions (orphan-txn-*)
-#   • Pending notification content
-#   • Recovery mode state
-#   • Health checks (DNS, WebUI, blocklist, config)
-#   • Final diagnosis
-#
-# HARD-STS-01: `_ud_missing` is counted in `_health_issues`.
-# HARD-STS-02: `_auto_now` is validated before arithmetic.
-# HARD-STS-07: snapshot listing uses the shared helper.
-# STS-9:      file-count grep no longer emits "0\n0".
-# STS-11:     snapshot loop uses a here-document (no subshell).
-# ============================================================
+# Full diagnostic report. Intended to be pasted verbatim into a
+# GitHub issue. Colors applied only when stdout is a TTY.
 if [ "$DIAGNOSE_MODE" = "1" ]; then
-    # --- Colors ---
     if [ -t 1 ]; then
         C_RED=$(printf '\033[0;31m'); C_GREEN=$(printf '\033[0;32m')
         C_YELLOW=$(printf '\033[0;33m'); C_CYAN=$(printf '\033[0;36m')
@@ -1324,21 +989,15 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
             echo "     Last backup: ${C_DIM}$BACKUP_LAST_NAME${C_NC} ($BACKUP_LAST_AGE)"
             echo ""
 
-            # HARD-STS-07: list up to 10 most recent snapshots via
-            # the shared helper.
-            # STS-9:  file-count grep no longer emits "0\n0".
-            # STS-11: here-document (not a pipe) so the loop body
-            #         runs in the current shell and `_bk_i` is
-            #         preserved after the loop.
             echo "  ${C_BOLD}Recent snapshots:${C_NC}"
             _bk_i=0
             while IFS= read -r _snap; do
                 [ -z "$_snap" ] && continue
                 _bk_i=$((_bk_i + 1))
                 _file_count=0
-            for _chk in "$PERSISTENT_BACKUP/$_snap"/*.conf "$PERSISTENT_BACKUP/$_snap"/*.toml "$PERSISTENT_BACKUP/$_snap"/*.txt; do
-                [ -f "$_chk" ] && _file_count=$((_file_count + 1))
-            done
+                for _chk in "$PERSISTENT_BACKUP/$_snap"/*.conf "$PERSISTENT_BACKUP/$_snap"/*.toml "$PERSISTENT_BACKUP/$_snap"/*.txt; do
+                    [ -f "$_chk" ] && _file_count=$((_file_count + 1))
+                done
                 [ -z "$_file_count" ] && _file_count=0
                 _has_manifest=""
                 [ -f "$PERSISTENT_BACKUP/$_snap/.manifest.json" ] && _has_manifest=" +manifest"
@@ -1349,23 +1008,18 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
 $(_list_snapshots 10)
 EOF
 
-            # Show .last_stable if present
             if [ -n "$BACKUP_LAST_STABLE" ]; then
                 echo ""
                 echo "  ${C_BOLD}.last_stable:${C_NC} $BACKUP_LAST_STABLE"
             fi
 
-            # Show .last_auto_backup age if present
             if [ -f "$LAST_AUTO_BACKUP_MARKER" ]; then
                 _auto_mtime=$(stat -c %Y "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
                     || _auto_mtime=$(stat -f %m "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
                     || _auto_mtime=0
                 if echo "$_auto_mtime" | grep -qE '^[0-9]+$' && [ "$_auto_mtime" -gt 0 ]; then
-                    # HARD-STS-02: validate _auto_now before arithmetic.
                     _auto_now=$(date +%s 2>/dev/null)
-                    case "$_auto_now" in
-                        ''|*[!0-9]*) _auto_now=0 ;;
-                    esac
+                    case "$_auto_now" in ''|*[!0-9]*) _auto_now=0 ;; esac
                     if [ "$_auto_now" -gt 0 ]; then
                         _auto_age=$((_auto_now - _auto_mtime))
                         echo "  ${C_BOLD}Last auto-backup:${C_NC} $(format_age "$_auto_age")"
@@ -1410,7 +1064,6 @@ EOF
     echo "${C_BOLD}─── Health Checks ───${C_NC}"
     _health_issues=0
 
-    # DNS engine port
     if [ "$DNS_RUNNING" = "YES" ]; then
         echo "  ${C_GREEN}✓${C_NC} DNS engine listening on 5354/UDP"
     else
@@ -1418,7 +1071,6 @@ EOF
         _health_issues=$((_health_issues + 1))
     fi
 
-    # WebUI port
     if [ "$WEBUI_RUNNING" = "YES" ]; then
         echo "  ${C_GREEN}✓${C_NC} WebUI listening on port $PORT"
     else
@@ -1426,14 +1078,12 @@ EOF
         _health_issues=$((_health_issues + 1))
     fi
 
-    # Blocklist
     if [ "$BLOCKLIST_COUNT" -gt 0 ]; then
         echo "  ${C_GREEN}✓${C_NC} Blocklist loaded ($BLOCKLIST_COUNT entries, $BLOCKLIST_SIZE bytes)"
     else
         echo "  ${C_YELLOW}⚠${C_NC} Blocklist is empty (no profile applied yet?)"
     fi
 
-    # Config
     if [ -f "$TOML_FILE" ]; then
         echo "  ${C_GREEN}✓${C_NC} dnscrypt-proxy.toml present"
     else
@@ -1448,14 +1098,12 @@ EOF
         _health_issues=$((_health_issues + 1))
     fi
 
-    # Profile
     if [ -n "$PROFILE_KEY" ]; then
         echo "  ${C_GREEN}✓${C_NC} Active profile: $PROFILE_NAME ($MEMORY_HINT)"
     else
         echo "  ${C_YELLOW}⚠${C_NC} Profile file missing or invalid"
     fi
 
-    # STATUS_FILE consistency
     if [ "$IS_DISABLED" = "NO" ]; then
         if [ "$STATUS_FROM_FILE" = "ON" ] && [ "$DNS_RUNNING" = "NO" ]; then
             echo "  ${C_YELLOW}⚠${C_NC} STATUS_FILE=ON but DNS engine is not running (Watchdog should recover it)"
@@ -1464,7 +1112,6 @@ EOF
         fi
     fi
 
-    # HARD-STS-01: user data integrity now increments _health_issues.
     if [ "$_ud_missing" -gt 0 ]; then
         echo "  ${C_RED}✗${C_NC} $_ud_missing user data file(s) missing"
         _health_issues=$((_health_issues + 1))
@@ -1472,7 +1119,6 @@ EOF
         echo "  ${C_GREEN}✓${C_NC} All 5 user data files present"
     fi
 
-    # Backup layer
     if [ "$BACKUP_STATUS" = "ok" ]; then
         echo "  ${C_GREEN}✓${C_NC} Backup layer healthy ($BACKUP_COUNT snapshot(s))"
     elif [ "$BACKUP_STATUS" = "empty" ]; then
@@ -1497,7 +1143,7 @@ EOF
     elif [ "$_health_issues" -gt 0 ]; then
         echo "  ${C_RED}❌ $_health_issues critical issue(s) detected${C_NC}"
         echo "     See the 'Health Checks' section above"
-        echo "     Full guide: docs/TROUBLESHOOTING.md"
+        echo "     Full guide: docs/GUIDE.md §7"
     else
         echo "  ${C_YELLOW}⚠  Services not fully running${C_NC}"
         echo "     Try: su -c 'sh $MODDIR/action.sh --restart'"
@@ -1511,7 +1157,6 @@ EOF
     echo "================================================================="
     echo ""
 
-    # Exit code mirrors overall health
     if [ "$IS_DISABLED" = "YES" ]; then
         exit 3
     elif [ "$DNS_RUNNING" = "YES" ] && [ "$WEBUI_RUNNING" = "YES" ] && [ "$_health_issues" -eq 0 ]; then
@@ -1524,6 +1169,7 @@ fi
 # ============================================================
 # [14] Full mode (default)
 # ============================================================
+# Multi-section, colored, human-readable report.
 if [ -t 1 ]; then
     RED=$(printf '\033[0;31m')
     GREEN=$(printf '\033[0;32m')
@@ -1582,7 +1228,6 @@ fi
 if [ "$STATUS_FROM_FILE" != "UNKNOWN" ]; then
     EXPECTED=$([ "$DNS_RUNNING" = "YES" ] && echo "ON" || echo "OFF")
     if [ "$STATUS_FROM_FILE" != "$EXPECTED" ]; then
-        # Note: STATUS_FILE may differ from actual state during crash
         printf "  ${DIM}(status file: %s - user intent; may differ from actual state)${NC}\n" "$STATUS_FROM_FILE"
     fi
 fi
@@ -1607,7 +1252,6 @@ printf "  Last update:   %s\n" "$LAST_UPDATE"
 printf "  ${DIM}Raw source:    %s entries / %s bytes${NC}\n" "$RAW_BLOCKLIST_COUNT" "$RAW_BLOCKLIST_SIZE"
 echo ""
 
-# --- v1.2.0 — Backup & Recovery section ---
 printf "%s--- Backup & Recovery ---%s\n" "$CYAN" "$NC"
 case "$BACKUP_STATUS" in
     missing)
@@ -1630,22 +1274,18 @@ case "$BACKUP_STATUS" in
         ;;
 esac
 
-# In-flight transactions warning
 if [ "$BACKUP_TXN_COUNT" -gt 0 ]; then
     printf "  ${YELLOW}⚠${NC}  In-flight:     %s txn dir(s) — install in progress or interrupted\n" "$BACKUP_TXN_COUNT"
 fi
 
-# Orphan transactions warning
 if [ "$BACKUP_ORPHAN_COUNT" -gt 0 ]; then
     printf "  ${YELLOW}⚠${NC}  Orphans:       %s preserved orphan-txn dir(s)\n" "$BACKUP_ORPHAN_COUNT"
 fi
 
-# Recovery mode warning
 if [ "$RECOVERY_MODE_ACTIVE" = "YES" ]; then
     printf "  ${YELLOW}⚠${NC}  Recovery mode: ${YELLOW}TRIGGER PRESENT${NC} — next install will restore\n"
 fi
 
-# Pending notification
 if [ -n "$PENDING_NOTIFY_CONTENT" ]; then
     printf "  ${CYAN}ℹ${NC}  Notification:  %s\n" "$PENDING_NOTIFY_CONTENT"
 fi
@@ -1684,14 +1324,9 @@ echo ""
 # ============================================================
 # [16] Verbose extra section
 # ============================================================
-# STS-9:  file-count grep no longer emits "0\n0".
-# STS-11: snapshot enumeration loop uses a here-document so it
-#         runs in the current shell (no subshell).
-# ============================================================
 if [ "$VERBOSE_MODE" = "1" ]; then
     printf "%s--- Verbose: Ports & Environment ---%s\n" "$MAGENTA" "$NC"
 
-    # All known ports
     printf "  WebUI port:        %s\n" "$PORT"
     printf "  Dashboard port:    %s\n" "$DASHBOARD_PORT"
     printf "  Monitoring UI:     %s (reserved)\n" "$_MONITORING_UI_PORT"
@@ -1699,7 +1334,6 @@ if [ "$VERBOSE_MODE" = "1" ]; then
     printf "  DNS engine proto:  UDP/TCP\n"
     echo ""
 
-    # Config file paths
     printf "  ${DIM}webui.conf:        %s${NC}\n" "$CONF_FILE"
     printf "  ${DIM}dnscrypt-proxy.toml: %s${NC}\n" "$TOML_FILE"
     printf "  ${DIM}selected_profile:  %s${NC}\n" "$SELECTED_FILE"
@@ -1708,11 +1342,9 @@ if [ "$VERBOSE_MODE" = "1" ]; then
     printf "  ${DIM}backup dir:        %s${NC}\n" "$PERSISTENT_BACKUP"
     echo ""
 
-    # Raw STATUS_FILE content
     printf "  STATUS_FILE raw:   %s\n" "${STATUS_FROM_FILE:-<missing>}"
     echo ""
 
-    # v1.2.0 — Full backup listing (HARD-STS-07: shared helper)
     if [ "$BACKUP_STATUS" = "ok" ]; then
         printf "%s--- Verbose: All Backups ---%s\n" "$MAGENTA" "$NC"
         while IFS= read -r _snap; do
@@ -1731,7 +1363,6 @@ EOF
         echo ""
     fi
 
-    # v1.2.0 — Full transactions listing
     if [ "$BACKUP_TXN_COUNT" -gt 0 ]; then
         printf "%s--- Verbose: In-flight Transactions ---%s\n" "$MAGENTA" "$NC"
         (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -1746,7 +1377,6 @@ EOF
         echo ""
     fi
 
-    # v1.2.0 — Full orphan transactions listing
     if [ "$BACKUP_ORPHAN_COUNT" -gt 0 ]; then
         printf "%s--- Verbose: Orphan Transactions ---%s\n" "$MAGENTA" "$NC"
         (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
@@ -1761,7 +1391,6 @@ EOF
         echo ""
     fi
 
-    # v1.2.0 — Recovery mode trigger files listing
     if [ "$RECOVERY_MODE_ACTIVE" = "YES" ]; then
         printf "%s--- Verbose: Recovery Triggers ---%s\n" "$MAGENTA" "$NC"
         [ -f "$RECOVERY_TRIGGER_1" ] && printf "  ${YELLOW}•${NC} %s\n" "$RECOVERY_TRIGGER_1"
@@ -1789,7 +1418,6 @@ elif [ "$DNS_RUNNING" = "NO" ] || [ "$WEBUI_RUNNING" = "NO" ]; then
     echo ""
 fi
 
-# --- v1.2.0 — Diagnose hint ---
 if [ "$VERBOSE_MODE" != "1" ]; then
     printf "${DIM}Tip: run 'status.sh --diagnose' for a full report (backups + health)${NC}\n"
     echo ""
@@ -1798,6 +1426,7 @@ fi
 # ============================================================
 # [18] Exit code
 # ============================================================
+# Mirrors the state model used by --check, --json, and --short.
 if [ "$IS_DISABLED" = "YES" ]; then
     exit 3
 elif [ "$DNS_RUNNING" = "YES" ] && [ "$WEBUI_RUNNING" = "YES" ]; then

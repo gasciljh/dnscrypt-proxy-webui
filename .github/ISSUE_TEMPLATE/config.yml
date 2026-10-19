@@ -1,166 +1,35 @@
 # ============================================================
-# DNSCrypt Smart Filter – Issue Templates Configuration
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — Issue Templates Configuration
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Customizes the "New Issue" page on GitHub:
-#   • Disables "Open a blank issue" (forces the user to pick a template)
-#   • Adds quick links (Discussions, Security, Docs)
-#   • Routes questions to the correct channels
+# Customizes the "New Issue" page on GitHub.
 #
 # Reference:
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
 # ============================================================
 # Cross-references:
-# ============================================================
 #   • .github/ISSUE_TEMPLATE/bug_report.yml        — bug report form
 #   • .github/ISSUE_TEMPLATE/feature_request.yml   — feature request form
 #   • .github/PULL_REQUEST_TEMPLATE.md             — PR template
 #   • .github/PULL_REQUEST_TEMPLATE/release.md     — release PR template
-#   • .github/SECURITY.md                          — security policy (short)
-#   • SECURITY.md                                  — root security policy
-#   • docs/FAQ.md                                  — FAQ (Q1–Q130)
-#   • docs/TROUBLESHOOTING.md                      — diagnostics
-#   • docs/BACKUP.md                               — backup system (v1.2.0)
-#   • docs/EMERGENCY.md                            — recovery (v1.2.0)
-#   • docs/UPGRADE.md §3.x                         — upgrade paths
-#   • docs/ARCHITECTURE.md §4.13                   — v1.3.0 refinements
-#   • docs/COMPATIBILITY.md                        — device matrix
-#   • docs/ROADMAP.md §5                           — v1.5.0 plan
+#   • SECURITY.md                                  — security policy
+#   • docs/GUIDE.md §2, §5, §7, §8, §10            — install, update, troubleshooting, emergency, FAQ
+#   • docs/REFERENCE.md §2, §3, §4, §5             — API, internals, backup, compatibility
+#   • docs/CONTRIBUTING.md §5, §11, §13, §14       — branch, release, hotfix, recognition
+#   • docs/adr/README.md                           — ADR index
+#   • docs/ROADMAP.md                              — future versions
 #   • CHANGELOG.md                                 — version history
 # ============================================================
-# v1.1.0 additions (kept):
-#   • Added three new contact links covering the workflow docs
-#     added during the v1.0.0 cycle:
-#       - docs/BRANCHING.md        (Git workflow)
-#       - docs/RELEASE_PROCESS.md  (Release process)
-#       - docs/adr/README.md       (Architecture Decision Records)
-#     These are essential for contributors who want to submit
-#     PRs but are unsure about branch/PR policy.
-#   • Reordered contact links so the most commonly-needed ones
-#     appear first.
-#   • Expanded the documentation for each field so a future
-#     maintainer can understand the intent without cross-checking
-#     multiple GitHub pages.
-#
-# ============================================================
-# v1.2.0 additions:
-#   • Version bumped from v1.1.0 to v1.2.0.
-#   • Added three new v1.2.0-specific contact links, placed
-#     immediately after the troubleshooting link:
-#       - docs/BACKUP.md      — Backup system reference
-#       - docs/EMERGENCY.md   — Emergency recovery guide
-#       - docs/UPGRADE.md     — Version upgrade guide
-#     These are the first things a user should read if they
-#     suspect data loss, restore failure, or an upgrade problem.
-#   • Reordered the full contact list to reflect the v1.2.0
-#     priorities (FAQ → Troubleshooting → Backup → Emergency →
-#     Upgrade → Discussions → Security → Install → Branching →
-#     Release Process → ADRs → Compatibility → Changelog →
-#     Roadmap).
-#   • Expanded the "about" text for the backup and emergency
-#     links to explain the recovery trigger (`recovery` file)
-#     and the persistent backup directory
-#     (`/sdcard/dnscrypt-webui-backup/`).
-#   • All text is English-only (global edition). No Arabic
-#     strings exist in this file.
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (this file, still v1.2.0)
-# ============================================================
-# A pre-release audit of this file identified the following
-# issues. All of them are addressed in-place; no version bump.
-#
-#   🔧 ISS-4 — Every `about:` field was a multi-line block
-#     scalar (`|`) containing 3–6 lines of text. GitHub renders
-#     the `about` string in a small card next to the link name,
-#     with a very limited vertical budget (roughly two lines).
-#     A block scalar that long is either visually truncated or
-#     forces the card to scroll — neither of which is what the
-#     reader expects. All `about:` values have been rewritten as
-#     two-line summaries. The detail that was removed from each
-#     card still lives in the linked document itself, which is
-#     where a reader who follows the link will see it.
-#
-# Cross-references (v1.2.0):
-#   • docs/BACKUP.md      — backup system reference
-#   • docs/EMERGENCY.md   — emergency recovery guide
-#   • docs/UPGRADE.md §3.1 — v1.1.0 → v1.2.0 upgrade path
-# ============================================================
-# v1.3.0 additions (extended in this revision):
-# ============================================================
-#   • Version bumped to v1.3.0.
-#
-#   Client-side changes (web/index.html):
-#     • A dynamic PWA install button.
-#     • A live status LED on the "Today" counter.
-#
-#   Boot-path fix (proxy/service.sh):
-#     • DNS auto-start after boot via direct API call.
-#
-#   Server-side refinements (backup layer):
-#     The v1.3.0 release ALSO refined snapshot-detection and
-#     rotation semantics that underpin the persistent backup
-#     system referenced by several contact links below. Three
-#     identifiers (used in CHANGELOG.md [v1.3.0] and
-#     docs/ARCHITECTURE.md §4.13):
-#
-#       🔧 SNAP-MANIFEST — `main.go:buildBackupInfo()` detects
-#         a snapshot by `.manifest.json` presence, not by name
-#         pattern.
-#
-#       🔧 SNAP-MTIME — `last_backup_name` is selected by
-#         mtime, descending (with a name-based fallback).
-#
-#       🔧 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT —
-#         `functions.sh:rotate_backups()` uses the same
-#         detection + sort, plus two protected targets
-#         (`.last_stable` + newest install).
-#
-#   ⚠️ Impact on THIS file:
-#     No contact link was added or removed. But the "about"
-#     text of two links was updated:
-#       • The Roadmap link — from "planned for v1.2.0, v1.3.0,
-#         and v2.0.0" to "planned for v1.4.0 and v2.0.0".
-#       • The Changelog link — from "through v1.2.0" to
-#         "through v1.3.0".
-#     The Backup and Emergency links continue to point at
-#     docs that describe the v1.3.0 semantics (SNAP-*/ROT-*).
-#
-# ============================================================
-# v1.4.0 additions:
-# ============================================================
-#   • Version bumped to v1.4.0.
-#   • The Roadmap link's `about:` text is updated one more
-#     time: "planned for v1.5.0 and v2.0.0". Rationale: with
-#     the v1.4.0 release, the current roadmap (docs/ROADMAP.md
-#     §5) tracks v1.5.0 as the next minor and v2.0.0 as the
-#     next major. v1.3.0 and v1.4.0 have both been shipped.
-#   • The Changelog link's `about:` text is updated from
-#     "from v1.0.0 through v1.3.0" to
-#     "from v1.0.0 through v1.4.0".
-#   • The Compatibility link's `about:` text is extended to
-#     also mention the v1.4.0 companion app integration.
-#   • The Installation link's `about:` text is extended to
-#     mention the OPTIONAL companion Android app
-#     (`web/app-debug.apk`) bundled with the module ZIP.
-#   • The Upgrade guide's `about:` text was CORRECTED to
-#     include v1.3.0 in the upgrade path. The previous text
-#     read "v1.0.0 → v1.1.0 → v1.2.0 → v1.4.0", silently
-#     skipping the v1.3.0 release. The path is now
-#     "v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0 → v1.4.0".
-#   • The FAQ link's `about:` text now explicitly mentions
-#     that the Q-range still covers through Q130 (no new
-#     questions were added in v1.3.0 or v1.4.0).
-#   • No new contact link was added for the companion app
-#     itself. The companion app is documented in a separate
-#     repository (gasciljh/dnscrypt-proxy-app). Pointing users
-#     there from the "New Issue" page would fragment the
-#     support surface. Instead, the Installation link mentions
-#     the app, and the bug report template includes a
-#     dedicated v1.4.0 companion-app diagnostics section.
+# v1.5.0 additions:
+#   • Version bumped to v1.5.0.
+#   • All links updated to the consolidated documentation
+#     (v1.5.0 merged 35 markdown files → 15).
+#   • ADR count "8" → "3" (v1.5.0 renumbering, ADR-0002 + ADR-0003).
+#   • Roadmap "planned for v1.6.0 and v2.0.0".
+#   • Changelog "through v1.5.0".
 # ============================================================
 
 # ============================================================
@@ -170,58 +39,40 @@
 # template, which automatically ensures the required information
 # is collected (version, device, logs, etc.).
 #
-# When to enable this?
-#   • Yes: projects that need structured information (like ours).
-#     A blank issue would bypass the preflight checks and
-#     environment fields, making bug reports much harder to act on.
-#   • No: flexible projects that allow full freedom.
-#
-# Our choice: false (strict) — the project receives bug reports
-# from a wide range of devices/ROMs/kernels, and unstructured
-# reports would slow down triage significantly.
-#
-# v1.2.0 note: the strictness is even more important now, because
-# data-loss reports REQUIRE the v1.2.0 diagnostic block
-# (backup count, last_stable, recovery mode, orphan txn). A blank
-# issue would silently lose that context.
-#
-# v1.3.0 note: the backup diagnostics rely on the v1.3.0
-# detection and sort semantics (SNAP-MANIFEST, SNAP-MTIME,
-# ROT-*). A blank issue would also lose any context about the
-# rotation state of the backup directory.
-#
-# v1.4.0 note: the companion app diagnostics (v1.4.0) are also
-# only collected through the bug report template. A blank issue
-# would silently lose that context too.
+# v1.5.0 note: the strictness is more important than ever. The
+# v1.5.0 companion-install flow introduces new failure modes
+# (token expiry, localhost gate, rate limit, cascade exhaustion,
+# SELinux staging, Play Protect) and the Layer 0/1 split
+# introduces new shell failure modes. Both diagnostics blocks
+# are only reachable through the bug report template — a blank
+# issue would silently lose all that context.
 # ============================================================
 blank_issues_enabled: false
 
 # ============================================================
 # [2] Quick contact links
 # ============================================================
-# Appear below "New Issue" — guide the user to the correct channel.
+# Appear below "New Issue" — guide the user to the correct
+# channel.
 #
-# Ordering rationale (v1.2.0):
-#   Links are listed in decreasing order of how often they are
-#   needed by first-time visitors:
-#     1. FAQ                 — before asking anything
-#     2. Troubleshooting     — before opening a bug
-#     3. Backup reference    — for data-loss / restore questions
-#     4. Emergency recovery  — for bootloop / lost-data scenarios
-#     5. Upgrade guide       — for version-to-version questions
-#     6. Discussions         — general questions
-#     7. Security            — private vulnerability reports
-#     8. Install             — installation questions
-#     9. Branching           — before opening a PR
-#    10. Release Process     — how releases are cut
-#    11. ADRs                — architectural decisions
-#    12. Compatibility       — "will it work on my device?"
-#    13. Changelog           — "what's new?"
-#    14. Roadmap             — "will feature X be added?"
+# Ordering:
+#   1. FAQ                 — before asking anything
+#   2. Troubleshooting     — before opening a bug
+#   3. Backup reference    — data-loss / restore questions
+#   4. Emergency recovery  — bootloop / lost-data scenarios
+#   5. Upgrade guide       — version-to-version questions
+#   6. Discussions         — general questions
+#   7. Security            — private vulnerability reports
+#   8. Install             — installation questions
+#   9. Branching           — before opening a PR
+#  10. Release Process     — how releases are cut
+#  11. ADRs                — architectural decisions
+#  12. Compatibility       — "will it work on my device?"
+#  13. Changelog           — "what's new?"
+#  14. Roadmap             — "will feature X be added?"
 #
-# ISS-4 fix: all `about` values below are two-line summaries.
-# GitHub renders them in a narrow card; multi-line block scalars
-# (used previously) were visually truncated or forced scroll.
+# `about:` values are two-line summaries. GitHub renders them
+# in a narrow card with a very limited vertical budget.
 # ============================================================
 contact_links:
 
@@ -229,49 +80,45 @@ contact_links:
   # [2.1] FAQ (Frequently Asked Questions)
   # ------------------------------------------------------------
   - name: ❓ Frequently Asked Questions (FAQ)
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/FAQ.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#10-faq
     about: |
-      Common questions with detailed answers (Q1–Q130).
+      Common questions with detailed answers.
       Read this first — the answer may already be here.
 
   # ------------------------------------------------------------
   # [2.2] Troubleshooting guide
   # ------------------------------------------------------------
   - name: 🆘 Troubleshooting guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/TROUBLESHOOTING.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#7-troubleshooting
     about: |
       Comprehensive diagnostics for DNS, WebUI, firewall, and backup issues.
       Read this before opening an Issue.
 
   # ------------------------------------------------------------
-  # [2.3] Backup system reference (v1.2.0 + v1.3.0 semantics)
+  # [2.3] Backup system reference
   # ------------------------------------------------------------
   - name: 💾 Backup system reference
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BACKUP.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system
     about: |
       The 5 preserved files, the 10 defensive layers, directory layout,
       rotation (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT), and manual restore.
 
   # ------------------------------------------------------------
-  # [2.4] Emergency recovery guide (v1.2.0)
+  # [2.4] Emergency recovery guide
   # ------------------------------------------------------------
   - name: 🚨 Emergency recovery guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/EMERGENCY.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery
     about: |
       Step-by-step recovery for bootloop, lost data, broken DNS, or firewall.
       Recovery trigger: touch recovery && reboot.
 
   # ------------------------------------------------------------
-  # [2.5] Upgrade guide (corrected: now includes v1.3.0)
-  # ------------------------------------------------------------
-  # CORRECTED in this revision: the previous text listed
-  # "v1.0.0 → v1.1.0 → v1.2.0 → v1.4.0", silently skipping
-  # v1.3.0. The path now includes v1.3.0 correctly.
+  # [2.5] Upgrade guide
   # ------------------------------------------------------------
   - name: ⬆️ Version upgrade guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/UPGRADE.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#5-update
     about: |
-      Upgrade paths v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0 → v1.4.0,
+      Upgrade paths v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0 → v1.4.0 → v1.5.0,
       settings preservation, and rollback.
 
   # ------------------------------------------------------------
@@ -293,19 +140,19 @@ contact_links:
       Do NOT open a public Issue for security vulnerabilities.
 
   # ------------------------------------------------------------
-  # [2.8] Installation guide (mentions companion APK, v1.4.0)
+  # [2.8] Installation guide
   # ------------------------------------------------------------
   - name: 📘 Installation guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/INSTALL.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#2-install
     about: |
-      Step-by-step install for Magisk / KernelSU / APatch, including the
-      OPTIONAL companion Android app (web/app-debug.apk).
+      Install for Magisk / KernelSU / APatch, plus the v1.5.0 one-tap
+      companion install flow (5-level pm install cascade).
 
   # ------------------------------------------------------------
   # [2.9] Git branching strategy
   # ------------------------------------------------------------
   - name: 🌿 Git branching & PR guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/BRANCHING.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/CONTRIBUTING.md#5-branch-strategy
     about: |
       Branch types, naming rules, PR target rules, and protection policy.
       Read before opening a PR.
@@ -314,7 +161,7 @@ contact_links:
   # [2.10] Release process guide
   # ------------------------------------------------------------
   - name: 🚀 Release process guide
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/RELEASE_PROCESS.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/CONTRIBUTING.md#11-release-process
     about: |
       How releases are prepared, tagged, published, and synced.
       Covers release.sh and release-patch.sh.
@@ -325,32 +172,32 @@ contact_links:
   - name: 📐 Architecture Decision Records
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md
     about: |
-      The "why" behind major architectural decisions (6 ADRs).
-      Read before proposing changes to core design.
+      The "why" behind major architectural decisions (3 ADRs — including
+      v1.5.0's filepath-securejoin + Layered Bootstrap).
 
   # ------------------------------------------------------------
-  # [2.12] Compatibility matrix (mentions v1.1.0 + v1.2.0 + v1.4.0)
+  # [2.12] Compatibility matrix
   # ------------------------------------------------------------
   - name: ✅ Compatibility matrix
-    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/COMPATIBILITY.md
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#5-compatibility-matrix
     about: |
-      Compatibility by Android version, ROM, kernel, chipset, and root
-      solution. Covers v1.1.0 memory profiles, v1.2.0 backup, and v1.4.0 APK.
+      Compatibility by Android version, ROM, kernel, chipset, and root.
+      Covers v1.1.0 profiles, v1.2.0 backup, v1.3.0 rotation, and v1.5.0 Layer 0/1.
 
   # ------------------------------------------------------------
-  # [2.13] Changelog (through v1.4.0)
+  # [2.13] Changelog
   # ------------------------------------------------------------
   - name: 📋 Changelog
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md
     about: |
-      All notable changes from v1.0.0 through v1.4.0.
+      All notable changes from v1.0.0 through v1.5.0.
       See what's new in the latest release.
 
   # ------------------------------------------------------------
-  # [2.14] Roadmap (v1.5.0 and v2.0.0)
+  # [2.14] Roadmap
   # ------------------------------------------------------------
   - name: 🗺️ Project roadmap
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md
     about: |
-      What is planned for v1.5.0 and v2.0.0.
+      What is planned for v1.6.0 and v2.0.0.
       Check here before proposing a feature.

@@ -1,189 +1,59 @@
 // ============================================================
-// DNSCrypt Smart Filter – Dev Container Configuration
-// Version: v1.4.0 (Global Edition)
-// Last updated: 2026-10-08
-// Author: gasciljh
-// Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+// DNSCrypt Smart Filter — Dev Container Configuration
+// Version: v1.5.0 (Global Edition)
+// Last updated: 2026-10-19
 // ============================================================
-// v1.4.0 — Companion Android app integration
-// ============================================================
-//   📱 DC-V14-01 — No configuration change. The devcontainer
-//     installs Go, Node, shellcheck, and shfmt (via setup.sh).
-//     The companion Android app APK does not require any new
-//     tooling in the devcontainer.
+// Reproducible VS Code Dev Container for the project.
 //
-//   📱 DC-V14-02 — Version bump v1.2.0 → v1.4.0 (skipping
-//     v1.3.0, which did not affect the devcontainer — see the
-//     v1.3.0 block below for the rationale).
-//
-//   📱 DC-V14-03 — No new extension or tool is required for the
-//     CodeQL `go/path-injection` fix in `main.go::removeModule`,
-//     or for the iOS PWA logic removal in `web/index.html`. Both
-//     changes are pure source-level edits that the existing
-//     toolchain (Go, shellcheck, shfmt, golangci-lint) already
-//     covers.
-// ============================================================
-// v1.3.0 — No changes to the devcontainer
-// ============================================================
-//   📌 The v1.3.0 release did not touch this file.
-//
-//   The v1.3.0 release is primarily a feature release:
-//     • PWA install button (client-side, web/index.html)
-//     • Live status LED (client-side, web/index.html)
-//     • DNS auto-start fix (shell-side, proxy/service.sh)
-//
-//   The v1.3.0 release ALSO refined snapshot-detection and
-//   rotation semantics shared by every consumer of the
-//   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-//   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-//   touched main.go, functions.sh, service.sh, watchdog.sh,
-//   status.sh, customize.sh, action.sh, and uninstall.sh.
-//
-//   Why this file was NOT modified:
-//     • The devcontainer configuration describes the DEVELOPMENT
-//       environment (VS Code extensions, container features,
-//       tool versions). It does NOT interact with the runtime
-//       backup layer, the rotation semantics, or any of the
-//       files touched by the v1.3.0 refinements.
-//     • The v1.3.0 server-side changes are all source-level
-//       (Go and shell); none require a new extension, feature,
-//       or tool in the container.
-//     • All tools already installed (Go, shellcheck, shfmt,
-//       golangci-lint) cover the v1.3.0 code changes without
-//       modification.
-//
-//   Therefore the entire container configuration is byte-for-byte
-//   identical between v1.2.0 and v1.3.0. See CHANGELOG.md
-//   [v1.3.0] and docs/ARCHITECTURE.md §4.13 for the full delta.
-// ============================================================
-// Cross-references:
-// ============================================================
-//   • .devcontainer/setup.sh          — postCreateCommand
-//   • .github/workflows/ci.yml        — CI matrix (mirrors
-//                                        the local toolchain)
-//   • .github/workflows/upgrade-test.yml
-//                                     — 42-scenario matrix
-//                                        (v1.2.0, manual)
-//   • .github/dependabot.yml §[3]     — tracks devcontainer
-//                                        feature versions
-//   • docs/BACKUP.md                  — backup reference
-//                                        (v1.2.0, device-side)
-//   • docs/EMERGENCY.md               — recovery guide
-//                                        (v1.2.0, device-side)
-//   • docs/ARCHITECTURE.md §4.13      — v1.3.0 server-side
-//                                        refinements
-//   • CHANGELOG.md §[v1.3.0], §[v1.4.0]
-// ============================================================
-// ============================================================
-// Purpose:
-//   Provides a reproducible development environment using VS Code
-//   Dev Containers.
-//
-//   On container creation:
-//     1. A minimal Ubuntu 22.04 image is pulled.
-//     2. Go 1.22, GitHub CLI, and common-utils are installed
-//        (as devcontainer features).
-//     3. .devcontainer/setup.sh runs as postCreateCommand to
-//        install the full toolchain (shellcheck, shfmt,
-//        golangci-lint, markdownlint, yamllint, actionlint,
-//        pre-commit, etc.).
-//     4. VS Code extensions are installed automatically.
+// On container creation:
+//   1. Minimal Ubuntu 22.04 image is pulled.
+//   2. Go 1.22, GitHub CLI, and common-utils are installed
+//      as devcontainer features.
+//   3. .devcontainer/setup.sh runs as postCreateCommand to
+//      install the full toolchain (shellcheck, shfmt,
+//      golangci-lint, yamllint, actionlint, pre-commit, etc.).
+//   4. VS Code extensions are installed automatically.
 //
 // Usage:
 //   code .
 //   F1 → "Dev Containers: Reopen in Container"
-//   Wait ~2-4 minutes (first run only).
 //
-// Reference:
-//   https://containers.dev/implementors/json_reference/
+// Features:
+//   • devcontainers/go:v1          — Go 1.22
+//   • devcontainers/github-cli:v1  — gh CLI
+//   • devcontainers/common-utils:v2 — base utilities
 //
-// ============================================================
-// Features used:
-// ============================================================
-//   ┌───────────────────────────────┬────────┬──────────┐
-//   │ Feature                             │ Version │ Purpose    │
-//   ├───────────────────────────────┼────────┼──────────┤
-//   │ devcontainers/features/go           │ 1       │ Go 1.22    │
-//   │ devcontainers/features/github-cli   │ 1       │ gh CLI     │
-//   │ devcontainers/features/common-utils │ 2       │ base utils │
-//   └───────────────────────────────┴────────┴──────────┘
+// postCreateCommand:
+//   Runs `.devcontainer/setup.sh` which installs:
+//     shellcheck · shfmt · golangci-lint v2 · staticcheck ·
+//     gosec · actionlint · yamllint · detect-secrets ·
+//     pre-commit.
 //
-//   The `:1` / `:2` suffix in each feature key is the feature's
-//   MAJOR version (devcontainer spec). Dependabot tracks these
-//   under the "devcontainers" ecosystem — see
-//   .github/dependabot.yml §[3].
+//   If it fails, re-run manually: `bash .devcontainer/setup.sh`
 //
-// ============================================================
-// postCreateCommand chain:
-// ============================================================
-//   1. The image + features install their base tooling.
-//   2. .devcontainer/setup.sh runs (bash, idempotent, verbose).
-//   3. setup.sh installs the remaining dev tools:
-//        • shellcheck        (shell linting)
-//        • shfmt             (shell formatting)
-//        • golangci-lint v2  (Go linting)
-//        • staticcheck       (Go static analysis)
-//        • gosec             (Go security, optional)
-//        • actionlint        (GH Actions linting)
-//        • markdownlint-cli  (if npm is available)
-//        • yamllint          (Python)
-//        • detect-secrets    (Python)
-//        • pre-commit        (Python)
-//   4. setup.sh runs a final verification and prints a table of
-//      installed tool versions.
-//
-//   If postCreateCommand fails, re-run it manually:
-//     bash .devcontainer/setup.sh
-//
-// ============================================================
 // remoteUser:
-// ============================================================
-//   The container runs as `vscode` (non-root). This matters for
-//   tools that install into $HOME (go binaries, pip user packages,
-//   pre-commit hooks). Any tool that needs root uses sudo, which
-//   is pre-configured for the vscode user in devcontainer base
-//   images.
+//   Runs as `vscode` (non-root). Tools that install into
+//   $HOME (go binaries, pip user packages, pre-commit hooks)
+//   are affected. Root-needing tools use sudo.
 //
-// ============================================================
-// v1.1.0 additions (kept in v1.2.0):
-// ============================================================
-//   • Version bumped to v1.1.0 (documentation only — no behavior
-//     changes since v1.0.0).
-//   • Added a "Features used" table for quick scanning.
-//   • Expanded the "postCreateCommand chain" section to list all
-//     tools installed by setup.sh (previously only mentioned by
-//     name).
-//   • Added a note about remoteUser behavior — this affects where
-//     Go binaries and Python packages land, which is a common
-//     source of confusion when debugging "command not found"
-//     errors.
+// v1.5.0 additions:
+//   • No new feature or tool. v1.5.0 adds two shell scripts
+//     (boot-mini.sh, install_app.sh) covered by the existing
+//     toolchain.
+//   • Cross-references updated to the consolidated docs
+//     (v1.5.0 merged 35 markdown files → 15).
+//   • ADR-0007 and ADR-0008 were renumbered to ADR-0002 and
+//     ADR-0003 respectively in v1.5.0 (see docs/MAP.md §5.1).
 //
-// ============================================================
-// v1.2.0 additions:
-// ============================================================
-//   • Version bumped to v1.2.0 (documentation only — no behavior
-//     changes since v1.1.0).
-//   • The v1.2.0 release is a data-preservation release. It does
-//     NOT add any new dependencies, new tools, or new build steps.
-//     Therefore this devcontainer configuration requires NO
-//     changes to remain compatible with v1.2.0.
-//   • Confirmed: the 10 defensive layers introduced by v1.2.0
-//     live in shell scripts (customize.sh, service.sh, status.sh,
-//     uninstall.sh, functions.sh, watchdog.sh) and in main.go.
-//     None of them require a new tool for development or testing.
-//   • The dev environment used to develop v1.1.0 is the same
-//     environment used to develop v1.2.0. No tool was added,
-//     removed, or upgraded.
-//   • Cross-referenced docs/BACKUP.md and docs/EMERGENCY.md for
-//     readers who land here from a data-preservation context:
-//     those documents describe RUNTIME behavior on a real Android
-//     device, not development tooling. Testing the 10 layers
-//     requires a rooted Android device (or the emulator matrix
-//     in .github/workflows/upgrade-test.yml), not a new dev tool.
-//   • Expanded the "Features used" table with clear column
-//     headers for readability.
-//   • All comments are English-only (global edition). No Arabic
-//     strings exist in this file.
+// Cross-references:
+//   • .devcontainer/setup.sh             — postCreateCommand
+//   • .github/workflows/ci.yml           — CI matrix
+//   • .github/workflows/upgrade-test.yml — 42-scenario matrix
+//   • .github/dependabot.yml §[3]        — devcontainer features
+//   • docs/REFERENCE.md §4               — backup reference
+//   • docs/GUIDE.md §8                   — recovery guide
+//   • docs/REFERENCE.md §3               — v1.3.0 SNAP-*/ROT-*
+//   • CHANGELOG.md                       — version history
 // ============================================================
 {
   "name": "DNSCrypt Smart Filter Dev",

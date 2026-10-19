@@ -1,172 +1,46 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter – fetch_app_apk.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Fetch the companion Android app APK from the
-#   dnscrypt-proxy-app repository releases.
+# Fetch the companion Android app APK from the
+# dnscrypt-proxy-app repository releases.
 #
-# Single Source of Truth:
-#   proxy/app-apk.version    (e.g. "1.0.0", no "v" prefix)
+# Version source: proxy/app-apk.version (SSOT, X.Y.Z no "v").
 #
-# Source URL pattern:
-#   https://github.com/gasciljh/dnscrypt-proxy-app/
-#     releases/download/v<version>/app-debug.apk
-#
-# Output (default: ./dist/):
+# Output (default ./dist/):
 #   dist/DNS-Proxy-v<version>.apk
 #   dist/DNS-Proxy-v<version>.apk.sha256
 #
-# Features:
-#   • Local cache checked first (~/.cache/dnscrypt-proxy-webui/app)
-#   • SHA256 verification via .manifest.json
-#   • Offline mode (--offline)
-#   • JSON output for CI (--json)
-#   • Idempotent — safe to run multiple times
+# The .sha256 sidecar references the FINAL staged filename,
+# `app-debug.apk`, NOT the intermediate dist name. This makes
+# the sidecar directly usable by `sha256sum -c` after
+# release.yml copies it to `web/app-debug.apk.sha256`, and by
+# install_app.sh on device.
+#
+# ⚠️ release.yml REGENERATES this dist sidecar so its embedded
+#    name matches the GitHub Release asset (DNS-Proxy-v*.apk).
+#    The output produced HERE is only correct for the copy
+#    inside the module ZIP (web/app-debug.apk.sha256).
 #
 # Usage:
 #   ./scripts/fetch_app_apk.sh
 #   ./scripts/fetch_app_apk.sh --verbose
 #   ./scripts/fetch_app_apk.sh --offline
-#   ./scripts/fetch_app_apk.sh --force
 #   ./scripts/fetch_app_apk.sh --json | jq .
 #
 # Environment:
-#   GITHUB_TOKEN     — Optional. Increases API rate limit.
-#   APP_CACHE_DIR    — Override cache directory.
-#   NO_COLOR         — Disable colored output.
+#   GITHUB_TOKEN     — optional; increases GitHub API rate limit
+#   APP_CACHE_DIR    — override cache directory
+#   NO_COLOR         — disable colored output
 #
 # Exit codes:
 #   0 — APK ready (cache hit or download success)
-#   1 — Download failed from all sources
-#   2 — Invalid arguments / missing tools / missing version file
-#
-# ============================================================
-# v1.4.0 — initial release
-# ============================================================
-#   📱 FDAPK-1 — New script. Fetches the companion Android app
-#     APK from gasciljh/dnscrypt-proxy-app releases and places
-#     it in `dist/` as `DNS-Proxy-v<app-version>.apk`.
-#
-#     Invoked by:
-#       • `.github/workflows/release.yml` (step "Fetch companion
-#         Android app APK") — best-effort, does not block the
-#         release if the fetch fails.
-#       • `Makefile` target `fetch-apk` — developer convenience.
-#
-#     Idempotent. Uses a local cache under
-#     `~/.cache/dnscrypt-proxy-webui/app/` and a
-#     `.manifest.json` for SHA256 tracking.
-#
-#   📱 FDAPK-2 — Version-aware. The app version is read from
-#     `proxy/app-apk.version` (single source of truth). The
-#     version may be overridden with `--version`.
-#
-#   📱 FDAPK-3 — Fallback URL. If the pinned version's release
-#     asset is not found, the script retries with the
-#     `releases/latest/download/` URL. This lets the pipeline
-#     recover from a release-tag naming change without a script
-#     update.
-#
-#   📱 FDAPK-4 — Sanity check. After download, the first two
-#     bytes are verified to be `PK` (ZIP magic). This rejects
-#     HTML error pages that servers sometimes return with
-#     HTTP 200.
-#
-# ============================================================
-# v1.4.0 — Post-audit fixes (this revision)
-# ============================================================
-#   🔧 FDAPK-5 — `read_app_version` return-code handling.
-#     The original code used:
-#         APP_VERSION="$(read_app_version)"
-#         if [ -z "$APP_VERSION" ]; then exit 2; fi
-#
-#     Under `set -e` (which the script enables), a non-zero
-#     return from `read_app_version` causes the shell to exit
-#     IMMEDIATELY with the function's exit status — BEFORE the
-#     `if [ -z ... ]` check can run. The documented exit code 2
-#     ("missing version file") was therefore never reached; the
-#     script exited with code 1 instead.
-#
-#     Fix: capture the return status explicitly and translate
-#     it to exit code 2:
-#         if ! APP_VERSION="$(read_app_version)"; then
-#             exit 2
-#         fi
-#
-#     The `if !` guard is placed OUTSIDE the command
-#     substitution so that `set -e` does not trigger on the
-#     failed assignment. The explicit `exit 2` is now the ONLY
-#     path for a missing/empty version file.
-#
-#   🔧 FDAPK-6 — `--help` now documents the short flags.
-#     The argument parser has always accepted `-f`, `-v`, `-q`,
-#     `-j`, `-h` (see the `case "$1" in` block in section [4]),
-#     but the `--help` text only listed the long forms. This
-#     made the short flags invisible to anyone who did not read
-#     the source. The help text has been updated to show both
-#     forms side-by-side, matching the actual parser.
-#
-#   🔧 FDAPK-7 — Tool-check `for` loop collapsed to `if`.
-#     The original used:
-#         for tool in curl; do
-#             if ! command -v "$tool" >/dev/null 2>&1; then
-#                 log_error "Missing tool: $tool"
-#                 exit 2
-#             fi
-#         done
-#     The single-iteration loop triggered ShellCheck SC2043
-#     ("This loop will only ever run once"). It has been
-#     rewritten as a plain `if` with a hardcoded `curl`, which
-#     is both clearer and ShellCheck-clean.
-#
-# ============================================================
-# Non-responsibilities (deliberately NOT done here)
-# ============================================================
-#   • Does NOT build the companion APK. The companion app
-#     lives in a separate repository
-#     (gasciljh/dnscrypt-proxy-app) and is built there.
-#   • Does NOT publish the APK to the GitHub Release. That is
-#     handled by `.github/workflows/release.yml` (attaches
-#     `dist/DNS-Proxy-v*.apk` and `.sha256`).
-#   • Does NOT touch the DNS binaries cache. That is
-#     `scripts/fetch_dns_binaries.sh`.
-#   • Does NOT touch `proxy/app-apk.version`. It is read-only.
-#   • Does NOT touch the backup layer or the WebUI.
-# ============================================================
-# Coordination with the module
-# ============================================================
-#   • The version of the companion app is stored in
-#     `proxy/app-apk.version` (single source of truth).
-#   • The module's CI (`ci.yml`) verifies that the version
-#     file exists and is well-formed — but does NOT require
-#     the APK itself to be present.
-#   • The module's packaging (`package_module.sh`) treats the
-#     APK as OPTIONAL: it bundles `web/app-debug.apk` when it
-#     exists, and warns (without failing) when it does not.
-#   • The module's HTTP server (`main.go`) serves the APK at
-#     `GET /app-debug.apk` when it is present, and returns
-#     404 otherwise.
-#
-# Cross-references:
-#   • proxy/app-apk.version         — Single Source of Truth
-#   • scripts/fetch_dns_binaries.sh — the DNS-binaries equivalent
-#   • scripts/package_module.sh     — bundles web/app-debug.apk
-#   • .github/workflows/release.yml — CI consumer (best-effort)
-#   • .github/workflows/ci.yml      — verifies metadata
-#   • Makefile                      — `make fetch-apk`
-#   • docs/DNS_BINARIES.md          — parallel pipeline reference
-#   • docs/COMPATIBILITY.md         — companion app compatibility
-#   • CHANGELOG.md §[v1.4.0]        — full v1.4.0 delta
-# ============================================================
-# POSIX note on `set -euo pipefail`:
-#   This script uses bash (not POSIX sh). It is one of the
-#   `scripts/*` helpers run by the developer or by CI, not by
-#   Android at runtime. It is therefore free to use bash-isms.
+#   1 — download failed from all sources
+#   2 — invalid arguments / missing tools / missing version file
 # ============================================================
 
 set -euo pipefail
@@ -179,38 +53,39 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 APP_VERSION_FILE="$REPO_ROOT/proxy/app-apk.version"
 
-# Companion app repo (must match APP_REPO in dnscrypt-proxy-app)
 APP_REPO="gasciljh/dnscrypt-proxy-app"
 APP_ASSET_NAME="app-debug.apk"
+SIDECAR_REF_NAME="app-debug.apk"
 
-# Default directories
 DEFAULT_OUTPUT_DIR="$REPO_ROOT/dist"
 DEFAULT_CACHE_DIR="${APP_CACHE_DIR:-${HOME}/.cache/dnscrypt-proxy-webui/app}"
 
-# HTTP timeout (seconds)
 HTTP_TIMEOUT=60
 
 # ============================================================
 # [2] Colors
 # ============================================================
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-	RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-	CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 else
-	RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
+    RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
 # ============================================================
-# [3] Output helpers (stdout for user, stderr for diagnostics)
+# [3] Logging
 # ============================================================
+# Stream discipline: info/ok → stdout; warn/error/debug → stderr.
+# Keeps stdout clean for value-producing contexts (e.g. when
+# this script's output is piped).
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
 log_ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⚠${NC}  $1" >&2; }
 log_error() { echo -e "  ${RED}✗${NC} $1" >&2; }
 log_debug() {
-	if [ "$VERBOSE" = "1" ]; then
-		echo -e "  ${DIM}·${NC} $1" >&2
-	fi
+    if [ "$VERBOSE" = "1" ]; then
+        echo -e "  ${DIM}·${NC} $1" >&2
+    fi
 }
 
 # ============================================================
@@ -226,7 +101,7 @@ CACHE_DIR=""
 VERSION_OVERRIDE=""
 
 show_help() {
-	cat << 'EOF'
+    cat << 'EOF'
 DNSCrypt Smart Filter – fetch_app_apk.sh
 
 Usage:
@@ -235,7 +110,8 @@ Usage:
 Options:
   --output-dir <dir>    Output directory (default: ./dist)
   --cache-dir <dir>     Cache directory
-  --version <ver>       App version (default: from proxy/app-apk.version)
+  --version <ver>       Override app version (default: from
+                        proxy/app-apk.version)
   --offline             Use cache only (no download)
   --force, -f           Force re-download even if cached
   --verbose, -v         Verbose output
@@ -250,66 +126,72 @@ Examples:
   ./scripts/fetch_app_apk.sh -j | jq .
   ./scripts/fetch_app_apk.sh -f --output-dir ./dist
 
+Output:
+  dist/DNS-Proxy-v<version>.apk
+  dist/DNS-Proxy-v<version>.apk.sha256
+
 Exit codes:
   0 — APK ready (cache hit or download success)
-  1 — Download failed from all sources
-  2 — Invalid arguments / missing tools / missing version file
-
-Coordination:
-  The app version is read from proxy/app-apk.version.
-  This script does NOT touch the DNS binaries cache, the module
-  version, or the WebUI. It is a pure fetcher.
-
-See:
-  scripts/fetch_dns_binaries.sh  — the DNS-binaries equivalent
-  .github/workflows/release.yml  — CI consumer of this script
+  1 — download failed from all sources
+  2 — invalid arguments / missing tools / missing version file
 EOF
-	exit 0
+    exit 0
 }
 
 while [ $# -gt 0 ]; do
-	case "$1" in
-		--output-dir)
-			shift
-			OUTPUT_DIR="${1:-}"
-			if [ -z "$OUTPUT_DIR" ]; then
-				log_error "--output-dir requires a path"
-				exit 2
-			fi
-			;;
-		--cache-dir)
-			shift
-			CACHE_DIR="${1:-}"
-			if [ -z "$CACHE_DIR" ]; then
-				log_error "--cache-dir requires a path"
-				exit 2
-			fi
-			;;
-		--version)
-			shift
-			VERSION_OVERRIDE="${1:-}"
-			if [ -z "$VERSION_OVERRIDE" ]; then
-				log_error "--version requires a value (e.g. 1.0.0)"
-				exit 2
-			fi
-			;;
-		--offline)     OFFLINE=1 ;;
-		--force|-f)    FORCE=1 ;;
-		--verbose|-v)  VERBOSE=1 ;;
-		--quiet|-q)    QUIET=1 ;;
-		--json|-j)     JSON=1 ;;
-		--help|-h)     show_help ;;
-		*)
-			log_error "Unknown option: $1"
-			echo "Use --help for assistance" >&2
-			exit 2
-			;;
-	esac
-	shift
+    case "$1" in
+        --output-dir)
+            shift
+            OUTPUT_DIR="${1:-}"
+            if [ -z "$OUTPUT_DIR" ]; then
+                log_error "--output-dir requires a path"
+                exit 2
+            fi
+            ;;
+        --cache-dir)
+            shift
+            CACHE_DIR="${1:-}"
+            if [ -z "$CACHE_DIR" ]; then
+                log_error "--cache-dir requires a path"
+                exit 2
+            fi
+            ;;
+        --version)
+            shift
+            VERSION_OVERRIDE="${1:-}"
+            if [ -z "$VERSION_OVERRIDE" ]; then
+                log_error "--version requires a value (e.g. 1.0.0)"
+                exit 2
+            fi
+            ;;
+        --offline)     OFFLINE=1 ;;
+        --force|-f)    FORCE=1 ;;
+        --verbose|-v)  VERBOSE=1 ;;
+        --quiet|-q)    QUIET=1 ;;
+        --json|-j)     JSON=1 ;;
+        --help|-h)     show_help ;;
+        *)
+            log_error "Unknown option: $1"
+            echo "Use --help for assistance" >&2
+            exit 2
+            ;;
+    esac
+    shift
 done
 
+# --force and --offline are mutually exclusive: --force discards
+# a valid cache entry, --offline refuses to download. Combined,
+# every architecture fails with "cache missing" even when the
+# cache is present.
+if [ "$OFFLINE" = "1" ] && [ "$FORCE" = "1" ]; then
+    log_error "--offline and --force are mutually exclusive"
+    log_info "  --offline  → use cache only"
+    log_info "  --force    → ignore cache and re-download"
+    exit 2
+fi
+
 # ============================================================
-# [5] Defaults
+# [5] Defaults + tool check
 # ============================================================
 [ -z "$CACHE_DIR" ]  && CACHE_DIR="$DEFAULT_CACHE_DIR"
 [ -z "$OUTPUT_DIR" ] && OUTPUT_DIR="$DEFAULT_OUTPUT_DIR"
@@ -317,217 +199,249 @@ done
 mkdir -p "$CACHE_DIR" "$OUTPUT_DIR"
 MANIFEST_FILE="$CACHE_DIR/.manifest.json"
 
-# ============================================================
-# [6] Tool check
-# ============================================================
-# FDAPK-7: replaced the single-iteration `for tool in curl; do`
-# loop (ShellCheck SC2043) with a plain `if`. Only curl is
-# required for the download path; sha256 and jq are detected
-# separately below because they are optional.
 if ! command -v curl >/dev/null 2>&1; then
-	log_error "Missing tool: curl"
-	exit 2
+    log_error "Missing tool: curl"
+    exit 2
 fi
 
 HAS_SHA256=0
 SHA256_CMD=""
 if command -v sha256sum >/dev/null 2>&1; then
-	HAS_SHA256=1; SHA256_CMD="sha256sum"
+    HAS_SHA256=1; SHA256_CMD="sha256sum"
 elif command -v shasum >/dev/null 2>&1; then
-	HAS_SHA256=1; SHA256_CMD="shasum -a 256"
+    HAS_SHA256=1; SHA256_CMD="shasum -a 256"
 fi
 
 HAS_JQ=0
 command -v jq >/dev/null 2>&1 && HAS_JQ=1
 
 # ============================================================
-# [7] Helpers
+# [6] Helpers
 # ============================================================
 file_size() {
-	local out
-	out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-	out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
-	return 1
+    local out
+    out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+    out=$(stat -f%z "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
+    return 1
 }
 
 file_sha256() {
-	[ "$HAS_SHA256" = "0" ] && return 1
-	$SHA256_CMD "$1" 2>/dev/null | awk '{print $1}'
+    [ "$HAS_SHA256" = "0" ] && return 1
+    $SHA256_CMD "$1" 2>/dev/null | awk '{print $1}'
+}
+
+# write_sidecar <apk_path> <sidecar_path> <embedded_filename>
+#
+# Emits `<hash>  <filename>` (two spaces, standard sha256sum -c
+# format). The embedded filename is the FINAL staged name, not
+# the intermediate dist name. See header for rationale.
+write_sidecar() {
+    local src="$1"
+    local dst="$2"
+    local ref="$3"
+
+    [ "$HAS_SHA256" = "0" ] && return 1
+
+    local h
+    h=$(file_sha256 "$src")
+    [ -z "$h" ] && return 1
+
+    printf '%s  %s\n' "$h" "$ref" > "$dst"
+    return 0
 }
 
 manifest_get() {
-	local key="$1"
-	if [ "$HAS_JQ" = "1" ] && [ -f "$MANIFEST_FILE" ]; then
-		jq -r --arg k "$key" '.[$k].sha256 // empty' "$MANIFEST_FILE" 2>/dev/null
-	fi
+    local key="$1"
+    if [ "$HAS_JQ" = "1" ] && [ -f "$MANIFEST_FILE" ]; then
+        jq -r --arg k "$key" '.[$k].sha256 // empty' "$MANIFEST_FILE" 2>/dev/null
+    fi
 }
 
 manifest_set() {
-	local key="$1" sha="$2" version="$3" url="$4"
-	[ "$HAS_JQ" = "0" ] && return 0
+    local key="$1" sha="$2" version="$3" url="$4"
+    [ "$HAS_JQ" = "0" ] && return 0
 
-	local current="{}"
-	if [ -f "$MANIFEST_FILE" ]; then
-		current=$(cat "$MANIFEST_FILE" 2>/dev/null) || current="{}"
-		echo "$current" | jq empty 2>/dev/null || current="{}"
-	fi
+    local current="{}"
+    if [ -f "$MANIFEST_FILE" ]; then
+        current=$(cat "$MANIFEST_FILE" 2>/dev/null) || current="{}"
+        echo "$current" | jq empty 2>/dev/null || current="{}"
+    fi
 
-	local updated
-	if ! updated=$(echo "$current" | jq \
-		--arg k "$key" --arg s "$sha" --arg v "$version" --arg u "$url" \
-		--arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-		'.[$k] = {sha256: $s, version: $v, url: $u, fetched_at: $t}' 2>/dev/null); then
-		return 1
-	fi
-	[ -z "$updated" ] && return 1
-	printf '%s\n' "$updated" > "$MANIFEST_FILE"
-	return 0
+    local updated
+    if ! updated=$(echo "$current" | jq \
+        --arg k "$key" --arg s "$sha" --arg v "$version" --arg u "$url" \
+        --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '.[$k] = {sha256: $s, version: $v, url: $u, fetched_at: $t}' 2>/dev/null); then
+        return 1
+    fi
+    [ -z "$updated" ] && return 1
+    printf '%s\n' "$updated" > "$MANIFEST_FILE"
+    return 0
 }
 
 # ============================================================
-# [8] Read app version (Single Source of Truth)
+# [7] Read app version (SSOT)
 # ============================================================
-# FDAPK-5 fix: the return status of `read_app_version` is
-# captured explicitly via `if !`, OUTSIDE the command
-# substitution. This prevents `set -e` from exiting the shell
-# with the function's internal exit status (1) before the
-# documented `exit 2` can run.
-# ============================================================
+# Resolution: --version override → file → abort.
+#
+# The --version value is normalized the same way as the file
+# value: leading whitespace/CRLF trimmed, optional "v" prefix
+# stripped. A bare "v" (which strips to an empty string) is
+# rejected here with an explicit message — without this check
+# the empty string would later fail the "X.Y.Z" regex and exit
+# silently with code 2.
 read_app_version() {
-	if [ -n "$VERSION_OVERRIDE" ]; then
-		printf '%s' "$VERSION_OVERRIDE" | sed 's/^v//'
-		return 0
-	fi
-	if [ -f "$APP_VERSION_FILE" ]; then
-		local v
-		v=$(tr -d '\r\n' < "$APP_VERSION_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^v//')
-		if [ -n "$v" ]; then
-			printf '%s' "$v"
-			return 0
-		fi
-	fi
-	log_error "proxy/app-apk.version missing or empty"
-	return 1
+    if [ -n "$VERSION_OVERRIDE" ]; then
+        local v
+        v=$(printf '%s' "$VERSION_OVERRIDE" \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | sed 's/^v//')
+
+        if [ -z "$v" ]; then
+            log_error "--version value is empty after stripping the 'v' prefix"
+            log_info "  Received: '$VERSION_OVERRIDE'"
+            log_info "  Expected: X.Y.Z (e.g. 1.0.0, or v1.0.0)"
+            return 1
+        fi
+
+        printf '%s' "$v"
+        return 0
+    fi
+
+    if [ -f "$APP_VERSION_FILE" ]; then
+        local v
+        v=$(tr -d '\r\n' < "$APP_VERSION_FILE" \
+            | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+            | sed 's/^v//')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+
+    log_error "proxy/app-apk.version missing or empty"
+    return 1
 }
 
 APP_VERSION=""
 if ! APP_VERSION="$(read_app_version)"; then
-	exit 2
+    exit 2
 fi
 
 if [ -z "$APP_VERSION" ]; then
-	exit 2
+    exit 2
 fi
 
 if ! echo "$APP_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-	log_error "Invalid app version: '$APP_VERSION'"
-	log_info "Format: X.Y.Z (e.g. 1.0.0)"
-	exit 2
+    log_error "Invalid app version: '$APP_VERSION'"
+    log_info "Format: X.Y.Z (e.g. 1.0.0)"
+    exit 2
 fi
 
 APP_TAG="v${APP_VERSION}"
 
 # ============================================================
-# [9] URLs
+# [8] URLs
 # ============================================================
 GITHUB_URL="https://github.com/${APP_REPO}/releases/download/${APP_TAG}/${APP_ASSET_NAME}"
 
-# Fallback: "latest" pointer (works even if the tag name scheme changes)
+# Fallback: the "latest" pointer. Resolves even if the tag name
+# scheme changes.
 GITHUB_LATEST_URL="https://github.com/${APP_REPO}/releases/latest/download/${APP_ASSET_NAME}"
 
 # ============================================================
-# [10] Header
+# [9] Header
 # ============================================================
 if [ "$JSON" = "0" ] && [ "$QUIET" = "0" ]; then
-	echo ""
-	echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-	echo -e "${BOLD}║  📦 DNSCrypt Companion App — APK Fetcher                  ║${NC}"
-	echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
-	echo ""
-	echo -e "  ${BOLD}App version:${NC}   ${GREEN}${APP_VERSION}${NC}"
-	echo -e "  ${BOLD}Source repo:${NC}   ${DIM}${APP_REPO}${NC}"
-	echo -e "  ${BOLD}Cache dir:${NC}     ${DIM}${CACHE_DIR}${NC}"
-	echo -e "  ${BOLD}Output dir:${NC}    ${DIM}${OUTPUT_DIR}${NC}"
-	[ "$OFFLINE" = "1" ] && echo -e "  ${BOLD}Mode:${NC}          ${YELLOW}OFFLINE${NC}"
-	[ "$FORCE" = "1" ]   && echo -e "  ${BOLD}Force:${NC}         ${YELLOW}YES${NC}"
-	echo ""
+    echo ""
+    echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BOLD}║  📦 DNSCrypt Companion App — APK Fetcher                  ║${NC}"
+    echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${BOLD}App version:${NC}   ${GREEN}${APP_VERSION}${NC}"
+    echo -e "  ${BOLD}Source repo:${NC}   ${DIM}${APP_REPO}${NC}"
+    echo -e "  ${BOLD}Cache dir:${NC}     ${DIM}${CACHE_DIR}${NC}"
+    echo -e "  ${BOLD}Output dir:${NC}    ${DIM}${OUTPUT_DIR}${NC}"
+    [ "$OFFLINE" = "1" ] && echo -e "  ${BOLD}Mode:${NC}          ${YELLOW}OFFLINE${NC}"
+    [ "$FORCE" = "1" ]   && echo -e "  ${BOLD}Force:${NC}         ${YELLOW}YES${NC}"
+    echo ""
 fi
 
 # ============================================================
-# [11] Output paths
+# [10] Output paths
 # ============================================================
 OUTPUT_APK="${OUTPUT_DIR}/DNS-Proxy-v${APP_VERSION}.apk"
 OUTPUT_SHA="${OUTPUT_APK}.sha256"
 CACHE_FILE="${CACHE_DIR}/DNS-Proxy-v${APP_VERSION}.apk"
 
 # ============================================================
-# [12] Cache check
+# [11] Cache check
 # ============================================================
+# Cache is keyed by version. A cached file is used only if its
+# SHA matches the manifest entry (when both are available).
 if [ -f "$CACHE_FILE" ] && [ -s "$CACHE_FILE" ] && [ "$FORCE" = "0" ]; then
 
-	# v1.4.0: guard against set -e exit on corrupt manifest.
-	cached_sha=$(manifest_get "DNS-Proxy-v${APP_VERSION}" || true)
-	if [ -n "$cached_sha" ] && [ "$HAS_SHA256" = "1" ]; then
-		actual_sha=$(file_sha256 "$CACHE_FILE")
-		if [ "$actual_sha" != "$cached_sha" ]; then
-			log_warn "SHA mismatch in cache — re-downloading"
-			rm -f "$CACHE_FILE"
-		fi
-	fi
+    cached_sha=$(manifest_get "DNS-Proxy-v${APP_VERSION}" || true)
+    if [ -n "$cached_sha" ] && [ "$HAS_SHA256" = "1" ]; then
+        actual_sha=$(file_sha256 "$CACHE_FILE")
+        if [ "$actual_sha" != "$cached_sha" ]; then
+            log_warn "SHA mismatch in cache — re-downloading"
+            rm -f "$CACHE_FILE"
+        fi
+    fi
 
-	if [ -f "$CACHE_FILE" ]; then
-		size=$(file_size "$CACHE_FILE") || size=0
-		[ -z "$size" ] && size=0
+    if [ -f "$CACHE_FILE" ]; then
+        size=$(file_size "$CACHE_FILE") || size=0
+        [ -z "$size" ] && size=0
 
-		# Copy from cache to output
-		cp -f "$CACHE_FILE" "$OUTPUT_APK"
+        cp -f "$CACHE_FILE" "$OUTPUT_APK"
 
-		# Write SHA256 file
-		if [ "$HAS_SHA256" = "1" ]; then
-			(cd "$OUTPUT_DIR" && $SHA256_CMD "$(basename "$OUTPUT_APK")" > "$(basename "$OUTPUT_SHA")")
-		fi
+        if [ "$HAS_SHA256" = "1" ]; then
+            write_sidecar "$OUTPUT_APK" "$OUTPUT_SHA" "$SIDECAR_REF_NAME"
+        fi
 
-		if [ "$JSON" = "0" ] && [ "$QUIET" = "0" ]; then
-			log_ok "cache hit → $OUTPUT_APK (${size} bytes)"
-		fi
+        if [ "$JSON" = "0" ] && [ "$QUIET" = "0" ]; then
+            log_ok "cache hit → $OUTPUT_APK (${size} bytes)"
+        fi
 
-		if [ "$JSON" = "1" ]; then
-			cat << JSONEOF
+        if [ "$JSON" = "1" ]; then
+            cat << JSONEOF
 {
   "status": "cached",
   "version": "${APP_VERSION}",
   "apk_path": "${OUTPUT_APK}",
   "sha256_path": "${OUTPUT_SHA}",
+  "sha256_embedded_name": "${SIDECAR_REF_NAME}",
   "size": ${size}
 }
 JSONEOF
-		fi
-		exit 0
-	fi
+        fi
+        exit 0
+    fi
 fi
 
 # ============================================================
-# [13] Offline mode — cannot download
+# [12] Offline mode
 # ============================================================
 if [ "$OFFLINE" = "1" ]; then
-	log_error "cache missing (offline mode)"
-	if [ "$JSON" = "1" ]; then
-		cat << JSONEOF
+    log_error "cache missing (offline mode)"
+    if [ "$JSON" = "1" ]; then
+        cat << JSONEOF
 {
   "status": "failed",
   "version": "${APP_VERSION}",
   "reason": "offline_and_no_cache"
 }
 JSONEOF
-	fi
-	exit 1
+    fi
+    exit 1
 fi
 
 # ============================================================
-# [14] Download
+# [13] Download
 # ============================================================
 if [ "$JSON" = "0" ] && [ "$QUIET" = "0" ]; then
-	log_info "downloading ${APP_ASSET_NAME} (v${APP_VERSION})..."
+    log_info "downloading ${APP_ASSET_NAME} (v${APP_VERSION})..."
 fi
 
 tmp_file="${CACHE_DIR}/.tmp-${APP_VERSION}.apk"
@@ -535,41 +449,43 @@ downloaded_url=""
 success=0
 
 for url in "$GITHUB_URL" "$GITHUB_LATEST_URL"; do
-	[ "$success" = "1" ] && break
+    [ "$success" = "1" ] && break
 
-	log_debug "GET $url"
+    log_debug "GET $url"
 
-	curl_args=(
-		-fsSL
-		--max-time "$HTTP_TIMEOUT"
-		--retry 2
-		--retry-delay 1
-	)
-	if [ -n "${GITHUB_TOKEN:-}" ]; then
-		curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
-	fi
+    curl_args=(
+        -fsSL
+        --max-time "$HTTP_TIMEOUT"
+        --retry 2
+        --retry-delay 1
+    )
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl_args+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+    fi
 
-	if curl "${curl_args[@]}" -o "$tmp_file" "$url" 2>/dev/null; then
-		if [ -s "$tmp_file" ]; then
-			# Basic sanity: APK is a ZIP → first 2 bytes "PK"
-			magic=$(head -c 2 "$tmp_file" 2>/dev/null || true)
-			if [ "$magic" = "PK" ]; then
-				downloaded_url="$url"
-				success=1
-				log_debug "Success: $url"
-			else
-				log_warn "Invalid APK (not a ZIP): $url"
-				rm -f "$tmp_file"
-			fi
-		fi
-	fi
+    if curl "${curl_args[@]}" -o "$tmp_file" "$url" 2>/dev/null; then
+        if [ -s "$tmp_file" ]; then
+            # APK is a ZIP → first 2 bytes "PK". Rejects HTML
+            # error pages that servers sometimes return with
+            # HTTP 200.
+            magic=$(head -c 2 "$tmp_file" 2>/dev/null || true)
+            if [ "$magic" = "PK" ]; then
+                downloaded_url="$url"
+                success=1
+                log_debug "Success: $url"
+            else
+                log_warn "Invalid APK (not a ZIP): $url"
+                rm -f "$tmp_file"
+            fi
+        fi
+    fi
 done
 
 if [ "$success" = "0" ]; then
-	log_error "download failed from all sources"
-	rm -f "$tmp_file"
-	if [ "$JSON" = "1" ]; then
-		cat << JSONEOF
+    log_error "download failed from all sources"
+    rm -f "$tmp_file"
+    if [ "$JSON" = "1" ]; then
+        cat << JSONEOF
 {
   "status": "failed",
   "version": "${APP_VERSION}",
@@ -577,60 +493,83 @@ if [ "$success" = "0" ]; then
   "urls_tried": ["${GITHUB_URL}", "${GITHUB_LATEST_URL}"]
 }
 JSONEOF
-	fi
-	exit 1
+    fi
+    exit 1
 fi
 
-# Move to cache
 mv -f "$tmp_file" "$CACHE_FILE"
 chmod 0644 "$CACHE_FILE"
 
 # ============================================================
-# [15] Compute SHA + manifest
+# [14] Compute SHA + update manifest
 # ============================================================
 sha=""
 if [ "$HAS_SHA256" = "1" ]; then
-	sha=$(file_sha256 "$CACHE_FILE")
+    sha=$(file_sha256 "$CACHE_FILE")
 fi
 
 manifest_set "DNS-Proxy-v${APP_VERSION}" "$sha" "$APP_VERSION" "$downloaded_url" 2>/dev/null || true
 
 # ============================================================
-# [16] Copy to output + write .sha256
+# [15] Copy to output + write sidecar + self-test
 # ============================================================
 cp -f "$CACHE_FILE" "$OUTPUT_APK"
 
 if [ "$HAS_SHA256" = "1" ]; then
-	(cd "$OUTPUT_DIR" && $SHA256_CMD "$(basename "$OUTPUT_APK")" > "$(basename "$OUTPUT_SHA")")
+    write_sidecar "$OUTPUT_APK" "$OUTPUT_SHA" "$SIDECAR_REF_NAME"
+
+    # Self-test the sidecar: run `sha256sum -c` from a temp dir
+    # with the referenced file present. This is the standard
+    # validation; if it fails, the sidecar format has drifted.
+    if [ -f "$OUTPUT_SHA" ] && [ -s "$OUTPUT_SHA" ]; then
+        _tmpdir="$(mktemp -d 2>/dev/null || true)"
+        if [ -z "$_tmpdir" ] || [ ! -d "$_tmpdir" ]; then
+            log_debug "sidecar self-test skipped (mktemp unavailable)"
+        else
+            cp -f "$OUTPUT_APK" "${_tmpdir}/${SIDECAR_REF_NAME}" 2>/dev/null || true
+            cp -f "$OUTPUT_SHA" "${_tmpdir}/${SIDECAR_REF_NAME}.sha256" 2>/dev/null || true
+            if ! (cd "$_tmpdir" && $SHA256_CMD -c "${SIDECAR_REF_NAME}.sha256" >/dev/null 2>&1); then
+                log_warn "sidecar self-test failed (format regression?)"
+            else
+                log_debug "sidecar self-test passed"
+            fi
+            rm -rf "$_tmpdir" 2>/dev/null || true
+        fi
+    fi
 fi
 
 size=$(file_size "$CACHE_FILE") || size=0
 [ -z "$size" ] && size=0
 
 # ============================================================
-# [17] Output
+# [16] Final output
 # ============================================================
 if [ "$JSON" = "1" ]; then
-	sha_escaped=$(printf '%s' "$sha" | sed 's/"/\\"/g')
-	cat << JSONEOF
+    sha_escaped=$(printf '%s' "$sha" | sed 's/"/\\"/g')
+    cat << JSONEOF
 {
   "status": "downloaded",
   "version": "${APP_VERSION}",
   "apk_path": "${OUTPUT_APK}",
   "sha256_path": "${OUTPUT_SHA}",
   "sha256": "${sha_escaped}",
+  "sha256_embedded_name": "${SIDECAR_REF_NAME}",
   "size": ${size},
   "url": "${downloaded_url}"
 }
 JSONEOF
-	exit 0
+    exit 0
 fi
 
 if [ "$QUIET" = "0" ]; then
-	sha_short=""
-	[ -n "$sha" ] && sha_short="${sha:0:16}..."
-	log_ok "downloaded → $OUTPUT_APK (${size} bytes)"
-	[ -n "$sha_short" ] && log_ok "sha256: $sha_short"
+    sha_short=""
+    [ -n "$sha" ] && sha_short="${sha:0:16}..."
+    log_ok "downloaded → $OUTPUT_APK (${size} bytes)"
+    [ -n "$sha_short" ] && log_ok "sha256: $sha_short"
+    log_ok "sidecar: $OUTPUT_SHA"
+    log_info "  embedded name: ${SIDECAR_REF_NAME}"
+    log_info "  (release.yml will copy the sidecar to"
+    log_info "   web/app-debug.apk.sha256 before packaging)"
 fi
 
 exit 0
