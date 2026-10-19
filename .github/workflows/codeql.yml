@@ -1,332 +1,59 @@
 # ============================================================
 # DNSCrypt Smart Filter – CodeQL Workflow
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Static Application Security Testing (SAST) using GitHub
-#   CodeQL. Runs on every push/PR to main or develop, plus a
-#   weekly scheduled scan on Monday at 06:00 UTC.
+# Static Application Security Testing (SAST) using GitHub
+# CodeQL.
 #
-# Steps:
-#   • Checkout source
-#   • Setup Go 1.22
-#   • Initialize CodeQL (security-extended queries)
-#   • Build the Go binary
-#   • Perform the analysis
+# Runs on:
+#   • Every push/PR to main or develop
+#   • Weekly scheduled scan (Monday 06:00 UTC)
+#   • Manual workflow_dispatch
 #
-# Branch strategy:
-#   • main    → stable releases (protected)
-#   • develop → integration branch (features merged here first)
-#
-# ============================================================
 # Query suite — security-extended:
-# ============================================================
-#   CodeQL ships with multiple query suites. This workflow uses
-#   `security-extended`, which is broader than the default:
+#   Broader than the default. Includes core security queries
+#   plus additional CWE coverage. Chosen because this project
+#   is security-sensitive (root module, handles credentials,
+#   modifies firewall).
 #
-#   ┌─────────────────┬─────────────────────────────┐
-#   │ Suite              │ Scope                            │
-#   ├─────────────────┼─────────────────────────────┤
-#   │ default            │ Core security queries only       │
-#   │ security-extended  │ Core + additional CWEs           │
-#   │                    │ (recommended for security-       │
-#   │                    │ sensitive projects)              │
-#   │ security-and-      │ Above + quality/maintainability  │
-#   │ quality            │ checks (noisier)                 │
-#   └─────────────────┴─────────────────────────────┘
+#   The default suite would miss classes of issues this
+#   project cares about; security-and-quality is noisier than
+#   needed.
 #
-#   This project is security-sensitive (root module, handles
-#   credentials, modifies firewall), so security-extended is the
-#   right trade-off: more findings without excessive noise.
-#
-# ============================================================
 # CodeQL for Go — build requirement:
-# ============================================================
-#   CodeQL analyzes Go by observing an actual build. The "Build"
-#   step below calls `go build` on the proxy module. This is
-#   required — without it, CodeQL cannot extract the AST and
-#   would fail with "no code found" for the language.
+#   CodeQL analyzes Go by observing an actual build. The
+#   "Build" step below calls `go build` on the proxy package.
+#   Without it, CodeQL cannot extract the AST and fails with
+#   "no code found" for the language.
 #
-#   ⚠️ The build uses CGO_ENABLED=0 (default when no CC is set)
-#   because CodeQL runs on ubuntu-22.04 without the Android NDK.
-#   This is intentional: the analysis cares about source
-#   semantics, not the target architecture.
+#   The build uses CGO_ENABLED=0 (default when no CC is set)
+#   because CodeQL runs on ubuntu-22.04 without the Android
+#   NDK. The analysis cares about source semantics, not the
+#   target architecture.
 #
-# ============================================================
-# What CodeQL does NOT cover in this project:
-# ============================================================
-#   CodeQL only analyzes Go source code. It does NOT analyze:
+# What CodeQL does NOT cover:
+#   • Shell scripts (proxy/*.sh, scripts/*.sh)
+#       → covered by ci.yml (bash -n + integration checks)
+#   • YAML workflows (.github/workflows/*.yml)
+#       → syntax covered by `check-yaml` in pre-commit
+#   • Frontend JS (web/*.html, web/sw.js)
+#       → covered by CSP + audit corrections
+#   • TOML / JSON / Markdown
+#       → covered by format checkers (pre-commit)
 #
-#     • Shell scripts (proxy/*.sh, scripts/*.sh)
-#       → Covered by `bash -n` in
-#         .github/workflows/ci.yml → `backup-smoke-test` job
-#         (syntax check on all 8 shell scripts) plus the
-#         project-specific "Verify Layer 1-10 function presence"
-#         check.
+# Repository hygiene:
+#   The build output is written to /tmp/codeql-out/ — OUTSIDE
+#   the repository tree. This guarantees:
+#     1. No stray binary can accidentally end up in git.
+#     2. `go build -o <dir>/ ./...` works regardless of how
+#        many packages `./...` matches (each main package gets
+#        its own binary under the dir).
 #
-#         ⚠️ Historical note: shellcheck WAS used in ci.yml
-#            until 2026-09-30, when it was REMOVED entirely
-#            (see ci.yml HARD-CI-10). The removal rationale:
-#            even with `--shell=bash` and four excluded warning
-#            classes, shellcheck emitted false positives that
-#            blocked PRs without catching real bugs. Static
-#            analysis of the shell scripts is now the joint
-#            responsibility of CodeQL (for the Go code those
-#            scripts call) and developer-side pre-commit hooks
-#            (for the shell scripts themselves).
-#
-#     • YAML workflows (.github/workflows/*.yml)
-#       → Covered by actionlint (developer-side, via pre-commit)
-#
-#     • Frontend JS (web/*.html, web/sw.js)
-#       → Not analyzed by CodeQL for Go; CSP + audit corrections
-#         cover the documented attack surface
-#
-#     • TOML / JSON / Markdown files
-#       → Covered by format checkers (pre-commit, markdownlint)
-#
-# ============================================================
-# Trigger matrix:
-# ============================================================
-#   ┌────────────────┬─────────┬───────────────────┐
-#   │ Event             │ Branch   │ Notes                 │
-#   ├────────────────┼─────────┼───────────────────┤
-#   │ push              │ main     │ full analysis         │
-#   │ push              │ develop  │ full analysis         │
-#   │ pull_request      │ main     │ full analysis         │
-#   │ pull_request      │ develop  │ full analysis         │
-#   │ schedule          │ —        │ weekly Mon 06:00 UTC  │
-#   │ workflow_dispatch │ any      │ manual                │
-#   └────────────────┴─────────┴───────────────────┘
-#
-#   The weekly scheduled run catches new CVEs published against
-#   the codebase even when no commits were pushed. CodeQL updates
-#   its query database regularly; the schedule ensures the
-#   project benefits from those updates.
-#
-# ============================================================
-# category field:
-# ============================================================
-#   The `category: "/language:go"` field tags each analysis with
-#   a stable identifier. This matters when a repository has
-#   multiple languages — the category prevents analyses from
-#   overwriting each other on the GitHub Security tab.
-#
-# ============================================================
-# ⚠️ Action versions:
-# ============================================================
-#   This workflow uses github/codeql-action@v3, which is a
-#   well-established release. The other actions
-#   (actions/checkout, actions/setup-go) use the same versions
-#   as ci.yml (v4, v5) for consistency.
-#
-#   If any `uses:` line fails with "reference not found", see the
-#   note in ci.yml — the resolution is the same (check the
-#   action's releases page and update the version).
-#
-#   Dependabot tracks the github-actions ecosystem weekly and
-#   will open PRs for updates automatically.
-#
-# ============================================================
-# v1.1.0 changes (kept):
-# ============================================================
-#   • Version bumped to v1.1.0 (documentation only — no behavior
-#     changes since v1.0.0).
-#   • Added the "Query suite" comparison table explaining why
-#     security-extended is used.
-#   • Added a note about CodeQL's Go build requirement.
-#   • Added a Trigger matrix table.
-#   • Documented the `category` field's role.
-#
-# ============================================================
-# v1.2.0 changes:
-# ============================================================
-#   • Version bumped to v1.2.0 (documentation only — no behavior
-#     changes since v1.1.0).
-#
-#   • No changes to the analysis pipeline, the query suite, the
-#     trigger conditions, or the action versions.
-#
-#   • The v1.2.0 release adds new shell scripts and modifies
-#     main.go (data-preservation layers 1-10). All of those
-#     changes are automatically covered by the existing Go query
-#     suite — no workflow change required.
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-#   🔧 CQ-1 — The `go build` output now lives at
-#     `proxy/.codeql-analyze` (inside the workspace), and is
-#     removed via a `trap` handler so that cleanup runs in ALL
-#     cases (success, failure, interrupt).
-#
-#     Implementation note: the `trap` handler is the SAME change
-#     described under HARD-CQ-07 below. Both identifiers refer
-#     to one code edit; CQ-1 documents the WHAT (no lingering
-#     artifact) and HARD-CQ-07 documents the HOW (trap on EXIT).
-#     Count them together when tallying release notes.
-#
-#     ⚠️ The previous version's claim that the file is
-#        "not tracked by git (see .gitignore)" was NOT
-#        verified. The actual fix for the `.gitignore` entry is
-#        tracked under HARD-CQ-08 and requires a change to
-#        `.gitignore` — not to this workflow.
-#
-#   🔧 CQ-2 — The "What CodeQL does NOT cover" section points
-#     at the backup-smoke-test job in ci.yml for the shell-script
-#     coverage story.
-#
-#     ⚠️ Historical note: the reference was originally to the
-#        "CI-2 note in ci.yml, which documents the exact scope of
-#        shellcheck coverage (5 of 8 scripts)". That reference
-#        became stale on 2026-09-30 when shellcheck was removed
-#        from ci.yml entirely (see ci.yml HARD-CI-10). The
-#        section above has been rewritten to reflect the current
-#        state: only `bash -n` + the layer-presence check remain.
-#
-# ============================================================
-# v1.2.0 (Global Edition) — Additional hardening in this revision
-# ============================================================
-#   🛡️ HARD-CQ-01 — Action versions aligned with ci.yml and
-#     release.yml (checkout@v4, setup-go@v5). The prior `@v7`
-#     references were speculative.
-#
-#   🛡️ HARD-CQ-02 — Removed the `go mod init` fallback. If
-#     `proxy/go.mod` is missing, the build now fails with a
-#     clear error message instead of silently creating an
-#     empty module file. Parity with the `package_module.sh`
-#     discipline of failing loudly on missing required files.
-#
-#   🛡️ HARD-CQ-03 — `cache: true` for setup-go. The prior
-#     `cache: false` disabled module caching and added ~20-40 s
-#     per run.
-#
-#   🛡️ HARD-CQ-04 — Action versions unified across all
-#     workflows.
-#
-#   🛡️ HARD-CQ-05 — `go build ./...` instead of
-#     `go build main.go`. Robust to future refactors that add
-#     more .go files to the proxy package.
-#
-#   🛡️ HARD-CQ-06 — `set -euo pipefail` on the Build step.
-#     Parity with ci.yml and package_module.sh.
-#
-#   🛡️ HARD-CQ-07 — The Build step uses `trap` to remove
-#     `proxy/.codeql-analyze` on any exit. Ensures that the
-#     file does not linger when the build fails partway through
-#     (the previous `rm -f` line never ran in that case).
-#
-#     ⚠️ HARD-CQ-07 and CQ-1 describe the SAME code change.
-#     They are both documented because CQ-1 was written first
-#     (post-audit section) and HARD-CQ-07 was added later
-#     (Global Edition section) as part of the broader hardening
-#     pass. See CQ-1's note above.
-#
-#   🛡️ HARD-CQ-08 — The header's "Repository hygiene" note now
-#     explicitly states that the `.gitignore` entry for
-#     `proxy/.codeql-analyze` MUST exist. If it is missing
-#     (see H-02 in the original audit), running the build
-#     locally will leave an untracked file in `git status`.
-#     The fix belongs in `.gitignore`, not in this workflow.
-#
-# ============================================================
-# v1.3.0 — No changes to the CodeQL configuration
-# ============================================================
-#   The v1.3.0 release is primarily a feature release (PWA
-#   install button, live status LED, DNS auto-start after
-#   boot). None of those changes touch Go source code:
-#     • PWA install button  → web/index.html (client-side JS/HTML)
-#     • Live status LED     → web/index.html (client-side CSS/JS)
-#     • DNS auto-start fix  → proxy/service.sh (shell)
-#
-#   The v1.3.0 release ALSO refined snapshot-detection and
-#   rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
-#
-#   However, this workflow (codeql.yml) was NOT modified in
-#   v1.3.0. Its query suite, trigger matrix, `category` field,
-#   build step, and action versions are all unchanged from
-#   v1.2.0. CodeQL automatically analyzed the updated main.go
-#   (SNAP-MANIFEST + SNAP-MTIME) on the next scheduled or
-#   push-triggered run; the workflow did not need to know about
-#   the semantic change.
-#
-#   ⚠️ CodeQL DID report 6 of the 8 original alerts during the
-#      v1.3.0 development cycle, but those alerts were closed
-#      by fixes in the Go source (main.go and, transitively,
-#      the modules the affected code touched) — not by a change
-#      to this workflow file.
-#
-#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13.
-# ============================================================
-# v1.4.0 — Companion Android app integration + CodeQL closure
-# ============================================================
-#   🎯 CQ-V14-01 — The last 2 outstanding CodeQL alerts
-#     (`go/path-injection` in `removeModule`, alerts #1 and #2)
-#     were CLOSED in v1.4.0. The fix is in
-#     `proxy/main.go::removeModule`:
-#
-#       • The caller-provided path is sanitized via
-#         `filepath.Base()` before any path construction.
-#       • The final path is rebuilt from the trusted
-#         `MODULES_DIR` constant + the sanitized basename.
-#       • No user-controlled data reaches any path expression.
-#       • A defence-in-depth prefix check is retained as a
-#         second layer (but does NOT participate in path
-#         construction).
-#
-#     ⚠️ The fix is in the GO SOURCE, not in this workflow.
-#        This workflow continues to analyze `proxy/main.go`
-#        with the same `security-extended` query suite. The
-#        alerts are now closed because the code no longer
-#        contains the pattern CodeQL was flagging.
-#
-#   🎯 CQ-V14-02 — No change to this workflow's structure:
-#     • Same `security-extended` query suite.
-#     • Same trigger matrix (push, PR, weekly, manual).
-#     • Same `category: "/language:go"`.
-#     • Same build step (`go build ./...`).
-#     • Same `github/codeql-action@v3`.
-#
-#   🎯 CQ-V14-03 — The companion Android app APK
-#     (`web/app-debug.apk`) is NOT analyzed by this workflow.
-#     It is a pre-built binary fetched from a separate
-#     repository (gasciljh/dnscrypt-proxy-app). CodeQL for Go
-#     has nothing to analyze in an APK.
-#
-# ============================================================
-# Repository hygiene (HARD-CQ-08):
-# ============================================================
-#   The `.codeql-analyze` binary is a build artifact and MUST
-#   NOT be committed. Two conditions must hold:
-#
-#     1. The Build step below removes the file on any exit
-#        (success, failure, interrupt) via a `trap` handler.
-#        This is the primary protection.
-#
-#     2. `.gitignore` contains an entry for
-#        `proxy/.codeql-analyze` (or a glob that covers it).
-#        This is the belt-and-suspenders protection that keeps
-#        the file out of `git status` if a developer runs the
-#        build manually and the trap fails to fire.
-#
-#   ⚠️ As of this revision, the second condition is NOT verified
-#      by any check in the repository. If you are reviewing this
-#      workflow as part of a security audit, confirm that
-#      `.gitignore` contains the entry. The original audit
-#      (H-02) flagged this as an open item.
-#
-#      v1.4.0 status: the entry IS present in the current
-#      `.gitignore` (both `/.codeql-analyze` and
-#      `proxy/.codeql-analyze`). The HARD-CQ-08 note is
-#      retained as a reminder for future contributors.
+#   A `trap` on EXIT removes the temp directory on every path
+#   (success, failure, interrupt).
 # ============================================================
 
 name: CodeQL
@@ -356,7 +83,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          # HARD-CQ-03: caching re-enabled.
           cache: true
 
       - name: Initialize CodeQL
@@ -365,10 +91,20 @@ jobs:
           languages: go
           config-file: ./.github/codeql/codeql-config.yml
 
-      # HARD-CQ-02: fail loudly if proxy/go.mod is missing.
-      # HARD-CQ-05: build the whole package, not just main.go.
-      # HARD-CQ-06: set -euo pipefail for full safety.
-      # HARD-CQ-07 (== CQ-1): trap ensures cleanup on any exit.
+      # Fail loudly if proxy/go.mod is missing — a silent
+      # fallback would let the analysis run against an empty
+      # module and report zero findings.
+      #
+      # Build the whole package (`./...`), not just main.go:
+      # CodeQL extracts the AST from every compiled file.
+      #
+      # `trap` on EXIT ensures the output directory is removed
+      # on every path (success, failure, interrupt).
+      #
+      # -buildvcs=false: no VCS stamping (deterministic).
+      # -trimpath:       normalize paths for reproducibility
+      #                  (matches proxy/build.sh's release
+      #                  build flags).
       - name: Build
         run: |
           set -euo pipefail
@@ -382,13 +118,14 @@ jobs:
             exit 1
           fi
 
-          # Ensure the artifact is removed on any exit path.
-          trap 'rm -f ./.codeql-analyze' EXIT
+          # Ensure the output directory is removed on any exit path.
+          # /tmp is outside the repo tree, so no stray binary can
+          # accidentally end up in git regardless of trap success.
+          OUT_DIR="/tmp/codeql-out"
+          trap 'rm -rf "$OUT_DIR"' EXIT
+          mkdir -p "$OUT_DIR"
 
-          # Build the whole proxy package. CodeQL observes the
-          # compilation and extracts the AST; the binary itself
-          # is not consumed by the analysis.
-          go build -buildvcs=false -trimpath -o ./.codeql-analyze ./...
+          go build -buildvcs=false -trimpath -o "$OUT_DIR/" ./...
 
       - name: Perform Analysis
         uses: github/codeql-action/analyze@v3

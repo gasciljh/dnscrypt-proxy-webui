@@ -1,9 +1,10 @@
 # DNSCrypt Smart Filter
 
-System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-proxy.
+System-wide DNS filtering for Android devices, built on DNSCrypt
+and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.4.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.5.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
@@ -11,200 +12,58 @@ System-wide DNS filtering for Android devices, built on DNSCrypt and dnscrypt-pr
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8.svg)](https://go.dev/)
 [![Android App](https://img.shields.io/badge/Android%20App-v1.0.0-3DDC84.svg)](https://github.com/gasciljh/dnscrypt-proxy-app)
 
-> **📖 Project documentation**:
-> - Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
-> - Release process → [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md)
-> - Architecture Decisions → [`docs/adr/README.md`](docs/adr/README.md)
-> - Backup system → [`docs/BACKUP.md`](docs/BACKUP.md)
-> - Emergency recovery → [`docs/EMERGENCY.md`](docs/EMERGENCY.md)
-> - Version history → [`CHANGELOG.md`](CHANGELOG.md)
->
-> **🎯 Current version**: **v1.4.0** — Integration release. (v1.4.0-integration)
->
-> **v1.4.0 adds**: a **companion Android app** bundled into the
-> module ZIP as an OPTIONAL asset (`web/app-debug.apk`). The WebUI
-> install button is a direct `<a download>` link pointing at
-> `/app-debug.apk`. **CodeQL path-injection alerts** in
-> `removeModule` (proxy/main.go) are closed via `filepath.Base()`
-> sanitization. **iOS PWA logic is removed** (Android-only project).
->
-> **v1.3.0 added**: a **smart dynamic PWA install button**, a
-> **live status LED** on the Today counter, **DNS auto-start after
-> boot** (bounded wait + direct API call in `service.sh`), plus
-> **server-side refinements** in `main.go` and `functions.sh`
-> (snapshot detection by `.manifest.json` presence, mtime-based
-> sorting, safer rotation). See [`CHANGELOG.md`](CHANGELOG.md)
-> for the full v1.3.0 changelog.
->
-> **v1.2.0 added**: the **10 defensive layers** for user-data
-> preservation — persistent backup at
-> `/sdcard/dnscrypt-webui-backup/`, multi-source detection,
-> transactional installs with rollback, recovery mode, SHA256
-> integrity verification, SELinux context preservation.
->
-> **v1.1.0 added**: dynamic Go runtime memory limit per blocklist
-> profile (light=80 MB → ultimate=220 MB), extended `shellQuote`,
-> and the `MONITORING_UI_PORT` constant.
->
-> See [`CHANGELOG.md`](CHANGELOG.md) for the full v1.4.0 changelog.
-
 ---
 
-## Overview
+## What This Is
 
-DNSCrypt Smart Filter is a Magisk / KernelSU / APatch module that turns an
-Android device into a filtered, encrypted DNS resolver.
+A Magisk / KernelSU / APatch module that turns an Android device
+into a filtered, encrypted DNS resolver:
 
-- Local DNS engine on `127.0.0.1:5354` (DNSCrypt / DoH)
-- Transparent redirection of port 53 traffic to the local engine
+- Local DNS engine on `127.0.0.1:5354` (DNSCrypt + DoH)
+- Transparent redirection of port 53 (Custom Chains, no orphan rules)
 - Multi-level blocklists (HaGeZi Light → Ultimate)
 - Allowlist / Denylist with a browser editor
 - Bilingual WebUI (English default + Arabic toggle)
 - Separate monitoring Dashboard with JSON metrics
 - Installable PWA with offline fallback
-- **v1.1.0**: Dynamic Go runtime memory limit per blocklist profile
-  (light=80 MB → ultimate=220 MB) — prevents GC thrashing on heavy profiles
-- **v1.2.0**: 10 defensive layers for user-data preservation — the
-  persistent backup at `/sdcard/dnscrypt-webui-backup/` survives
-  reboot, uninstall, and factory reset of `/data`
-- **v1.3.0**: Smart dynamic PWA install button + live status LED +
-  DNS auto-start after boot (via direct API call in `service.sh`) +
-  server-side refinements in `main.go` / `functions.sh`
-- **v1.4.0**: Companion Android app integrated — a native WebView
-  wrapper (~3 MB) is now bundled into the module ZIP as an
-  OPTIONAL asset (`web/app-debug.apk`). The WebUI install button
-  is a direct `<a download>` link (no browser-specific logic), and
-  CodeQL path-injection alerts in `removeModule` are closed.
-  iOS PWA logic removed (Android-only project).
+- Zero telemetry — no connection to any analytics server
 
 Works at the system level — no per-app configuration, no VPN.
-
-### 📱 Optional Android App
-
-For a native experience without requiring a browser, install
-the companion app:
-
-**→ [dnscrypt-proxy-app v1.0.0](https://github.com/gasciljh/dnscrypt-proxy-app/releases/tag/v1.0.0)**
-
-| Feature | Details |
-|---|---|
-| Size | ~3 MB |
-| Stack | Kotlin + WebView |
-| Min Android | 5.0 (API 21) |
-| Browser required | ❌ No |
-| Telemetry | ❌ None |
-
-A lightweight WebView wrapper that loads the WebUI at
-`127.0.0.1:9090` directly. Useful if you don't want to keep
-a browser tab open.
-
-The companion app is fetched by `scripts/fetch_app_apk.sh` from
-the [dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
-repository and staged at `web/app-debug.apk` before packaging.
-Its version is pinned in `proxy/app-apk.version` (currently
-`1.0.0`, no `v` prefix).
 
 ---
 
 ## Requirements
 
-### Mandatory
+| Requirement | Minimum | Recommended |
+|---|---|---|
+| Android | 5.0 (API 21) | 10+ (API 29) |
+| Root | Magisk 20.4+ / KernelSU 0.9+ / APatch | Magisk 26+ |
+| Kernel | 3.10+ | 4.14+ |
+| RAM | 1 GB | 2 GB+ |
+| `/data` free | 20 MB | — |
+| `/sdcard` free | 6 MB | 50 MB+ |
+| Architecture | arm64 / arm / x86_64 / x86 | arm64 |
 
-| Requirement | Minimum |
-|---|---|
-| Android | 5.0 (API 21) |
-| Root | Magisk 20.4+ / KernelSU 0.9+ / APatch |
-| Kernel | 3.10+ |
-| RAM | 1 GB |
-| Storage (`/data`) | ~20 MB free |
-| Storage (`/sdcard`) | **~10 MB free** (v1.2.0 backup) |
-| Architecture | `arm64-v8a` / `armeabi-v7a` / `x86_64` / `x86` |
+**Not compatible with**: AdAway (port conflict), VPN apps
+(routing conflict), SuperSU (legacy).
 
-### Recommended by Profile (v1.1.0)
-
-The Go runtime soft memory limit is computed per profile by `main.go`.
-Choosing a profile that matches your device RAM avoids GC pressure
-while keeping DNS filtering effective.
-
-| Device RAM | Recommended profile | WebUI soft limit | Filtered entries |
-|---|:---:|---:|---:|
-| 1 GB | Light | 80 MB | ~40,000 |
-| 2 GB | Normal | 100 MB | ~120,000 |
-| 3 GB | **PRO** (default) | 120 MB | ~250,000 |
-| 4 GB | PRO++ | 160 MB | ~350,000 |
-| 6 GB+ | Ultimate | 220 MB | ~500,000 |
-
-### Incompatible with
-
-- AdAway (port conflict)
-- VPN apps (routing conflict)
-- SuperSU (legacy)
+For per-profile memory recommendations, see
+[`docs/GUIDE.md`](docs/GUIDE.md) §3.3.
 
 ---
 
-## Installation
+## Install (60 seconds)
 
-1. Download `dnscrypt-webui-1.4.0-module.zip` from
+1. Download `dnscrypt-webui-1.5.0-module.zip` from
    [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
-2. Install via Magisk Manager / KernelSU Manager / APatch.
-3. Save the credentials shown on-screen (also stored at
-   `/data/local/tmp/dnscrypt_credentials.txt`).
-4. Reboot.
-5. Open `http://127.0.0.1:9090` and log in.
-6. Select a blocklist profile and press **Apply**.
+2. Verify: `sha256sum -c dnscrypt-webui-1.5.0-module.zip.sha256`.
+3. Install via **Magisk Manager** / **KernelSU** / **APatch**.
+4. **Reboot**.
+5. Open `http://127.0.0.1:9090` and log in with the credentials
+   printed during install.
 
-The installer (`customize.sh`) prints the expected memory limit for your
-active profile during installation (v1.1.0). This is informational only —
-`main.go` remains the authority for the actual
-`debug.SetMemoryLimit()` value at runtime.
-
-### Data preservation (v1.2.0)
-
-The installer runs **10 defensive layers** to protect your 5 user
-config files:
-
-- **Layer 1** — Multi-source detection (7 candidate locations).
-- **Layer 2** — Persistent backup to `/sdcard/dnscrypt-webui-backup/`.
-- **Layer 3** — SHA256 integrity verification (advisory).
-- **Layer 4** — Transactional install with automatic rollback.
-- **Layer 5** — Root-solution compatibility (Magisk / KernelSU / APatch).
-- **Layer 6** — SELinux context preservation.
-- **Layer 7** — Recovery mode (trigger file).
-- **Layer 8** — Config migrations.
-- **Layer 9** — Auto-backup (24 h) + rotation (max 21 snapshots).
-- **Layer 10** — Observability (`status.sh --diagnose` + 7-field
-  `runtime_info.backups`).
-
-**What is preserved**:
-
-- `webui.conf`
-- `dnscrypt-proxy.toml`
-- `selected_profile.txt`
-- `allowlist.txt`
-- `denylist.txt`
-
-**Where it lives**: `/sdcard/dnscrypt-webui-backup/` — survives
-reboot, uninstall, and factory reset of `/data`.
-
-### Companion app (v1.4.0)
-
-A companion Android app is bundled into the module ZIP as an
-OPTIONAL asset. It is served by `main.go` at `/app-debug.apk`
-(mime: `application/vnd.android.package-archive`,
-Cache-Control: `public, max-age=3600, immutable`).
-
-The WebUI install button is a direct download link pointing at
-`/app-debug.apk`. If the APK is absent from the build (e.g. a
-local developer build without a network fetch), the route returns
-404 and the button link leads to a "file not found" page — the
-rest of the WebUI continues to work normally.
-
-> **Cache notes (v1.4.0)**:
-> - `web/app-debug.apk` is **not tracked by git** — it is a build
->   artifact (see `.gitignore` §[20]).
-> - The APK is **not precached by the Service Worker**. It is
->   served with a long-lived `Cache-Control` header by `main.go`;
->   the browser's own HTTP cache is the primary storage layer.
+Full walkthrough (upgrade, uninstall, recovery, companion app):
+see [`docs/GUIDE.md`](docs/GUIDE.md).
 
 ---
 
@@ -214,22 +73,22 @@ rest of the WebUI continues to work normally.
 |:----:|---|---|
 | 9090 | WebUI | `webui.conf` → `PORT` |
 | 9091 | Dashboard | `webui.conf` → `DASHBOARD_PORT` |
-| 8080 | monitoring_ui (internal) | fixed |
+| 8080 | monitoring_ui (internal) | fixed — reserved |
 | 5354 | DNS engine (internal) | fixed |
 
 Port `8080` is reserved. `main.go` refuses to start if `PORT` or
-`DASHBOARD_PORT` conflicts with it. Port values outside `[1, 65535]`
-fall back to defaults (v1.0.0 `readConfPort` range check).
+`DASHBOARD_PORT` conflicts with it. Port values outside
+`[1, 65535]` fall back to defaults.
 
 ---
 
 ## Blocklist Profiles
 
-| Profile | Source | Approximate entries | WebUI soft limit (v1.1.0) |
+| Profile | Source | Approximate entries | WebUI soft limit |
 |---|---|---:|---:|
 | Light | HaGeZi Light | ~40,000 | 80 MB |
 | Normal | HaGeZi Normal | ~120,000 | 100 MB |
-| PRO | HaGeZi PRO | ~250,000 | 120 MB |
+| **PRO** (default) | HaGeZi PRO | ~250,000 | 120 MB |
 | PRO++ | HaGeZi PRO++ | ~350,000 | 160 MB |
 | Ultimate | HaGeZi Ultimate | ~500,000 | 220 MB |
 
@@ -241,565 +100,118 @@ Source: [HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists).
 
 ```text
 User Apps → :53 (DNS)
-    ↓
+    │
+    ▼
 iptables / ip6tables / nftables
 (Custom Chains: DNSCRYPT_OUT / DNSCRYPT_OUT6)
-    ↓
+    │
+    ▼
 dnscrypt-proxy :5354
     ├── blocklist.txt (local filter)
     └── DNSCrypt / DoH (encrypted upstream)
 
-WebUI :9090     ← HTTP / SSE ←────── browser
+WebUI :9090     ← HTTP / SSE ←──── browser
 Dashboard :9091 ← /api/metrics (JSON proxy)
                   → monitoring_ui :8080
 
+Companion install (v1.5.0):
+    WebUI button ──► install-method modal (3 actions)
+        ├──► local root install (5-level pm install cascade)
+        ├──► GitHub page (external)
+        └──► GitHub APK (direct download)
+
 Persistent Backup :/sdcard/dnscrypt-webui-backup/
-    ← 10 defensive layers (v1.2.0)
-    ← protects the 5 user config files
-    ← survives reboot, uninstall, /data reset
+    ← 10 defensive layers; protects the 5 user config files
+    ← survives reboot and module uninstall
+    ← apk/ subfolder mirrors web/app-debug.apk (v1.5.0)
 
-Companion APK: web/app-debug.apk   (build artifact — gitignored)
-    ← served at /app-debug.apk (v1.4.0)
-    ← fetched by scripts/fetch_app_apk.sh
-    ← NOT precached by the Service Worker
+Shell layout (v1.5.0 — Layered Bootstrap):
+    proxy/boot-mini.sh  (Layer 0 — 5 primitives + constant)
+            ↑ sourced by
+    proxy/functions.sh  (Layer 1 — advanced functions)
 ```
 
-Components:
-
-| Component | Language | Role |
-|---|---|---|
-| `proxy/main.go` | Go | HTTP server, auth, blocklist rebuild, metrics proxy, dynamic memory limit (v1.1.0), pre-critical backups (v1.2.0), watchdog token (v1.2.0), `/app-debug.apk` route (v1.4.0), CodeQL-hardened `removeModule` (v1.4.0), snapshot detection by manifest + mtime sort (v1.3.0) |
-| `proxy/*.sh` | Shell (BusyBox) | Install, service lifecycle, watchdog, firewall, backup helpers (v1.2.0), rotation rewrite (v1.3.0) |
-| `web/` | HTML / CSS / JS | WebUI, Dashboard, PWA (bilingual EN/AR since v1.2.0), optional companion APK asset (v1.4.0) |
-| `scripts/` | Bash | Build, packaging, DNS binaries fetcher, companion APK fetcher (v1.4.0), release automation |
+Full architecture, trade-offs, and internals:
+see [`docs/REFERENCE.md`](docs/REFERENCE.md) §1, §3.
 
 ---
 
-## Project Structure
+## Optional Android App
 
-```text
-dnscrypt-proxy-webui/          # 89 tracked files + 1 build artifact
-├── .editorconfig                    # EditorConfig rules (LF, indent, charset)
-├── .gitattributes                   # Git attributes (LF enforcement, export-ignore)
-├── .gitignore                       # Git ignore rules (build, secrets, IDE, APK)
-├── .pre-commit-config.yaml          # Pre-commit hooks
-├── .secrets.baseline                # detect-secrets baseline
-├── CHANGELOG.md                     # Version history
-├── CODE_OF_CONDUCT.md               # Contributor Covenant v2.1
-├── LICENSE                          # MIT License
-├── Makefile                         # Unified commands
-├── module.prop                      # Magisk/KernelSU definition
-├── README.md                        # Overview (EN)
-├── SECURITY.md                      # Security policy (root summary)
-├── update.json                      # Auto-update metadata
-├── VERSION                          # Single source of truth (v1.4.0)
-│
-├── .github/                         # CI/CD (12 files)
-│   ├── workflows/
-│   │   ├── ci.yml                   # Build matrix + backup-smoke-test + verify companion app metadata
-│   │   ├── codeql.yml               # Security scanning (SAST)
-│   │   ├── release.yml              # Signed release + fetch/stage APK + sync main → develop
-│   │   └── upgrade-test.yml         # 42-scenario data-preservation matrix (v1.2.0)
-│   │
-│   ├── ISSUE_TEMPLATE/
-│   │   ├── bug_report.yml           # Bug report template
-│   │   ├── config.yml               # Issue template chooser
-│   │   └── feature_request.yml      # Feature request template
-│   │
-│   ├── PULL_REQUEST_TEMPLATE.md     # Default PR template
-│   ├── PULL_REQUEST_TEMPLATE/       # Additional PR templates
-│   │   └── release.md               # Release-specific PR template
-│   │
-│   ├── CODEOWNERS                   # Auto-assign reviewers
-│   ├── dependabot.yml               # Dependency updates
-│   └── SECURITY.md                  # Security policy (summary)
-│
-├── .devcontainer/                   # Unified dev environment (2 files)
-│   ├── devcontainer.json            # VS Code Dev Container config
-│   └── setup.sh                     # Auto-install dev tools
-│
-├── META-INF/                        # Magisk bootstrap (2 files)
-│   └── com/google/android/
-│       ├── update-binary            # Magisk entry point
-│       └── updater-script           # "#MAGISK" marker
-│
-├── scripts/                         # Build & release tools (6 files)
-│   ├── fetch_dns_binaries.sh        # DNS binaries fetcher (Level 4)
-│   ├── fetch_app_apk.sh             # Companion APK fetcher (v1.4.0)
-│   ├── generate-icons.sh            # PNG/ICO icon generator
-│   ├── package_module.sh            # Build Magisk ZIP (optional APK bundling)
-│   ├── release.sh                   # Stable / Prerelease automation
-│   └── release-patch.sh             # PATCH-only (hotfix) automation
-│
-├── proxy/                           # Backend (Go + Shell) — 15 files
-│   ├── action.sh                    # Magisk Action button (+ --backup/--diagnose)
-│   ├── app-apk.version              # Companion app version (1.0.0, v1.4.0)
-│   ├── build.sh                     # 4-arch cross-compile
-│   ├── customize.sh                 # Magisk installer (10 data-preservation layers)
-│   ├── dnscrypt-proxy.toml          # DNSCrypt engine config
-│   ├── dnscrypt-proxy.version       # DNS binary version (2.1.18)
-│   ├── functions.sh                 # Shared shell library (backup helpers + rotation)
-│   ├── go.mod                       # Go module definition
-│   ├── main.go                      # HTTP server
-│   ├── post-fs-data.sh              # Early boot cleanup
-│   ├── service.sh                   # Boot service + periodic auto-backup
-│   ├── status.sh                    # Status display (+ --diagnose/--json)
-│   ├── uninstall.sh                 # Cleanup + orphan txn preservation
-│   ├── watchdog.sh                  # Standalone watchdog (token auth)
-│   └── webui.conf                   # WebUI/Dashboard config
-│
-├── web/                             # Frontend (PWA, bilingual EN/AR) — 13 tracked + 1 artifact
-│   ├── apple-touch-icon.png         # Launcher icon fallback (Android + legacy Safari)
-│   ├── dashboard.html               # Monitoring dashboard
-│   ├── favicon.ico                  # IE + bookmarks
-│   ├── favicon-16x16.png            # Legacy favicon
-│   ├── favicon-32x32.png            # Modern favicon
-│   ├── icon-192.png                 # PWA icon (PNG, legacy browsers)
-│   ├── icon-192.svg                 # PWA icon (SVG, modern browsers)
-│   ├── icon-512.png                 # PWA icon (maskable PNG)
-│   ├── icon-512.svg                 # PWA icon (maskable SVG)
-│   ├── index.html                   # Main UI (FSM + SW Update + EN/AR toggle)
-│   ├── manifest.json                # PWA manifest (lang=en, dir=ltr defaults)
-│   ├── offline.html                 # Offline fallback page
-│   ├── sw.js                        # Service Worker (language-neutral)
-│   └── [app-debug.apk]              # ← build artifact, gitignored (.gitignore §[20])
-│
-└── docs/                            # Documentation (18 + 7 in adr/ = 25 files)
-    ├── adr/                         # Architecture Decision Records (7 files)
-    │   ├── README.md                # ADR index + template + methodology
-    │   ├── 0001-two-branch-model.md
-    │   ├── 0002-automated-releases.md
-    │   ├── 0003-post-release-sync.md
-    │   ├── 0004-unified-pr-template.md          (⚠️ Superseded)
-    │   ├── 0005-release-specific-pr-template.md
-    │   └── 0006-rename-hotfix-to-release-patch.md
-    │
-    ├── API.md                       # HTTP API reference
-    ├── ARCHITECTURE.md              # System architecture
-    ├── BACKUP.md                    # Backup system reference (v1.2.0)
-    ├── BRANCHING.md                 # Git branching strategy
-    ├── COMPATIBILITY.md             # Device compatibility matrix
-    ├── CONTRIBUTING.md              # Contribution guide
-    ├── DEVELOPMENT.md               # Developer guide
-    ├── DNS_BINARIES.md              # DNS binaries management
-    ├── EMERGENCY.md                 # Emergency recovery (v1.2.0)
-    ├── FAQ.md                       # Common questions (Q121–Q130 = v1.2.0)
-    ├── GLOSSARY.md                  # Terms & abbreviations
-    ├── HALL_OF_FAME.md              # Contributors recognition
-    ├── INSTALL.md                   # Installation guide
-    ├── RELEASE_PROCESS.md           # Release process guide
-    ├── ROADMAP.md                   # Future plans
-    ├── SECURITY.md                  # Threat model + disclosure
-    ├── TROUBLESHOOTING.md           # Troubleshooting guide
-    └── UPGRADE.md                   # Version upgrade guide
-```
+A ~3 MB native WebView wrapper for the WebUI
+([separate repository](https://github.com/gasciljh/dnscrypt-proxy-app)):
 
-**File count**: 89 tracked files + 1 build artifact
-(`web/app-debug.apk`, produced by `scripts/fetch_app_apk.sh` and
-ignored by `.gitignore` §[20]).
+- **Size**: ~3 MB · **Stack**: Kotlin + WebView · **Min Android**: 5.0
+- **Telemetry**: None · **Source**:
+  [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
 
----
+**Install paths** (v1.5.0): click **📲 Install App** in the WebUI
+header → choose **Install locally** (5-level `pm install` cascade,
+requires root), or one of the two GitHub fallbacks (Open GitHub
+page / Direct download).
 
-## CLI Commands
-
-```bash
-# Full status
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh"
-
-# JSON status (includes 7-field backups object in v1.2.0)
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json"
-
-# One-line status (includes profile + memory hint in v1.1.0)
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
-
-# Full diagnostic report (v1.2.0 — Layer 10)
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
-
-# Restart WebUI
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"
-
-# Manual backup (v1.2.0)
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
-
-# Comprehensive check (DNS + WebUI + profile + memory + backup)
-su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --check"
-```
-
----
-
-## Configuration
-
-`proxy/webui.conf`:
-
-```
-PORT=9090
-DASHBOARD_PORT=9091
-BIND_ADDR=127.0.0.1
-AUTO_RESTART_DNS=1
-AUTO_RESTART_WEBUI=1
-LOG_LEVEL=info
-```
-
-Rules:
-
-- No spaces around `=`
-- No trailing comments on the same line
-- `PORT` and `DASHBOARD_PORT` must differ
-- `BIND_ADDR=0.0.0.0` requires credentials set in
-  `dnscrypt-proxy.toml` → `[monitoring_ui]`
-
-`proxy/dnscrypt-proxy.toml` controls the DNS engine itself (listen
-addresses, resolver selection, cache, blocklists, monitoring UI).
-Credentials for the internal monitoring UI live in `[monitoring_ui]`.
-
-### Persistent Backup Directory (v1.2.0)
-
-```
-/sdcard/dnscrypt-webui-backup/
-├── current/                          # live mirror (always up-to-date)
-├── <timestamp>-<version>-<pid>/      # install snapshot
-├── <timestamp>-manual-<pid>/         # manual snapshot
-├── <timestamp>-auto-<pid>/           # periodic snapshot
-├── txn-<timestamp>-<pid>/            # in-flight transaction
-├── orphan-txn-<timestamp>-<pid>/     # preserved interrupted install
-├── .last_stable                      # recovery pointer
-├── .last_auto_backup                 # periodic marker (mtime)
-├── .upgrade_history.json             # upgrade log
-└── README.md                         # user guide
-```
-
-Permissions: `0700` on directories, `0600` on files (owned by root).
-Rotation: keeps the 21 newest snapshots, sorted by **mtime**
-descending (v1.3.0) with `.last_stable` and newest-install
-protection.
-
----
-
-## HTTP API
-
-All endpoints on `http://127.0.0.1:9090` unless noted.
-
-| Method | Endpoint | Auth | Purpose |
-|---|---|---|---|
-| GET | `/healthz` | No | Liveness check |
-| GET | `/readyz` | Localhost only | Readiness check |
-| GET | `/app-debug.apk` | No | **Companion Android app APK (v1.4.0)** — returns 404 when absent |
-| GET | `/api?action=status` | Yes | Service status (ON / OFF) |
-| GET | `/api?action=get_profile` | Yes | Current profile + entry count + `memory_limit_mb` (v1.1.0) |
-| GET | `/api?action=get_custom_rules` | Yes | Allowlist + Denylist content |
-| GET | `/api?action=runtime_info` | Yes | Build info + ports + `profile_key` + `memory_limit_mb` + `backups` object (v1.2.0) |
-| GET | `/api?action=logs` | Yes | Last log lines |
-| GET | `/api?action=list_logs` | Yes | List diagnostic files |
-| GET | `/events` | Yes | SSE stream |
-| GET | `/api/metrics` | Yes | Dashboard JSON (port 9091) |
-| POST | `/api/auth/login` | No | Login (POST-only) |
-| POST | `/api/auth/logout` | Yes | Logout (POST-only) |
-| POST | `/api/update_profile` | Yes | Update blocklist (+ pre-critical backup) |
-| POST | `/api/save_allowlist` | Yes | Save allowlist (+ pre-critical backup) |
-| POST | `/api/save_denylist` | Yes | Save denylist (+ pre-critical backup) |
-| POST | `/api/save_custom_rules` | Yes | Save both (+ pre-critical backup) |
-| POST | `/api/append_denylist` | Yes | Append to denylist (**requires `content` param in v1.2.0**) |
-| POST | `/api/toggle_service` | Yes | Toggle DNS engine |
-| POST | `/api/restart_service` | Yes | Restart DNS engine |
-| POST | `/api/ensure_running_service` | **Watchdog token** (v1.2.0) | Ensure DNS running |
-
-### `runtime_info.backups` (v1.2.0)
-
-A new 7-field object:
-
-```json
-{
-  "available": 5,
-  "in_flight_txn": 0,
-  "orphan_txn": 0,
-  "last_backup": "2026-09-29 15:00:00",
-  "last_backup_name": "20260929-150000-manual-12345",
-  "last_stable": "20260929-095826-v1.2.0-12345",
-  "path": "/sdcard/dnscrypt-webui-backup"
-}
-```
-
-Full reference: [`docs/API.md`](docs/API.md) §6.1.7.
+Full details, failure modes, and cascade reference:
+see [`docs/GUIDE.md`](docs/GUIDE.md) §9.
 
 ---
 
 ## Security
 
-Applied protections:
+- **Binding**: `127.0.0.1` by default; `0.0.0.0` requires
+  credentials.
+- **Auth**: Login POST-only, constant-time comparison, rate limit
+  (5 / 15 min, includes Basic Auth), HttpOnly cookies with
+  `SameSite=Lax`.
+- **Firewall**: Custom Chains only — no orphan rules.
+- **Data preservation (v1.2.0)**: 10 defensive layers, persistent
+  backup with mode `0700` / `0600`, SHA256 advisory verification,
+  transactional install with rollback.
+- **Companion install (v1.5.0)**: One-shot CSRF token (60 s TTL),
+  per-IP rate limit, localhost-only, SELinux staging
+  (**never `setenforce 0`**), Play Protect trap, 75 s cascade
+  deadline.
 
-**Authentication**
+**No GPG or Cosign signing** as of v1.5.0. Only the `.sha256`
+checksum is attached to the release.
 
-- BIND_ADDR defaults to `127.0.0.1`; public binds require credentials
-- Login POST-only (CSRF protection)
-- Basic Auth rate limiting (5 attempts / 15 minutes)
-- Constant-time password comparison (`subtle.ConstantTimeCompare`)
-- HttpOnly session cookies with `SameSite=Lax`
-- CSRF-GET protection on state-changing endpoints
-- **v1.2.0**: Watchdog token (`X-Watchdog-Token`) on
-  `ensure_running_service` — closes a CSRF hole
-
-**Headers**
-
-- Strict CSP, `X-Frame-Options: DENY`, `nosniff`, COOP, CORP
-
-**Input validation**
-
-- `MaxBytesReader` (5 MB) on all POST bodies
-- `/readyz` restricted to localhost
-- `shellQuote()` on all dynamic shell paths (extended charset in v1.1.0)
-- `readConfPort()` range check (1–65535)
-- **v1.4.0**: `removeModule` routes the caller-provided path through
-  `filepath.Base()` and rebuilds the final path from the trusted
-  `MODULES_DIR` constant — closes two CodeQL `go/path-injection`
-  alerts (#1, #2). No user-controlled data reaches any path
-  expression.
-
-**Firewall**
-
-- Custom iptables / ip6tables chains (no orphan rules)
-- nftables support via `dnscrypt_filter` table
-- IPv4/IPv6 separation (no cross-protocol contamination)
-
-**State & concurrency**
-
-- STATUS_FILE represents user intent (not process state)
-- `rebuildMu` mutex serializes blocklist rebuilds (RACE-1)
-- **`backupMu` mutex serializes pre-critical backups (v1.2.0)**
-- Auth cache (60 s) reduces file I/O
-
-**Data preservation (v1.2.0)**
-
-- 10 defensive layers for user config files
-- Persistent backup directory with `0700`/`0600` permissions
-- SHA256 integrity verification (advisory)
-- Transactional install with rollback
-- Recovery mode via trigger file
-- SELinux context preservation (`restorecon` / `chcon`)
-
-**v1.1.0 additions**
-
-- **MEM-1** — Dynamic per-profile memory limit
-  (`debug.SetMemoryLimit`) prevents GC thrashing on heavy profiles
-  while keeping DoS protection on light ones
-- **MEM-2** — Extended `shellQuote()` charset (`{`, `}`, `\n`, `\t`)
-  for defense-in-depth
-- **MEM-3** — `MONITORING_UI_PORT` constant used in `metricsProxyHandler`
-  (removes the last hardcoded `"8080"` reference)
-
-**Public static asset (v1.4.0)**
-
-- `/app-debug.apk` is served without authentication (static asset,
-  no secrets). Missing file → 404; existing file → 200 with
-  `Cache-Control: public, max-age=3600, immutable`.
-
-Report vulnerabilities privately: [`SECURITY.md`](SECURITY.md).
+Full threat model, 36 attack-vector subsections, and audit registry:
+see [`SECURITY.md`](SECURITY.md).
 
 ---
 
 ## Performance
 
-### Baseline (all profiles)
-
 | Metric | Value |
 |---|---|
-| RAM (WebUI idle) | ~15 MB |
-| RAM (WebUI peak) | ~25 MB |
+| RAM (WebUI idle / peak) | ~15 MB / ~35 MB (profile-dependent) |
+| RAM (DNS engine) | ~5 MB |
 | Battery | ~1–2% / day |
 | DNS latency (cached) | ~1–5 ms |
-| Service startup | ~2–5 s |
-| `rebuildBlocklist` (100K entries) | ~200 ms |
-| `rebuildBlocklist` (500K entries) | ~1 s |
+| `rebuildBlocklist` (500K) | ~1 s |
+| Companion install (root) | ~5–15 s (typical) |
 
-### RAM by Profile (v1.1.0 — MEM-1)
+The Go runtime soft memory limit is set per profile
+(light=80 MB → ultimate=220 MB). `runtime_info` exposes
+`profile_key` + `memory_limit_mb`.
 
-The WebUI process sets a per-profile **soft** memory limit via
-`debug.SetMemoryLimit`. This is a **soft** limit: the Go runtime
-prefers running GC more aggressively over OOMing. Setting it too low
-causes CPU waste (GC overhead); too high wastes RAM.
-
-| Profile | Soft limit | WebUI RSS (idle) | WebUI RSS (peak) |
-|---|---:|---:|---:|
-| Light | 80 MB | ~15 MB | ~25 MB |
-| Normal | 100 MB | ~15 MB | ~30 MB |
-| PRO | 120 MB | ~15 MB | ~35 MB |
-| PRO++ | 160 MB | ~15 MB | ~45 MB |
-| Ultimate | 220 MB | ~15 MB | ~60 MB |
-
-**Note**: "WebUI RSS" is the actual resident memory of the WebUI
-process. The "soft limit" is the ceiling at which the Go runtime
-starts running GC more aggressively — it is not the RSS.
-
-The limit is recomputed:
-
-- At startup (in `main()`)
-- After every profile change (in `updateProfile()`)
-
-**Observability**:
-
-```bash
-# Effective limit for the active profile
-curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.memory_limit_mb'
-
-# Active profile key
-curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.profile_key'
-
-# Backup state (v1.2.0)
-curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups'
-```
-
-### Backup Storage (v1.2.0)
-
-| Metric | Value |
-|---|---|
-| Size per snapshot | ~30–100 KB (5 config files) |
-| Total with rotation (21 snapshots) | ~2.5 MB max |
-| Backup duration | < 5 s wall |
-| Restore duration | < 3 s |
-| Rotation policy | Keep 21 newest by **mtime**, with `.last_stable` + newest-install protection (v1.3.0) |
-| Pre-critical backup frequency | On every destructive write |
-| Periodic backup interval | 24 h (service.sh) |
-
-**Impact**: Negligible. No measurable CPU or battery impact.
-
----
-
-## Development
-
-```bash
-# 1. Clone
-git clone https://github.com/gasciljh/dnscrypt-proxy-webui.git
-cd dnscrypt-proxy-webui
-
-# 2. Switch to develop (the integration branch)
-git checkout develop
-
-# 3. Common commands
-make version         # show current version (v1.4.0)
-make build           # build all 4 architectures
-make package         # build + package
-make clean           # clean build outputs
-make check-backup    # validate backup shell functions (v1.2.0)
-make check-all       # run all local validations (v1.2.0)
-make fetch-apk       # fetch companion APK into dist/ (v1.4.0)
-make check-app-version # verify companion app metadata (v1.4.0)
-make diagnose-help   # how to run diagnose on a device (v1.2.0)
-make help            # show available targets
-```
-
-**Branching**: This project uses `main` (stable releases) + `develop`
-(integration). Never commit to `main` directly — open a PR against
-`develop`.
-
-**Workflow guides**:
-
-- Git workflow → [`docs/BRANCHING.md`](docs/BRANCHING.md)
-- Release automation → [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md)
-- Architecture decisions → [`docs/adr/README.md`](docs/adr/README.md)
-- Backup system → [`docs/BACKUP.md`](docs/BACKUP.md)
-
-**Toolchain**: Go 1.22+, Android NDK r26b+ (for cross-compilation).
-
-**Full guide**: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
-
----
-
-## Building
-
-```bash
-cd proxy
-./build.sh --clean --parallel          # all 4 architectures
-./build.sh --single arm64              # one architecture
-./build.sh --info                      # environment / NDK info
-./build.sh --package                   # binaries ZIP
-```
-
-Output: `proxy/build/dnscrypt-webui-{arm64,arm,amd64,386}`.
-
-Reproducible builds via `SOURCE_DATE_EPOCH` (extracted from the last
-commit).
-
----
-
-## Releasing
-
-Releases are automated through two scripts:
-
-| Script | Use for | Branch | Bump |
-|---|---|---|---|
-| `release.sh` | Stable / Prerelease | `develop` or `release/*` | Any |
-| `release-patch.sh` | Hotfix (PATCH only) | `main` | PATCH only |
-
-**Stable release** (from `develop`):
-
-```bash
-./scripts/release.sh v1.4.0
-```
-
-**PATCH release** (from `main`):
-
-```bash
-./scripts/release-patch.sh v1.4.1
-```
-
-The scripts update version files, create a signed tag, and push to
-`origin`. GitHub Actions then:
-
-1. Fetches the companion APK into `dist/` (v1.4.0).
-2. Stages it at `web/app-debug.apk` before packaging (v1.4.0).
-3. Builds the module ZIP.
-4. Publishes the release with 8 artifacts (including `dist/DNS-Proxy-v*.apk`
-   and `.sha256` in v1.4.0).
-5. Auto-syncs `main → develop`.
-
-**PATCH releases** require a **manual back-merge** after publication:
-
-```bash
-make sync
-```
-
-**Release PRs** (`release/*` or `hotfix/*` → `main`) should use the
-release-specific PR template:
-
-```text
-https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...<branch>?template=release.md
-```
-
-**v1.2.0 addition**: The `backup-smoke-test` job in `ci.yml` validates
-the 10 defensive layers, and the `upgrade-test.yml` matrix runs 42
-scenarios before release.
-
-**v1.4.0 addition**: `ci.yml` also verifies the companion app metadata
-(`proxy/app-apk.version` format + `scripts/fetch_app_apk.sh` presence).
-
-Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
+Detailed benchmarks by profile:
+see [`docs/REFERENCE.md`](docs/REFERENCE.md) §3.5.
 
 ---
 
 ## Documentation
 
-| File | Purpose |
+**The documentation map is [`docs/MAP.md`](docs/MAP.md).** It
+defines the 12 user-facing documentation files and the rule that
+every fact has exactly one home.
+
+| Audience | Start here |
 |---|---|
-| [`docs/INSTALL.md`](docs/INSTALL.md) | Installation guide |
-| [`docs/FAQ.md`](docs/FAQ.md) | Common questions (Q121–Q130 = v1.2.0) |
-| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Diagnostics and fixes (§7.8–§7.11 = backups) |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture (§3.10, §4.10 = v1.2.0) |
-| [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model + Audit Corrections (§5.31–§5.33 = v1.2.0) |
-| [`docs/API.md`](docs/API.md) | HTTP API reference (§6.1.7, §10.6, §10.7) |
-| [`docs/BACKUP.md`](docs/BACKUP.md) | **Backup system reference (v1.2.0)** |
-| [`docs/EMERGENCY.md`](docs/EMERGENCY.md) | **Emergency recovery (v1.2.0)** |
-| [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) | Device compatibility matrix |
-| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | Developer guide (§8.12–§8.14 = v1.2.0) |
-| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Contribution guidelines (§8.9–§8.11 = v1.2.0) |
-| [`docs/BRANCHING.md`](docs/BRANCHING.md) | Git branching strategy |
-| [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md) | Release process guide |
-| [`docs/adr/README.md`](docs/adr/README.md) | Architecture Decision Records |
-| [`docs/UPGRADE.md`](docs/UPGRADE.md) | Version upgrade guide (§3.1 = v1.2.0) |
-| [`docs/DNS_BINARIES.md`](docs/DNS_BINARIES.md) | DNS binaries management |
-| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) | Terms and abbreviations |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Future plans |
-| [`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md) | Contributors (Data Guardian badge) |
-| [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) | Community guidelines |
-| [`CHANGELOG.md`](CHANGELOG.md) | Version history (including v1.4.0) |
+| New visitor | [`docs/GUIDE.md`](docs/GUIDE.md) §1–§3 |
+| End user | [`docs/GUIDE.md`](docs/GUIDE.md) |
+| Integrator | [`docs/REFERENCE.md`](docs/REFERENCE.md) §2 |
+| Contributor | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
+| Security researcher | [`SECURITY.md`](SECURITY.md) |
 
 ---
 
@@ -808,26 +220,7 @@ Full guide: [`docs/RELEASE_PROCESS.md`](docs/RELEASE_PROCESS.md).
 - **Bug reports** → [Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues/new?template=bug_report.yml)
 - **Feature requests** → [Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues/new?template=feature_request.yml)
 - **Pull requests** → follow [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md)
-- **Branch policy** → [`docs/BRANCHING.md`](docs/BRANCHING.md)
-- **Architecture decisions** → [`docs/adr/README.md`](docs/adr/README.md)
-- **Backup testing** → [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) §8.9, §8.10, §8.11
-- **Security reports** → [`SECURITY.md`](SECURITY.md)
-
-**Contribution requirements**:
-
-- Any PR touching the 10 defensive layers must update
-  `docs/BACKUP.md` and `docs/EMERGENCY.md`.
-- Any new user-facing string must supply both `en` and `ar` entries.
-- Any destructive operation on user data must call
-  `createAutoBackup(reason)` first.
-- **v1.4.0**: Any PR touching `scripts/fetch_app_apk.sh` must keep
-  `proxy/app-apk.version` as the single source of truth for the
-  companion app version. Any PR touching the `/app-debug.apk`
-  route must update §4.12 of `docs/ARCHITECTURE.md`.
-
-**Data Guardian badge**: Test the backup/restore system across
-3+ devices or 3+ root solutions and submit a report. See
-[`docs/HALL_OF_FAME.md`](docs/HALL_OF_FAME.md).
+- **Security reports** → [`SECURITY.md`](SECURITY.md) §1 (**not** a public issue)
 
 This project follows the
 [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
@@ -838,7 +231,7 @@ This project follows the
 
 | Project | Description |
 |---|---|
-| [**dnscrypt-proxy-app**](https://github.com/gasciljh/dnscrypt-proxy-app) | Native Android WebView wrapper for this WebUI (optional, ~3 MB APK, fetched by `scripts/fetch_app_apk.sh`) |
+| [**dnscrypt-proxy-app**](https://github.com/gasciljh/dnscrypt-proxy-app) | Native Android WebView wrapper for the WebUI (optional, ~3 MB) |
 
 ---
 
@@ -846,40 +239,24 @@ This project follows the
 
 - [dnscrypt-proxy](https://github.com/DNSCrypt/dnscrypt-proxy) — DNS engine
 - [HaGeZi DNS Blocklists](https://github.com/hagezi/dns-blocklists) — blocklists
-- [Magisk](https://github.com/topjohnwu/Magisk) — module framework
-- [KernelSU](https://github.com/tiann/KernelSU) — alternative module framework
-- [APatch](https://github.com/bmax121/APatch) — root solution
-- [ShellCheck](https://github.com/koalaman/shellcheck) — shell linting
-- [shfmt](https://github.com/mvdan/sh) — shell formatting
-- [golangci-lint](https://github.com/golangci/golangci-lint) — Go linting
-- [Cosign](https://github.com/sigstore/cosign) — artifact signing
-- [Go runtime/debug](https://pkg.go.dev/runtime/debug#SetMemoryLimit) — for `SetMemoryLimit` (v1.1.0)
-- [Android FUSE documentation](https://source.android.com/docs/core/storage) — for `/sdcard/` mount behavior (v1.2.0)
-- [Android SELinux documentation](https://source.android.com/docs/security/features/selinux) — for `restorecon` / `chcon` (v1.2.0)
+- [Magisk](https://github.com/topjohnwu/Magisk) / [KernelSU](https://github.com/tiann/KernelSU) / [APatch](https://github.com/bmax121/APatch) — root solutions
+- [filepath-securejoin](https://github.com/cyphar/filepath-securejoin) — path sanitization (ADR-0002)
+- [Go runtime/debug](https://pkg.go.dev/runtime/debug#SetMemoryLimit) — memory limit
 
 ---
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
-
-The Code of Conduct is licensed under
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+MIT — see [`LICENSE`](LICENSE). The Code of Conduct is licensed
+under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 
 ## Links
 
-### Main module
-
-- Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-- Releases: https://github.com/gasciljh/dnscrypt-proxy-webui/releases
-- Issues: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
-- Discussions: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
-- Security reports: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
-
-### Companion app
-
-- Repository: https://github.com/gasciljh/dnscrypt-proxy-app
-- Releases: https://github.com/gasciljh/dnscrypt-proxy-app/releases
-- Issues: https://github.com/gasciljh/dnscrypt-proxy-app/issues
+- **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
+- **Releases**: https://github.com/gasciljh/dnscrypt-proxy-webui/releases
+- **Issues**: https://github.com/gasciljh/dnscrypt-proxy-webui/issues
+- **Discussions**: https://github.com/gasciljh/dnscrypt-proxy-webui/discussions
+- **Security reports**: https://github.com/gasciljh/dnscrypt-proxy-webui/security/advisories/new
+- **Companion app**: https://github.com/gasciljh/dnscrypt-proxy-app

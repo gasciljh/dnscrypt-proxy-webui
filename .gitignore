@@ -1,7 +1,7 @@
 # ============================================================
 # Git Ignore for DNSCrypt Smart Filter
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -13,113 +13,14 @@
 #   Patterns are defined only for file types that actually
 #   exist or are created by this repository at runtime.
 #
-# v1.1.0 notes (kept):
-#   • Removed two no-op negations:
-#       - `!proxy/dnscrypt-proxy.version` in [2] (the patterns
-#         above could never match it).
-#       - `!proxy/*.key.pub` in [13] (`*.key` cannot match
-#         `*.key.pub`).
-#   • Added clarifying comments for sections that previously
-#     had none.
-#
-# ============================================================
-# v1.2.0 changes:
-#   • Version bumped from v1.1.0 to v1.2.0.
-#   • 🔧 FIX (this revision): Corrected the IDE negation pattern
-#     in §[12]. The previous pattern `.vscode/` ignored the
-#     entire directory, which made the following
-#     `!.vscode/settings.json.example` a NO-OP. Git cannot
-#     un-ignore a file inside an ignored directory.
-#
-#     The corrected pattern is `.vscode/*`, which ignores only
-#     the CONTENTS of `.vscode/` (not the directory itself),
-#     allowing the negation to work as intended.
-#     This fix is tracked as HARD-GI-06 (see §[12]).
-#
-#   • Added a cross-reference from §[1] (`dist/`) to `make
-#     package`, which creates the packaged ZIP + checksum.
-#
-#   • Confirmed: the persistent backup directory on the device
-#     — `/sdcard/dnscrypt-webui-backup/` — NEVER appears in the
-#     repository. It lives on the Android device's SD card.
-#
-#   • Re-audited sections [1]–[19] against the v1.2.0 file
-#     inventory. No new build artifact or runtime file was
-#     introduced by the data-preservation release.
-#
-# ============================================================
-# v1.3.0 changes:
-#   • Version bumped from v1.2.0 to v1.3.0.
-#   • No new build artifact or runtime file was introduced by
-#     the v1.3.0 release (PWA install button + live status LED
-#     + DNS auto-start fix). The existing rules remain
-#     sufficient.
-#
-# ============================================================
-# v1.4.0 changes (this revision):
-#   • Version bumped from v1.3.0 to v1.4.0.
-#   • Added §[20] for the companion Android app:
-#       - `web/app-debug.apk` — staged by `release.yml` before
-#         packaging. It is a build artifact and must not be
-#         committed.
-#       - `.apk` files in general are excluded.
-#
-#   • 🔧 STRUCTURAL FIX: Removed the duplicate `[3] DNS binaries`
-#     section. Its rules were moved into a new §[21] at the
-#     correct position, and section numbers were re-ordered to
-#     avoid the collision with §[3] (Runtime directory).
-#
-#     The previous file had two sections labelled `[3]`:
-#       - `# [3] Runtime directory (proxy/run/)`     ← correct
-#       - `# [3] DNS binaries (fetched by ...)`      ← duplicate
-#
-#   • Confirmed: the `proxy/app-apk.version` (v1.4.0) file is
-#     TRACKED and must NEVER be ignored. It is a single-line
-#     text file, not a build artifact.
-#
-#   • Re-audited sections [1]–[21] against the v1.4.0 file
-#     inventory. No other new pattern was required.
-#
-# ============================================================
 # Reminder:
 #   If you add a new pattern here, add a matching exclusion in
 #   .gitattributes if the file is binary, or a matching section
 #   in .editorconfig if it has specific formatting rules.
-#
-# Cross-references:
-#   • docs/BACKUP.md      — backup system reference (v1.2.0)
-#   • docs/EMERGENCY.md   — emergency recovery guide (v1.2.0)
-#   • docs/UPGRADE.md     — version upgrade guide
-#   • Makefile            — `make package`, `make check-docs`,
-#                           `make check-backup`, `make check-all`,
-#                           `make fetch-apk`, `make check-app-version`
-#   • .github/workflows/codeql.yml — HARD-CQ-08 note about
-#                                    `proxy/.codeql-analyze`
 # ============================================================
 
 # ============================================================
 # [1] Build artifacts
-# ============================================================
-# Outputs produced locally or in CI:
-#   • build/           — local build tree (if ever used)
-#   • proxy/build/     — WebUI binaries output (from build.sh)
-#   • dist/            — Magisk ZIP + checksum
-#                        (from `make package` → package_module.sh)
-#   • *.zip            — any ZIP (defensive)
-#   • *.tar.*          — any tarball (defensive)
-#   • *.sha256         — checksum sidecar files (defensive, HARD-GI-03)
-#   • *.sarif          — CodeQL analysis output (HARD-GI-02)
-#   • .codeql-analyze  — CodeQL build output (HARD-GI-05, closes H-02)
-#
-# v1.2.0 note: `make package` creates
-# `dist/dnscrypt-webui-<VERSION>-module.zip` and its `.sha256`.
-# Both live under `dist/`, which is ignored here.
-#
-# HARD-GI-05 note: The CodeQL workflow writes a temporary build
-# artifact to `proxy/.codeql-analyze`. It is removed by a trap
-# handler on any exit path, but a manual build or a partial
-# failure could leave the file behind. The two patterns below
-# keep it out of `git status` in either case.
 # ============================================================
 build/
 proxy/build/
@@ -134,25 +35,7 @@ dist/
 proxy/.codeql-analyze
 
 # ============================================================
-# [2] WebUI binaries (built by build.sh / release.yml)
-# ============================================================
-# These files are never committed — they are built from main.go
-# and injected into the Magisk ZIP at packaging time.
-#
-# Patterns cover:
-#   • proxy/dnscrypt-webui-arm64
-#   • proxy/dnscrypt-webui-arm
-#   • proxy/dnscrypt-webui-amd64
-#   • proxy/dnscrypt-webui-386
-#   • dnscrypt-webui-* (root-level, from --package)
-#
-# ⚠️ The file `proxy/dnscrypt-proxy.version` is tracked and must
-#    NEVER be ignored. Verify with:
-#      git check-ignore -v proxy/dnscrypt-proxy.version
-#      → should report "not ignored".
-#
-# ⚠️ v1.4.0: The file `proxy/app-apk.version` is also tracked
-#    and must NEVER be ignored.
+# [2] WebUI binaries
 # ============================================================
 proxy/dnscrypt-webui-*
 proxy/dnscrypt-webui
@@ -161,35 +44,10 @@ dnscrypt-webui-*
 # ============================================================
 # [3] Runtime directory (proxy/run/)
 # ============================================================
-# The run/ directory is created at runtime by main.go.
-# Its contents:
-#   • dnscrypt.status       — user intent (ON/OFF)
-#   • dnscrypt.pid          — DNS engine PID
-#   • webui.pid             — WebUI PID
-#   • watchdog.pid          — Watchdog PID
-#   • update_progress.txt   — progress file during profile update
-#   • .bootstrap_cache      — 5-minute TTL cache of bootstrap IPs
-#   • .watchdog_token       — v1.2.0 watchdog auth token (0600)
-#
-# None of these must ever be committed.
-#
-# Data preservation (v1.2.0):
-#   The 10 defensive layers do NOT write any file into
-#   proxy/run/. They write to /sdcard/dnscrypt-webui-backup/
-#   (outside the repository).
-# ============================================================
 proxy/run/*
 
 # ============================================================
-# [4] Runtime files (outside proxy/run/)
-# ============================================================
-# Fallback locations when proxy/run/ is not writable (SELinux,
-# permissions). See main.go initPaths().
-#
-# HARD-GI-04: `*.tmp-*` covers the dash variant of `mktemp`
-# output (`<file>.tmp-<random>`) used by external tooling. The
-# underscore variant (`<file>.tmp_<random>`), used by
-# atomicWriteFile, is covered by `*.tmp_*` below.
+# [4] Runtime files (fallback locations)
 # ============================================================
 *.pid
 *.status
@@ -203,9 +61,6 @@ proxy/run/*
 # ============================================================
 # [5] Log rotation artifacts
 # ============================================================
-# Produced by main.go (orderly rotation at 1 MB) and by
-# functions.sh (emergency rotation at 50 MB).
-# ============================================================
 *.log.*.gz
 *.log.*.old
 *.log.emergency.*
@@ -213,21 +68,15 @@ proxy/run/*
 # ============================================================
 # [6] Bootstrap cache
 # ============================================================
-# Created by functions.sh (5-minute TTL from TOML).
-# ============================================================
 .bootstrap_cache
 
 # ============================================================
-# [7] User configs (never committed — user-specific)
+# [7] User configs
 # ============================================================
-# These files are either:
-#   • Downloaded at runtime (blocklist.txt, blocklist.raw)
-#   • Edited by the user via the WebUI (allowlist, denylist)
-#   • Generated by customize.sh at install (selected_profile)
+# Runtime downloads + user-edited files.
 #
-# ⚠️ proxy/webui.conf and proxy/dnscrypt-proxy.toml are NOT
-#    in this list — they are template files that ship with the
-#    module and MUST be tracked.
+# Note: proxy/webui.conf and proxy/dnscrypt-proxy.toml are
+# template files that ship with the module and MUST be tracked.
 # ============================================================
 proxy/allowlist.txt
 proxy/denylist.txt
@@ -240,9 +89,6 @@ proxy/blocked-ips.txt
 # ============================================================
 # [8] Go build artifacts
 # ============================================================
-# Go 1.22 is the current toolchain (see proxy/go.mod).
-# These artifacts can appear during local testing or debugging.
-# ============================================================
 *.test
 *.exe
 *.exe~
@@ -253,24 +99,12 @@ __debug_bin*
 __debug_bin*.exe
 
 # ============================================================
-# [9] Development environment (temporary)
-# ============================================================
-# HARD-GI-07 note (v1.2.0): the `/tmp/...` patterns that used
-# to live here have been removed. In `.gitignore`, a leading
-# `/` anchors to the repository root, not to the filesystem
-# root — so `/tmp/dnscrypt-dev/` actually meant
-# `<repo_root>/tmp/dnscrypt-dev/`, which does not exist.
-#
-# If you need to ignore a repo-local scratch directory in the
-# future, name it explicitly (e.g. `.scratch/`) and add a
-# pattern without a leading slash — never `/tmp/`.
+# [9] Development scratch
 # ============================================================
 .scratch/
 
 # ============================================================
 # [10] Package build artifacts
-# ============================================================
-# Files created by scripts/package_module.sh during staging.
 # ============================================================
 *.filelist.txt
 .filelist.txt
@@ -292,23 +126,9 @@ desktop.ini
 # ============================================================
 # [12] IDE / Editor
 # ============================================================
-# 🔧 v1.2.0 FIX (HARD-GI-06) — This section previously used
-#    `.vscode/` (a directory-only pattern), which caused the
-#    negation below to be a NO-OP.
-#
-#    Git rule: `dir/` matches the DIRECTORY and everything
-#    inside it. A negation `!dir/file` has NO effect, because
-#    Git cannot re-include a file when its parent directory
-#    is excluded.
-#
-#    This section therefore uses `.vscode/*` (not `.vscode/`),
-#    so that `.vscode/settings.json.example` — if it exists —
-#    is tracked as intended.
-#
-#    The same pattern applies to `.idea/` below: it uses
-#    `.idea/` (directory-only) because there is NO negation
-#    for it. If a negation is ever added, it MUST be changed
-#    to `.idea/*`.
+# .vscode/* (not .vscode/) so the negation below can re-include
+# settings.json.example. Git cannot re-include a file when its
+# parent directory is excluded.
 # ============================================================
 .vscode/*
 !.vscode/settings.json.example
@@ -324,13 +144,12 @@ desktop.ini
 # ============================================================
 # [13] Secrets & credentials (defensive)
 # ============================================================
-# This section is DEFENSIVE ONLY. None of these files exist
-# in the repository today. The patterns guard against a
-# contributor accidentally committing a real secret.
+# None of these files exist in the repository today. The
+# patterns guard against a contributor accidentally committing
+# a real secret.
 #
-# ⚠️ The `.secrets.baseline` file is NOT ignored — it is
-#    the detect-secrets baseline and must be tracked. There is
-#    no `*.baseline` pattern here, so it is not matched.
+# Note: .secrets.baseline is NOT ignored — it is the
+# detect-secrets baseline and must be tracked.
 # ============================================================
 .secrets
 *.pem
@@ -344,9 +163,6 @@ desktop.ini
 
 # ============================================================
 # [14] Local overrides
-# ============================================================
-# Files a developer may create locally to test with custom
-# settings. Never committed.
 # ============================================================
 *.local
 local.conf
@@ -368,12 +184,6 @@ webui.conf.local
 # ============================================================
 # [17] Documentation build
 # ============================================================
-# Reserved for future use (no docs build system today).
-#
-# v1.2.0 note: `make check-docs` verifies the presence of
-# three specific documentation files. It is a READ-ONLY check
-# — it does NOT create any file.
-# ============================================================
 docs/_build/
 docs/.cache/
 site/
@@ -381,79 +191,49 @@ site/
 # ============================================================
 # [18] Misc
 # ============================================================
-# Catch-all for transient files created by tools that do not
-# have a dedicated section above.
-# ============================================================
 *.cache
 *.pid.tmp
 
 # ============================================================
-# [19] Data-preservation test artifacts (v1.2.0) — defensive
+# [19] Data-preservation test artifacts (v1.2.0)
 # ============================================================
-# These paths may be created by a developer while testing the
-# v1.2.0 data-preservation layers manually on a workstation.
+# Manual test files created by developers. Not created by any
+# script during normal operation.
 #
-# They are NOT created by any script in this repository during
-# normal operation.
-#
-# ⚠️ The real backup directory on the device —
-#    `/sdcard/dnscrypt-webui-backup/` — lives OUTSIDE the
-#    repository and is therefore NOT listed here.
+# The real backup directory on the device —
+# /sdcard/dnscrypt-webui-backup/ — lives OUTSIDE the
+# repository and is NOT listed here.
 # ============================================================
 .scratch/dnscrypt-backup-test/
 .scratch/dnscrypt-txn-test/
 .scratch/dnscrypt-upgrade-backup-*
 .scratch/dnscrypt-backup-manual/
 
-# --- Backup staging files (transient) ---
 *.manifest.json.tmp
 *.upgrade_history.json.tmp
 *.manifest.json.tmp_*
 *.upgrade_history.json.tmp_*
 
-# --- Transaction directories (test only) ---
 txn-*/
 orphan-txn-*/
 
 # ============================================================
-# [20] Companion Android app APK (v1.4.0 — new)
+# [20] Companion Android app APK (v1.4.0)
 # ============================================================
-# `web/app-debug.apk` is staged by `release.yml` before packaging
-# and copied into the module ZIP. It is a build artifact and
-# MUST NOT be committed.
+# web/app-debug.apk is staged by release.yml before packaging
+# and copied into the module ZIP. It is a build artifact.
 #
-# The APK is fetched by `scripts/fetch_app_apk.sh` at build time
-# from the sister repository `gasciljh/dnscrypt-proxy-app`.
-#
-# Local developer builds may omit the APK entirely — the module
-# works without it (see docs/COMPATIBILITY.md §8.5.1).
-#
-# `.apk` files in general are also excluded, to prevent an
-# accidental commit of any Android package from any source.
+# The `*.apk` pattern also covers `dist/DNS-Proxy-*.apk` and any
+# other APK that might land in the repository by accident.
 # ============================================================
-web/app-debug.apk
 *.apk
 
 # ============================================================
-# [21] DNS binaries (fetched by fetch_dns_binaries.sh)
+# [21] DNS binaries
 # ============================================================
-# DNS engine binaries downloaded per architecture. Injected
-# into the Magisk ZIP at packaging time. Never committed.
-#
-# 🔧 v1.4.0 STRUCTURAL FIX: This section was previously
-#    mislabelled as `[3]`, colliding with the runtime directory
-#    section. It is now numbered `[21]` and lives at the end,
-#    which matches the order of its introduction.
-#
-# ⚠️ NOTE: proxy/dnscrypt-proxy.toml and
-#    proxy/dnscrypt-proxy.version are TRACKED files. The
-#    patterns below use full filenames (no wildcard), so
-#    neither is matched. Verify:
-#      git check-ignore -v proxy/dnscrypt-proxy.version
-#      → should report "not ignored".
-#
-# ⚠️ v1.4.0: proxy/app-apk.version is also TRACKED — no
-#    pattern here matches it.
+# proxy/dnscrypt-proxy.toml and proxy/dnscrypt-proxy.version
+# are TRACKED files. The patterns below use full filenames,
+# so neither is matched.
 # ============================================================
 proxy/dnscrypt-proxy-arm64
 proxy/dnscrypt-proxy-arm

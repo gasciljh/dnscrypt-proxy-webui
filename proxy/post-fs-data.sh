@@ -1,331 +1,60 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
 # ============================================================
-# DNSCrypt Smart Filter – post-fs-data.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — post-fs-data.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Early boot cleanup script (Magisk/KernelSU phase).
+# Early boot cleanup script (Magisk/KernelSU phase).
+# Runs BEFORE system_server starts (post-fs-data phase).
 #
-#   Runs BEFORE system_server starts (post-fs-data phase).
+# Trigger: Magisk / KernelSU / APatch
+#          during the post-fs-data boot phase (no arguments).
 #
-# Responsibilities:
-#   • Emergency cleanup when the module is disabled
-#   • Clean Custom Chains (DNSCRYPT_OUT / DNSCRYPT_OUT6)
-#   • Clean legacy rules from older versions (best-effort)
+# Responsibilities (only when the module is disabled):
+#   • Emergency cleanup of firewall rules
 #   • Kill lingering dnscrypt-proxy / dnscrypt-webui processes
 #   • Remove stale PID files (both locations)
 #   • Write STATUS_FILE = OFF (legitimate when disabled)
 #
 # Design:
-#   • Self-contained — no dependency on functions.sh
-#   • No background processes — Magisk does not wait for them
-#   • Safe on all devices (path checks + security guards)
-#   • Idempotent — safe to run multiple times
-#   • Protected log_msg with 50 MB emergency rotation (parity
-#     with functions.sh:log_fn, watchdog.sh:log_msg, and
-#     service.sh:log_msg — HARD-PFD-01)
+#   • Self-contained — no dependency on functions.sh. This
+#     script runs before /data may be fully mounted, so it
+#     cannot rely on Layer-1 primitives.
+#   • No background processes — Magisk does not wait for them.
+#   • Safe on all devices (path checks + security guards).
+#   • Idempotent — safe to run multiple times.
+#   • Log helper with 50 MB emergency rotation and a
+#     `_LOG_DISABLED` short-circuit for unwritable locations.
+#   • Uses `local` inside `inline_firewall_cleanup` — supported
+#     by mksh, busybox ash, bash, dash, and ksh (every shell
+#     Android ships).
 #
-# v1.2.0 additions:
-#   • Explicit "Data preservation non-participation" section
-#   • Expanded "Non-responsibilities" section (8 items)
-#   • Legacy cleanup list synchronized (functionally) with
-#     customize.sh and uninstall.sh
-#   • Section numbering unified ([1]..[6])
-#
-# ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-# This file carries two identifier families. The inventory
-# below is the AUTHORITATIVE list of identifiers actually
-# present in this file. It was verified during the v1.4.0
-# release audit.
-#
-# Identifier inventory in THIS file (10 total):
-#
-#   • PFD-1, PFD-2                                 (2)
-#       — original post-audit corrections
-#
-#   • PFD-3, PFD-4, PFD-5                          (3)
-#       — corrections added in the v1.2.0 revision:
-#         PFD-3 → `log_msg` short-circuit via a
-#                  `_LOG_DISABLED` flag once a write has
-#                  failed, to prevent repeated futile
-#                  syscalls on a read-only filesystem.
-#         PFD-4 → Documentation clarification on the
-#                  two numbering systems in this file
-#                  (section `[1]..[6]` vs. protection-
-#                  layer `[1]..[10]`).
-#         PFD-5 → Documentation note on the hard-coded
-#                  legacy IP list (self-containment
-#                  trade-off vs. customize.sh).
-#
-#   • HARD-PFD-01, HARD-PFD-02, HARD-PFD-03,
-#     HARD-PFD-04, HARD-PFD-05                      (5)
-#       — hardening fixes
-#
-# NOTE ON HARD-PFD-01 (scope clarification):
-#   The identifier `HARD-PFD-01` is SCOPED TO THIS FILE.
-#   It refers to the emergency-only 50 MB rotation inside
-#   `log_msg` (parity with `functions.sh:log_fn` and
-#   `watchdog.sh:log_msg`).
-#
-#   This is DISTINCT from the identifier `HARD-01` that
-#   appears in `main.go` (which concerns `cleanupOldGz`
-#   scoping of .gz files). The two identifiers share the
-#   "01" suffix but belong to different files and different
-#   concerns. Future auditors must not conflate them.
-#   All `HARD-PFD-NN` identifiers are exclusively scoped
-#   to `post-fs-data.sh`.
-#
-# NOTE ON IDENTIFIER GAPS:
-#   There are no gaps in this file. All of PFD-1, PFD-2,
-#   PFD-3, PFD-4, PFD-5 and HARD-PFD-01..05 are present.
-#
-# ------------------------------------------------------------
-# Original post-audit corrections:
-# ------------------------------------------------------------
-#
-#   🔧 PFD-1 — `_ip` inside the legacy RETURN cleanup loop is
-#     now declared `local`.
-#
-#   🔧 PFD-2 — The synchronization comment now uses the phrase
-#     "functionally equivalent" with an explicit list of the
-#     two diverging groups, instead of claiming a false
-#     identity.
-#
-# ------------------------------------------------------------
-# Hardening fixes (HARD-PFD-01 … HARD-PFD-05):
-# ------------------------------------------------------------
-#
-#   🛡️ HARD-PFD-01 — `log_msg` performs emergency-only
-#     rotation at 50 MB, every 100th call. Parity with
-#     `functions.sh:log_fn`, `watchdog.sh:log_msg`, and
-#     `service.sh:log_msg`. The counter `_LOG_CALL_COUNT` is a
-#     global by design (it must persist across calls within
-#     the same shell process).
-#
-#   🛡️ HARD-PFD-02 — The STATUS_FILE write in section [5] now
-#     verifies success. If both `$STATUS_FILE` and
-#     `/data/local/tmp/dnscrypt.status` fail to receive the
-#     "OFF" value, a warning is logged.
-#
-#   🛡️ HARD-PFD-03 — `MOD_NAME` is now validated after the
-#     `basename` call. If `basename` is unavailable or returns
-#     an empty string, a fallback string is used explicitly.
-#
-#   🛡️ HARD-PFD-04 — Section [5] now logs a single
-#     informational line when the module is ENABLED (the
-#     common case). This makes the boot log self-documenting.
-#
-#   🛡️ HARD-PFD-05 — When the `run/` directory is not usable
-#     (fallback to /data/local/tmp), the script now explicitly
-#     verifies that /data/local/tmp is writable before adopting
-#     it as the fallback. If neither is writable, a warning is
-#     emitted once and the script continues with the paths it
-#     has.
-#
-# ------------------------------------------------------------
-# Corrections added in the v1.2.0 revision (PFD-3..PFD-5):
-# ------------------------------------------------------------
-#
-#   🔧 PFD-3 — `log_msg` now installs a `_LOG_DISABLED` flag
-#     on the FIRST failure to create or append to the log file.
-#     All subsequent calls short-circuit at the top of the
-#     function. The previous version performed three separate
-#     syscalls (`[ -d ]`, `[ -f ]`, `>>` redirection) on every
-#     call, even when /data/local/tmp was read-only. On a
-#     filesystem that cannot be written, this produced a stream
-#     of failed attempts across the whole boot sequence. The
-#     flag caps that to a single failure detection.
-#
-#     The flag is intentionally NOT persisted across processes
-#     — each new shell invocation gets a fresh `_LOG_DISABLED`
-#     and re-evaluates its environment. Only within a single
-#     process is the short-circuit active.
-#
-#     The emergency-rotation code path (HARD-PFD-01) runs
-#     BEFORE the flag check, so rotation is never blocked by
-#     a prior write failure. This is deliberate: the rotation
-#     can succeed even when a subsequent append would fail
-#     (e.g. when only the file's content directory is full).
-#
-#   🔧 PFD-4 — Documentation clarification. This file uses
-#     TWO separate numbering systems:
-#
-#       (a) Section numbers `[1]`..`[6]`
-#           — physical structure of the script
-#             (module path, paths, log_msg, cleanup,
-#              main branch, exit).
-#
-#       (b) Protection-layer numbers `[1]`..`[10]`
-#           — the v1.2.0 data-preservation architecture
-#             (multi-source, backup, integrity, txn,
-#              root-compat, SELinux, recovery, migrations,
-#              automation, observability).
-#
-#     The two numbering systems are UNRELATED. They are
-#     both one-based and both appear as bracketed numbers,
-#     which is why they were previously confusing. A
-#     dedicated note is now placed immediately after the
-#     layer table to make the distinction explicit.
-#
-#   🔧 PFD-5 — Documentation note on the hard-coded legacy
-#     IP list in `inline_firewall_cleanup`. This list
-#     (9.9.9.9, 8.8.8.8, 1.1.1.1, ...) duplicates the one
-#     used by `customize.sh:_inline_cleanup_firewall` and
-#     `uninstall.sh:_inline_cleanup_firewall`. The
-#     duplication is DELIBERATE: this script must remain
-#     self-contained because it runs before `functions.sh`
-#     is guaranteed to be sourceable. A comment near the
-#     list now documents the trade-off and the sync
-#     requirement.
-#
-# ============================================================
 # Non-responsibilities (deliberately NOT done here):
-# ============================================================
-#   The post-fs-data phase is very early in boot. Many things
-#   that would be reasonable at other times are unsafe or
-#   pointless here. This script deliberately avoids:
+#   • private_dns_mode reset       → service.sh
+#   • route_localnet restore       → uninstall.sh
+#   • Firewall rule creation       → service.sh / main.go
+#   • Backup operations            → service.sh (post-boot)
+#   • Restore operations           → customize.sh (at install)
+#   • Transaction cleanup          → main.go + service.sh
+#   • Orphan-txn inspection        → user-initiated only
+#   • Pending notification read    → main.go
+#   • Companion install flow       → main.go + install_app.sh
 #
-#   1. private_dns_mode reset
-#      → Moved to service.sh because the `settings` service
-#        may not be ready during post-fs-data.
-#
-#   2. route_localnet restore
-#      → Handled by uninstall.sh because it requires sysctl,
-#        which may not be available this early.
-#
-#   3. Firewall rule creation
-#      → Only cleanup runs here. Active rules are created
-#        later by main.go (startService) or service.sh.
-#
-#   4. Backup operations (v1.2.0)
-#      → The persistent backup at /sdcard/dnscrypt-webui-backup/
-#        requires /sdcard/ to be mounted, which is not
-#        guaranteed this early. Auto-backup runs in service.sh
-#        after sys.boot_completed.
-#
-#   5. Restore operations (v1.2.0)
-#      → Restoration is triggered by customize.sh at install
-#        time (Layer 7: recovery mode), not at boot.
-#
-#   6. Transaction cleanup (v1.2.0)
-#      → Orphan transactions are cleaned up by:
-#          - customize.sh (self cleanup after COMMIT)
-#          - main.go:cleanupOldTransactions (startup)
-#          - service.sh:do_cleanup_transactions (boot)
-#        All three run after /sdcard/ is mounted.
-#
-#   7. Orphan transaction inspection (v1.2.0)
-#      → `orphan-txn-*` directories are NEVER removed by this
-#        script. They are the user's explicit signal that they
-#        want to inspect them manually. See docs/BACKUP.md.
-#
-#   8. Pending notification handling (v1.2.0)
-#      → .pending_notification is read by main.go at startup
-#        and by service.sh at boot. This script does nothing
-#        with it because the WebUI is not running yet.
-#
-# ============================================================
-# Coordination with v1.2.0 data-preservation layers:
-# ============================================================
-#   ┌────┬──────────────────────────┬────────────────────────┐
-#   │ #  │ Layer                    │ Handled by             │
-#   ├────┼──────────────────────────┼────────────────────────┤
-#   │ 1  │ Multi-source detection   │ customize.sh (install) │
-#   │ 2  │ Persistent backup        │ service.sh + main.go   │
-#   │ 3  │ Integrity verification   │ customize.sh (install) │
-#   │ 4  │ Transactional upgrades   │ customize.sh (install) │
-#   │ 5  │ Root-solution compat     │ customize.sh (install) │
-#   │ 6  │ SELinux preservation     │ customize.sh (install) │
-#   │ 7  │ Recovery mode            │ customize.sh (install) │
-#   │ 8  │ Config migrations        │ customize.sh (install) │
-#   │ 9  │ Automation + rotation    │ service.sh (boot)      │
-#   │ 10 │ Observability            │ status.sh --diagnose   │
-#   └────┴──────────────────────────┴────────────────────────┘
-#
-#   post-fs-data.sh does NOT participate in any of these layers.
-#   It is a cleanup-only script that runs at the earliest safe
-#   phase of boot.
-#
-# ------------------------------------------------------------
-# PFD-4 — Numbering clarification (READ ME):
-# ------------------------------------------------------------
-#   The table above uses PROTECTION-LAYER numbers 1..10.
-#   The rest of this file uses SECTION numbers [1]..[6].
-#
-#   The two numbering systems are unrelated:
-#     • Section `[1]` = "Determine module path safely".
-#     • Layer `1`     = "Multi-source detection".
-#
-#   Do not infer a correspondence between them. Layer 1 is
-#   NOT implemented in section [1]; it is implemented by
-#   customize.sh at install time. The layer table describes
-#   WHO implements each layer, not WHERE in this file.
-# ============================================================
-# v1.3.0 — No changes to the early-boot cleanup
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   The v1.3.0 release ALSO refined the snapshot-detection
-#   and rotation semantics shared by every consumer of the
-#   persistent backup directory (SNAP-MANIFEST, SNAP-MTIME,
-#   ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
-#   touched main.go, functions.sh, service.sh, watchdog.sh,
-#   status.sh, customize.sh, action.sh, and uninstall.sh.
-#
-#   This file (post-fs-data.sh) was NOT modified in v1.3.0.
-#   It contains no snapshot enumeration, no rotation, no
-#   backup handling, and no reference to the persistent
-#   backup directory. Its sole concern is early-boot cleanup
-#   (firewall, processes, PID files, STATUS_FILE). Therefore
-#   the v1.3.0 refinements have no bearing on this file.
-#
-#   All v1.2.0 emergency-cleanup logic remains byte-for-byte
-#   identical between v1.2.0 and v1.3.0.
-#
-#   For the full v1.3.0 story, see CHANGELOG.md [v1.3.0] and
-#   docs/ARCHITECTURE.md §4.13.
-# ============================================================
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 PFD-V14-01 — No behavior change. The companion
-#     Android app APK (web/app-debug.apk) is NOT part of the
-#     post-fs-data lifecycle. It is extracted by customize.sh
-#     and served by main.go; neither phase overlaps with this
-#     script.
-#
-#     The APK is a one-shot user download; it does not affect
-#     boot cleanup, firewall state, or process lifecycle.
-#
-#   📱 PFD-V14-02 — Version bump v1.3.0 → v1.4.0.
-#     Documentation only. No changes to the emergency cleanup
-#     path, the Custom Chain teardown, or the STATUS_FILE
-#     semantics.
-#
-# ============================================================
-# POSIX note on `local`:
-#   This script uses `local` inside the inline_firewall_cleanup
-#   function. The `local` keyword is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
+# Cross-references:
+#   • VERSION                    — module version (SSOT)
+#   • proxy/functions.sh         — canonical shell library
+#   • proxy/service.sh           — boot service
+#   • proxy/uninstall.sh         — teardown
+#   • docs/REFERENCE.md §1, §3   — architecture reference
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path safely
+# [1] Module path (safely, with security check)
 # ============================================================
 MODDIR=${0%/*}
 [ "$MODDIR" = "." ] && MODDIR=$(pwd)
@@ -335,16 +64,14 @@ case "$MODDIR" in
     *) MODDIR="/data/adb/modules/${MODDIR}" ;;
 esac
 
-# --- Security check: must be inside /data/adb/modules ---
+# Security: must be inside /data/adb/modules. Exit silently
+# otherwise — this script has no business running outside the
+# module tree.
 case "$MODDIR" in
     /data/adb/modules/*) ;;
-    *)
-        # Not a known path — exit silently
-        exit 0
-        ;;
+    *) exit 0 ;;
 esac
 
-# --- Check: are we actually in a module path? ---
 if [ ! -d "$MODDIR" ]; then
     exit 0
 fi
@@ -355,18 +82,17 @@ fi
 LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 RUN_DIR="$MODDIR/proxy/run"
 
-# HARD-PFD-03: validate MOD_NAME after the `basename` call.
+# Fallback to the canonical module ID if basename fails.
 MOD_NAME=$(basename "$MODDIR" 2>/dev/null)
 if [ -z "$MOD_NAME" ]; then
     MOD_NAME="dnscrypt-proxy-webui"
 fi
 
-# --- Determine active run directory ---
-# HARD-PFD-05: verify writability of the fallback too, and
-# emit a single warning if neither location is usable.
+# Prefers $RUN_DIR when writable; falls back to /data/local/tmp.
+# If neither is writable, `_RUN_DIR_FALLBACK_UNWRITABLE` is set
+# and [3b] emits a single warning once log_msg is available.
 RUN_DIR_USABLE=0
 if [ -d "$RUN_DIR" ] && [ -w "$RUN_DIR" ]; then
-    # shellcheck disable=SC2034
     RUN_DIR_USABLE=1
     STATUS_FILE="$RUN_DIR/dnscrypt.status"
     PID_FILE="$RUN_DIR/dnscrypt.pid"
@@ -374,17 +100,10 @@ if [ -d "$RUN_DIR" ] && [ -w "$RUN_DIR" ]; then
     WATCHDOG_PID_FILE="$RUN_DIR/watchdog.pid"
 else
     STATUS_FILE="/data/local/tmp/dnscrypt.status"
-    # shellcheck disable=SC2034
     PID_FILE="/data/local/tmp/dnscrypt.pid"
-    # shellcheck disable=SC2034
     WEBUI_PID_FILE="/data/local/tmp/webui.pid"
-    # shellcheck disable=SC2034
     WATCHDOG_PID_FILE="/data/local/tmp/watchdog.pid"
 
-    # HARD-PFD-05: if the fallback is not writable either, log
-    # a single warning (log_msg is defined in section [3] and
-    # may not be safe to call before that point — we defer the
-    # warning to section [3b]).
     if [ ! -w "/data/local/tmp" ]; then
         _RUN_DIR_FALLBACK_UNWRITABLE=1
     else
@@ -395,44 +114,24 @@ fi
 # ============================================================
 # [3] Protected log_msg (with 50 MB emergency rotation)
 # ============================================================
-# At post-fs-data phase, the filesystem may not be fully ready:
-#   • /data/local/tmp may not exist yet (rare)
-#   • The log file may not be writable (very rare)
+# `_LOG_DISABLED` is a per-process short-circuit. Once a write
+# has failed, subsequent calls do nothing. The rotation path
+# runs BEFORE the flag check, so a prior append failure does
+# not block a legitimate rotation attempt.
 #
-# Every write is guarded so a failure never blocks boot.
-#
-# HARD-PFD-01: emergency-only rotation at 50 MB, every 100th
-# call. Parity with functions.sh:log_fn, watchdog.sh:log_msg,
-# and service.sh:log_msg. `_LOG_CALL_COUNT` is a global by
-# design (it must persist across calls within this shell
-# process).
-#
-# PFD-3: `_LOG_DISABLED` is a per-process short-circuit. Once
-# a write has failed, subsequent calls do nothing. The
-# emergency-rotation code path runs BEFORE the flag check,
-# so a prior append failure cannot block a legitimate rotation
-# attempt (rotation and append target different paths and can
-# fail independently).
-#
-# Design note: we deliberately do NOT create the log file with
-# restricted permissions. It is a public log that matches the
-# permissions set by main.go (0644).
-# ============================================================
+# `_LOG_CALL_COUNT` is a global by design — it must persist
+# across calls within the same shell process.
 _LOG_CALL_COUNT=0
 _LOG_DISABLED=0
 
 log_msg() {
-    # PFD-3: short-circuit if a previous call established that
-    # logging is not possible in this process.
     if [ "$_LOG_DISABLED" = "1" ]; then
         return 0
     fi
 
     _LOG_CALL_COUNT=$((_LOG_CALL_COUNT + 1))
 
-    # HARD-PFD-01: emergency-only 50 MB rotation. Runs before
-    # the PFD-3 flag check so that a legitimate rotation is
-    # not suppressed by a prior append failure.
+    # Emergency-only rotation at 50 MB, every 100th call.
     if [ $((_LOG_CALL_COUNT % 100)) -eq 0 ] && [ -f "$LOG_FILE" ]; then
         local _size
         _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
@@ -445,31 +144,24 @@ log_msg() {
     fi
 
     if [ ! -d "/data/local/tmp" ]; then
-        # PFD-3: remember the failure and stop trying.
         _LOG_DISABLED=1
         return 0
     fi
 
     if [ ! -f "$LOG_FILE" ]; then
         if ! : > "$LOG_FILE" 2>/dev/null; then
-            # PFD-3: creation failed — mark logging as disabled.
             _LOG_DISABLED=1
             return 0
         fi
     fi
 
     if ! echo "$(date +'%Y-%m-%d %H:%M:%S') - [post-fs-data] $1" >> "$LOG_FILE" 2>/dev/null; then
-        # PFD-3: append failed — mark logging as disabled.
         _LOG_DISABLED=1
     fi
 }
 
 # ============================================================
-# [3b] HARD-PFD-05 — deferred fallback warning
-# ============================================================
-# The check in [2] could not log because log_msg was not yet
-# defined. We now emit the warning if the fallback path was
-# also unwritable.
+# [3b] Deferred fallback warning
 # ============================================================
 if [ "${_RUN_DIR_FALLBACK_UNWRITABLE:-0}" = "1" ]; then
     log_msg "⚠️ Neither $RUN_DIR nor /data/local/tmp is writable — STATUS_FILE writes may fail"
@@ -478,51 +170,19 @@ fi
 # ============================================================
 # [4] Custom Chain cleanup (orphan prevention)
 # ============================================================
-# Strategy:
-#   1. Delete the DNSCRYPT_OUT / DNSCRYPT_OUT6 Custom Chains entirely
-#   2. Best-effort legacy cleanup (rules from older versions)
-#   3. No dependency on functions.sh (it may not be ready yet)
+# Removes the same SET of rules as customize.sh, uninstall.sh,
+# and functions.sh:manage_firewall 0. They differ only in the
+# comment tag applied to loopback rules during best-effort
+# legacy cleanup. Any change to the RULES removed here MUST be
+# applied consistently to all four.
 #
-# ⚠️ Synchronization note (PFD-2, corrected):
-#   The cleanup list below is FUNCTIONALLY EQUIVALENT to:
-#     • customize.sh  : _inline_cleanup_firewall
-#     • uninstall.sh  : _inline_cleanup_firewall
+# The hard-coded legacy IP list duplicates the pre-v1.2.0
+# default bootstrap set. Deliberate: this file must remain
+# self-contained because it runs before functions.sh is
+# guaranteed to be sourceable.
 #
-#   "Functionally equivalent" means all three files remove the
-#   same SET of rules. They differ only in the comment tag
-#   applied to the loopback (127.0.0.1) rules during the
-#   best-effort legacy cleanup:
-#
-#     • customize.sh : keeps 127.0.0.1 INSIDE the generic loop
-#                      (uses the default comment tag).
-#     • uninstall.sh : handles 127.0.0.1 in a SEPARATE block
-#                      with the specific tag
-#                      "dnscrypt_smart_filter_loopback_127.0.0.1".
-#     • post-fs-data.sh (this file): same as uninstall.sh.
-#
-#   The divergence exists because this script's cleanup does not
-#   need to preserve the default tag for future installs (it is
-#   only called when the module is DISABLED — there is no future
-#   install to prepare for). The intent is the same.
-#
-#   Any change to the RULES removed by this function MUST be
-#   applied consistently to all three files.
-#
-# PFD-1: `_ip` is declared `local` to prevent it from leaking
-# to the global scope after the loop finishes.
-#
-# PFD-5: The hard-coded legacy IP list below
-#   (9.9.9.9, 8.8.8.8, 1.1.1.1, 1.0.0.1, 8.8.4.4,
-#    208.67.222.222, 208.67.220.220) duplicates the list in
-#   customize.sh and uninstall.sh. The duplication is
-#   DELIBERATE: this file must remain self-contained because
-#   it runs before functions.sh is guaranteed to be sourceable
-#   (post-fs-data phase is very early in boot). The list is
-#   the pre-v1.2.0 default bootstrap set; new installs use the
-#   bootstrap_resolvers value from the TOML instead, but the
-#   legacy rules must still be removed for upgrades from old
-#   versions.
-# ============================================================
+# `_ip` is declared `local` to prevent it from leaking to the
+# global scope after the loop finishes.
 inline_firewall_cleanup() {
     # --- [1] nftables: delete the entire table ---
     if command -v nft >/dev/null 2>&1; then
@@ -531,21 +191,17 @@ inline_firewall_cleanup() {
         nft delete table ip6 dnscrypt_filter 2>/dev/null
     fi
 
-    # ============================================================
-    # [2] iptables (IPv4) — Custom Chain cleanup
-    # ============================================================
+    # --- [2] iptables (IPv4) — Custom Chain cleanup ---
     if command -v iptables >/dev/null 2>&1; then
         local _chain="DNSCRYPT_OUT"
 
-        # [2a] Remove jump rules from OUTPUT
         iptables -t nat -D OUTPUT -p udp --dport 53 -j "$_chain" --wait 3 2>/dev/null
         iptables -t nat -D OUTPUT -p tcp --dport 53 -j "$_chain" --wait 3 2>/dev/null
 
-        # [2b] Flush the chain itself
         iptables -t nat -F "$_chain" --wait 3 2>/dev/null
         iptables -t nat -X "$_chain" --wait 3 2>/dev/null
 
-        # [2c] Legacy cleanup — older versions
+        # Legacy cleanup — tagged and untagged variants
         iptables -t nat -D OUTPUT -p udp --dport 53 \
             -j DNAT --to-destination 127.0.0.1:5354 \
             -m comment --comment "dnscrypt_smart_filter" --wait 3 2>/dev/null
@@ -570,8 +226,6 @@ inline_firewall_cleanup() {
         iptables -t nat -D OUTPUT -d 127.0.0.1 -p tcp --dport 53 \
             -j RETURN --wait 3 2>/dev/null
 
-        # PFD-1 fix: `_ip` is declared `local`.
-        # PFD-5: hard-coded legacy list — see section header note.
         local _ip
         for _ip in 9.9.9.9 8.8.8.8 1.1.1.1 1.0.0.1 8.8.4.4 208.67.222.222 208.67.220.220; do
             iptables -t nat -D OUTPUT -d "$_ip" -p udp --dport 53 \
@@ -581,9 +235,7 @@ inline_firewall_cleanup() {
         done
     fi
 
-    # ============================================================
-    # [3] ip6tables (IPv6) — Custom Chain cleanup
-    # ============================================================
+    # --- [3] ip6tables (IPv6) — Custom Chain cleanup ---
     if command -v ip6tables >/dev/null 2>&1; then
         local _chain6="DNSCRYPT_OUT6"
 
@@ -615,31 +267,30 @@ inline_firewall_cleanup() {
 }
 
 # ============================================================
-# [5] Main path: if module is disabled → emergency cleanup
+# [5] Main path
 # ============================================================
 # No background operators: Magisk does not wait for background
-# processes. Without them, we guarantee cleanup completes
-# before the script exits.
+# processes. Without them, cleanup completes before the script
+# exits.
 #
-# Why we write STATUS_FILE = "OFF" here:
+# Why we write STATUS_FILE = "OFF" when disabled:
 #   The user explicitly disabled the module. Writing OFF is
 #   the correct representation of "user intent" per the
 #   STATUS_FILE contract. This is the ONLY legitimate place
 #   (alongside service.sh's disable path) where a script
 #   writes STATUS_FILE outside of main.go's start/stopService.
 #
-# HARD-PFD-02: the write to STATUS_FILE now verifies success.
-# If both locations fail, a warning is logged so the operator
-# knows watchdog.sh may not honor the disable intent.
-# ============================================================
+# The write is verified; if both locations fail, a warning is
+# logged so the operator knows watchdog.sh may not honor the
+# disable intent.
 if [ -f "$MODDIR/disable" ]; then
     log_msg "Module '$MOD_NAME' is DISABLED. Starting emergency cleanup..."
 
-    # --- 1) Firewall cleanup (Custom Chain + Legacy) ---
+    # 1) Firewall cleanup (Custom Chain + Legacy)
     inline_firewall_cleanup
     log_msg "✅ Firewall cleaned (Custom Chain + Legacy)"
 
-    # --- 2) Kill remaining processes (safety net) ---
+    # 2) Kill remaining processes
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-proxy 2>/dev/null
         log_msg "🔪 Killed lingering dnscrypt-proxy"
@@ -649,7 +300,7 @@ if [ -f "$MODDIR/disable" ]; then
         log_msg "🔪 Killed lingering dnscrypt-webui"
     fi
 
-    # --- 3) Remove PID files from both locations ---
+    # 3) Remove PID files from both locations
     rm -f "$RUN_DIR/dnscrypt.pid" 2>/dev/null
     rm -f "$RUN_DIR/webui.pid" 2>/dev/null
     rm -f "$RUN_DIR/watchdog.pid" 2>/dev/null
@@ -660,8 +311,8 @@ if [ -f "$MODDIR/disable" ]; then
 
     log_msg "✅ PID files removed"
 
-    # --- 4) Set status file in both locations ---
-    # HARD-PFD-02: verify that at least one write succeeded.
+    # 4) Write STATUS_FILE in both locations (verify at least
+    # one succeeded).
     _status_written=0
 
     if echo "OFF" > "$STATUS_FILE" 2>/dev/null; then
@@ -681,20 +332,16 @@ if [ -f "$MODDIR/disable" ]; then
     fi
 
     log_msg "✅ Emergency cleanup complete"
-    log_msg "   Non-action: private_dns_mode reset (handled by service.sh)"
-    log_msg "   Non-action: route_localnet restore (handled by uninstall.sh)"
-    log_msg "   Non-action: backup/restore (handled by service.sh + main.go)"
-    log_msg "   Non-action: transaction cleanup (handled by main.go + service.sh)"
-    log_msg "   Non-action: orphan-txn inspection (user-initiated only)"
-    log_msg "   Non-action: pending notification (handled by main.go)"
+    log_msg "   Non-actions handled elsewhere: private_dns_mode (service.sh),"
+    log_msg "   route_localnet (uninstall.sh), backup/restore (service.sh + main.go),"
+    log_msg "   transaction cleanup (main.go + service.sh), companion install (main.go)"
 else
     # Module is enabled — nothing to do in this phase.
-    # The active state is set up later by service.sh after boot.
     #
-    # HARD-PFD-04: emit one informational line so the boot log
-    # is self-documenting. Without this, an empty [post-fs-data]
-    # section in the log could not be distinguished from "the
-    # script did not run".
+    # A single informational line makes the boot log
+    # self-documenting. Without it, an empty [post-fs-data]
+    # section in the log could not be distinguished from
+    # "the script did not run".
     log_msg "Module '$MOD_NAME' is enabled — nothing to do in post-fs-data phase"
 fi
 

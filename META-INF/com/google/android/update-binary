@@ -1,116 +1,38 @@
 #!/sbin/sh
 # ============================================================
-# DNSCrypt Smart Filter – update-binary
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# DNSCrypt Smart Filter — update-binary
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # ============================================================
-# Purpose:
-#   Magisk / KernelSU / APatch module installer entry point.
+# Magisk / KernelSU / APatch module installer entry point.
 #
-#   This file is invoked by the root manager when the user
-#   selects the module ZIP for installation. Its only job is
-#   to bootstrap the Magisk environment and then hand control
-#   to the module's own `customize.sh` (which performs the
-#   full installation, including the 10 data-preservation
-#   layers introduced in v1.2.0).
+# Invoked by the root manager when the user selects the
+# module ZIP for installation. Delegates to `customize.sh`
+# (the real installer — 10 data-preservation layers).
 #
-# Arguments (passed by Magisk):
-#   $1 = <not used>
+# Arguments (provided by Magisk):
+#   $1 = unused
 #   $2 = OUTFD    (file descriptor for the install log UI)
 #   $3 = ZIPFILE  (absolute path to the module ZIP)
 #
 # Execution flow:
-#   1. Set umask 022 for consistent file permissions.
-#   2. Define a minimal ui_print fallback (before util_functions
-#      is loaded, so that error messages can still be shown).
-#   3. Verify Magisk >= 20.4 is installed; abort with a clear
-#      message otherwise.
-#   4. Mount /data so that /data/adb/magisk is reachable.
-#   5. Source /data/adb/magisk/util_functions.sh — this is
-#      provided by Magisk itself, not by this repository.
-#   6. Call install_module — the Magisk-provided function that
-#      runs the module's `customize.sh`.
+#   1. umask 022 for consistent file permissions.
+#   2. Fallback ui_print before util_functions is loaded.
+#   3. Verify Magisk >= 20.4 is installed.
+#   4. Mount /data, source util_functions.sh, call install_module.
 #
-# Compatibility:
-#   • Magisk      — 20.4+ (requires util_functions.sh)
-#   • KernelSU    — supported (provides a Magisk-compatible
-#                   util_functions.sh shim)
-#   • APatch      — supported (same compatibility layer)
+# Compatibility: Magisk 20.4+, KernelSU, APatch.
 #
-# ⚠️ This file is a standard Magisk boilerplate. It is
-#    intentionally kept close to the upstream template so that
-#    a future contributor familiar with Magisk can recognize
-#    it immediately. The only project-specific additions are
-#    the header above and the English-only messages.
+# ⚠️ Standard Magisk boilerplate. Body unchanged since v1.0.0.
+#    All DNSCrypt logic lives in `proxy/customize.sh`.
 #
-# ⚠️ This file does NOT contain any DNSCrypt logic. All
-#    installer logic lives in:
-#       proxy/customize.sh    (the actual installer)
-#    The 10 data-preservation layers of v1.2.0 are implemented
-#    entirely inside customize.sh, functions.sh, service.sh,
-#    status.sh, uninstall.sh, and main.go.
-#
-# ============================================================
 # Cross-references:
-# ============================================================
-#   • proxy/customize.sh             — the actual installer
-#   • proxy/functions.sh             — shared library
-#   • proxy/service.sh               — boot service
-#   • proxy/post-fs-data.sh          — early boot cleanup
-#   • proxy/uninstall.sh             — uninstall handler
-#   • proxy/main.go                  — WebUI backend
-#   • META-INF/com/google/android/updater-script
-#                                    — "#MAGISK" marker
-#   • docs/ARCHITECTURE.md §8.4      — META-INF bootstrap
-#   • docs/ARCHITECTURE.md §4.13     — v1.3.0 server-side refinements
-#   • docs/BACKUP.md                 — backup system reference
-#   • docs/INSTALL.md                — installation guide
-#   • CHANGELOG.md                   — version history (v1.0.0 → v1.4.0)
-# ============================================================
-#
-# ============================================================
-# v1.4.0 changes:
-# ============================================================
-#   • Version bumped from v1.3.0 to v1.4.0 (documentation only —
-#     no behavior changes since v1.0.0).
-#   • Body is IDENTICAL to v1.0.0, v1.1.0, v1.2.0, and v1.3.0.
-#     The v1.4.0 release is an integration release (companion
-#     Android app + CodeQL hardening + iOS PWA removal), none of
-#     which affects the Magisk bootstrap phase.
-#   • Confirmed English-only (global edition): the ui_print
-#     message is English. No Arabic strings exist in this file.
-#
-# ============================================================
-# v1.3.0 changes (carried forward):
-# ============================================================
-#   • Version bumped from v1.2.0 to v1.3.0 (documentation only —
-#     no behavior changes).
-#   • Body is IDENTICAL to v1.2.0. The v1.3.0 release added a
-#     PWA install button, a live status LED, and a DNS auto-start
-#     fix — all of which live in the WebUI and in `service.sh`,
-#     not in the Magisk bootstrap phase.
-#   • The v1.3.0 release also refined snapshot-detection and
-#     rotation semantics (SNAP-MANIFEST, SNAP-MTIME,
-#     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those changes live
-#     in main.go, functions.sh, service.sh, watchdog.sh,
-#     status.sh, customize.sh, action.sh, and uninstall.sh —
-#     NOT in the Magisk bootstrap phase (this file).
-#     See CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13.
-#
-# ============================================================
-# v1.2.0 changes (carried forward):
-# ============================================================
-#   • Version bumped to v1.2.0 (documentation only — no behavior
-#     changes since v1.0.0).
-#   • Added this header for traceability. The body below is
-#     identical to the standard Magisk v20.4+ boilerplate.
-#   • Confirmed English-only (global edition): the ui_print
-#     message is English. No Arabic strings exist in this file.
-#   • The v1.2.0 data-preservation layers are implemented
-#     entirely inside proxy/customize.sh (and its helpers), not
-#     in this bootstrap file.
+#   • proxy/customize.sh                — actual installer
+#   • proxy/functions.sh                — shared library (Layer 1)
+#   • proxy/uninstall.sh                — uninstall handler
+#   • docs/REFERENCE.md §1.8.2          — repository layout
+#   • docs/REFERENCE.md §4              — backup system reference
+#   • docs/GUIDE.md §2                  — installation guide
 # ============================================================
 
 #################

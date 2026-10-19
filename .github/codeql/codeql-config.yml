@@ -144,6 +144,6 @@ query-filters:
   #         `archive/zip` anywhere in the codebase, so this rule
   #         can never fire. Listed here for completeness only.
   #
-  # See docs/SECURITY.md §5.31 and §5.32 for the full security
-  # model, and docs/ARCHITECTURE.md §4.10 for the BAK-1..BAK-4
+  # See SECURITY.md §5.31 and §5.32 for the full security
+  # model, and docs/REFERENCE.md §3.13 for the BAK-1..BAK-4
   # backend additions that CodeQL verified.

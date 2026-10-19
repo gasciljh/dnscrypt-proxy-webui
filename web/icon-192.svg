@@ -1,35 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
      DNSCrypt Smart Filter - PWA Icon (192x192)
-     Version: v1.4.0 (Global Edition)
-     Last updated: 2026-10-08
+     Version: v1.5.0 (Global Edition)
+     Last updated: 2026-10-19
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
      Small SVG icon for modern browsers (PWA, favicon fallback).
-     Rendered at 192x192 in web/manifest.json -> icons[1].
+     Rendered at 192x192 in web/manifest.json icons[1].
 
      Design:
        * Blue gradient background with rounded corners (rx=42)
-       * Shield shape
-       * "DNS" text
+       * Shield shape centered at (96, 96)
+       * "DNS" bold label
        * Green status dot at bottom center
 
-     Purpose in manifest.json:
-       * Declared as "purpose": "any" - this SVG is served to
-         browsers that support SVG icons and prefer vector.
+     Purpose: "any" only. This SVG has rounded corners and
+     content close to the edges, which makes it unsuitable for
+     the "maskable" purpose. The maskable PNG is generated from
+     icon-512.svg.
 
-     [!] Not maskable:
-         This SVG has rounded corners (rx=42) and content close
-         to the edges, which makes it unsuitable for the
-         "maskable" purpose. The maskable PNG is generated from
-         icon-512.svg (see that file for details).
-
-     ============================================================
-     Icon source pipeline
-     ============================================================
-     This SVG is the SOURCE for icon-192.png only. It is NOT the
-     source for the 512x512 PNG or the favicons.
+     Icon source pipeline (scripts/generate-icons.sh):
+       This SVG produces icon-192.png only.
+       It is NOT the source for icon-512.png or the favicons.
 
      Generated from this file:
        * icon-192.png (192x192)
@@ -39,80 +32,15 @@
        * apple-touch-icon.png (180x180)
        * favicon-32x32.png    (32x32)
        * favicon-16x16.png    (16x16)
-       * favicon.ico          (from favicon-16 and favicon-32)
+       * favicon.ico
 
-     ============================================================
-     Design decisions
-     ============================================================
-     1. Rounded corners (rx=42, ~22% of the canvas):
-          Chosen for a modern app-icon look on Android launchers
-          that do NOT apply their own mask. On launchers that DO
-          apply a circular mask, the rounded corners are inside
-          the mask and are therefore invisible.
+     Do NOT edit this SVG without regenerating icon-192.png.
+     Use: scripts/generate-icons.sh -f
 
-     2. Shield shape:
-          Centered at (96, 96), width 120 px, height 148 px.
-          Fits well inside the 40% safe circle (radius ~76 px).
-
-     3. "DNS" label:
-          Bold, black text on the blue shield. Chosen for instant
-          recognition at small sizes.
-
-     4. Green status dot:
-          Radial gradient with a subtle ring. Signals "active
-          protection" without text.
-
-     5. Full-bleed background (rect fills 0,0 to 192,192):
-          Ensures the icon renders correctly even if a future
-          version switches this SVG to the "maskable" purpose
-          (the mask would only crop the rounded corners).
-
-     ============================================================
-     v1.4.0 changes:
-     ============================================================
-       * Version bumped from v1.3.0 to v1.4.0 to match the
-         module release.
-       * No design changes were made - the SVG path data is
-         IDENTICAL to v1.3.0 and to v1.2.0 before it.
-       * The v1.4.0 release ships a companion Android app
-         (web/app-debug.apk, optional), served by main.go at
-         GET /app-debug.apk. This icon is unaffected by that
-         integration - the PWA continues to use this SVG for
-         its own branding.
-       * Cross-reference to scripts/generate-icons.sh remains
-         authoritative: this SVG produces icon-192.png only.
-       * No new SVG files were introduced in v1.4.0. The
-         icon-maskable.svg file remains deferred (see
-         icon-512.svg for the v1.5.0 plan).
-       * All messages and comments are English-only (global
-         edition). No Arabic strings exist in this file.
-
-     ============================================================
-     v1.3.0 changes (historical):
-     ============================================================
-       * Version bumped from v1.2.0 to v1.3.0 to match the
-         module release.
-       * No design changes were made - the SVG path data is
-         IDENTICAL to v1.2.0.
-       * The v1.3.0 release added a PWA install button and a
-         live status LED to web/index.html. Neither change
-         affected this icon file.
-
-     ============================================================
-     v1.2.0 note (historical):
-     ============================================================
-       * Version bumped from v1.1.0 to v1.2.0 to match the
-         module release.
-       * No design changes were made - the SVG path data is
-         IDENTICAL to v1.1.0.
-       * Expanded the "Design decisions" section to explain each
-         visual choice (previously undocumented).
-       * Added explicit cross-reference to
-         scripts/generate-icons.sh (the authoritative pipeline).
-       * Reaffirmed the purpose (any, not maskable) with the
-         rounded-corner rationale.
-       * All messages and comments are English-only (global
-         edition). No Arabic strings exist in this file.
+     XML note: the W3C XML specification (section 2.5) forbids
+     the sequence of two consecutive hyphens inside a comment.
+     This header therefore writes script flags in short form
+     only (for example, `-f`).
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>

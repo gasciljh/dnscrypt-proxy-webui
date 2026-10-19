@@ -1,484 +1,117 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
 # ============================================================
-# DNSCrypt Smart Filter – functions.sh
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# DNSCrypt Smart Filter — functions.sh
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Purpose:
-#   Shared shell library sourced by other scripts (service.sh,
-#   action.sh, status.sh, uninstall.sh, watchdog.sh, main.go).
+# Layer 1 — advanced shell library. Sourced by:
+#   • service.sh, action.sh, status.sh, uninstall.sh, watchdog.sh
+#   • main.go (via runShell)
 #
-# Responsibilities (v1.2.0):
-#   • run/ directory management (init + fallback to /data/local/tmp)
-#   • Bootstrap IP cache (5-minute TTL from TOML)
-#   • Logging helper (with emergency-only rotation at 50 MB)
+# Responsibilities:
+#   • run/ directory hardening (chown 0:0)
+#   • Bootstrap IP cache (5-minute TTL, atomic write)
 #   • Progress file writer (atomic)
-#   • Config file reader (webui.conf)
-#   • Port readers with Port Guard (rejects 8080)
 #   • Section-restricted TOML credentials reader
-#   • Profile memory hint reader (v1.1.0)
-#   • Port check (TCP/UDP, IPv4/IPv6)
-#   • Service state check (DNS engine + WebUI)
+#   • Profile memory hint (display-only)
+#   • Service state checks (DNS engine + WebUI)
 #   • IPv6 availability detection
-#   • Firewall backend detection (nftables / iptables / none)
-#   • Legacy cleanup for older versions
-#   • iptables / ip6tables management with Custom Chains
-#     (DNSCRYPT_OUT / DNSCRYPT_OUT6) — no orphan rules
-#   • nftables management (inet table)
-#   • Unified manage_firewall interface
+#   • Firewall management (nftables / iptables / ip6tables)
 #   • Process cleanup (proxy, webui, orphans)
-#   • Aggressive cleanup (used on uninstall)
-#   • WebUI launcher with retry
-#   • SELinux context preservation helper (v1.2.0)
-#   • Persistent backup/restore helpers (v1.2.0)
-#   • Backup rotation (v1.2.0, rewritten v1.3.0)
-#   • Auto-backup trigger (v1.2.0)
-#   • Transaction cleanup helper (v1.2.0)
-#   • Watchdog token reader (v1.2.0)
+#   • WebUI launcher (setsid → busybox setsid → nohup)
+#   • Persistent backup helpers (backup, restore, rotate)
+#   • Watchdog token reader
 #
-# Port Guard:
-#   Port 8080 is reserved for monitoring_ui (dnscrypt-proxy.toml).
-#   get_webui_port / get_dashboard_port reject it and fall back
-#   to 9090 / 9091 respectively.
+# Delegated to Layer 0 (boot-mini.sh):
+#   log_msg, get_run_dir, read_conf, is_port_open, get_webui_port,
+#   and the _MONITORING_UI_PORT constant.
 #
-# Custom Chains:
-#   All dynamic firewall rules live inside dedicated chains:
-#     • DNSCRYPT_OUT   (IPv4)
-#     • DNSCRYPT_OUT6  (IPv6)
-#   Cleanup = -F + -X → complete wipe in one operation.
-#   No orphans when bootstrap_resolvers change.
-#
-# Section-restricted TOML:
-#   read_toml_credentials reads ONLY from [monitoring_ui].
-#   Section tracking ignores any username/password in other
-#   sections.
-#
-# ============================================================
-# v1.2.0 — Data preservation helpers
-# ============================================================
-# Five user config files are preserved across every upgrade:
-#   • webui.conf
-#   • dnscrypt-proxy.toml
-#   • selected_profile.txt
-#   • allowlist.txt
-#   • denylist.txt
-#
-# This library exposes the following helpers, used by
-# service.sh and (optionally) by main.go via runShell:
-#
-#   get_backup_dir
-#   ensure_backup_dir
-#   write_manifest <target_dir> <source> <count> [version]
-#   verify_backup_integrity <dir>
-#   backup_user_files <src_dir> [dst_dir] [version]
-#   restore_user_files <src_dir> [dst_dir]
-#   rotate_backups [keep_count]
-#   get_last_backup_time
-#   auto_backup_if_needed [interval_seconds]
-#   cleanup_old_transactions
-#   copy_with_context <src> <dst>
-#   get_watchdog_token
-#
-# These helpers are also implemented inline in customize.sh so
-# that the installer does not depend on this file. The versions
-# here are the canonical reference and are used at runtime.
-# ============================================================
-#
-# v1.1.0 coordination (unchanged in v1.2.0):
-#   • The constant `_MONITORING_UI_PORT` below MUST stay in sync
-#     with `MONITORING_UI_PORT` in main.go.
-#   • Memory limits (light/normal/pro/proplus/ultimate) are
-#     managed by main.go only. This file provides a read-only
-#     helper `get_profile_memory_hint` for user-facing display.
-#   • Port collision resolution is handled by customize.sh at
-#     install time; this file only enforces the 8080 rejection.
-# ============================================================
-#
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
-# ============================================================
-# This file carries two identifier families. The inventory
-# below is the AUTHORITATIVE list of identifiers actually
-# present in the file. It was corrected during the v1.4.0
-# release audit to remove historical mislabeling and to
-# document the true identifier set.
-#
-# Identifier inventory in THIS file (28 total):
-#
-#   • FSH-1, FSH-2, FSH-3, FSH-4, FSH-5, FSH-6, FSH-7,
-#     FSH-9, FSH-10, FSH-11                     (10)
-#       — original post-audit corrections
-#         (FSH-8 is intentionally NOT in this file —
-#          it belongs to customize.sh)
-#
-#   • FSH-12, FSH-13, FSH-14, FSH-15              (4)
-#       — NEW corrections in the v1.2.0 revision:
-#         FSH-12 → real symlink rejection in
-#                  `_load_bootstrap_from_cache`
-#                  (HARD-FSH-06 was documented but the
-#                   implementation was a no-op duplicate
-#                   of the previous `-f` check)
-#         FSH-13 → removed the redundant `: >` +
-#                  `touch` pair in
-#                  `auto_backup_if_needed`
-#         FSH-14 → `restore_user_files` now aborts on
-#                  critical-file failure (parity with
-#                  CSH-15 in customize.sh)
-#         FSH-15 → `get_watchdog_token` now rejects a
-#                  token file that is not a regular file
-#                  (symlink / FIFO / device rejection)
-#
-#   • FSH-16, FSH-17, FSH-18                      (3)
-#       — v1.4.0 documentation-sync corrections
-#         (see the v1.4.0 block below):
-#         FSH-16 → `functions.sh` is orthogonal to the
-#                  v1.4.0 companion APK integration
-#         FSH-17 → version header bumped v1.3.0 →
-#                  v1.4.0 (documentation only, no
-#                  behaviour change)
-#         FSH-18 → correction of the v1.3.0 block and of
-#                  the `rotate_backups` doc-header to
-#                  reflect the actual v1.3.0 refinement
-#
-#   • HARD-FSH-01, HARD-FSH-02, HARD-FSH-03,
-#     HARD-FSH-04, HARD-FSH-05, HARD-FSH-06,
-#     HARD-FSH-07, HARD-FSH-08, HARD-FSH-09,
-#     HARD-FSH-10, HARD-FSH-11                    (11)
-#       — hardening fixes
-#
-# NOTE ON IDENTIFIER GAPS:
-#   FSH-8 is intentionally absent from this file. It is a
-#   cross-reference to customize.sh (see "Documentation
-#   fixes" there) and does not represent a fix in this
-#   library. This is documented so future auditors do not
-#   assume the file is missing a fix.
-#
-# NOTE ON HARD-FSH-06 (documented fix vs. real fix):
-#   HARD-FSH-06 was documented as "rejects symlinks", but
-#   the original implementation duplicated the `[ ! -f ]`
-#   check (which follows symlinks and returns true for a
-#   regular target). The real fix is FSH-12 below. The
-#   HARD-FSH-06 entry is kept in the inventory for
-#   historical reference; the effective behavior is now
-#   delivered by FSH-12.
-#
-# ------------------------------------------------------------
-# Original post-audit corrections:
-# ------------------------------------------------------------
-#
-#   🔧 FSH-1 — `write_manifest` now produces the SAME JSON
-#     shape as customize.sh (including the `root_solution`
-#     field).
-#
-#   🔧 FSH-2 — `copy_with_context` now redirects cp's stderr
-#     to $LOG_FILE and logs a failure line via `log_fn`.
-#
-#   🔧 FSH-3 — `init_runtime_paths` now sets PROGRESS_FILE to
-#     `$RUN_DIR/update_progress.txt` when run/ is usable.
-#
-#   🔧 FSH-4 — `cleanup_old_transactions` declares `_txn` and
-#     `_state` as `local`.
-#
-#   🔧 FSH-5 — `backup_user_files` declares `local ts` at the
-#     top of the function.
-#
-#   🔧 FSH-6 — `ensure_backup_dir` applies chmod 0700 even when
-#     the backup root already exists.
-#
-#   🔧 FSH-7 — The doc table inside `verify_backup_integrity`
-#     matches the actual return values.
-#
-#   🔧 FSH-9 — `backup_user_files` and `auto_backup_if_needed`
-#     pass `${MODULE_VERSION:-unknown}` as the manifest version.
-#
-#   🔧 FSH-10 — Default snapshot directory names now include the
-#     caller PID (`-$$`). Mirrors the identical fix in
-#     `customize.sh` (BUG-CS-C) and in `main.go` (BUG-E).
-#
-#   🔧 FSH-11 — New `get_watchdog_token()` helper reads the
-#     token file generated by `customize.sh` or `main.go`.
-#
-# ------------------------------------------------------------
-# Hardening fixes (HARD-FSH-01 … HARD-FSH-11):
-# ------------------------------------------------------------
-#
-#   🛡️ HARD-FSH-01 — `write_manifest` now escapes JSON special
-#     characters in the `source` field (parity with the
-#     identical fix in customize.sh HARD-CS-05). A `json_escape`
-#     helper is defined once and reused.
-#
-#   🛡️ HARD-FSH-02 — The iptables/ip6tables fallback DNAT path
-#     now installs RETURN rules for loopback and bootstrap
-#     addresses, matching the Custom-Chain path. Without them,
-#     dnscrypt-proxy's own bootstrap queries would be DNAT'd
-#     back into itself, forming a resolver loop.
-#
-#   🛡️ HARD-FSH-03 — `verify_backup_integrity` logs a warning
-#     when 0 user files are present, so the caller sees why the
-#     function returned 1 instead of a silent failure.
-#
-#   🛡️ HARD-FSH-04 — `get_watchdog_token` prefers the
-#     `$WATCHDOG_TOKEN_FILE` variable (already set by
-#     `init_runtime_paths`) when available, falling back to
-#     `run_file .watchdog_token` only if it is unset.
-#
-#   🛡️ HARD-FSH-05 — `is_dnscrypt_running` cross-checks the PID
-#     file and verifies the PID's `comm` is exactly
-#     `dnscrypt-proxy` before falling back to `pgrep -x`.
-#
-#   🛡️ HARD-FSH-06 — (see FSH-12 for the real implementation)
-#     Historical: `_load_bootstrap_from_cache` was supposed to
-#     require the cache file to be a regular file (not a
-#     symlink or special file). The original code duplicated
-#     the `-f` check, so it did NOT reject symlinks. FSH-12
-#     replaces the duplicate with an explicit `-L` rejection.
-#
-#   🛡️ HARD-FSH-07 — `get_dynamic_bootstrap` bounds the number
-#     of extracted addresses (MAX 32) so a malformed TOML
-#     cannot produce an unbounded firewall rule set.
-#
-#   🛡️ HARD-FSH-08 — `_LOG_CALL_COUNT` is documented as an
-#     intentional global that persists across `log_fn` calls.
-#     It gates the emergency-only 50 MB rotation (every 100th
-#     call).
-#
-#   🛡️ HARD-FSH-09 — `cleanup_proxy` now removes the `.tmp`
-#     sidecar that a crashed `write_progress` may have left
-#     behind.
-#
-#   🛡️ HARD-FSH-10 — `rotate_backups` refuses to prune when the
-#     backup directory is not readable. Silent skips are now
-#     logged.
-#
-#   🛡️ HARD-FSH-11 — `auto_backup_if_needed` now checks that
-#     the resulting snapshot directory is a real directory
-#     before touching the `.last_auto_backup` marker.
-#
-# ------------------------------------------------------------
-# NEW corrections in the v1.2.0 revision (FSH-12 … FSH-15):
-# ------------------------------------------------------------
-#
-#   🔧 FSH-12 — `_load_bootstrap_from_cache` now ACTUALLY
-#     rejects symlinks. The previous implementation performed
-#     the same `[ ! -f "$file" ]` test twice, which follows
-#     symlinks and returns true for a regular target. The
-#     second test now uses `[ -L "$file" ]`, which detects a
-#     symlink itself (regardless of its target).
-#
-#   🔧 FSH-13 — `auto_backup_if_needed` previously ran both
-#     `: > "$marker"` and `touch "$marker"`. The first already
-#     creates the file and updates its mtime; the second is
-#     redundant. Only `touch` remains, since it expresses the
-#     intent ("update the marker") more directly.
-#
-#   🔧 FSH-14 — `restore_user_files` now performs the same
-#     critical-file strictness check that customize.sh
-#     introduced as CSH-15. A restore failure of `webui.conf`
-#     or `dnscrypt-proxy.toml` is treated as a critical
-#     failure and returns non-zero immediately, so callers
-#     (main.go, service.sh) can abort or retry without
-#     silently leaving the user without their configured
-#     WebUI port / credentials.
-#
-#   🔧 FSH-15 — `get_watchdog_token` now rejects a token file
-#     that exists but is not a regular file (symlink, FIFO,
-#     device node). This mirrors the FSH-12 hardening on the
-#     bootstrap cache, and closes a theoretical vector where
-#     a compromised run/ directory could redirect the token
-#     read to an attacker-controlled path.
-#
-# ============================================================
-# v1.3.0 — Server-side refinement: rotate_backups() rewrite
-# ============================================================
-#   The v1.3.0 release is primarily a feature release focused
-#   on the PWA install button and the live status LED — both
-#   are pure client-side features in web/index.html.
-#
-#   However, the shared shell library (functions.sh) was ALSO
-#   refined in v1.3.0. The `rotate_backups` function was
-#   rewritten for robustness. Earlier drafts of this header
-#   claimed "no changes to the shared library" and
-#   "byte-for-byte identical between v1.2.0 and v1.3.0" —
-#   those claims were inaccurate and have been corrected in
-#   the v1.4.0 revision (see the FSH-18 entry below).
-#
-#   The v1.3.0 rotation refinement is documented under three
-#   identifiers (also used in CHANGELOG.md and in
-#   docs/ARCHITECTURE.md §4.13.2):
-#
-#   🔧 ROT-MANIFEST — manifest-based snapshot detection.
-#     A directory is treated as a snapshot iff it contains a
-#     `.manifest.json` file. Excludes `current/`, `txn-*/`,
-#     and `orphan-txn-*/`.
-#
-#     Before v1.3.0: only directories whose name matched the
-#     `<YYYYMMDD>-<HHMMSS>-...` pattern were recognized, so
-#     custom-named snapshots were silently skipped.
-#
-#   🔧 ROT-MTIME — mtime sort.
-#     Candidates are ordered by mtime (numeric, descending),
-#     not by lexicographic directory name. Robust against
-#     clock drift and against manual renames. Aligns
-#     `rotate_backups` with the `runtime_info.backups` API
-#     (which uses the same mtime sort since v1.3.0 — see
-#     SNAP-MTIME in proxy/main.go).
-#
-#   🔧 ROT-PROTECT — protected rotation targets.
-#     Two additional snapshots are preserved on top of the
-#     21-newest window:
-#       • The `.last_stable` target (recovery pointer).
-#       • The newest install snapshot (name matches
-#         `-v<digit>`).
-#     Without these protections, the 21-newest window could
-#     silently evict the exact snapshot that recovery mode
-#     or rollback depends on.
-#
-#   All other v1.2.0 helpers (`backup_user_files`,
-#   `restore_user_files`, `auto_backup_if_needed`,
-#   `cleanup_old_transactions`, `copy_with_context`,
-#   `verify_backup_integrity`, `write_manifest`,
-#   `get_watchdog_token`) remain byte-for-byte identical
-#   between v1.2.0 and v1.3.0.
-#
-#   See CHANGELOG.md v1.3.0 section, and
-#   docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
-# ============================================================
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   📱 FSH-16 — No behavior change. `functions.sh` is a
-#     shared library sourced by service.sh, action.sh,
-#     status.sh, uninstall.sh, watchdog.sh, and (via runShell)
-#     main.go. It does NOT manage the companion Android app
-#     APK (`web/app-debug.apk`).
-#
-#     The APK lifecycle is handled by:
-#       • customize.sh → extracts it from the ZIP (unzip 'web/*')
-#       • proxy/main.go  → serves it at /app-debug.apk
-#       • release.yml    → stages it via fetch_app_apk.sh
-#
-#     `functions.sh` continues to manage the 5 user config files
-#     (webui.conf, dnscrypt-proxy.toml, selected_profile.txt,
-#     allowlist.txt, denylist.txt) and the backup/restore/rotation
-#     helpers, unchanged.
-#
-#   📱 FSH-17 — Version bump v1.3.0 → v1.4.0.
-#     No `--version` flag exists in this library (it is sourced,
-#     not executed directly). The version header is purely
-#     documentary. No behavior changes to any helper:
-#     backup_user_files, restore_user_files, rotate_backups,
-#     verify_backup_integrity, write_manifest, copy_with_context,
-#     get_watchdog_token, auto_backup_if_needed,
-#     cleanup_old_transactions, or the firewall functions.
-#
-#   📚 FSH-18 — Documentation-sync correction for v1.3.0.
-#     The v1.3.0 block above and the doc-block above
-#     `rotate_backups()` were previously inaccurate. They
-#     claimed "no changes to the shared library" and "sorted
-#     by DIRECTORY NAME ... does not depend on mtimes", while
-#     the v1.3.0 code in fact:
-#       • Detects snapshots by `.manifest.json` presence
-#         (ROT-MANIFEST).
-#       • Sorts candidates by mtime, descending (ROT-MTIME).
-#       • Preserves `.last_stable` and the newest install
-#         snapshot on top of the 21-newest window
-#         (ROT-PROTECT).
-#
-#     This revision corrects both blocks so they reflect the
-#     actual v1.3.0 implementation. No code in this file
-#     changed between v1.3.0 and v1.4.0 — this is a
-#     documentation-only correction. The version header on
-#     line 4 is bumped to v1.4.0 for traceability, in line
-#     with the other module files.
-#
-#     See CHANGELOG.md v1.4.0 section and
-#     docs/ARCHITECTURE.md §4.13.
-# ============================================================
-#
-# ============================================================
-# POSIX note on `local`:
-#   This library uses `local` for all internal variables. The
-#   `local` keyword is supported by:
-#     • mksh (the default /system/bin/sh on modern Android)
-#     • busybox ash (older Android)
-#     • bash, dash, ksh
-#   It is NOT part of the POSIX sh standard, but every shell
-#   Android ships supports it.
+# File layout:
+#   Part 1 of 3 — [1]–[11]:  Foundation
+#   Part 2 of 3 — [12]–[17]: Firewall
+#   Part 3 of 3 — [18]–[32]: Runtime + Backup
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Determine module path
+# [1] Module root resolution
 # ============================================================
-MODDIR=${0%/*}
-[ "$MODDIR" = "." ] && MODDIR=$(pwd)
-case $MODDIR in /*) ;; *) MODDIR="/data/adb/modules/${MODDIR}" ;; esac
-
-# ============================================================
-# [2] Shared constant with main.go
-# ============================================================
-# ⚠️ CRITICAL: This constant must stay in sync with MONITORING_UI_PORT
-# in main.go. Any change here must also be applied there.
+# Resolution order:
+#   1. Caller-supplied MODDIR (the normal path).
+#   2. $0-derived path (source tree or post-install layout).
+#   3. Canonical install path.
 #
-# The reserved port is used by dnscrypt-proxy's internal monitoring_ui.
-# Changing it requires coordinated updates in:
-#   • main.go             → MONITORING_UI_PORT
-#   • functions.sh        → _MONITORING_UI_PORT (this file)
-#   • customize.sh        → _MONITORING_UI_PORT
-#   • action.sh           → _MONITORING_UI_PORT
-#   • status.sh           → _MONITORING_UI_PORT
-#   • service.sh          → (via functions.sh)
-#   • watchdog.sh         → (uses TOML directly)
-#   • dnscrypt-proxy.toml → listen_address
-# ============================================================
-_MONITORING_UI_PORT="8080"
+# Mirrors boot-mini.sh's logic so functions.sh can locate
+# boot-mini.sh even when MODDIR was not pre-set.
+if [ -z "${MODDIR:-}" ]; then
+    _fn_dir="${0%/*}"
+    case "$_fn_dir" in
+        /*/proxy) MODDIR="${_fn_dir%/proxy}" ;;
+        /*)       MODDIR="$_fn_dir" ;;
+        *)        MODDIR="/data/adb/modules/dnscrypt-proxy-webui" ;;
+    esac
+    unset _fn_dir
+fi
 
 # ============================================================
-# [3] run/ directory management
+# [1b] Load boot-mini.sh (Layer 0)
 # ============================================================
-RUN_DIR="$MODDIR/proxy/run"
+# Search order: module root first (post-install layout), then
+# proxy/ (source tree). A missing boot-mini.sh is fatal — every
+# function below depends on the primitives it defines. The
+# error is emitted on stderr so the caller can see it in the
+# log or logcat.
+_BM_PATH=""
+for _cand in "$MODDIR/boot-mini.sh" "$MODDIR/proxy/boot-mini.sh"; do
+    if [ -f "$_cand" ]; then
+        _BM_PATH="$_cand"
+        break
+    fi
+done
 
+if [ -z "$_BM_PATH" ]; then
+    echo "functions.sh: boot-mini.sh not found (searched \$MODDIR and \$MODDIR/proxy)" >&2
+    # shellcheck disable=SC2317  # return-or-exit idiom
+    return 1 2>/dev/null || exit 1
+fi
+
+. "$_BM_PATH"
+unset _BM_PATH _cand
+
+# ============================================================
+# [2] Run directory management
+# ============================================================
+# ensure_run_dir adds chown 0:0 that the Layer-0 primitive does
+# not enforce on an already-existing directory.
+# Returns 0 on success, 1 when only /data/local/tmp is available.
 ensure_run_dir() {
-    if [ -d "$RUN_DIR" ] && [ -w "$RUN_DIR" ]; then
-        return 0
-    fi
-    if mkdir -p "$RUN_DIR" 2>/dev/null; then
-        chmod 0700 "$RUN_DIR" 2>/dev/null
-        chown 0:0 "$RUN_DIR" 2>/dev/null
-        if [ -w "$RUN_DIR" ]; then
-            return 0
-        fi
-    fi
-    return 1
+    local rd
+    rd=$(get_run_dir)
+    [ "$rd" = "/data/local/tmp" ] && return 1
+    chown 0:0 "$rd" 2>/dev/null
+    return 0
 }
 
-get_run_dir() {
-    if ensure_run_dir; then
-        printf "%s" "$RUN_DIR"
-    else
-        printf "%s" "/data/local/tmp"
-    fi
-}
-
+# run_file <name> — absolute path of a runtime file.
 run_file() {
-    local filename="$1"
     local run_dir
     run_dir=$(get_run_dir)
-    printf "%s/%s" "$run_dir" "$filename"
+    printf "%s/%s" "$run_dir" "$1"
 }
 
+# init_runtime_paths — populates the runtime file paths and
+# exports them. Prefers $RUN_DIR when writable; falls back to
+# /data/local/tmp otherwise.
 init_runtime_paths() {
     local rd
     rd=$(get_run_dir)
 
     LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 
-    # FSH-3 fix: match main.go's initPaths() — prefer run/ for
-    # PROGRESS_FILE when the run directory is usable.
     if [ "$rd" != "/data/local/tmp" ]; then
         PROGRESS_FILE="$rd/update_progress.txt"
     else
@@ -491,8 +124,8 @@ init_runtime_paths() {
     WATCHDOG_PID_FILE="$rd/watchdog.pid"
     WATCHDOG_TOKEN_FILE="$rd/.watchdog_token"
 
-    export LOG_FILE PROGRESS_FILE STATUS_FILE PID_FILE WEBUI_PID_FILE WATCHDOG_PID_FILE
-    export WATCHDOG_TOKEN_FILE
+    export LOG_FILE PROGRESS_FILE STATUS_FILE PID_FILE
+    export WEBUI_PID_FILE WATCHDOG_PID_FILE WATCHDOG_TOKEN_FILE
     export RUN_DIR_ACTIVE="$rd"
 }
 
@@ -503,34 +136,70 @@ TOML_FILE="$MODDIR/proxy/dnscrypt-proxy.toml"
 WEBUI_CONF="$MODDIR/proxy/webui.conf"
 SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
-# --- v1.2.0 — Data preservation paths ---
+# --- Data preservation paths ---
+#
+# PERSISTENT_BACKUP and USER_FILES are the canonical Layer-1
+# definitions. Two other files define the same values:
+#
+#   • customize.sh  — the installer runs BEFORE the module is
+#                     extracted, so functions.sh is not on disk
+#                     yet. It cannot source this file.
+#   • uninstall.sh  — runs self-contained (see its header) and
+#                     intentionally does not source this file.
+#
+# The duplication is deliberate. Any change to PERSISTENT_BACKUP
+# or USER_FILES MUST be applied to all three files. A CI check
+# (`ci.yml` Step 3 — PERSISTENT_BACKUP path consistency)
+# enforces that every file references the same path.
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- Firewall cache variables ---
-_FW_CACHE=""
-_FW_CACHE_TIME=0
-
 # ============================================================
-# [3b] HARD-FSH-01 — JSON escape helper
+# [3] JSON escape helper
 # ============================================================
-# Minimal JSON string escaper. Escapes backslash and double
-# quote, and drops C0 control characters. Used by write_manifest
-# for the `source` field, which is the only user-controllable
-# string in the manifest.
+# Escapes a string for safe inclusion inside a JSON string
+# literal. Handles:
+#   • backslash    → \\   (MUST be first)
+#   • double-quote → \"
+#   • tab          → \t
+#   • CR           → \r
+#   • LF           → \n   (multi-line input)
+#
+# After the explicit escapes, any remaining C0 control
+# characters (0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F) are dropped.
+# Tab (0x09), CR (0x0D) and LF (0x0A) are excluded from the
+# `tr` range because they have already been escaped above.
+#
+# NOTE: `tr` alone cannot perform this transformation — it
+# operates per-byte and cannot insert multi-byte escape
+# sequences. The `awk` pass handles the escape; `tr` cleans up
+# whatever remains.
 json_escape() {
-    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\010\013\014\016-\037'
+    printf '%s' "$1" | awk '
+        BEGIN { ORS = "" }
+        {
+            gsub(/\\/, "\\\\")
+            gsub(/"/, "\\\"")
+            gsub(/\t/, "\\t")
+            gsub(/\r/, "\\r")
+            if (NR > 1) printf "\\n"
+            printf "%s", $0
+        }
+    ' | tr -d '\000-\010\013\014\016-\037'
 }
 
 # ============================================================
-# [4] Read bootstrap_resolvers from TOML
+# [4] Bootstrap resolver cache
 # ============================================================
-# HARD-FSH-07: bound the number of extracted addresses so a
-# malformed TOML cannot produce an unbounded firewall rule set.
+# get_dynamic_bootstrap — extract bootstrap_resolvers from the
+# TOML. Bounds the count at 32 so a malformed TOML cannot
+# produce an unbounded firewall rule set.
+#
+# Anchor pattern requires bootstrap_resolvers to be the first
+# non-whitespace token, so a commented-out line (`# bootstrap_...`)
+# does not trigger collection.
 get_dynamic_bootstrap() {
-    if [ ! -f "$TOML_FILE" ]; then
-        return 0
-    fi
+    [ ! -f "$TOML_FILE" ] && return 0
 
     awk '
         /^[[:space:]]*bootstrap_resolvers[[:space:]]*=/ { in_array=1 }
@@ -544,42 +213,28 @@ get_dynamic_bootstrap() {
     | tr '\n' ' '
 }
 
-# ============================================================
-# [5] Load BOOTSTRAP_IPS (with cache)
-# ============================================================
 _BOOTSTRAP_CACHE_FILE="$(get_run_dir)/.bootstrap_cache"
-_BOOTSTRAP_CACHE_TTL=300  # 5 minutes
+_BOOTSTRAP_CACHE_TTL=300
 
-# ------------------------------------------------------------
-# FSH-12 fix — REAL symlink rejection.
-#
-# The previous implementation performed the SAME `[ ! -f ... ]`
-# test twice. `[ -f ]` follows symlinks and returns true if the
-# final target is a regular file, so a symlink pointing to a
-# regular file would have passed both checks. The second check
-# is now an explicit `[ -L ]`, which returns true when the path
-# itself is a symlink — regardless of what it points to.
-#
-# HARD-FSH-06 (documented) is now actually delivered by FSH-12.
-# ------------------------------------------------------------
+# _load_bootstrap_from_cache — rejects missing paths, symlinks,
+# non-regular files, stale entries, and content that does not
+# look like a space-separated IP list.
 _load_bootstrap_from_cache() {
-    # Reject non-existent paths and non-regular files.
-    if [ ! -f "$_BOOTSTRAP_CACHE_FILE" ]; then
-        return 1
-    fi
-
-    # Reject symlinks. `[ -L ]` is true when the path is a
-    # symlink, even if its target exists and is a regular file.
-    if [ -L "$_BOOTSTRAP_CACHE_FILE" ]; then
-        return 1
-    fi
+    [ ! -f "$_BOOTSTRAP_CACHE_FILE" ] && return 1
+    [ -L "$_BOOTSTRAP_CACHE_FILE" ] && return 1
 
     local cache_mtime now age
     cache_mtime=$(stat -c %Y "$_BOOTSTRAP_CACHE_FILE" 2>/dev/null) \
         || cache_mtime=$(stat -f %m "$_BOOTSTRAP_CACHE_FILE" 2>/dev/null) \
         || return 1
 
-    now=$(date +%s)
+    # Guard: a failed `date` produces an empty `now`, which would
+    # turn the arithmetic below into a syntax error.
+    now=$(date +%s 2>/dev/null)
+    case "$now" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+
     age=$((now - cache_mtime))
 
     if [ "$age" -lt 0 ] || [ "$age" -gt "$_BOOTSTRAP_CACHE_TTL" ]; then
@@ -588,13 +243,8 @@ _load_bootstrap_from_cache() {
 
     local cached
     cached=$(cat "$_BOOTSTRAP_CACHE_FILE" 2>/dev/null)
-    if [ -z "$cached" ]; then
-        return 1
-    fi
+    [ -z "$cached" ] && return 1
 
-    # Reject anything that does not look like a space-separated
-    # list of IP addresses. The regex accepts digits, dots,
-    # colons, hex letters, and spaces — nothing else.
     if printf '%s' "$cached" | grep -qE '[^0-9a-fA-F.:[:space:]]'; then
         return 1
     fi
@@ -603,15 +253,27 @@ _load_bootstrap_from_cache() {
     return 0
 }
 
+# _save_bootstrap_to_cache — atomic write via tmp + mv.
 _save_bootstrap_to_cache() {
     local value="$1"
     local _rd
     _rd=$(get_run_dir)
     mkdir -p "$_rd" 2>/dev/null
-    printf "%s" "$value" > "$_rd/.bootstrap_cache" 2>/dev/null || true
+
+    local _tmp="${_rd}/.bootstrap_cache.tmp.$$"
+    if ! printf "%s" "$value" > "$_tmp" 2>/dev/null; then
+        rm -f "$_tmp" 2>/dev/null
+        return 0
+    fi
+
+    if ! mv -f "$_tmp" "$_rd/.bootstrap_cache" 2>/dev/null; then
+        rm -f "$_tmp" 2>/dev/null
+        return 0
+    fi
+
+    return 0
 }
 
-# --- Try loading from cache first ---
 _CACHED_BOOTSTRAP=$(_load_bootstrap_from_cache 2>/dev/null)
 
 if [ -n "$_CACHED_BOOTSTRAP" ]; then
@@ -628,43 +290,15 @@ else
     _save_bootstrap_to_cache "$BOOTSTRAP_IPS"
 fi
 
-# --- Loopback always included ---
 LOOPBACK_IPS="127.0.0.1"
 
 # ============================================================
-# [6] Logging — Emergency-Only Rotation
+# [5] Progress file writer (atomic)
 # ============================================================
-# The WebUI (main.go) owns orderly rotation at 1 MB. This helper
-# only rotates when the log exceeds 50 MB — that is an emergency
-# threshold, not a routine one.
-#
-# HARD-FSH-08: `_LOG_CALL_COUNT` is an intentional GLOBAL. It
-# persists across all `log_fn` calls within the same shell
-# process and is the counter that gates the emergency rotation
-# (which runs every 100th call). It is not declared `local`
-# because it must survive across function invocations.
-_LOG_CALL_COUNT=0
-
-log_fn() {
-    _LOG_CALL_COUNT=$((_LOG_CALL_COUNT + 1))
-
-    if [ $((_LOG_CALL_COUNT % 100)) -eq 0 ] && [ -f "$LOG_FILE" ]; then
-        local _size
-        _size=$(wc -c < "$LOG_FILE" 2>/dev/null | tr -d ' ')
-        if [ -n "$_size" ] && [ "$_size" -gt 52428800 ]; then
-            local emg
-            emg="${LOG_FILE}.emergency.$(date +%s)"
-            mv -f "$LOG_FILE" "$emg" 2>/dev/null
-            : > "$LOG_FILE"
-        fi
-    fi
-
-    echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE" 2>/dev/null
-}
-
-# ============================================================
-# [7] Write progress file
-# ============================================================
+# The message is truncated at 200 chars and sanitized of the
+# pipe character (`|`), which is the field separator between
+# percent and message in the file format. Without sanitization,
+# a message containing `|` would shift the parse in main.go.
 write_progress() {
     local percent="$1"
     local msg="$2"
@@ -679,65 +313,24 @@ write_progress() {
         msg=$(printf "%s" "$msg" | cut -c1-200)
     fi
 
+    # Replace the field separator to preserve the parse contract.
+    msg=$(printf '%s' "$msg" | tr '|' '/')
+
     printf "%d|%s" "$percent" "$msg" > "${PROGRESS_FILE}.tmp" 2>/dev/null
     mv -f "${PROGRESS_FILE}.tmp" "$PROGRESS_FILE" 2>/dev/null
 }
 
 # ============================================================
-# [8] Read value from config file
+# [6] Dashboard port — Port Guard
 # ============================================================
-get_conf_value() {
-    local conf="$1"
-    local key="$2"
-    local default="${3:-}"
-
-    if [ -f "$conf" ]; then
-        local val
-        val=$(grep "^${key}=" "$conf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r')
-        case "$val" in
-            *" #"*)
-                val="${val%% #*}"
-                ;;
-        esac
-        val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        if [ -n "$val" ]; then
-            printf "%s" "$val"
-            return 0
-        fi
-    fi
-    printf "%s" "$default"
-    return 1
-}
-
-# ============================================================
-# [9] Read WebUI/Dashboard ports — Port Guard
-# ============================================================
-get_webui_port() {
-    local conf_file="${1:-$WEBUI_CONF}"
-    local port
-    port=$(get_conf_value "$conf_file" "PORT" "9090" 2>/dev/null)
-
-    if echo "$port" | grep -qE '^[0-9]+$' && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
-        if [ "$port" = "$_MONITORING_UI_PORT" ]; then
-            log_fn "⚠️ PORT=$port conflicts with monitoring_ui — falling back to 9090"
-            printf "9090"
-            return 0
-        fi
-        printf "%s" "$port"
-        return 0
-    fi
-    printf "9090"
-    return 1
-}
-
 get_dashboard_port() {
     local conf_file="${1:-$WEBUI_CONF}"
     local port
-    port=$(get_conf_value "$conf_file" "DASHBOARD_PORT" "9091" 2>/dev/null)
+    port=$(read_conf "$conf_file" "DASHBOARD_PORT" "9091" 2>/dev/null)
 
     if echo "$port" | grep -qE '^[0-9]+$' && [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then
         if [ "$port" = "$_MONITORING_UI_PORT" ]; then
-            log_fn "⚠️ DASHBOARD_PORT=$port conflicts with monitoring_ui — falling back to 9091"
+            log_msg "⚠️ DASHBOARD_PORT=$port conflicts with monitoring_ui — falling back to 9091"
             printf "9091"
             return 0
         fi
@@ -749,19 +342,10 @@ get_dashboard_port() {
 }
 
 # ============================================================
-# [9b] Profile memory hint (v1.1.0)
+# [7] Profile memory hint (display-only)
 # ============================================================
-# Returns a user-facing string describing the expected soft
-# memory limit for the active profile.
-#
-# ⚠️ This is a HINT only. main.go is the authority for the
-#    actual debug.SetMemoryLimit() value.
-#
-# Usage:
-#   get_profile_memory_hint
-#     → "120 MB (pro)"
-#     → "80 MB (light)"
-# ============================================================
+# HINT only. main.go is the authority for the actual
+# debug.SetMemoryLimit() value.
 get_profile_memory_hint() {
     local profile="pro"
 
@@ -787,12 +371,12 @@ get_profile_memory_hint() {
 }
 
 # ============================================================
-# [10] Read AUTO_RESTART_* options
+# [8] Auto-restart options
 # ============================================================
 get_auto_restart_dns() {
     local conf="${1:-$WEBUI_CONF}"
     local val
-    val=$(get_conf_value "$conf" "AUTO_RESTART_DNS" "1")
+    val=$(read_conf "$conf" "AUTO_RESTART_DNS" "1")
     case "$val" in
         0|1) printf "%s" "$val" ;;
         *)   printf "1" ;;
@@ -802,7 +386,7 @@ get_auto_restart_dns() {
 get_auto_restart_webui() {
     local conf="${1:-$WEBUI_CONF}"
     local val
-    val=$(get_conf_value "$conf" "AUTO_RESTART_WEBUI" "1")
+    val=$(read_conf "$conf" "AUTO_RESTART_WEBUI" "1")
     case "$val" in
         0|1) printf "%s" "$val" ;;
         *)   printf "1" ;;
@@ -810,15 +394,45 @@ get_auto_restart_webui() {
 }
 
 # ============================================================
-# [11] Read TOML credentials — Section-Restricted
+# [9] TOML credentials — section-restricted
 # ============================================================
 # Reads ONLY from [monitoring_ui]. Section tracking ignores any
 # username/password in other sections.
 #
-# Supports section header with trailing comment:
+# Supports section headers with trailing comments:
 #     [monitoring_ui] # monitoring section
 #
-# v1.0.0 fix: the pattern is extracted between the first [ and ].
+# NOTE: this parser is intentionally duplicated in three files
+# (functions.sh, customize.sh, install_app.sh). Each file must
+# be independently sourceable at different stages of the module
+# lifecycle, so the duplication is deliberate. Any behavioral
+# change MUST be applied to all three.
+parse_toml_value() {
+    local s="$1"
+    [ -z "$s" ] && return 0
+    s=$(printf '%s' "$s" | sed 's/^[[:space:]]*//')
+
+    case "$s" in
+        \"*)
+            printf '%s' "$s" | sed 's/^"//; s/".*//'
+            return 0
+            ;;
+    esac
+
+    case "$s" in
+        \'*)
+            printf '%s' "$s" | sed "s/^'//; s/'.*//"
+            return 0
+            ;;
+    esac
+
+    case "$s" in
+        *" #"*) s="${s%% #*}" ;;
+    esac
+    printf '%s' "$s" | sed 's/[[:space:]]*$//'
+    return 0
+}
+
 read_toml_credentials() {
     local user="" pass=""
 
@@ -837,7 +451,6 @@ read_toml_credentials() {
             ''|\#*) continue ;;
         esac
 
-        # Section header with trailing comment support
         case "$trimmed" in
             \[*)
                 local section
@@ -858,16 +471,12 @@ read_toml_credentials() {
         case "$trimmed" in
             *=*)
                 local key val
-                key=$(printf '%s' "$trimmed" | sed 's/^\([^=]*\)=.*/\1/')
+                key=$(printf '%s' "$trimmed" | sed 's/^\([^=]*\)=.*$/\1/')
                 key=$(printf '%s' "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
                 val=$(printf '%s' "$trimmed" | sed 's/^[^=]*=//')
-                val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                case "$val" in
-                    *" #"*) val="${val%% #*}" ;;
-                esac
-                val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                val=$(printf '%s' "$val" | sed "s/^['\"]//;s/['\"]$//")
+                val=$(printf '%s' "$val" | sed 's/^[[:space:]]*//')
+                val=$(parse_toml_value "$val")
 
                 case "$key" in
                     username) user="$val" ;;
@@ -881,63 +490,15 @@ read_toml_credentials() {
 }
 
 # ============================================================
-# [12] Port check (TCP / UDP)
+# [10] Service state checks
 # ============================================================
-is_port_open() {
-    local port="$1"
-    local proto="${2:-tcp}"
-
-    case "$port" in
-        ''|*[!0-9]*) return 1 ;;
-    esac
-
-    local hex_port
-    hex_port=$(printf "%04X" "$port")
-
-    if [ "$proto" = "udp" ]; then
-        if [ -f /proc/net/udp ]; then
-            grep -qi ":$hex_port " /proc/net/udp 2>/dev/null && return 0
-        fi
-        if [ -f /proc/net/udp6 ]; then
-            grep -qi ":$hex_port " /proc/net/udp6 2>/dev/null && return 0
-        fi
-
-        if command -v ss >/dev/null 2>&1; then
-            ss -lun 2>/dev/null | grep -q ":$port " && return 0
-        fi
-
-        if command -v netstat >/dev/null 2>&1; then
-            netstat -uln 2>/dev/null | grep -q ":$port " && return 0
-        fi
-    else
-        if [ -f /proc/net/tcp ]; then
-            grep -qi ":$hex_port " /proc/net/tcp 2>/dev/null && return 0
-        fi
-        if [ -f /proc/net/tcp6 ]; then
-            grep -qi ":$hex_port " /proc/net/tcp6 2>/dev/null && return 0
-        fi
-
-        if command -v ss >/dev/null 2>&1; then
-            ss -ltn 2>/dev/null | grep -q ":$port " && return 0
-        fi
-
-        if command -v netstat >/dev/null 2>&1; then
-            netstat -tln 2>/dev/null | grep -q ":$port " && return 0
-        fi
-    fi
-
-    return 1
-}
-
-# ============================================================
-# [13] Unified module service checks
-# ============================================================
-# HARD-FSH-05: cross-check the PID file first and verify the
-# PID's comm is exactly `dnscrypt-proxy`. This is the runtime
-# analogue of main.go BUG-J and avoids false positives after
-# PID reuse.
+# is_dnscrypt_running — two-tier check:
+#   1. PID file → /proc/<pid>/comm == "dnscrypt-proxy" → port
+#      5354/udp listening. The comm check catches PID reuse
+#      after a reboot; the port check catches a process that is
+#      alive but not yet bound.
+#   2. Fallback: pgrep -x dnscrypt-proxy + port check.
 is_dnscrypt_running() {
-    # Preferred check: PID file + comm match.
     local pid_file
     pid_file=$(run_file dnscrypt.pid)
     if [ -f "$pid_file" ]; then
@@ -954,7 +515,6 @@ is_dnscrypt_running() {
         fi
     fi
 
-    # Fallback: exact-name pgrep + port check.
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         if is_port_open 5354 udp; then
             return 0
@@ -963,32 +523,58 @@ is_dnscrypt_running() {
     return 1
 }
 
+# is_webui_running [port] — defaults to get_webui_port.
+# Port check only; the WebUI is a single process with a single
+# listening socket.
 is_webui_running() {
     local port="${1:-$(get_webui_port)}"
     is_port_open "$port" tcp
 }
 
 # ============================================================
-# [14] Check IPv6 availability
+# [11] IPv6 availability
 # ============================================================
+# /proc/net/if_inet6 lists one line per interface that has an
+# IPv6 address. Its absence (or empty content) means IPv6 is
+# not available on this device — all IPv6 firewall work can be
+# skipped without error.
 is_ipv6_available() {
-    if [ ! -f /proc/net/if_inet6 ]; then
-        return 1
-    fi
+    [ ! -f /proc/net/if_inet6 ] && return 1
+
     local count
     count=$(wc -l < /proc/net/if_inet6 2>/dev/null | tr -d ' ')
-    if [ -z "$count" ] || [ "$count" -eq 0 ]; then
-        return 1
-    fi
+
+    # wc -l returns 0 for an empty file; treat "0 lines" as
+    # "no interfaces with IPv6".
+    [ -z "$count" ] && return 1
+    [ "$count" -eq 0 ] && return 1
+
     return 0
 }
 
 # ============================================================
-# [15] Detect firewall (cache 60 seconds)
+# [12] Firewall backend detection (60 s cache)
 # ============================================================
+# Probe order:
+#   1. nftables — try `nft add table inet` (dual-stack) first,
+#      then `ip` (IPv4-only). Delete the probe table on success.
+#   2. iptables — verify the nat table is listable (catches
+#      builds where the binary exists but the kernel module is
+#      missing).
+#   3. none — neither backend usable.
+#
+# Cached for 60 seconds. manage_firewall is called multiple
+# times per boot; each detection costs several forks.
+_FW_CACHE=""
+_FW_CACHE_TIME=0
+
 detect_firewall() {
     local now
-    now=$(date +%s 2>/dev/null || echo "0")
+    now=$(date +%s 2>/dev/null)
+    case "$now" in
+        ''|*[!0-9]*) now=0 ;;
+    esac
+
     if [ -n "$_FW_CACHE" ] && [ "$((now - _FW_CACHE_TIME))" -lt 60 ]; then
         printf "%s" "$_FW_CACHE"
         return 0
@@ -1028,8 +614,21 @@ detect_firewall() {
 }
 
 # ============================================================
-# [16] Legacy Cleanup (migration from older versions)
+# [13] Legacy firewall cleanup
 # ============================================================
+# Versions prior to v1.2.0 installed DNAT rules directly in
+# OUTPUT, without a dedicated Custom Chain. Every upgrade must
+# remove those legacy rules before installing the new ones.
+#
+# Every deletion is attempted twice — once with the
+# `dnscrypt_smart_filter` comment tag, once without. This covers
+# both the tagged rules (recent legacy versions) and the
+# untagged rules (oldest legacy version).
+#
+# Both helpers are guarded by a once-per-shell flag. Without
+# the guard, mode-0 (blind cleanup) followed by mode-1
+# (install) would run the same delete cascade twice.
+
 _LEGACY_CLEANUP_IPTABLES_DONE=0
 
 _legacy_cleanup_iptables() {
@@ -1038,7 +637,6 @@ _legacy_cleanup_iptables() {
 
     command -v iptables >/dev/null 2>&1 || return 0
 
-    # --- Old DNAT (with comment) ---
     iptables -t nat -D OUTPUT -p udp --dport 53 \
         -j DNAT --to-destination 127.0.0.1:5354 \
         -m comment --comment "dnscrypt_smart_filter" 2>/dev/null
@@ -1046,13 +644,11 @@ _legacy_cleanup_iptables() {
         -j DNAT --to-destination 127.0.0.1:5354 \
         -m comment --comment "dnscrypt_smart_filter" 2>/dev/null
 
-    # --- Old DNAT (without comment) ---
     iptables -t nat -D OUTPUT -p udp --dport 53 \
         -j DNAT --to-destination 127.0.0.1:5354 2>/dev/null
     iptables -t nat -D OUTPUT -p tcp --dport 53 \
         -j DNAT --to-destination 127.0.0.1:5354 2>/dev/null
 
-    # --- Old RETURN rules ---
     local _ip
     for _ip in 127.0.0.1 $BOOTSTRAP_IPS; do
         case "$_ip" in *:*) continue ;; esac
@@ -1069,7 +665,12 @@ _legacy_cleanup_iptables() {
     return 0
 }
 
+_LEGACY_CLEANUP_IP6TABLES_DONE=0
+
 _legacy_cleanup_ip6tables() {
+    [ "$_LEGACY_CLEANUP_IP6TABLES_DONE" = "1" ] && return 0
+    _LEGACY_CLEANUP_IP6TABLES_DONE=1
+
     command -v ip6tables >/dev/null 2>&1 || return 0
 
     ip6tables -t nat -D OUTPUT -p udp --dport 53 \
@@ -1104,23 +705,21 @@ _legacy_cleanup_ip6tables() {
 }
 
 # ============================================================
-# [17] Hybrid iptables (IPv4)
+# [14] Hybrid iptables (IPv4)
 # ============================================================
 # Strategy:
-#   1. Full cleanup (Custom Chain + Legacy + Direct)
-#   2. Try Custom Chain first (clean, no orphans)
-#   3. If it fails → fallback to Direct DNAT
+#   • mode != 1  →  full cleanup, return.
+#   • mode == 1  →  cleanup, then:
+#       1. Try Custom Chain (clean, no orphans).
+#       2. If it fails → fallback to Direct DNAT.
 #
-# Why Hybrid:
-#   Some devices (OnePlus, some Samsung) have OEM chains
-#   (such as onelink_nat_chain) that prevent Custom Chain
-#   creation. In that case, Direct DNAT works reliably.
+# Some OEM chains (OnePlus, some Samsung) prevent Custom Chain
+# creation; Direct DNAT works reliably on those.
 #
-# HARD-FSH-02: In the fallback path the same RETURN rules used
-# inside the Custom Chain are installed in OUTPUT before the
-# DNAT rules. Without them, dnscrypt-proxy's own bootstrap
-# queries would be DNAT'd back into itself.
-# ============================================================
+# In the fallback path, the same RETURN rules used inside the
+# Custom Chain are installed in OUTPUT before the DNAT rules.
+# Without them, dnscrypt-proxy's own bootstrap queries would be
+# DNAT'd back into itself, forming a resolver loop.
 manage_iptables() {
     local mode="$1"
     local chain="DNSCRYPT_OUT"
@@ -1129,17 +728,14 @@ manage_iptables() {
 
     command -v iptables >/dev/null 2>&1 || return 1
 
-    # --- Legacy cleanup (once) ---
     _legacy_cleanup_iptables
 
-    # --- [A] Full cleanup (all methods) ---
-    # Custom Chain
+    # --- [A] Full cleanup ---
     iptables -t nat -D OUTPUT -p udp --dport 53 -j "$chain" --wait 5 2>/dev/null
     iptables -t nat -D OUTPUT -p tcp --dport 53 -j "$chain" --wait 5 2>/dev/null
     iptables -t nat -F "$chain" --wait 5 2>/dev/null
     iptables -t nat -X "$chain" --wait 5 2>/dev/null
 
-    # Direct DNAT (with comment)
     iptables -t nat -D OUTPUT -p udp --dport 53 \
         -j DNAT --to-destination "$dest_v4" \
         -m comment --comment "$comment" --wait 5 2>/dev/null
@@ -1147,14 +743,11 @@ manage_iptables() {
         -j DNAT --to-destination "$dest_v4" \
         -m comment --comment "$comment" --wait 5 2>/dev/null
 
-    # Direct DNAT (without comment)
     iptables -t nat -D OUTPUT -p udp --dport 53 \
         -j DNAT --to-destination "$dest_v4" --wait 5 2>/dev/null
     iptables -t nat -D OUTPUT -p tcp --dport 53 \
         -j DNAT --to-destination "$dest_v4" --wait 5 2>/dev/null
 
-    # Also clean up any leftover RETURN rules from a previous
-    # fallback install (HARD-FSH-02).
     local _c_ip
     for _c_ip in $LOOPBACK_IPS $BOOTSTRAP_IPS; do
         case "$_c_ip" in *:*) continue ;; esac
@@ -1165,7 +758,7 @@ manage_iptables() {
     done
 
     if [ "$mode" != "1" ]; then
-        log_fn "✅ iptables: cleaned (all methods)"
+        log_msg "✅ iptables: cleaned (all methods)"
         return 0
     fi
 
@@ -1173,11 +766,9 @@ manage_iptables() {
     local use_chain=0
 
     if iptables -t nat -N "$chain" --wait 5 2>/dev/null; then
-        # Add jump rules
         if iptables -t nat -I OUTPUT -p udp --dport 53 -j "$chain" --wait 5 2>/dev/null && \
            iptables -t nat -I OUTPUT -p tcp --dport 53 -j "$chain" --wait 5 2>/dev/null; then
 
-            # Add RETURN rules
             local _added_return=0
             local _ip
             for _ip in $LOOPBACK_IPS $BOOTSTRAP_IPS; do
@@ -1187,50 +778,41 @@ manage_iptables() {
                 fi
             done
 
-            # Add DNAT catch-all
             if [ "$_added_return" -gt 0 ]; then
                 if iptables -t nat -A "$chain" -j DNAT --to-destination "$dest_v4" --wait 5 2>/dev/null; then
                     use_chain=1
-                    log_fn "✅ iptables: custom chain $chain created ($_added_return RETURN, 1 DNAT)"
+                    log_msg "✅ iptables: custom chain $chain created ($_added_return RETURN, 1 DNAT)"
                 fi
             fi
         fi
     fi
 
-    # --- [C] If Custom Chain failed → Fallback to Direct DNAT ---
+    # --- [C] Fallback to Direct DNAT ---
     if [ "$use_chain" = "0" ]; then
-        # Clean up any failed Custom Chain remnants
         iptables -t nat -D OUTPUT -p udp --dport 53 -j "$chain" --wait 5 2>/dev/null
         iptables -t nat -D OUTPUT -p tcp --dport 53 -j "$chain" --wait 5 2>/dev/null
         iptables -t nat -F "$chain" --wait 5 2>/dev/null
         iptables -t nat -X "$chain" --wait 5 2>/dev/null
 
-        log_fn "ℹ️ iptables: custom chain failed, using direct DNAT"
+        log_msg "ℹ️ iptables: custom chain failed, using direct DNAT"
 
-        # Insert DNAT rules at the top first, then push them
-        # down with the RETURN rules (so RETURN comes BEFORE
-        # DNAT in the chain — matching the Custom Chain order).
         if ! iptables -t nat -I OUTPUT -p udp --dport 53 \
                 -j DNAT --to-destination "$dest_v4" \
                 -m comment --comment "$comment" --wait 5 2>/dev/null; then
-            log_fn "❌ iptables: failed to add UDP DNAT"
+            log_msg "❌ iptables: failed to add UDP DNAT"
             return 1
         fi
 
         if ! iptables -t nat -I OUTPUT -p tcp --dport 53 \
                 -j DNAT --to-destination "$dest_v4" \
                 -m comment --comment "$comment" --wait 5 2>/dev/null; then
-            log_fn "❌ iptables: failed to add TCP DNAT, rolling back UDP"
+            log_msg "❌ iptables: failed to add TCP DNAT, rolling back UDP"
             iptables -t nat -D OUTPUT -p udp --dport 53 \
                 -j DNAT --to-destination "$dest_v4" \
                 -m comment --comment "$comment" --wait 5 2>/dev/null
             return 1
         fi
 
-        # HARD-FSH-02: now push the RETURN rules ABOVE the DNAT
-        # rules, in reverse iteration order so that the final
-        # chain reads exactly like the Custom Chain (RETURNs on
-        # top, catch-all DNAT at the bottom).
         local _insert_failed=0
         local _ip2
         for _ip2 in $LOOPBACK_IPS $BOOTSTRAP_IPS; do
@@ -1246,20 +828,23 @@ manage_iptables() {
         done
 
         if [ "$_insert_failed" = "1" ]; then
-            log_fn "⚠️ iptables: some RETURN rules failed to insert (fallback continues)"
+            log_msg "⚠️ iptables: some RETURN rules failed to insert (fallback continues)"
         fi
 
-        log_fn "✅ iptables: direct DNAT applied (fallback mode)"
+        log_msg "✅ iptables: direct DNAT applied (fallback mode)"
     fi
 
     return 0
 }
 
 # ============================================================
-# [18] Hybrid ip6tables (IPv6)
+# [15] Hybrid ip6tables (IPv6)
 # ============================================================
-# HARD-FSH-02: same fallback-RETURN fix as IPv4.
-# ============================================================
+# Same strategy as [14], adapted for IPv6:
+#   1. Early-return if IPv6 is unavailable.
+#   2. Early-return if the nat table is not supported by the
+#      kernel build.
+#   3. Full cleanup → Custom Chain → Direct DNAT fallback.
 manage_ip6tables() {
     local mode="$1"
     local chain="DNSCRYPT_OUT6"
@@ -1267,14 +852,14 @@ manage_ip6tables() {
     local dest_v6="[::1]:5354"
 
     if ! is_ipv6_available; then
-        [ "$mode" = "1" ] && log_fn "ℹ️ IPv6 not available, skipping ip6tables"
+        [ "$mode" = "1" ] && log_msg "ℹ️ IPv6 not available, skipping ip6tables"
         return 0
     fi
 
     command -v ip6tables >/dev/null 2>&1 || return 0
 
     if ! ip6tables -t nat -L -n >/dev/null 2>&1; then
-        log_fn "ℹ️ ip6tables -t nat not supported, skipping IPv6"
+        log_msg "ℹ️ ip6tables -t nat not supported, skipping IPv6"
         return 0
     fi
 
@@ -1298,8 +883,6 @@ manage_ip6tables() {
     ip6tables -t nat -D OUTPUT -p tcp --dport 53 \
         -j DNAT --to-destination "$dest_v6" --wait 5 2>/dev/null
 
-    # Also clean up any leftover RETURN rules from a previous
-    # fallback install (HARD-FSH-02).
     local _c_ip
     for _c_ip in ::1 $BOOTSTRAP_IPS; do
         case "$_c_ip" in
@@ -1313,7 +896,7 @@ manage_ip6tables() {
     done
 
     if [ "$mode" != "1" ]; then
-        log_fn "✅ ip6tables: cleaned"
+        log_msg "✅ ip6tables: cleaned"
         return 0
     fi
 
@@ -1339,7 +922,7 @@ manage_ip6tables() {
             if [ "$_added_return" -gt 0 ]; then
                 if ip6tables -t nat -A "$chain" -j DNAT --to-destination "$dest_v6" --wait 5 2>/dev/null; then
                     use_chain=1
-                    log_fn "✅ ip6tables: custom chain $chain created ($_added_return RETURN, 1 DNAT)"
+                    log_msg "✅ ip6tables: custom chain $chain created ($_added_return RETURN, 1 DNAT)"
                 fi
             fi
         fi
@@ -1352,12 +935,12 @@ manage_ip6tables() {
         ip6tables -t nat -F "$chain" --wait 5 2>/dev/null
         ip6tables -t nat -X "$chain" --wait 5 2>/dev/null
 
-        log_fn "ℹ️ ip6tables: using direct DNAT (fallback)"
+        log_msg "ℹ️ ip6tables: using direct DNAT (fallback)"
 
         if ! ip6tables -t nat -I OUTPUT -p udp --dport 53 \
                 -j DNAT --to-destination "$dest_v6" \
                 -m comment --comment "$comment" --wait 5 2>/dev/null; then
-            log_fn "❌ ip6tables: failed UDP DNAT"
+            log_msg "❌ ip6tables: failed UDP DNAT"
             return 1
         fi
 
@@ -1367,11 +950,10 @@ manage_ip6tables() {
             ip6tables -t nat -D OUTPUT -p udp --dport 53 \
                 -j DNAT --to-destination "$dest_v6" \
                 -m comment --comment "$comment" --wait 5 2>/dev/null
-            log_fn "❌ ip6tables: failed TCP DNAT"
+            log_msg "❌ ip6tables: failed TCP DNAT"
             return 1
         fi
 
-        # HARD-FSH-02: push RETURN rules above the DNAT rules.
         local _ip2
         for _ip2 in ::1 $BOOTSTRAP_IPS; do
             case "$_ip2" in
@@ -1384,20 +966,27 @@ manage_ip6tables() {
                 -j RETURN -m comment --comment "$comment" --wait 5 2>/dev/null
         done
 
-        log_fn "✅ ip6tables: direct DNAT applied (fallback)"
+        log_msg "✅ ip6tables: direct DNAT applied (fallback)"
     fi
 
     return 0
 }
 
 # ============================================================
-# [19] nftables management
+# [16] nftables management
 # ============================================================
-# Uses a single inet table that covers both IPv4 and IPv6. The
-# final DNAT rule redirects all port-53 traffic (both families)
-# to the IPv4 loopback resolver. dnscrypt-proxy listens on
-# 127.0.0.1:5354 and accepts both families there.
-# ============================================================
+# Single `inet` table covering both IPv4 and IPv6. Final DNAT
+# rule redirects all port-53 traffic (both families) to the
+# IPv4 loopback resolver.
+#
+# Rule order inside the chain (order matters):
+#   1. RETURN for each bootstrap IPv4/IPv6.
+#   2. RETURN for ::1.
+#   3. DNAT for remaining UDP:53.
+#   4. DNAT for remaining TCP:53.
+#
+# `nft delete table inet dnscrypt_filter` removes the whole
+# table atomically — no orphan chains, no orphan rules.
 manage_nftables() {
     local mode="$1"
     local table="dnscrypt_filter"
@@ -1410,13 +999,13 @@ manage_nftables() {
 
     if [ "$mode" = "1" ]; then
         if ! nft add table inet "$table" 2>/dev/null; then
-            log_fn "❌ nftables: failed to create table"
+            log_msg "❌ nftables: failed to create table"
             return 1
         fi
 
         if ! nft add chain inet "$table" "$chain" \
                 '{ type nat hook output priority -100 ; }' 2>/dev/null; then
-            log_fn "❌ nftables: failed to create nat chain"
+            log_msg "❌ nftables: failed to create nat chain"
             nft delete table inet "$table" 2>/dev/null
             return 1
         fi
@@ -1446,32 +1035,43 @@ manage_nftables() {
 
         if ! nft add rule inet "$table" "$chain" \
                 meta l4proto udp th dport 53 dnat to "$dest_v4" 2>/dev/null; then
-            log_fn "❌ nftables: failed UDP DNAT"
+            log_msg "❌ nftables: failed UDP DNAT"
             nft delete table inet "$table" 2>/dev/null
             return 1
         fi
 
         if ! nft add rule inet "$table" "$chain" \
                 meta l4proto tcp th dport 53 dnat to "$dest_v4" 2>/dev/null; then
-            log_fn "❌ nftables: failed TCP DNAT"
+            log_msg "❌ nftables: failed TCP DNAT"
             nft delete table inet "$table" 2>/dev/null
             return 1
         fi
 
-        log_fn "✅ nftables: rules added"
+        log_msg "✅ nftables: rules added"
     fi
 
     return 0
 }
 
 # ============================================================
-# [20] Firewall management (unified interface)
+# [17] Firewall management (unified interface)
 # ============================================================
+# Mode:
+#   "0" → remove all rules (blind cleanup).
+#   "1" → install rules using the best available backend.
+#
+# Mode 0 invokes every backend's cleanup path unconditionally.
+# It does NOT rely on `detect_firewall` being correct —
+# guarantees no orphan rules even if the device switched
+# backends between two runs.
+#
+# Always returns 0 — a device with no supported firewall must
+# still allow the rest of the boot sequence to complete.
 manage_firewall() {
     local mode="$1"
 
     if [ "$mode" = "0" ]; then
-        log_fn "🧹 Blind firewall cleanup..."
+        log_msg "🧹 Blind firewall cleanup..."
         manage_nftables 0 2>/dev/null
         manage_iptables 0 2>/dev/null
         manage_ip6tables 0 2>/dev/null
@@ -1484,7 +1084,7 @@ manage_firewall() {
     case "$fw" in
         nftables)
             if ! manage_nftables 1 2>/dev/null; then
-                log_fn "⚠️ nftables failed, falling back to iptables"
+                log_msg "⚠️ nftables failed, falling back to iptables"
                 manage_iptables 1 2>/dev/null
                 manage_ip6tables 1 2>/dev/null
             fi
@@ -1494,7 +1094,7 @@ manage_firewall() {
             manage_ip6tables 1 2>/dev/null
             ;;
         *)
-            log_fn "⚠️ No supported firewall found"
+            log_msg "⚠️ No supported firewall found"
             ;;
     esac
 
@@ -1502,12 +1102,21 @@ manage_firewall() {
 }
 
 # ============================================================
-# [21] Process cleanup
+# [18] Process cleanup
 # ============================================================
-# HARD-FSH-09: also remove the `.tmp` sidecar that a crashed
-# `write_progress` may have left behind.
+# cleanup_proxy terminates dnscrypt-proxy and removes its
+# runtime artifacts.
+#
+# Order:
+#   1. pkill -9 -x dnscrypt-proxy (exact-name match).
+#   2. 1-second grace period (kernel reap before fuser).
+#   3. fuser -k on the DNS ports (catches a process bound to
+#      5354/udp but named differently).
+#   4. Remove the PID file from both locations.
+#   5. Remove the .tmp sidecar a crashed write_progress may
+#      have left behind.
 cleanup_proxy() {
-    log_fn "🧹 Cleaning up dnscrypt-proxy"
+    log_msg "🧹 Cleaning up dnscrypt-proxy"
 
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-proxy 2>/dev/null
@@ -1522,14 +1131,19 @@ cleanup_proxy() {
     rm -f "$(run_file dnscrypt.pid)" 2>/dev/null
     rm -f /data/local/tmp/dnscrypt.pid 2>/dev/null
 
-    # HARD-FSH-09: stale progress temp file.
     rm -f "${PROGRESS_FILE}.tmp" 2>/dev/null
 
-    log_fn "✅ cleanup_proxy completed"
+    log_msg "✅ cleanup_proxy completed"
 }
 
+# cleanup_webui terminates dnscrypt-webui and removes its PID
+# files.
+#
+# Does NOT call `fuser` on the WebUI port — the port is
+# user-configurable, and a stale fuser call could kill an
+# unrelated process that happened to listen on the same port.
 cleanup_webui() {
-    log_fn "🧹 Cleaning up dnscrypt-webui"
+    log_msg "🧹 Cleaning up dnscrypt-webui"
 
     if pgrep -x dnscrypt-webui >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-webui 2>/dev/null
@@ -1538,17 +1152,30 @@ cleanup_webui() {
     rm -f "$(run_file webui.pid)" 2>/dev/null
     rm -f /data/local/tmp/webui.pid 2>/dev/null
 
-    log_fn "✅ cleanup_webui completed"
+    log_msg "✅ cleanup_webui completed"
 }
 
 # ============================================================
-# [22] Orphan process cleanup
+# [19] Orphan process cleanup
 # ============================================================
+# Detects and kills processes holding a port this module owns
+# but that are not the intended process (per PID file).
+#
+# Three cases for the current port holder:
+#   1. comm == dnscrypt-webui → leftover from a previous run.
+#      Kill it.
+#   2. comm is empty → process already gone. Ignore.
+#   3. comm is anything else → a FOREIGN process. DO NOT kill.
+#      Log a warning so the operator can investigate.
+#
+# Case 3 is the critical safety valve: without it, a module
+# that was misconfigured to a common port and then corrected
+# would kill whatever legitimate service was listening.
 cleanup_orphans() {
-    log_fn "🧹 Cleaning up orphan processes..."
+    log_msg "🧹 Cleaning up orphan processes..."
 
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
-        log_fn "Found orphan dnscrypt-proxy processes, killing..."
+        log_msg "Found orphan dnscrypt-proxy processes, killing..."
         pkill -9 -x dnscrypt-proxy 2>/dev/null
     fi
 
@@ -1560,6 +1187,10 @@ cleanup_orphans() {
     local port
     port=$(get_webui_port)
     if command -v fuser >/dev/null 2>&1; then
+        # fuser writes "PID" or "PID1 PID2" (space-separated) to
+        # stdout; the "user" column goes to stderr. Extract only
+        # decimal PIDs to avoid picking up the numeric suffix of
+        # a filename on ROMs that emit the target path.
         local pid_on_port
         pid_on_port=$(fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+$' | head -n1)
 
@@ -1568,27 +1199,34 @@ cleanup_orphans() {
             comm=$(cat "/proc/$pid_on_port/comm" 2>/dev/null)
             case "$comm" in
                 dnscrypt-webui|dnscrypt-webui*)
-                    log_fn "Port $port held by PID $pid_on_port ($comm), killing..."
+                    log_msg "Port $port held by PID $pid_on_port ($comm), killing..."
                     kill -9 "$pid_on_port" 2>/dev/null
                     ;;
                 "")
-                    log_fn "Port $port held by PID $pid_on_port (process gone), ignoring"
+                    log_msg "Port $port held by PID $pid_on_port (process gone), ignoring"
                     ;;
                 *)
-                    log_fn "Port $port held by PID $pid_on_port ($comm), NOT killing (unexpected process)"
+                    log_msg "Port $port held by PID $pid_on_port ($comm), NOT killing (unexpected process)"
                     ;;
             esac
         fi
     fi
 
-    log_fn "✅ cleanup_orphans completed"
+    log_msg "✅ cleanup_orphans completed"
 }
 
 # ============================================================
-# [23] Aggressive cleanup
+# [20] Aggressive cleanup
 # ============================================================
+# Called by uninstall.sh and by any caller that needs a
+# guaranteed full teardown.
+#
+# Order:
+#   1. Processes first (release sockets before firewall teardown).
+#   2. Firewall.
+#   3. PID files last.
 aggressive_cleanup() {
-    log_fn "🧹 Aggressive cleanup starting..."
+    log_msg "🧹 Aggressive cleanup starting..."
     cleanup_proxy
     cleanup_webui
     cleanup_orphans
@@ -1597,17 +1235,30 @@ aggressive_cleanup() {
     rm -f "$(run_file watchdog.pid)" 2>/dev/null
     rm -f /data/local/tmp/watchdog.pid 2>/dev/null
 
-    log_fn "✅ Aggressive cleanup completed"
+    log_msg "✅ Aggressive cleanup completed"
 }
 
 # ============================================================
-# [24] Start WebUI
+# [21] Start WebUI
 # ============================================================
+# Launch strategy (three-way fallback):
+#   1. `setsid`         — preferred; new session so the child
+#                         survives the parent's exit.
+#   2. `busybox setsid` — same, for BusyBox-only builds.
+#   3. `nohup`          — last resort; ignores SIGHUP but does
+#                         not create a new session.
+#
+# After launch, waits up to 35 seconds for the WebUI to bind.
+# During this wait, also checks `kill -0` against the WebUI
+# PID, so a port collision (which causes the WebUI to exit
+# immediately) is detected as a distinct failure mode.
+#
+# Return: 0 = bound within timeout; 1 = died early or timeout.
 start_native_webui() {
     local bin="$1"
     local port="${2:-9090}"
 
-    log_fn "🚀 Starting WebUI (port: $port)"
+    log_msg "🚀 Starting WebUI (port: $port)"
 
     cleanup_webui
 
@@ -1635,12 +1286,12 @@ start_native_webui() {
     local i=0
     while [ "$i" -lt 35 ]; do
         if [ -n "$web_pid" ] && ! kill -0 "$web_pid" 2>/dev/null; then
-            log_fn "❌ WebUI process died unexpectedly (Port collision?)"
+            log_msg "❌ WebUI process died unexpectedly (Port collision?)"
             return 1
         fi
 
         if is_port_open "$port" tcp; then
-            log_fn "✅ WebUI bound to port $port (PID: ${web_pid:-unknown})"
+            log_msg "✅ WebUI bound to port $port (PID: ${web_pid:-unknown})"
             return 0
         fi
 
@@ -1648,35 +1299,25 @@ start_native_webui() {
         i=$((i + 1))
     done
 
-    log_fn "❌ WebUI failed to bind within 35s"
+    log_msg "❌ WebUI failed to bind within 35s"
     return 1
 }
 
 # ============================================================
-# [25] v1.2.0 — SELinux-aware file copy
+# [22] SELinux-aware file copy
 # ============================================================
 # Copies a single file and preserves its SELinux context.
-# Preference order:
-#   1. restorecon — the canonical tool
-#   2. chcon u:object_r:magisk_file:s0 — manual fallback
-#   3. no-op — if neither tool is available
+# Preference: restorecon → chcon → no-op.
+# Applies chmod 0600 (owner-only).
 #
-# Also applies chmod 0600 (owner-only), which is appropriate for
-# every file in the data-preservation set.
-#
-# ⚠️ FSH-2 fix: this function and the one in customize.sh share
-#    identical FUNCTIONAL behavior (copy + SELinux context +
-#    chmod 0600). They differ in ONE respect: how a failed cp
-#    is reported.
-#      • customize.sh → appends cp's stderr to $INSTALL_LOG
-#      • functions.sh → appends cp's stderr to $LOG_FILE
-# ============================================================
+# The error path uses `log_msg` which handles an unset
+# $LOG_FILE by falling back to stderr.
 copy_with_context() {
     local src="$1"
     local dst="$2"
 
-    if ! cp -f "$src" "$dst" 2>>"$LOG_FILE"; then
-        log_fn "❌ copy_with_context FAILED: $src → $dst"
+    if ! cp -f "$src" "$dst" 2>>"${LOG_FILE:-/dev/null}"; then
+        log_msg "❌ copy_with_context FAILED: $src → $dst"
         return 1
     fi
 
@@ -1692,31 +1333,19 @@ copy_with_context() {
 }
 
 # ============================================================
-# [25b] v1.2.0 — Watchdog token reader (FSH-11)
+# [23] Watchdog token reader
 # ============================================================
-# Reads the token file that main.go and customize.sh write to
-# $RUN_DIR/.watchdog_token (mode 0600). Used by watchdog.sh to
-# authenticate its POST /api/ensure_running_service call against
-# the X-Watchdog-Token header check in main.go (BUG-B fix).
+# Reads the token written by customize.sh §[19b] or by main.go
+# (loadOrCreateWatchdogToken). Used by watchdog.sh to
+# authenticate its POST /api/ensure_running_service call.
 #
-# The token is a 64-char hex string (256 bits). Both writers
-# (customize.sh §[19b] and main.go:loadOrCreateWatchdogToken)
-# persist it atomically so that no partial read can occur.
+# Token is 64 hex chars (256 bits). Both writers persist it
+# atomically, so no partial read can occur. Symlink rejection
+# prevents a race where the caller reads a link-target instead
+# of the token itself.
 #
-# HARD-FSH-04: prefer the $WATCHDOG_TOKEN_FILE variable set by
-# `init_runtime_paths` (identical to main.go's path), falling
-# back to a `run_file` lookup only if it is empty.
-#
-# FSH-15: reject a token file that is not a regular file
-# (symlink, FIFO, device node). This mirrors the FSH-12
-# hardening on the bootstrap cache. A compromised run/ directory
-# could theoretically redirect the token read to an attacker-
-# controlled path, and the `-L` test closes that vector.
-#
-# Return values:
-#   0 — token read successfully; printed to stdout (no newline)
-#   1 — token file missing, not a regular file, or empty
-# ============================================================
+# Return: 0 = token read (stdout, no newline); 1 = missing,
+# symlink, or too short.
 get_watchdog_token() {
     local token_file=""
 
@@ -1726,10 +1355,7 @@ get_watchdog_token() {
         token_file="$(run_file .watchdog_token)"
     fi
 
-    # FSH-15: must exist and be a regular file.
     [ -f "$token_file" ] || return 1
-
-    # FSH-15: must NOT be a symlink.
     [ -L "$token_file" ] && return 1
 
     local tok
@@ -1743,21 +1369,18 @@ get_watchdog_token() {
 }
 
 # ============================================================
-# [26] v1.2.0 — Persistent backup helpers
+# [24] Backup directory paths
 # ============================================================
-
-# --- get_backup_dir ---
 get_backup_dir() {
     printf "%s" "$PERSISTENT_BACKUP"
 }
 
-# --- ensure_backup_dir ---
-# Creates the backup root if missing, and applies chmod 0700
-# in ALL cases (FSH-6 fix).
+# ensure_backup_dir creates the backup root if missing and
+# applies chmod 0700 in ALL cases.
 #
 # On Android, /sdcard is a FUSE mount that typically ignores
-# chmod. The call is best-effort — the effective protection
-# remains the per-file chmod 0600 applied by copy_with_context.
+# chmod. The call is best-effort — the effective protection is
+# the per-file chmod 0600 applied by copy_with_context.
 ensure_backup_dir() {
     if [ ! -d "$PERSISTENT_BACKUP" ]; then
         mkdir -p "$PERSISTENT_BACKUP" 2>/dev/null || return 1
@@ -1766,12 +1389,16 @@ ensure_backup_dir() {
     return 0
 }
 
-# --- write_manifest <target_dir> <source> <count> [version] ---
+# ============================================================
+# [25] write_manifest <target_dir> <source> <count> [version]
+# ============================================================
 # Writes a .manifest.json with metadata about the snapshot.
+# Three string fields are escaped with the shared `json_escape`
+# helper: source (user-controllable), version (module.prop),
+# and root_solution (hard-coded enum).
 #
-# HARD-FSH-01: the `source` field is JSON-escaped with the
-# shared `json_escape` helper. Previously a source path
-# containing a quote or backslash produced invalid JSON.
+# `timestamp` (date format) and `files_count` (integer) are
+# safe by construction.
 write_manifest() {
     local target_dir="$1"
     local source="$2"
@@ -1782,7 +1409,6 @@ write_manifest() {
     local ts
     ts=$(date +%Y%m%d-%H%M%S)
 
-    # Detect root solution if not already known (best-effort).
     local root_sol="${ROOT_SOLUTION:-}"
     if [ -z "$root_sol" ]; then
         if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
@@ -1796,12 +1422,9 @@ write_manifest() {
         fi
     fi
 
-    # HARD-FSH-01: escape the user-controllable string fields.
-    local src_escaped
+    local src_escaped version_escaped root_escaped
     src_escaped=$(json_escape "$source")
-    local version_escaped
     version_escaped=$(json_escape "$version")
-    local root_escaped
     root_escaped=$(json_escape "$root_sol")
 
     local files_json=""
@@ -1832,19 +1455,22 @@ EOF
     return 0
 }
 
-# ------------------------------------------------------------
-# verify_backup_integrity <dir>
-# ------------------------------------------------------------
+# ============================================================
+# [26] verify_backup_integrity <dir> [strict]
+# ============================================================
 # Validates every user file in the given directory:
 #   • Non-empty
 #   • Size < 10 MB
-#   • SHA256 matches the manifest (when jq/awk/sha256 are available)
+#   • SHA256 matches the manifest (when jq/awk/sha256 available)
 #
-# Returns 0 if clean, 1 if any warnings were detected.
+# strict=0 (default) — best-effort. Missing manifest or missing
+#                     sha256sum are advisory only.
+# strict=1           — manifest and sha256sum mandatory; also
+#                     cross-checks the file count against the
+#                     manifest's files_count.
 #
-# HARD-FSH-03: when 0 user files are found, a warning is logged
-# so the caller understands why the function returned 1.
-# ============================================================
+# Returns 0 if clean, 1 if any warnings were detected. When 0
+# user files are found, logs a warning and returns 1.
 verify_backup_integrity() {
     local dir="$1"
     local strict="${2:-0}"
@@ -1861,19 +1487,17 @@ verify_backup_integrity() {
     local has_sha=0
     command -v sha256sum >/dev/null 2>&1 && has_sha=1
 
-    # v1.2.0 STRICT: manifest and sha256sum are mandatory.
     if [ "$strict" = "1" ]; then
         if [ ! -f "$manifest" ]; then
-            log_fn "⚠️ verify_backup: manifest missing: $manifest"
+            log_msg "⚠️ verify_backup: manifest missing: $manifest"
             return 1
         fi
         if [ "$has_sha" != "1" ]; then
-            log_fn "⚠️ verify_backup: sha256sum unavailable — cannot verify"
+            log_msg "⚠️ verify_backup: sha256sum unavailable — cannot verify"
             return 1
         fi
     fi
 
-    # v1.2.0 STRICT: expected file count from the manifest.
     local manifest_count=0
     if [ "$strict" = "1" ] && [ "$has_jq" = "1" ]; then
         manifest_count=$(jq -r '.files_count // 0' "$manifest" 2>/dev/null)
@@ -1888,7 +1512,7 @@ verify_backup_integrity() {
         checked=$((checked + 1))
 
         if [ ! -s "$file" ]; then
-            log_fn "⚠️ verify_backup: empty file: $f"
+            log_msg "⚠️ verify_backup: empty file: $f"
             errors=$((errors + 1))
             continue
         fi
@@ -1896,7 +1520,7 @@ verify_backup_integrity() {
         local size
         size=$(wc -c < "$file" 2>/dev/null | tr -d ' ')
         if [ -n "$size" ] && [ "$size" -gt 10485760 ]; then
-            log_fn "⚠️ verify_backup: oversized file: $f ($size bytes)"
+            log_msg "⚠️ verify_backup: oversized file: $f ($size bytes)"
             errors=$((errors + 1))
             continue
         fi
@@ -1934,10 +1558,9 @@ verify_backup_integrity() {
                            sed 's/.*"sha256"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
         fi
 
-        # v1.2.0 STRICT: missing hash is an error in strict mode.
         if [ -z "$expected_sha" ]; then
             if [ "$strict" = "1" ]; then
-                log_fn "⚠️ verify_backup: no SHA256 in manifest for: $f"
+                log_msg "⚠️ verify_backup: no SHA256 in manifest for: $f"
                 errors=$((errors + 1))
             fi
             continue
@@ -1947,52 +1570,45 @@ verify_backup_integrity() {
         actual_sha=$(sha256sum "$file" 2>/dev/null | awk '{print $1}')
 
         if [ "$actual_sha" != "$expected_sha" ]; then
-            log_fn "⚠️ verify_backup: SHA256 mismatch: $f"
-            log_fn "   expected: ${expected_sha:0:16}..."
-            log_fn "   actual:   ${actual_sha:0:16}..."
+            log_msg "⚠️ verify_backup: SHA256 mismatch: $f"
+            log_msg "   expected: ${expected_sha:0:16}..."
+            log_msg "   actual:   ${actual_sha:0:16}..."
             errors=$((errors + 1))
         fi
     done
 
     if [ "$checked" -eq 0 ]; then
-        # HARD-FSH-03: explicit log so the caller is not confused
-        # by a silent "1" return.
-        log_fn "⚠️ verify_backup: no user files found in $dir"
+        log_msg "⚠️ verify_backup: no user files found in $dir"
         return 1
     fi
 
-    # v1.2.0 STRICT: cross-check the count against the manifest.
     if [ "$strict" = "1" ] && [ "$manifest_count" -gt 0 ]; then
         if [ "$checked" -ne "$manifest_count" ]; then
-            log_fn "⚠️ verify_backup: count mismatch — manifest=$manifest_count, checked=$checked"
+            log_msg "⚠️ verify_backup: count mismatch — manifest=$manifest_count, checked=$checked"
             errors=$((errors + 1))
         fi
     fi
 
-    # v1.2.0: always log the summary (observability).
-    log_fn "ℹ️ verify_backup: checked=$checked errors=$errors in $(basename "$dir")"
+    log_msg "ℹ️ verify_backup: checked=$checked errors=$errors in $(basename "$dir")"
 
     [ "$errors" -eq 0 ]
 }
 
-# ------------------------------------------------------------
-# backup_user_files <src_dir> [dst_dir] [version]
-# ------------------------------------------------------------
-# Takes a snapshot of the 5 user files from <src_dir>.
+# ============================================================
+# [27] backup_user_files <src_dir> [dst_dir] [version]
+# ============================================================
+# Snapshots the 5 user files from <src_dir>.
 #
 # If <dst_dir> is provided, files are written directly there
-# (used by the transaction system and by main.go). Otherwise,
-# a new timestamped directory is created under $PERSISTENT_BACKUP.
+# (used by the transaction system and by main.go). Otherwise a
+# timestamped directory is created under $PERSISTENT_BACKUP:
+#     <YYYYMMDD>-<HHMMSS>-manual-<pid>
 #
 # Returns 0 on success (>= 1 file copied), 1 on any failure.
 #
-# FSH-10: the default directory name now includes the caller PID.
-#   Naming convention for the default path:
-#     <YYYYMMDD>-<HHMMSS>-manual-<pid>
-#
-#   When main.go passes an explicit dst_dir, the name is:
-#     <YYYYMMDD>-<HHMMSS>-manual-<pid>-<rand4>
-# ------------------------------------------------------------
+# Iterates over $USER_FILES only. The `apk/` mirror subfolder
+# (created by customize.sh §[10c]) is not in that list and is
+# therefore never touched.
 backup_user_files() {
     local src_dir="$1"
     local dst_dir="$2"
@@ -2000,22 +1616,21 @@ backup_user_files() {
     local ts
 
     [ -d "$src_dir" ] || {
-        log_fn "❌ backup_user_files: source dir not found: $src_dir"
+        log_msg "❌ backup_user_files: source dir not found: $src_dir"
         return 1
     }
 
     if [ -z "$dst_dir" ]; then
         ensure_backup_dir || {
-            log_fn "❌ backup_user_files: cannot create backup root"
+            log_msg "❌ backup_user_files: cannot create backup root"
             return 1
         }
         ts=$(date +%Y%m%d-%H%M%S)
-        # FSH-10: include PID in the default name.
         dst_dir="$PERSISTENT_BACKUP/$ts-manual-$$"
     fi
 
     mkdir -p "$dst_dir" 2>/dev/null || {
-        log_fn "❌ backup_user_files: cannot create target: $dst_dir"
+        log_msg "❌ backup_user_files: cannot create target: $dst_dir"
         return 1
     }
 
@@ -2029,58 +1644,107 @@ backup_user_files() {
         fi
     done
 
-    # Issue 4 fix: fail if 0 files were copied.
     if [ "$count" -eq 0 ]; then
-        log_fn "❌ backup_user_files: 0 files copied from $src_dir"
+        log_msg "❌ backup_user_files: 0 files copied from $src_dir"
         rm -rf "$dst_dir" 2>/dev/null
         return 1
     fi
 
     write_manifest "$dst_dir" "$src_dir" "$count" "$version"
 
-    log_fn "✅ backup_user_files: $count file(s) → $dst_dir"
+    log_msg "✅ backup_user_files: $count file(s) → $dst_dir"
     return 0
 }
 
-# ------------------------------------------------------------
-# restore_user_files <src_dir> [dst_dir]
-# ------------------------------------------------------------
+# ============================================================
+# [28] restore_user_files <src_dir> [dst_dir]
+# ============================================================
 # Restores the 5 user files from <src_dir> into <dst_dir>
 # (default: $MODDIR/proxy) with SELinux context preservation
 # and per-file verification.
 #
-# Returns 0 if at least one file was successfully restored,
-# 1 otherwise.
+# Returns 0 if at least one file was restored, 1 otherwise.
 #
-# FSH-14: critical-file strictness (parity with CSH-15).
-#   A restore failure of `webui.conf` or `dnscrypt-proxy.toml`
-#   is treated as a critical failure. The function returns
-#   non-zero IMMEDIATELY (without waiting for the total failure
-#   count to reach any threshold), so callers (main.go,
-#   service.sh) can abort the current operation and preserve
-#   the previous state. Without this check, a single silent
-#   failure could leave the user without their configured
-#   WebUI port or credentials.
-# ------------------------------------------------------------
+# Three-part safety model:
+#
+#   (a) PRE-FLIGHT — verify that BOTH critical source files
+#       (webui.conf, dnscrypt-proxy.toml) exist and are
+#       non-empty. If either is missing, return 1 immediately
+#       without touching dst_dir.
+#
+#   (b) SNAPSHOT — before the restore loop, save the pre-restore
+#       content of the two critical files into a temp dir. For
+#       critical files that did not exist pre-restore, record
+#       an `.absent` marker so rollback can DELETE them.
+#
+#   (c) ROLLBACK — on critical failure, restore the two critical
+#       files from the snapshot (or delete them if absent).
+#       The loop BREAKS on the first critical failure instead
+#       of continuing to overwrite non-critical files with data
+#       from an unverified source.
+#
+# Iterates over $USER_FILES only. The `apk/` mirror subfolder
+# is never touched.
 restore_user_files() {
     local src_dir="$1"
     local dst_dir="${2:-$MODDIR/proxy}"
 
     [ -d "$src_dir" ] || {
-        log_fn "❌ restore_user_files: source dir not found: $src_dir"
+        log_msg "❌ restore_user_files: source dir not found: $src_dir"
         return 1
     }
 
     mkdir -p "$dst_dir" 2>/dev/null || {
-        log_fn "❌ restore_user_files: cannot create target: $dst_dir"
+        log_msg "❌ restore_user_files: cannot create target: $dst_dir"
         return 1
     }
 
-    # Verify source integrity first (advisory)
+    # --- (a) PRE-FLIGHT ---
+    local _critical_missing=0
+    local _cf
+    for _cf in webui.conf dnscrypt-proxy.toml; do
+        if [ ! -f "$src_dir/$_cf" ] || [ ! -s "$src_dir/$_cf" ]; then
+            log_msg "❌ restore_user_files: critical source missing/empty: $_cf"
+            _critical_missing=1
+        fi
+    done
+    if [ "$_critical_missing" = "1" ]; then
+        log_msg "❌ restore_user_files: aborting — critical source(s) incomplete"
+        return 1
+    fi
+
     verify_backup_integrity "$src_dir" || {
-        log_fn "⚠️ restore_user_files: source has integrity warnings (continuing)"
+        log_msg "⚠️ restore_user_files: source has integrity warnings (continuing)"
     }
 
+    # --- (b) SNAPSHOT ---
+    # The temp dir lives inside dst_dir so the later `mv`/`cp`
+    # stays on the same filesystem. It carries a distinctive
+    # `.restore_snap.*` prefix that `rotate_backups` excludes
+    # (no `.manifest.json`), so a signal-interrupted restore
+    # cannot leak a false snapshot into the rotation set.
+    local _snapdir=""
+    _snapdir=$(mktemp -d "${dst_dir}/.restore_snap.XXXXXX" 2>/dev/null) || _snapdir=""
+
+    if [ -n "$_snapdir" ]; then
+        local _cf2
+        for _cf2 in webui.conf dnscrypt-proxy.toml; do
+            if [ -f "$dst_dir/$_cf2" ] && [ -s "$dst_dir/$_cf2" ]; then
+                if ! cp -f "$dst_dir/$_cf2" "$_snapdir/$_cf2" 2>/dev/null; then
+                    log_msg "⚠️ restore_user_files: snapshot of $_cf2 failed — no rollback available"
+                    rm -rf "$_snapdir" 2>/dev/null
+                    _snapdir=""
+                    break
+                fi
+            else
+                : > "$_snapdir/$_cf2.absent" 2>/dev/null
+            fi
+        done
+    else
+        log_msg "⚠️ restore_user_files: mktemp -d failed — no rollback available"
+    fi
+
+    # --- Restore loop ---
     local restored=0
     local failed=0
     local critical_failed=0
@@ -2096,7 +1760,8 @@ restore_user_files() {
                     case "$f" in
                         webui.conf|dnscrypt-proxy.toml)
                             critical_failed=1
-                            log_fn "❌ restore_user_files: CRITICAL verify failure: $f"
+                            log_msg "❌ restore_user_files: CRITICAL verify failure: $f"
+                            break
                             ;;
                     esac
                 fi
@@ -2105,99 +1770,101 @@ restore_user_files() {
                 case "$f" in
                     webui.conf|dnscrypt-proxy.toml)
                         critical_failed=1
-                        log_fn "❌ restore_user_files: CRITICAL copy failure: $f"
+                        log_msg "❌ restore_user_files: CRITICAL copy failure: $f"
+                        break
                         ;;
                 esac
             fi
         fi
     done
 
-    # FSH-14: critical-file failure short-circuits.
+    # --- (c) ROLLBACK ---
+    if [ "$critical_failed" = "1" ] && [ -n "$_snapdir" ]; then
+        log_msg "🔄 restore_user_files: rolling back critical files..."
+        local _cf3
+        for _cf3 in webui.conf dnscrypt-proxy.toml; do
+            if [ -f "$_snapdir/$_cf3" ]; then
+                if cp -f "$_snapdir/$_cf3" "$dst_dir/$_cf3" 2>/dev/null; then
+                    chmod 0600 "$dst_dir/$_cf3" 2>/dev/null
+                    log_msg "  ✓ Rolled back: $_cf3"
+                else
+                    log_msg "  ⚠️ Rollback of $_cf3 failed"
+                fi
+            elif [ -f "$_snapdir/$_cf3.absent" ]; then
+                if rm -f "$dst_dir/$_cf3" 2>/dev/null; then
+                    log_msg "  ✓ Removed (was absent): $_cf3"
+                fi
+            fi
+        done
+    fi
+
+    [ -n "$_snapdir" ] && rm -rf "$_snapdir" 2>/dev/null
+
     if [ "$critical_failed" = "1" ]; then
-        log_fn "❌ restore_user_files: critical file(s) failed — aborting"
+        log_msg "❌ restore_user_files: critical file(s) failed — aborting"
         return 1
     fi
 
     if [ "$failed" -gt 0 ]; then
-        log_fn "⚠️ restore_user_files: $failed non-critical file(s) failed"
+        log_msg "⚠️ restore_user_files: $failed non-critical file(s) failed"
     fi
 
     if [ "$restored" -gt 0 ]; then
-        log_fn "✅ restore_user_files: $restored file(s) ← $src_dir"
+        log_msg "✅ restore_user_files: $restored file(s) ← $src_dir"
         return 0
     fi
 
-    log_fn "❌ restore_user_files: no files restored from $src_dir"
+    log_msg "❌ restore_user_files: no files restored from $src_dir"
     return 1
 }
 
-# ------------------------------------------------------------
-# rotate_backups [keep_count]
-# ------------------------------------------------------------
+# ============================================================
+# [29] rotate_backups [keep_count]
+# ============================================================
 # Prunes the persistent backup directory to keep at most
 # `keep_count` snapshots (default 21), preserving:
 #   • current/      (live snapshot)
 #   • txn-*/        (in-flight transactions)
 #   • orphan-txn-*/ (preserved interrupted transactions)
+#   • apk/          (companion APK mirror, v1.5.0)
+#   • .restore_snap.* (transient restore scratch — no manifest)
 #   • .last_stable  (pointer)
 #   • .upgrade_history.json / .txt
 #   • .last_auto_backup
 #   • README.md
 #
-# v1.3.0 REWRITE (FSH-18) — the detection, ordering, and
-# protection logic was rewritten in v1.3.0 for robustness.
-# See the inline block at the top of the function body for
-# the implementation notes:
-#   • ROT-MANIFEST  — snapshots are detected by the presence
-#                     of `.manifest.json` (not by name pattern).
-#   • ROT-MTIME     — candidates are sorted by mtime (numeric,
-#                     descending), not by directory name.
-#                     Robust against clock drift and manual
-#                     renames.
-#   • ROT-PROTECT   — two additional targets are preserved on
-#                     top of the 21-newest window:
-#                       - the `.last_stable` target;
-#                       - the newest install snapshot.
+# Three rotation semantics:
 #
-# v1.2.0 HISTORY — the original v1.2.0 implementation sorted
-# by directory name (which starts with `YYYYMMDD-HHMMSS-`) and
-# did NOT explicitly protect `.last_stable` or the newest
-# install. That implementation was replaced in v1.3.0. Do NOT
-# restore it.
+#   • ROT-MANIFEST — snapshots are detected by the presence of
+#     `.manifest.json` (not by name pattern).
 #
-# HARD-FSH-10: refuse to prune when the directory is not
-# readable, and log the skip.
-# ------------------------------------------------------------
+#   • ROT-MTIME — candidates are sorted by mtime (numeric,
+#     descending), not by directory name.
+#
+#   • ROT-PROTECT — two additional targets are preserved on
+#     top of the 21-newest window:
+#       - the `.last_stable` target (recovery pointer)
+#       - the newest install snapshot (name matching `-v<digit>`)
+#
+# Canonical status: THIS is the reference implementation.
+# `customize.sh` §[22b] carries a mirrored copy because the
+# installer runs before the module is extracted and cannot
+# source this file. Any change here MUST be applied to the
+# customize.sh copy as well.
+#
+# The `apk/` mirror subfolder is preserved by TWO independent
+# mechanisms:
+#   (a) The `case` statement explicitly skips it.
+#   (b) It has no `.manifest.json`, so ROT-MANIFEST would
+#       exclude it even without (a).
 rotate_backups() {
     local keep="${1:-21}"
 
     [ -d "$PERSISTENT_BACKUP" ] || return 0
     [ -r "$PERSISTENT_BACKUP" ] || {
-        log_fn "⚠️ rotate_backups: $PERSISTENT_BACKUP is not readable — skipping"
+        log_msg "⚠️ rotate_backups: $PERSISTENT_BACKUP is not readable — skipping"
         return 0
     }
-
-    # ============================================================
-    # v1.3.0 — Professional rotation logic
-    #          (ROT-MANIFEST + ROT-MTIME + ROT-PROTECT)
-    # ============================================================
-    # Detection (ROT-MANIFEST):
-    #   A directory is a snapshot iff it contains a
-    #   `.manifest.json` file. Excludes current/, txn-*/,
-    #   and orphan-txn-*/.
-    # Sorting (ROT-MTIME):
-    #   Candidates are ordered by mtime (numeric, descending),
-    #   not by directory name. Robust against clock drift and
-    #   against custom snapshot names.
-    # Preservation (ROT-PROTECT):
-    #   Two additional snapshots are protected on top of the
-    #   21-newest window:
-    #     • .last_stable target        (recovery pointer)
-    #     • newest install snapshot    (name contains -v<digit>)
-    #
-    # See CHANGELOG.md (v1.3.0) and
-    # docs/ARCHITECTURE.md §4.13.2 and §11.31–§11.33.
-    # ============================================================
 
     local _protected=""
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
@@ -2211,7 +1878,7 @@ rotate_backups() {
             _d="${_d%/}"
             [ -d "$_d" ] || continue
             case "$_d" in
-                current|txn-*|orphan-txn-*) continue ;;
+                current|txn-*|orphan-txn-*|apk|.restore_snap.*) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
             _mt=$(stat -c %Y "$_d" 2>/dev/null) \
@@ -2219,7 +1886,7 @@ rotate_backups() {
                 || _mt=0
             case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
             printf '%s %s\n' "$_mt" "$_d"
-        done | sort -rn -k1,1
+        done | LC_ALL=C sort -rn -k1,1
     )
 
     [ -z "$_list" ] && return 0
@@ -2228,12 +1895,12 @@ rotate_backups() {
     total=$(printf '%s\n' "$_list" | wc -l | tr -d ' ')
 
     if [ "$total" -le "$keep" ]; then
-        log_fn "ℹ️ rotate_backups: $total snapshot(s) — within limit ($keep)"
+        log_msg "ℹ️ rotate_backups: $total snapshot(s) — within limit ($keep)"
         return 0
     fi
 
     local to_remove=$((total - keep))
-    log_fn "🧹 rotate_backups: removing $to_remove old snapshot(s) (keeping $keep)"
+    log_msg "🧹 rotate_backups: removing $to_remove old snapshot(s) (keeping $keep)"
 
     local _newest_install
     _newest_install=$(
@@ -2247,37 +1914,33 @@ rotate_backups() {
     while IFS=' ' read -r _mt _name; do
         [ -z "$_name" ] && continue
         if [ "$_name" = "$_protected" ]; then
-            log_fn "  🛡️ Preserved (last_stable): $_name"
+            log_msg "  🛡️ Preserved (last_stable): $_name"
             continue
         fi
         if [ "$_name" = "$_newest_install" ]; then
-            log_fn "  🛡️ Preserved (newest install): $_name"
+            log_msg "  🛡️ Preserved (newest install): $_name"
             continue
         fi
         if rm -rf "${PERSISTENT_BACKUP:?}/${_name:?}" 2>/dev/null; then
-            log_fn "  🗑️ Removed: $_name"
+            log_msg "  🗑️ Removed: $_name"
         fi
     done <<EOF
 $(printf '%s\n' "$_list" | tail -n "$to_remove")
 EOF
 
-    log_fn "✅ rotate_backups: done"
+    log_msg "✅ rotate_backups: done"
     return 0
 }
 
-# ------------------------------------------------------------
-# get_last_backup_time
-# ------------------------------------------------------------
+# ============================================================
+# [30] get_last_backup_time
+# ============================================================
 # Returns the epoch mtime of .last_auto_backup, or 0 if the
 # marker does not exist.
-# ------------------------------------------------------------
 get_last_backup_time() {
     local marker="$PERSISTENT_BACKUP/.last_auto_backup"
 
-    if [ ! -f "$marker" ]; then
-        printf "0"
-        return 0
-    fi
+    [ ! -f "$marker" ] && { printf "0"; return 0; }
 
     local mtime
     mtime=$(stat -c %Y "$marker" 2>/dev/null) \
@@ -2287,29 +1950,24 @@ get_last_backup_time() {
     printf "%s" "$mtime"
 }
 
-# ------------------------------------------------------------
-# auto_backup_if_needed [interval_seconds]
-# ------------------------------------------------------------
+# ============================================================
+# [31] auto_backup_if_needed [interval_seconds]
+# ============================================================
 # Triggers a backup if the last one is older than
 # `interval_seconds` (default 86400 = 24 hours).
 #
-# Uses $PERSISTENT_BACKUP/.last_auto_backup as the marker file.
-# Called by service.sh on every boot (Layer 9).
+# Uses $PERSISTENT_BACKUP/.last_auto_backup as the marker.
+# Called by service.sh on every boot.
 #
-# HARD-FSH-11: the marker is updated only after verifying that
-# the target directory actually exists. A partial failure does
-# not lock out the next attempt for 24 hours.
+# The marker is updated only after verifying the target
+# directory exists. A silent failure would otherwise push the
+# next attempt 24 hours into the future.
 #
-# FSH-13: the previous version ran both `: > "$marker"` and
-#   `touch "$marker"`. The first already creates the file and
-#   updates its mtime; the second was redundant. Only `touch`
-#   remains, since it expresses the intent ("update the marker")
-#   directly.
-# ------------------------------------------------------------
+# Neither this function nor rotate_backups() touches the apk/
+# mirror.
 auto_backup_if_needed() {
     local interval="${1:-86400}"
 
-    # Validate interval is numeric
     if ! echo "$interval" | grep -qE '^[0-9]+$'; then
         interval=86400
     fi
@@ -2336,60 +1994,45 @@ auto_backup_if_needed() {
     local age=$((now - last))
 
     if [ "$last" -gt 0 ] && [ "$age" -lt "$interval" ]; then
-        log_fn "ℹ️ auto_backup: skipped (last was ${age}s ago, interval=${interval}s)"
+        log_msg "ℹ️ auto_backup: skipped (last was ${age}s ago, interval=${interval}s)"
         return 0
     fi
 
-    log_fn "🔄 auto_backup: starting (age=${age}s, interval=${interval}s)"
+    log_msg "🔄 auto_backup: starting (age=${age}s, interval=${interval}s)"
 
     local ts
     ts=$(date +%Y%m%d-%H%M%S)
-    # FSH-10: include PID in the target name.
     local target="$PERSISTENT_BACKUP/$ts-auto-$$"
 
     if backup_user_files "$src_dir" "$target"; then
-        # HARD-FSH-11: verify the target actually exists before
-        # advancing the marker. A silent failure here would push
-        # the next attempt 24 hours into the future.
         if [ -d "$target" ]; then
-            # FSH-13: single touch — the redundant `: >` was
-            # removed. `touch` creates the file if missing and
-            # updates its mtime otherwise, which is exactly the
-            # marker semantics we need.
             touch "$PERSISTENT_BACKUP/.last_auto_backup" 2>/dev/null || true
         else
-            log_fn "⚠️ auto_backup: target dir missing after backup — marker not updated"
+            log_msg "⚠️ auto_backup: target dir missing after backup — marker not updated"
             return 1
         fi
 
-        # Rotate to keep the total bounded
         rotate_backups 21
 
-        log_fn "✅ auto_backup: complete → $target"
+        log_msg "✅ auto_backup: complete → $target"
         return 0
     fi
 
-    log_fn "❌ auto_backup: failed"
+    log_msg "❌ auto_backup: failed"
     return 1
 }
 
-# ------------------------------------------------------------
-# cleanup_old_transactions
-# ------------------------------------------------------------
+# ============================================================
+# [32] cleanup_old_transactions
+# ============================================================
 # Removes COMMIT'd txn-* directories from previous installs.
-#
-# The transaction system (customize.sh Layer 4) creates:
-#   $PERSISTENT_BACKUP/txn-<timestamp>-<pid>/
-#     ├── .state    — "START" | "COMMIT" | "ROLLBACK"
-#     ├── .pid      — installer PID
-#     └── <files>   — snapshot for rollback
 #
 # ROLLBACK and START transactions are PRESERVED — they may
 # contain the only copy of a user's data if an install was
 # interrupted mid-flight.
 #
-# FSH-4 fix: `_txn` and `_state` are declared `local`.
-# ------------------------------------------------------------
+# Iterates over txn-* directories only. The apk/ mirror does
+# not match that prefix and is never touched.
 cleanup_old_transactions() {
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
@@ -2409,7 +2052,7 @@ cleanup_old_transactions() {
     done
 
     if [ "$_removed" -gt 0 ]; then
-        log_fn "✅ cleanup_old_transactions: removed $_removed COMMIT'd txn(s)"
+        log_msg "✅ cleanup_old_transactions: removed $_removed COMMIT'd txn(s)"
     fi
 
     return 0

@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CODEOWNERS
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.5.0 (Global Edition)
+# Last updated: 2026-10-17
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -31,236 +31,127 @@
 #
 # ⚠️ Note:
 #   CODEOWNERS works on FILE PATHS only — it does NOT control
-#   branch rules. For branch policies (which branches can be
-#   pushed to, PR targets, etc.), see:
-#     • docs/BRANCHING.md §6 (Branch Protection)
+#   branch rules. For branch policies, see:
+#     • docs/CONTRIBUTING.md §12 (Branch Protection)
 #     • Repository Settings → Branches
 #     • Repository Settings → Rules → Rulesets
-#
 # ============================================================
-# Identifier inventory in this file (6 total):
+# Identifier inventory in this file (9 total):
 #   • CO-1, CO-2, CO-3                            (3)
 #       — v1.2.0 post-audit corrections
 #   • CO-V14-01, CO-V14-02, CO-V14-03             (3)
 #       — v1.4.0 additions
-#   • HARD-CO-01 (v1.4.0 audit — Last updated fix)
-#   • HARD-CO-02 (v1.4.0 audit — v1.3.0 block added)
-#   • HARD-CO-03 (v1.4.0 audit — Cross-references added)
+#   • HARD-CO-01, HARD-CO-02, HARD-CO-03          (3)
+#       — v1.4.0 audit corrections
+#   • CO-V15-01, CO-V15-02, CO-V15-03             (3)
+#       — v1.5.0 additions
+#   • HARD-CO-04 (v1.5.0 audit — count fix + new files)
 #
 # Cross-references:
-#   • docs/BRANCHING.md §6           — branch protection policy
+#   • docs/CONTRIBUTING.md §12       — branch protection policy
 #   • docs/CONTRIBUTING.md           — contribution guide
-#   • docs/ARCHITECTURE.md §4.13     — v1.3.0 server-side refinements (authoritative)
-#   • docs/BACKUP.md                 — backup system reference (v1.2.0 + v1.3.0 rotation)
-#   • docs/EMERGENCY.md              — emergency recovery (v1.2.0)
-#   • docs/adr/README.md §4          — ADR lifecycle
-#   • .github/workflows/release.yml  — release pipeline (Non-goals section)
-#   • CHANGELOG.md                   — version history (v1.0.0 → v1.4.0)
+#   • docs/REFERENCE.md §3           — v1.3.0 server-side refinements
+#   • docs/REFERENCE.md §1.4         — Layered Bootstrap (v1.5.0)
+#   • docs/REFERENCE.md §3.12        — install_app.sh contract (v1.5.0)
+#   • docs/REFERENCE.md §4           — backup system reference
+#   • docs/GUIDE.md §8               — emergency recovery
+#   • docs/adr/README.md             — ADR lifecycle
+#   • .github/workflows/release.yml  — release pipeline
+#   • CHANGELOG.md                   — version history
 # ============================================================
 # v1.1.0 additions (kept):
-#   • Added /docs/adr/ — all Architecture Decision Records are
-#     reviewed together. ADRs are immutable once accepted and
-#     encode long-term architectural choices, so they get the
-#     same reviewer as core code.
-#   • Added /scripts/release-patch.sh — the PATCH-release
-#     automation introduced during the v1.0.0 cycle
-#     (see docs/adr/0006).
-#   • Added /.github/PULL_REQUEST_TEMPLATE/ — the release-specific
-#     PR template introduced in docs/adr/0005.
-#   • Reorganized patterns into numbered sections matching the
-#     style used in other repository configuration files.
-#   • Expanded the "Notes on branch policy" section to point at
-#     the newer Rulesets UI in addition to classic Branch
-#     Protection.
+#   • Added /docs/adr/ — all ADRs reviewed together.
+#   • Added /scripts/release-patch.sh — PATCH-release automation.
+#   • Added /.github/PULL_REQUEST_TEMPLATE/ — release-specific PR template.
+#   • Reorganized patterns into numbered sections.
+#   • Expanded "Notes on branch policy" to point at Rulesets UI.
+#
+# v1.2.0 additions (kept):
+#   • Added explicit ownership for data-preservation artifacts:
+#       /proxy/customize.sh, /proxy/functions.sh, /proxy/service.sh,
+#       /proxy/status.sh, /proxy/main.go.
+#   • Added backup / emergency / upgrade documentation.
+#     (v1.5.0 consolidation: content now in docs/REFERENCE.md §4,
+#      docs/GUIDE.md §8, docs/GUIDE.md §5).
+#   • Added /.github/workflows/upgrade-test.yml (42-scenario matrix).
+#   • Regrouped core shell scripts into lifecycle vs runtime.
+#   • All comments English-only.
+#
+# v1.2.0 — POST-AUDIT FIXES (kept):
+#   • CO-1 — Section [4] claim about release signing/SBOM corrected.
+#   • CO-2 — Added 5 missing critical files to explicit sections:
+#       /META-INF/, /.github/ISSUE_TEMPLATE/, /.github/SECURITY.md,
+#       /proxy/build.sh, /proxy/dnscrypt-proxy.version.
+#   • CO-3 — Header example pattern clarified.
+#
+# v1.3.0 — Server-side rotation refinements (kept):
+#   • SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT.
+#   • Affected files listed for reviewer awareness.
+#   • Ownership impact: NONE (all files already covered).
+#
+# v1.4.0 — Companion Android app integration (kept):
+#   • CO-V14-01 — `web/app-debug.apk` (covered by /web/) +
+#     `scripts/fetch_app_apk.sh` (§[8]) + `proxy/app-apk.version` (§[2]).
+#   • CO-V14-02 — CodeQL fix in `/proxy/main.go` (covered by §[2]).
+#   • CO-V14-03 — Docs review unchanged.
+#
+# v1.4.0 — POST-AUDIT FIXES (kept):
+#   • HARD-CO-01 — Last updated corrected to 2026-10-08.
+#   • HARD-CO-02 — v1.3.0 block added above this section.
+#   • HARD-CO-03 — Cross-references block added.
 #
 # ============================================================
-# v1.2.0 additions:
-#   • Version bumped from v1.1.0 to v1.2.0.
-#   • Added explicit ownership for the v1.2.0 data-preservation
-#     artifacts:
-#       - /proxy/customize.sh   → primary owner of the 10 layers
-#       - /proxy/functions.sh   → backup helpers
-#       - /proxy/service.sh     → periodic auto-backup trigger
-#       - /proxy/status.sh      → --diagnose tool (Layer 10)
-#       - /proxy/main.go        → createAutoBackup + notifications
-#     These were already covered by the /proxy/ pattern, but are
-#     now listed explicitly because they encode the entire
-#     data-preservation contract. Any change here requires
-#     careful review.
-#   • Added /docs/BACKUP.md and /docs/EMERGENCY.md as
-#     high-priority documentation requiring the maintainer's
-#     review. These describe runtime behavior on a real device
-#     and must stay in sync with the shell scripts above.
-#   • Added /docs/UPGRADE.md — the upgrade guide is the
-#     user-facing companion to the data-preservation layers.
-#     Any change to §3.0 (v1.0.0 → v1.1.0) or §3.1 (v1.1.0 →
-#     v1.2.0) must be reviewed together with the corresponding
-#     change in customize.sh.
-#   • The list of core shell scripts (§2) was regrouped:
-#       - Lifecycle scripts (customize, service, post-fs-data,
-#         uninstall) are now marked as "data-preservation critical".
-#       - Runtime scripts (action, status, functions, watchdog)
-#         are grouped separately.
-#   • Added /.github/workflows/upgrade-test.yml to the CI/CD
-#     section — the 42-scenario data-preservation matrix is a
-#     critical piece of the v1.2.0 pipeline.
-#   • Documentation section expanded to include:
-#       - /docs/BACKUP.md
-#       - /docs/EMERGENCY.md
-#       - /docs/UPGRADE.md
-#   • All comments and messages are English-only (global
-#     edition). No Arabic strings exist in this file.
-#
+# v1.5.0 — Global Edition
 # ============================================================
-# v1.2.0 — POST-AUDIT FIXES (still v1.2.0)
+#   🆕 CO-V15-01 — Two new critical shell scripts added to §[2]:
+#       /proxy/boot-mini.sh      — Layer 0 (ADR-0003, Phase 0)
+#       /proxy/install_app.sh    — 5-level pm install cascade (v1.5.0)
+#     Plus one new dependency file:
+#       /proxy/go.sum            — checksum for filepath-securejoin
+#                                  (ADR-0002)
+#
+#   🆕 CO-V15-02 — Two new ADR files added to §[9]:
+#       /docs/adr/0002-external-dependency.md
+#       /docs/adr/0003-layered-bootstrap.md
+#     The /docs/adr/ pattern already covers them; listed here for
+#     traceability.
+#
+#   🆕 CO-V15-03 — Reference + CodeQL config:
+#       /docs/REFERENCE.md §7                — added to §[6] and §[10]
+#       /.github/codeql/codeql-config.yml    — added to §[5]
+#       /.shellcheckrc                       — added to §[11]
+#
+#   Impact on ownership: NONE (all files fall under @gasciljh).
+#   All v1.5.0 additions were already covered by directory patterns;
+#   the explicit entries exist for reviewer clarity.
+#
+#   ⚠️ v1.5.0 introduces the first external Go dependency. Any
+#      future PR touching /proxy/go.mod or /proxy/go.sum requires
+#      an ADR per the compliance rule of ADR-0002.
+#
+#   ⚠️ v1.5.0 introduces Layer 0 (boot-mini.sh). Any future PR
+#      that adds a new Layer-0 primitive MUST update:
+#        • proxy/boot-mini.sh
+#        • proxy/functions.sh (only if it needs to alias it)
+#        • .github/workflows/ci.yml Step 9 (verify Layer-0 integrity)
+#      See docs/adr/0003-layered-bootstrap.md.
 # ============================================================
-# A pre-release audit of this file identified the following
-# issues. All of them are addressed in-place; no version bump.
-#
-#   🔧 CO-1 — Section [4] claimed the maintainer reviews
-#     "release signing, SBOM + Attestations, security policy".
-#     The first two claims were FALSE — this project does not
-#     sign releases (the tag is annotated, not signed), does
-#     not produce a Cosign signature, and does not generate an
-#     SBOM. See the "Non-goals" section in
-#     .github/workflows/release.yml for the authoritative list.
-#     The comment in section [4] now lists only what actually
-#     exists (version + versionCode, SHA256 checksum,
-#     security policy). This is the same class of correction
-#     that was applied to release.yml (REL-1, REL-2, REL-3)
-#     and to README.md.
-#
-#   🔧 CO-2 — Five classes of files that are CRITICAL to the
-#     module's install/runtime behavior were not listed
-#     explicitly. They were covered only by the catch-all `*`
-#     pattern, which made them invisible to a reader who scans
-#     this file to understand what "critical" means:
-#       • /META-INF/                — Magisk install entry point
-#       • /.github/ISSUE_TEMPLATE/  — structured bug reports
-#       • /.github/SECURITY.md      — vulnerability disclosure
-#       • /proxy/build.sh           — the cross-compile driver
-#       • /proxy/dnscrypt-proxy.version — single source of truth
-#                                      for the DNS engine version
-#     All five are now listed in their appropriate sections.
-#     META-INF is in a new section [4b] because it is neither
-#     frontend nor backend — it is the installer bootstrap.
-#
-#   🔧 CO-3 — The header listed `/docs/*.md` as an example of
-#     a "specific files" pattern, but the file itself only uses
-#     directory patterns (`/docs/`). The header now presents
-#     the glob form as an EXAMPLE (not as something used here),
-#     and adds the `*.go` extension-glob form as a second
-#     example, so the reader understands both styles.
-#
+# HARD-CO-04 — v1.5.0 audit corrections
 # ============================================================
-# v1.3.0 — Server-side rotation refinements (HARD-CO-02)
-# ============================================================
-#   📌 The v1.3.0 release did not change the CODEOWNERS
-#      patterns themselves. All v1.2.0 patterns remain valid.
+#   🔧 Count fix: the identifier inventory at the top previously
+#     said "6 total" but the list contained 9 identifiers. The
+#     counter now reads "9 total" (v1.4.0 baseline) + the new
+#     v1.5.0 identifiers.
 #
-#   However, the v1.3.0 release DID change the internal
-#   semantics of several files that are already covered by
-#   §[2] and §[10] below. The change is documented here so
-#   that a future reviewer understands what to look for when
-#   those files change.
+#   🔧 Added 8 v1.5.0 files to their appropriate sections:
+#       §[2]  — boot-mini.sh, install_app.sh, go.sum
+#       §[5]  — codeql-config.yml
+#       §[6]  — REFERENCE.md §7 (MANIFEST_NOTES content)
+#       §[9]  — ADR-0002, ADR-0003 (already covered by /docs/adr/)
+#       §[10] — REFERENCE.md §7 (also cross-referenced)
+#       §[11] — .shellcheckrc
 #
-#   Server-side refinements (backup layer):
-#     The v1.3.0 release rewrote the snapshot-detection and
-#     rotation semantics shared by every consumer of the
-#     persistent backup directory. Three identifiers (used in
-#     CHANGELOG.md [v1.3.0] and docs/ARCHITECTURE.md §4.13):
-#
-#       🔧 SNAP-MANIFEST — `main.go:buildBackupInfo()` now
-#         detects a snapshot by `.manifest.json` presence,
-#         not by the v1.2.0 name pattern.
-#
-#       🔧 SNAP-MTIME — `last_backup_name` is now selected by
-#         mtime (descending), with a name-based fallback.
-#
-#       🔧 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT —
-#         `functions.sh:rotate_backups()` was rewritten with
-#         the same detection, the same sort, and two
-#         additional protected targets (`.last_stable` +
-#         newest install snapshot).
-#
-#   Files affected by the v1.3.0 refinement:
-#     • /proxy/main.go            (SNAP-* — §[2])
-#     • /proxy/functions.sh       (ROT-* — §[2])
-#     • /proxy/service.sh         (boot-path DNS auto-start)
-#     • /proxy/watchdog.sh        (§[5b] counter)
-#     • /proxy/status.sh          (_list_snapshots)
-#     • /proxy/customize.sh       (rotate_backups)
-#     • /proxy/action.sh          (_inline_rotate_backups +
-#                                  _inline_backup_summary)
-#     • /proxy/uninstall.sh       (§[5b] BACKUP_COUNT /
-#                                  BACKUP_LAST_NAME)
-#     • /docs/BACKUP.md           (rotation semantics — §[10])
-#     • /docs/ARCHITECTURE.md     (§4.13 — not explicitly
-#                                  owned; falls back to `*`)
-#
-#   Ownership impact: NONE.
-#     All affected files were already covered by their
-#     respective patterns. No new entry is required.
-#
-#   Review reminder: any future change to one of the files
-#   above MUST keep the SNAP-* / ROT-* semantics consistent
-#   across the module. See docs/ARCHITECTURE.md §4.13.2.
-#
-# ============================================================
-# v1.4.0 — Companion Android app integration
-# ============================================================
-#   🆕 CO-V14-01 — The module now bundles an OPTIONAL companion
-#     Android app APK (`web/app-debug.apk`). The file is staged
-#     by `.github/workflows/release.yml` via
-#     `scripts/fetch_app_apk.sh` before packaging. It is NOT
-#     committed to git (see `.gitignore`).
-#
-#     Ownership impact:
-#       • `/web/` — already covers `app-debug.apk` (via the
-#         existing directory pattern). No new entry needed.
-#       • `scripts/fetch_app_apk.sh` — added to §[8] (release
-#         tooling), because it participates in the release
-#         pipeline.
-#       • `proxy/app-apk.version` — added to §[2] (critical core),
-#         because it is the Single Source of Truth for the
-#         companion app version (read by `fetch_app_apk.sh`).
-#
-#   🆕 CO-V14-02 — New CodeQL fix in `/proxy/main.go`
-#     (`removeModule` — `go/path-injection` hardening). Already
-#     covered by the `/proxy/main.go` entry in §[2].
-#
-#   🆕 CO-V14-03 — Documentation review unchanged. The
-#     v1.4.0 release did not add new documentation files under
-#     `docs/`. The existing `/docs/` pattern covers everything.
-#
-# ============================================================
-# v1.4.0 — POST-AUDIT FIXES (this revision)
-# ============================================================
-#   A post-audit review of this file against the v1.3.0 / v1.4.0
-#   code identified the following documentation gaps. All are
-#   addressed in-place; no version bump.
-#
-#   🔧 HARD-CO-01 — `Last updated` corrected. The header
-#     previously said `2026-10-02` (the v1.3.0 release date,
-#     not the v1.4.0 file-editing date). It now reads
-#     `2026-10-08`, matching every other file in the v1.4.0
-#     module.
-#
-#   🔧 HARD-CO-02 — `v1.3.0` block added. The file previously
-#     jumped directly from the v1.2.0 POST-AUDIT block to the
-#     v1.4.0 block, with no mention of the v1.3.0 server-side
-#     refinements (SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST,
-#     ROT-MTIME, ROT-PROTECT). A new v1.3.0 block above
-#     documents them, and lists the affected files for
-#     reviewer awareness.
-#
-#   🟢 HARD-CO-03 — Cross-references block added at the top of
-#     the file, listing the authoritative sources for the
-#     v1.3.0 rotation semantics (`docs/ARCHITECTURE.md` §4.13),
-#     the branch protection policy (`docs/BRANCHING.md` §6),
-#     and the release-pipeline non-goals
-#     (`.github/workflows/release.yml`).
-#
+#   🟢 Added "Additional notes" entries for v1.5.0 review obligations.
 # ============================================================
 
 # ============================================================
@@ -276,53 +167,56 @@
 # ============================================================
 
 # --- Backend Go (security core) ---
-# HARD-CO-02 note: /proxy/main.go also carries the v1.3.0
-# SNAP-MANIFEST + SNAP-MTIME refinements to buildBackupInfo(),
-# and the v1.4.0 CodeQL go/path-injection hardening in
-# removeModule(). Any change here requires alignment with
-# docs/ARCHITECTURE.md §4.13.
+# HARD-CO-02 note: /proxy/main.go carries the v1.3.0 SNAP-MANIFEST
+# + SNAP-MTIME refinements, the v1.4.0 CodeQL go/path-injection
+# hardening, and the v1.5.0 companion-install endpoints + helpers.
+# Any change here requires alignment with:
+#   docs/REFERENCE.md §3 (SNAP-*/ROT-*)
+#   docs/REFERENCE.md §3.12 (companion install backend)
+#   docs/REFERENCE.md §2.7.14, §2.7.15, §2.6.16, §2.6.17 (v1.5.0 endpoints)
 /proxy/main.go              @gasciljh
 /proxy/go.mod               @gasciljh
+# CO-V15-01: go.sum pins the first (and only) external dependency
+# (filepath-securejoin v0.7.0, ADR-0002). Any change here requires
+# an ADR per the compliance rule of ADR-0002.
+/proxy/go.sum               @gasciljh
 
 # --- Data-preservation scripts (v1.2.0 — Layer 1–8) ---
 # These scripts implement the 10 defensive layers. Any change
 # requires a careful review of the corresponding section in
-# docs/BACKUP.md and docs/EMERGENCY.md.
-# HARD-CO-02 note: /proxy/customize.sh's rotate_backups() was
-# rewritten in v1.3.0 with the ROT-* semantics (parity with
-# functions.sh).
+# docs/REFERENCE.md §4 and docs/GUIDE.md §8.
 /proxy/customize.sh         @gasciljh
 /proxy/service.sh           @gasciljh
 /proxy/post-fs-data.sh      @gasciljh
 /proxy/uninstall.sh         @gasciljh
 
 # --- Runtime scripts (firewall + lifecycle + observability) ---
-# HARD-CO-02 note: /proxy/functions.sh:rotate_backups() uses
-# the v1.3.0 ROT-MANIFEST + ROT-MTIME + ROT-PROTECT semantics;
-# /proxy/status.sh uses the same SNAP-* semantics in
-# _list_snapshots; /proxy/watchdog.sh uses the SNAP-* semantics
-# in its §[5b] snapshot counter; /proxy/action.sh uses both via
-# _inline_list_snapshots + _inline_rotate_backups.
 /proxy/functions.sh         @gasciljh
 /proxy/watchdog.sh          @gasciljh
 /proxy/action.sh            @gasciljh
 /proxy/status.sh            @gasciljh
 
+# --- CO-V15-01: Layered Bootstrap (v1.5.0, ADR-0003) ---
+# boot-mini.sh is Layer 0 — the single source of truth for the 5
+# shared primitives (log_msg, get_run_dir, read_conf, is_port_open,
+# get_webui_port) and the _MONITORING_UI_PORT constant.
+# functions.sh (Layer 1) sources it at load time and must NOT
+# redefine any Layer-0 primitive. CI Step 9 verifies this.
+/proxy/boot-mini.sh         @gasciljh
+
+# --- CO-V15-01: Companion install (v1.5.0) ---
+# install_app.sh drives the 5-level pm install cascade
+# (bounded by a 75-second deadline; three-way trap split with
+# exit codes 130/143; SELinux staging; Play Protect restore).
+# Any change MUST keep the cascade order and the trap semantics
+# aligned with SECURITY.md §5.36.
+/proxy/install_app.sh       @gasciljh
+
 # --- Build tooling inside proxy/ ---
-# CO-2 fix: build.sh drives the 4-architecture cross-compile
-# and injects -ldflags (BuildVersion, BuildCommit, BuildTime,
-# ProjectURL). Any change here affects every binary shipped.
 /proxy/build.sh             @gasciljh
 
 # --- Version files (single sources of truth) ---
-# CO-2 fix: this file is read by scripts/fetch_dns_binaries.sh
-# to determine which upstream dnscrypt-proxy version to fetch.
-# Changing it affects every install and every upgrade.
 /proxy/dnscrypt-proxy.version  @gasciljh
-
-# CO-V14-01 (v1.4.0): the companion app version is the Single
-# Source of Truth for scripts/fetch_app_apk.sh. Any change here
-# triggers a re-fetch of the companion APK at the next release.
 /proxy/app-apk.version      @gasciljh
 
 # --- Config (security — Port Guard + credentials) ---
@@ -332,29 +226,11 @@
 # ============================================================
 # [3] Frontend
 # ============================================================
-# CO-V14-01 note (v1.4.0): this pattern already covers
-# `web/app-debug.apk` when it is staged for a release build.
-# The APK is a build artifact and is not committed (see
-# `.gitignore`), so no explicit pattern is required.
 /web/                       @gasciljh
 
 # ============================================================
 # [4] Security and versions
 # ============================================================
-# CO-1 fix: the previous comment claimed the maintainer reviews
-# "release signing, SBOM + Attestations". Those claims were
-# inaccurate — this project does NOT sign releases, does not
-# use Cosign, and does not generate an SBOM. See the "Non-goals"
-# section in .github/workflows/release.yml for the authoritative
-# list of what the pipeline does and does not produce.
-#
-# What these files DO control:
-#   • version (VERSION, module.prop:version)
-#   • versionCode (module.prop:versionCode) — drives update detection
-#   • SHA256 checksum of the release ZIP (produced by
-#     scripts/package_module.sh, not by these files themselves)
-#   • auto-update metadata (update.json: version, versionCode, zipUrl)
-#   • security policy (SECURITY.md)
 /VERSION                    @gasciljh
 /module.prop                @gasciljh
 /update.json                @gasciljh
@@ -362,15 +238,7 @@
 # ============================================================
 # [4b] Installer bootstrap (CO-2 fix)
 # ============================================================
-# META-INF/com/google/android/ is the standard Magisk /
-# KernelSU / APatch entry point. It contains exactly two files:
-#   • update-binary  — sources util_functions.sh and calls
-#                      install_module, which runs customize.sh
-#   • updater-script — the single line "#MAGISK"
-#
-# Any change here affects whether the module can be installed
-# at all. This is separate from /proxy/ because it is a
-# module-format concern, not a project concern.
+# META-INF/com/google/android/ — Magisk/KernelSU/APatch entry point.
 /META-INF/                  @gasciljh
 
 # ============================================================
@@ -384,20 +252,14 @@
 /.github/ISSUE_TEMPLATE/                    @gasciljh
 /.github/dependabot.yml     @gasciljh
 
+# CO-V15-03: CodeQL configuration (v1.5.0)
+# Any change to this file affects the security-analysis surface.
+/.github/codeql/            @gasciljh
+
 # --- v1.2.0: data-preservation CI matrix ---
-# The upgrade-test workflow runs the 42-scenario matrix that
-# validates the 10 defensive layers across:
-#   • 3 root solutions × 2 source versions × 7 scenarios
-# See docs/BACKUP.md for the full scenario list.
 /.github/workflows/upgrade-test.yml  @gasciljh
 
 # --- v1.4.0: companion APK release steps ---
-# CO-V14-01: the release workflow gained two new steps that
-# handle the companion APK ("Fetch companion Android app APK"
-# and "Stage APK for module ZIP"). Any change to those steps
-# requires the same review as the rest of the release pipeline.
-# (Covered by /.github/workflows/ above; listed here for
-# traceability.)
 /.github/workflows/release.yml      @gasciljh
 
 # ============================================================
@@ -410,6 +272,10 @@
 /SECURITY.md                @gasciljh
 /LICENSE                    @gasciljh
 
+# CO-V15-03: Manifest Notes — canonical reference for every
+# `x-note-*` field extracted from web/manifest.json in v1.5.0.
+# (v1.5.0: MANIFEST_NOTES consolidated into docs/REFERENCE.md §7; covered by /docs/)
+
 # ============================================================
 # [7] Build tooling
 # ============================================================
@@ -417,16 +283,9 @@
 /Makefile                   @gasciljh
 
 # ============================================================
-# [8] Branching & release documentation (v1.0.0)
+# [8] Branching & release documentation
 # ============================================================
-# These files define the workflow used by contributors and must
-# be reviewed together with the corresponding CI/CD changes.
-#
-# v1.4.0 — CO-V14-01: `scripts/fetch_app_apk.sh` joins this
-# section because it participates in the release pipeline. It
-# is the tool that downloads the companion APK before packaging.
-/docs/BRANCHING.md          @gasciljh
-/docs/RELEASE_PROCESS.md    @gasciljh
+/docs/CONTRIBUTING.md       @gasciljh
 /scripts/release.sh         @gasciljh
 /scripts/release-patch.sh   @gasciljh
 /scripts/fetch_app_apk.sh   @gasciljh
@@ -434,53 +293,39 @@
 # ============================================================
 # [9] Architecture Decision Records (ADRs)
 # ============================================================
-# All ADRs must be reviewed by the maintainer — they encode
-# long-term architectural decisions and cannot be edited once
-# accepted (only superseded by a new ADR).
+# All ADRs must be reviewed together — they encode long-term
+# architectural decisions and cannot be edited once accepted.
 #
-# See: docs/adr/README.md §4 (ADR Lifecycle)
+# CO-V15-02: the v1.5.0 cycle added two new ADRs:
+#   • ADR-0002 — External dependency (filepath-securejoin)
+#   • ADR-0003 — Layered Bootstrap pattern
+# The /docs/adr/ pattern covers both; listed here for traceability.
 /docs/adr/                  @gasciljh
+/docs/adr/0002-external-dependency.md   @gasciljh
+/docs/adr/0003-layered-bootstrap.md      @gasciljh
 
 # ============================================================
-# [10] Data preservation documentation (v1.2.0)
+# [10] Data preservation documentation
 # ============================================================
-# These three files are the user-facing companion to the 10
-# defensive layers implemented in /proxy/*.sh and /proxy/main.go.
-# Any change to one of them MUST be reviewed together with the
-# corresponding change in the shell scripts.
-#
-# /docs/BACKUP.md
-#   Full reference for the persistent backup system:
-#   directory layout, rotation policy, .manifest.json schema,
-#   .upgrade_history.json schema, manual backup/restore.
-#   HARD-CO-02 note: §6.5 was corrected in the v1.4.0 audit
-#   cycle to describe the v1.3.0 ROT-MANIFEST + ROT-MTIME +
-#   ROT-PROTECT semantics (not the v1.2.0 name-sort rule).
-#
-# /docs/EMERGENCY.md
-#   Step-by-step recovery guide for catastrophic scenarios:
-#   bootloop, user data lost, DNS broken, firewall broken,
-#   corrupted backup, last-resort reinstall.
-#
-# /docs/UPGRADE.md
-#   Version upgrade guide. §3.0 covers v1.0.0 → v1.1.0,
-#   §3.1 covers v1.1.0 → v1.2.0. Future upgrade paths will be
-#   added as new §3.X sections.
-# ============================================================
-/docs/BACKUP.md             @gasciljh
-/docs/EMERGENCY.md          @gasciljh
-/docs/UPGRADE.md            @gasciljh
+# The backup system reference lives in REFERENCE.md §4; the
+# emergency-recovery guide lives in GUIDE.md §8; upgrade paths
+# live in GUIDE.md §5.
+/docs/REFERENCE.md        @gasciljh
+/docs/GUIDE.md            @gasciljh
+/docs/GUIDE.md            @gasciljh
 
 # ============================================================
 # [11] Repo hygiene
 # ============================================================
-# Formatting, secrets detection, and dev environment config.
 /.gitattributes             @gasciljh
 /.gitignore                 @gasciljh
 /.editorconfig              @gasciljh
 /.pre-commit-config.yaml    @gasciljh
 /.secrets.baseline          @gasciljh
 /.devcontainer/             @gasciljh
+
+# CO-V15-03: shellcheck configuration (added in v1.5.0).
+/.shellcheckrc              @gasciljh
 
 # ============================================================
 # Additional notes
@@ -497,12 +342,11 @@
 #   • Security (fast + mandatory):
 #       /proxy/main.go      @gasciljh @security-team
 #
-#   • Data preservation (v1.2.0 — critical):
+#   • Data preservation:
 #       /proxy/customize.sh @gasciljh @data-guardian
-#       /docs/BACKUP.md     @gasciljh @data-guardian
-#       /docs/EMERGENCY.md  @gasciljh @data-guardian
+#       /docs/REFERENCE.md  @gasciljh @data-guardian
 #
-#   • Rotation semantics (v1.3.0 — critical):
+#   • Rotation semantics (v1.3.0):
 #       /proxy/functions.sh @gasciljh @data-guardian
 #       /proxy/status.sh    @gasciljh @data-guardian
 #       /proxy/watchdog.sh  @gasciljh @data-guardian
@@ -512,21 +356,32 @@
 #       /scripts/fetch_app_apk.sh @gasciljh @release-manager
 #       /proxy/app-apk.version    @gasciljh @release-manager
 #
+#   • CO-V15-01: Companion install flow (v1.5.0):
+#       /proxy/install_app.sh     @gasciljh @release-manager @security-team
+#       — Reviewer MUST cross-check SECURITY.md §5.36 and
+#         docs/REFERENCE.md §3.12 before approving.
+#
+#   • CO-V15-01: Layered Bootstrap (v1.5.0):
+#       /proxy/boot-mini.sh       @gasciljh @shell-maintainer
+#       — Any new Layer-0 primitive MUST also update
+#         .github/workflows/ci.yml Step 9. See ADR-0003.
+#
+#   • CO-V15-01: External dependency policy (v1.5.0):
+#       /proxy/go.mod             @gasciljh @security-team
+#       /proxy/go.sum             @gasciljh @security-team
+#       — Any new external Go dependency requires its own ADR
+#         per ADR-0002.
+#
 #   • Installer bootstrap:
 #       /META-INF/          @gasciljh @installer-reviewer
 #
 #   • CI/CD:
 #       /.github/workflows/ @gasciljh @ci-reviewer
 #
-#   • Architecture decisions (ADRs):
+#   • Architecture decisions:
 #       /docs/adr/          @gasciljh @decision-architect
 #
-#   • Release tooling:
-#       /scripts/release.sh         @gasciljh @release-manager
-#       /scripts/release-patch.sh   @gasciljh @release-manager
-#
 # To add a reviewer, append the handle to the matching line.
-# Multiple owners are space-separated.
 #
 # ============================================================
 # How it works
@@ -536,59 +391,37 @@
 #   1. GitHub reads CODEOWNERS.
 #   2. It finds the last matching pattern for the path.
 #   3. It assigns @gasciljh as a reviewer automatically.
-#   4. The user does not need to request a review manually.
 #
-# When a PR modifies an undefined file (e.g. /newfile.txt):
-#   → matched by `*` (first line) → @gasciljh.
+# When a PR modifies /proxy/install_app.sh (CO-V15-01):
+#   → matched by /proxy/ and /proxy/install_app.sh.
+#   → Reviewer MUST verify:
+#       • 5 cascade levels intact
+#       • 75-second deadline present
+#       • Three-way trap split (EXIT/INT/TERM)
+#       • SELinux staging still uses /data/local/tmp/
+#       • No `setenforce 0`
+#       • Play Protect trap restores `$_VERIFIER_ORIG`
+#     See SECURITY.md §5.36 and docs/REFERENCE.md §3.12.
 #
-# When a PR modifies /proxy/main.go and /docs/FAQ.md:
-#   → all matching owners are assigned (@gasciljh only, currently).
+# When a PR modifies /proxy/boot-mini.sh (CO-V15-01):
+#   → matched by /proxy/ and /proxy/boot-mini.sh.
+#   → Reviewer MUST verify:
+#       • The file still defines all 5 primitives + _MONITORING_UI_PORT
+#       • functions.sh still sources it (no redefinition)
+#       → CI Step 9 in ci.yml will catch regressions automatically.
 #
-# When a PR adds a new ADR in /docs/adr/:
-#   → matched by `/docs/adr/` → @gasciljh (mandatory review —
-#     ADRs are immutable once accepted).
+# When a PR modifies /proxy/go.mod or /proxy/go.sum (CO-V15-01):
+#   → A new external dependency requires its own ADR (ADR-0002
+#     compliance rule).
 #
-# When a PR modifies /scripts/release-patch.sh:
-#   → matched by `/scripts/` and `/scripts/release-patch.sh`.
-#     The more specific pattern wins — but both point to @gasciljh.
+# When a PR modifies docs/REFERENCE.md §7 (manifest x-note fields, CO-V15-03):
+#   → Reviewer MUST verify that every `x-note-*` field extracted
+#     from web/manifest.json is still documented here.
 #
-# When a PR modifies /proxy/customize.sh (v1.2.0):
-#   → matched by `/proxy/` and `/proxy/customize.sh`.
-#     The more specific pattern wins.
-#   → This file encodes the 10 data-preservation layers.
-#     A reviewer MUST cross-check docs/BACKUP.md and
-#     docs/EMERGENCY.md before approving.
-#
-# When a PR modifies /docs/BACKUP.md (v1.2.0):
-#   → matched by `/docs/` and `/docs/BACKUP.md`.
-#     Any change here MUST be reviewed together with
-#     /proxy/customize.sh — they describe the same contract.
-#   → HARD-CO-02 (v1.3.0): §6.5 now documents the ROT-*
-#     semantics. A reviewer MUST verify that any change keeps
-#     the rotation contract in sync with functions.sh.
-#
-# When a PR modifies /META-INF/com/google/android/update-binary
-# (CO-2 fix):
-#   → matched by `/META-INF/` → @gasciljh.
-#   → A reviewer MUST confirm the change does not break the
-#     Magisk install pipeline — this file is the first thing
-#     the root manager runs.
-#
-# When a PR modifies /scripts/fetch_app_apk.sh (v1.4.0):
-#   → matched by `/scripts/` and `/scripts/fetch_app_apk.sh`.
-#   → This script downloads the companion APK at release time.
-#     A reviewer MUST confirm it still respects the
-#     `--offline` / `--force` semantics and does not block
-#     the release on a network failure (the APK is OPTIONAL).
-#
-# When a PR modifies /proxy/functions.sh (v1.3.0 rotation):
-#   → matched by `/proxy/` and `/proxy/functions.sh`.
-#   → This file carries the ROT-MANIFEST + ROT-MTIME +
-#     ROT-PROTECT semantics. A reviewer MUST cross-check
-#     /proxy/main.go (SNAP-*), /proxy/status.sh
-#     (_list_snapshots), /proxy/customize.sh (rotate_backups),
-#     /proxy/action.sh (_inline_rotate_backups), and
-#     /docs/BACKUP.md §6.5 before approving.
+# When a PR modifies /.github/codeql/codeql-config.yml (CO-V15-03):
+#   → Reviewer MUST verify that any new `exclude:` block has a
+#     documented rationale and that no `go/path-injection` or
+#     `go/command-injection` rule is suppressed.
 #
 # ============================================================
 # Benefits
@@ -597,36 +430,27 @@
 # ✅ Faster review: the reviewer is assigned immediately.
 # ✅ No oversight: every PR is automatically reviewed.
 # ✅ Fine-grained: each file can have a different reviewer.
-# ✅ Team-friendly: supports team handles like @org/team-name.
-# ✅ GitHub standard: officially supported feature.
+# ✅ Team-friendly: supports team handles.
 # ✅ ADR-aware: architectural decisions trigger the right reviewer.
-# ✅ Data-preservation-aware (v1.2.0): critical backup/restore
-#    files are explicitly enumerated.
-# ✅ Rotation-aware (v1.3.0): the six files carrying the
-#    SNAP-* / ROT-* semantics are cross-referenced so a
-#    reviewer knows to check them together.
-# ✅ Companion-app-aware (v1.4.0): the release tooling for the
-#    optional Android app is enumerated with the rest of the
-#    release pipeline.
+# ✅ Data-preservation-aware (v1.2.0).
+# ✅ Rotation-aware (v1.3.0).
+# ✅ Companion-app-aware (v1.4.0).
+# ✅ CO-V15-01: Companion install-aware (v1.5.0) — the cascade
+#    and the Layer-0/1 split are both enumerated.
+# ✅ CO-V15-01: Dependency-aware (v1.5.0) — ADR-0002 compliance
+#    is enforced by explicit ownership of go.mod + go.sum.
 #
 # ============================================================
 # Notes on branch policy
 # ============================================================
 #
 # CODEOWNERS does NOT enforce branch rules. To protect branches
-# (e.g. prevent direct pushes to main, require CI to pass), use
-# one of:
+# use:
 #
-#   • Classic Branch Protection:
-#       Repository Settings → Branches
+#   • Classic Branch Protection: Settings → Branches
+#   • Rulesets: Settings → Rules → Rulesets
+#   • Tag protection: Rulesets (target: tags)
 #
-#   • Rulesets (newer UI):
-#       Repository Settings → Rules → Rulesets
-#
-#   • Tag protection:
-#       Repository Settings → Rules → Rulesets (target: tags)
-#
-# See docs/BRANCHING.md §6 for the full list of recommended
-# protection rules.
+# See docs/CONTRIBUTING.md §12 for the full branch-protection policy.
 #
 # ============================================================
