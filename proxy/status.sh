@@ -361,7 +361,6 @@ _inline_get_profile_memory_hint() {
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_tcp_open()           { is_port_open "$1" tcp; }
     is_udp_open()           { is_port_open "$1" udp; }
-    read_conf()             { read_conf "$1" "$2" "$3"; }
     read_webui_port()       { get_webui_port "$CONF_FILE" 2>/dev/null; }
 
     if command -v get_dashboard_port >/dev/null 2>&1; then

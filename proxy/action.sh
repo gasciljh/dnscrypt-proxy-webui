@@ -375,7 +375,6 @@ _inline_backup_summary() {
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_port_listening()  { is_port_open "$1" "${2:-tcp}"; }
     get_port()           { get_webui_port "$1"; }
-    read_conf()          { read_conf "$1" "$2" "$3"; }
     act_log()            { log_msg "$1"; }
 
     if command -v get_profile_memory_hint >/dev/null 2>&1; then

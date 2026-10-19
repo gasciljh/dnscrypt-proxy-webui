@@ -51,6 +51,8 @@ if [ -z "${MODDIR:-}" ]; then
     _fn_dir="${0%/*}"
     case "$_fn_dir" in
         /*/proxy) MODDIR="${_fn_dir%/proxy}" ;;
+        /system/*|/vendor/*|/sbin/*|/bin/*|/usr/*)
+                  MODDIR="/data/adb/modules/dnscrypt-proxy-webui" ;;
         /*)       MODDIR="$_fn_dir" ;;
         *)        MODDIR="/data/adb/modules/dnscrypt-proxy-webui" ;;
     esac

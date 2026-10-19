@@ -1171,6 +1171,32 @@ func syncParentDir(dir string) {
 // ============================================================
 // [12] Shell command execution
 // ============================================================
+// shellEnv returns the environment for shell subprocesses.
+// MODDIR and PROXYDIR are passed explicitly so child scripts
+// (functions.sh, install_app.sh) resolve paths correctly even
+// when invoked via /system/bin/sh — where $0 would otherwise
+// resolve to a system path (e.g. /system/bin/sh), causing
+// functions.sh to search for boot-mini.sh under /system/bin
+// and fail.
+//
+// This is defense-in-depth: functions.sh [1] and boot-mini.sh
+// [1] already reject system paths via their own case statements.
+// Passing the environment makes the intent explicit and fixes
+// any future script that uses `[ -z "${MODDIR:-}" ]` without
+// the system-path rejection.
+//
+// os.Environ() is preserved (rather than replaced) so that
+// PATH, HOME, TMPDIR, and every other inherited variable
+// remain available to the child — shell utilities like
+// `timeout`, `pgrep`, `iptables`, `settings`, and `getprop`
+// all depend on PATH being set.
+func shellEnv() []string {
+	return append(os.Environ(),
+		"MODDIR="+MODDIR,
+		"PROXYDIR="+PROXYDIR,
+	)
+}
+
 func getSystemShell() string {
 	systemShellOnce.Do(func() {
 		candidates := []string{"/system/bin/sh", "/bin/sh", "/usr/bin/sh"}
@@ -1234,6 +1260,7 @@ func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, getSystemShell(), "-c", cmd)
+	command.Env = shellEnv()
 	command.Stdout = io.Discard
 
 	errBuf := &limitedBuffer{max: MAX_STDERR_CAPTURE}
@@ -2048,6 +2075,7 @@ func callInstallScript(mode string) map[string]interface{} {
 	defer cancel()
 
 	command := exec.CommandContext(ctx, shell, "-c", cmd)
+	command.Env = shellEnv()
 
 	var outBuf bytes.Buffer
 	command.Stdout = &outBuf

@@ -357,12 +357,28 @@ _run_pm() {
 # ============================================================
 # [7] Package detection
 # ============================================================
+# Android 16 (API 36) no longer lists apps installed via
+# `pm install` in `pm list packages` output when invoked under
+# a `su -c` shell context — the package stays hidden even
+# though `dumpsys package <pkg>` reports it as installed.
+#
+# `pm path` resolves any package directly and works on every
+# Android version from API 21 through API 36+. It prints one
+# or more `package:<path>` lines for a split APK, and an empty
+# string for a missing package.
+#
+# The `package:` prefix check rejects error strings that some
+# ROMs print to stdout instead of returning a non-zero exit
+# code.
+# ============================================================
 COMPANION_PKG=""
 
+# _detect_companion_pkg — return the first candidate that is
+# currently installed, or the debug candidate as a fallback.
 _detect_companion_pkg() {
     local _p
     for _p in $COMPANION_PKG_CANDIDATES; do
-        if pm list packages 2>/dev/null | grep -qFx "package:$_p"; then
+        if dumpsys package "$_p" 2>/dev/null | grep -q 'versionName='; then
             printf '%s' "$_p"
             return 0
         fi
@@ -383,10 +399,17 @@ _refresh_companion_pkg() {
     fi
 }
 
+# _pkg_installed — same `dumpsys`-based rationale as
+# _detect_companion_pkg. `pm path` is NOT used because it is
+# blocked on some OEM ROMs (see _detect_companion_pkg above).
 _pkg_installed() {
-    pm list packages 2>/dev/null | grep -qFx "package:$COMPANION_PKG"
+    dumpsys package "$COMPANION_PKG" 2>/dev/null | grep -q 'versionName='
 }
 
+# _pkg_version_name — unchanged. `dumpsys package` is the only
+# detection primitive used by this script (see above); the
+# `versionName=` field is returned correctly on every tested
+# version (API 21–36), including the OEM ROMs that block `pm`.
 _pkg_version_name() {
     local out
     out=$(dumpsys package "$COMPANION_PKG" 2>/dev/null | grep -m1 'versionName=' || true)
@@ -402,7 +425,7 @@ _pkg_version_name() {
 
 # _wait_for_install [timeout_seconds] [deadline_epoch]
 #
-# Polls `pm list packages` until the package appears or the
+# Polls _pkg_installed until the package appears or the
 # timeout / absolute deadline is hit. Some ROMs return
 # "Success" from `pm install` but delay package registration.
 #

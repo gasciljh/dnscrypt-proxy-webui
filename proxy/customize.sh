@@ -1397,32 +1397,48 @@ fi
 # ============================================================
 # [10] Verify critical files
 # ============================================================
-# install_app.sh is a REQUIRED file:
-#   • Drives the one-tap companion app install.
-#   • Staged at the ZIP root by the packaging script.
-#   • A properly built ZIP always contains it.
+# Every file in this list is REQUIRED for the module to
+# function correctly after installation. A missing file
+# triggers a transaction rollback and aborts the install.
 #
-# boot-mini.sh is REQUIRED since v1.5.0 Phase 0:
-#   • Provides the Layer-0 primitives that functions.sh
-#     sources at load time.
+# install_app.sh — drives the one-tap companion app install.
+# boot-mini.sh    — Layer-0 primitives sourced by functions.sh.
+# proxy/*.version — read at runtime by install_app.sh and
+#                   main.go (see below); also read at build time
+#                   by fetch_dns_binaries.sh and fetch_app_apk.sh.
 #
-# On any missing file: the transaction is rolled back and the
-# install aborts with the exact list of missing paths.
+# The two version files are critical because:
+#   • install_app.sh reads app-apk.version to determine
+#     expected_version and detect installed/outdated state.
+#   • main.go exposes app-apk.version via runtime_info.app_version,
+#     which the WebUI uses to build the direct GitHub APK
+#     download URL without hardcoding the version.
+#   • If either is missing, the WebUI reports "unknown" for
+#     app_version and install_app.sh reports expected_version
+#     "unknown" — the install/update button can no longer
+#     distinguish "installed" from "update available".
+#
+# package_module.sh is the upstream producer of these files.
+# This section is defense-in-depth: a regression in that
+# script (e.g. forgetting the copy step) is caught here
+# before the user is left with a half-functional install.
 MISSING=""
-[ ! -f "$MODPATH/module.prop" ]         && MISSING="$MISSING module.prop"
-[ ! -f "$MODPATH/service.sh" ]          && MISSING="$MISSING service.sh"
-[ ! -f "$MODPATH/functions.sh" ]        && MISSING="$MISSING functions.sh"
-[ ! -f "$MODPATH/boot-mini.sh" ]        && MISSING="$MISSING boot-mini.sh"
-[ ! -f "$MODPATH/watchdog.sh" ]         && MISSING="$MISSING watchdog.sh"
-[ ! -f "$MODPATH/post-fs-data.sh" ]     && MISSING="$MISSING post-fs-data.sh"
-[ ! -f "$MODPATH/action.sh" ]           && MISSING="$MISSING action.sh"
-[ ! -f "$MODPATH/status.sh" ]           && MISSING="$MISSING status.sh"
-[ ! -f "$MODPATH/uninstall.sh" ]        && MISSING="$MISSING uninstall.sh"
-[ ! -f "$MODPATH/install_app.sh" ]      && MISSING="$MISSING install_app.sh"
-[ ! -f "$MODPATH/web/index.html" ]      && MISSING="$MISSING web/index.html"
-[ ! -f "$MODPATH/web/dashboard.html" ]  && MISSING="$MISSING web/dashboard.html"
-[ ! -f "$MODPATH/web/manifest.json" ]   && MISSING="$MISSING web/manifest.json"
-[ ! -f "$MODPATH/web/sw.js" ]           && MISSING="$MISSING web/sw.js"
+[ ! -f "$MODPATH/module.prop" ]                  && MISSING="$MISSING module.prop"
+[ ! -f "$MODPATH/service.sh" ]                   && MISSING="$MISSING service.sh"
+[ ! -f "$MODPATH/functions.sh" ]                 && MISSING="$MISSING functions.sh"
+[ ! -f "$MODPATH/boot-mini.sh" ]                 && MISSING="$MISSING boot-mini.sh"
+[ ! -f "$MODPATH/watchdog.sh" ]                  && MISSING="$MISSING watchdog.sh"
+[ ! -f "$MODPATH/post-fs-data.sh" ]              && MISSING="$MISSING post-fs-data.sh"
+[ ! -f "$MODPATH/action.sh" ]                    && MISSING="$MISSING action.sh"
+[ ! -f "$MODPATH/status.sh" ]                    && MISSING="$MISSING status.sh"
+[ ! -f "$MODPATH/uninstall.sh" ]                 && MISSING="$MISSING uninstall.sh"
+[ ! -f "$MODPATH/install_app.sh" ]               && MISSING="$MISSING install_app.sh"
+[ ! -f "$MODPATH/proxy/dnscrypt-proxy.version" ] && MISSING="$MISSING proxy/dnscrypt-proxy.version"
+[ ! -f "$MODPATH/proxy/app-apk.version" ]        && MISSING="$MISSING proxy/app-apk.version"
+[ ! -f "$MODPATH/web/index.html" ]               && MISSING="$MISSING web/index.html"
+[ ! -f "$MODPATH/web/dashboard.html" ]           && MISSING="$MISSING web/dashboard.html"
+[ ! -f "$MODPATH/web/manifest.json" ]            && MISSING="$MISSING web/manifest.json"
+[ ! -f "$MODPATH/web/sw.js" ]                    && MISSING="$MISSING web/sw.js"
 
 if [ -n "$MISSING" ]; then
     echo "❌ Missing critical files:$MISSING" >> "$INSTALL_LOG"

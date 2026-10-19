@@ -8,12 +8,13 @@
 #
 # Combines:
 #   • 10 shell scripts + 2 config files
+#   • 2 version files (dnscrypt-proxy.version, app-apk.version)
 #   • 4 WebUI binaries (arm64, arm, amd64, 386)
 #   • 4 DNS binaries (arm64, arm, x86_64, x86)
 #   • 13 required web files + 2 optional (app-debug.apk + .sha256)
 #   • module.prop
 #
-# Total: 36 entries (34 required + 2 optional), verified after
+# Total: 38 entries (36 required + 2 optional), verified after
 # packaging.
 #
 # Usage:
@@ -72,6 +73,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT"
 
 DNS_VERSION_FILE="$REPO_ROOT/proxy/dnscrypt-proxy.version"
+APP_VERSION_FILE="$REPO_ROOT/proxy/app-apk.version"
 FETCH_SCRIPT="$SCRIPT_DIR/fetch_dns_binaries.sh"
 
 # ────────────────────────────────────────────────────────────
@@ -343,6 +345,16 @@ log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
 # ────────────────────────────────────────────────────────────
 # [8] Read DNS version
 # ────────────────────────────────────────────────────────────
+# Both version files (dnscrypt-proxy.version and
+# app-apk.version) are the SSOT for the two downstream
+# pipelines:
+#   • fetch_dns_binaries.sh reads dnscrypt-proxy.version
+#   • fetch_app_apk.sh     reads app-apk.version
+#
+# If either is missing here, the pipeline is in an inconsistent
+# state: the ZIP would ship a version file that does not exist
+# in the repository, or ship binaries that do not match the
+# version file. Fail hard.
 if [ ! -f "$DNS_VERSION_FILE" ]; then
     log_error "Missing: $DNS_VERSION_FILE"
     log_info "Create it with: echo '2.1.18' > $DNS_VERSION_FILE"
@@ -353,6 +365,20 @@ DNS_VERSION=$(tr -d '\r\n' < "$DNS_VERSION_FILE" | sed 's/^[[:space:]]*//;s/[[:s
 
 if ! echo "$DNS_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     log_error "Invalid DNS version: '$DNS_VERSION'"
+    exit 2
+fi
+
+if [ ! -f "$APP_VERSION_FILE" ]; then
+    log_error "Missing: $APP_VERSION_FILE"
+    log_info "Create it with: echo '1.0.0' > $APP_VERSION_FILE"
+    exit 2
+fi
+
+APP_VERSION=$(tr -d '\r\n' < "$APP_VERSION_FILE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+if ! echo "$APP_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    log_error "Invalid app version: '$APP_VERSION'"
+    log_info "Expected format: X.Y.Z (no 'v' prefix)"
     exit 2
 fi
 
@@ -401,6 +427,7 @@ echo -e "  ${BOLD}Module VERSION:${NC}  ${GREEN}${VERSION}${NC}"
 echo -e "  ${BOLD}module.prop:${NC}     ${GREEN}${MODPROP_VERSION}${NC} (verified)"
 echo -e "  ${BOLD}versionCode:${NC}     ${GREEN}${MODPROP_VC}${NC} (expected ${EXPECTED_VC})"
 echo -e "  ${BOLD}DNS Version:${NC}     ${GREEN}${DNS_VERSION}${NC}"
+echo -e "  ${BOLD}App Version:${NC}     ${GREEN}${APP_VERSION}${NC}"
 echo -e "  ${BOLD}BUILD_DIR:${NC}       ${DIM}${BUILD_DIR}${NC}"
 echo -e "  ${BOLD}OUTPUT_DIR:${NC}      ${DIM}${OUTPUT_DIR_ABS}${NC}"
 echo -e "  ${BOLD}CACHE_DIR:${NC}       ${DIM}${DNS_CACHE_DIR}${NC}"
@@ -664,12 +691,28 @@ for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.s
     chmod 0755 "$STAGING/$s"
 done
 
-# --- Config (2) — under proxy/ ---
+# --- Config (2) — under proxy/, mode 0600 (may contain credentials) ---
 for f in dnscrypt-proxy.toml webui.conf; do
     src="$REPO_ROOT/proxy/$f"
     [ -f "$src" ] || { log_error "Missing: proxy/$f"; exit 1; }
     cp "$src" "$STAGING/proxy/$f"
     chmod 0600 "$STAGING/proxy/$f"
+done
+
+# --- Version files (2) — under proxy/, mode 0644 (not sensitive) ---
+# These files are read at runtime:
+#   • install_app.sh  → app-apk.version       (expected_version)
+#   • status.sh       → both (no direct read; shown for reference)
+#   • main.go         → app-apk.version       (runtime_info.app_version)
+#   • fetch_*.sh      → read at build time, before staging
+# Without them in the ZIP, install_app.sh falls back to
+# expected_version="unknown" and the WebUI cannot tell whether
+# the companion app is up to date.
+for f in dnscrypt-proxy.version app-apk.version; do
+    src="$REPO_ROOT/proxy/$f"
+    [ -f "$src" ] || { log_error "Missing: proxy/$f"; exit 1; }
+    cp "$src" "$STAGING/proxy/$f"
+    chmod 0644 "$STAGING/proxy/$f"
 done
 
 # --- WebUI binaries (4) ---
@@ -796,7 +839,7 @@ zip_size_human=$(du -h "$OUTPUT_PATH" 2>/dev/null | cut -f1 || true)
 log_ok "ZIP: $OUTPUT_NAME ($zip_size_human)"
 
 # ────────────────────────────────────────────────────────────
-# [20] Verify ZIP structure (34 required + 2 optional = 36)
+# [20] Verify ZIP structure (36 required + 2 optional = 38)
 # ────────────────────────────────────────────────────────────
 REQUIRED_IN_ZIP=(
     "module.prop"
@@ -814,6 +857,8 @@ REQUIRED_IN_ZIP=(
 
     "proxy/dnscrypt-proxy.toml"
     "proxy/webui.conf"
+    "proxy/dnscrypt-proxy.version"
+    "proxy/app-apk.version"
 
     "proxy/dnscrypt-proxy-arm64"
     "proxy/dnscrypt-proxy-arm"
@@ -922,6 +967,7 @@ echo -e "  ${BOLD}Size:${NC}           ${zip_size_human} (${zip_size} bytes)"
 echo -e "  ${BOLD}Module Ver:${NC}     ${VERSION}"
 echo -e "  ${BOLD}versionCode:${NC}    ${MODPROP_VC}"
 echo -e "  ${BOLD}DNS Engine:${NC}     ${DNS_VERSION}"
+echo -e "  ${BOLD}App Version:${NC}    ${APP_VERSION}"
 echo -e "  ${BOLD}DNS Cache:${NC}      ${DIM}${DNS_CACHE_DIR}${NC}"
 echo -e "  ${BOLD}SHA-256:${NC}        ${SHA256_HASH}"
 echo -e "  ${BOLD}Checksum:${NC}       ${CHECKSUM_FILE}"
