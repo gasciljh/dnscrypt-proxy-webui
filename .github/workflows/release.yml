@@ -584,12 +584,17 @@ jobs:
           # Strategy:
           #   1. Try fast-forward (no-op after sync)
           #   2. Otherwise, rebase develop onto main (linear history)
+<<<<<<< HEAD
           #   3. Skip empty commits that arise from squash-merges,
           #      bounded by MAX_SKIP_ITERATIONS to prevent hangs.
+=======
+          #   3. Skip empty commits that arise from squash-merges
+>>>>>>> origin/develop
           if git merge origin/main --no-edit --ff-only 2>/dev/null; then
             echo "::notice::Fast-forward succeeded"
           else
             echo "::notice::Fast-forward not possible — rebasing develop onto main"
+<<<<<<< HEAD
             MAX_SKIP_ITERATIONS=100
             _iterations=0
 
@@ -605,10 +610,20 @@ jobs:
                 # means the operator must resolve manually.
                 if git status --porcelain 2>/dev/null \
                      | grep -qE '^(UU|AA|DD|AU|UA|DU|UD) '; then
+=======
+            if ! git rebase origin/main; then
+              # After a squash-merge, develop's individual commits may
+              # become empty during rebase. Skip them until rebase ends
+              # or a real conflict is detected.
+              echo "::warning::Rebase issues — attempting to skip empty commits"
+              while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+                if ! git rebase --skip 2>/dev/null; then
+>>>>>>> origin/develop
                   echo "::warning::Real conflict — aborting sync"
                   git rebase --abort || true
                   exit 0
                 fi
+<<<<<<< HEAD
 
                 if ! git rebase --skip 2>/dev/null; then
                   if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
@@ -628,6 +643,9 @@ jobs:
                 exit 0
               fi
 
+=======
+              done
+>>>>>>> origin/develop
               echo "::notice::Rebase completed (empty commits skipped)"
             else
               echo "::notice::Rebase succeeded"
