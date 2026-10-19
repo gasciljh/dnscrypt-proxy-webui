@@ -3,7 +3,7 @@
 > What's coming next — the forward-looking plan.
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 

@@ -1,7 +1,7 @@
 # Technical Reference — DNSCrypt Smart Filter
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Audience**: Developers and integrators.
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh

@@ -1,7 +1,7 @@
 /* ============================================================
  * DNSCrypt Smart Filter — Service Worker
  * Version: v1.5.0 (Global Edition)
- * Last updated: 2026-10-18
+ * Last updated: 2026-10-19
  * ============================================================
  * Provides offline support and caching for the WebUI and
  * Dashboard as an installable PWA.

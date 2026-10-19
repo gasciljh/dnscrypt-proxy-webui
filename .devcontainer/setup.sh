@@ -2,7 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — devcontainer setup
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-18
+# Last updated: 2026-10-19
 # ============================================================
 # Runs automatically after the devcontainer is created
 # (postCreateCommand). Installs all tools required for

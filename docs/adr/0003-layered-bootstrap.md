@@ -2,7 +2,7 @@
 
 **Status**: ✅ Accepted
 **Date**: 2026-10-15
-**Consolidated**: 2026-10-18 (v1.5.0 Global Edition — renumbered from ADR-0008)
+**Consolidated**: 2026-10-19 (v1.5.0 Global Edition — renumbered from ADR-0008)
 **Authors**: [@gasciljh](https://github.com/gasciljh)
 **Supersedes**: —
 **Superseded by**: —

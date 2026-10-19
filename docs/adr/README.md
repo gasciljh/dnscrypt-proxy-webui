@@ -1,7 +1,7 @@
 # Architecture Decision Records (ADRs)
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 
 > An ADR is a short, immutable record of a significant architectural or
@@ -112,5 +112,5 @@ State the decision in active voice: *"We will..."*.
 
 ---
 
-*Last updated: 2026-10-18*
+*Last updated: 2026-10-19*
 *Version: v1.5.0 (Global Edition)*

@@ -7,16 +7,16 @@
 > one audience, one topic, one ceiling.
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Supersedes**: `docs/adr/0009-documentation-budget.md` (absorbed)
 
 **Update history**:
 
-- **v1.5.0 (2026-10-18, revision)** — `release.md` preserved as a
+- **v1.5.0 (2026-10-19, revision)** — `release.md` preserved as a
   separate file (Option A). Final count: **15 markdown files**
   (13 user-facing + 2 GitHub meta-files). §5.1 loses one deletion
   entry; §5.3 arithmetic updated; §7 records the rejected merge.
-- **v1.5.0 (2026-10-18)** — CONTRIBUTING ceiling raised
+- **v1.5.0 (2026-10-19)** — CONTRIBUTING ceiling raised
   `900 → 1,500` and documented as the fourth intentional
   exception. `CONTRIBUTING.md` is now a **5-source merge**
   (original + `DEVELOPMENT.md` + `BRANCHING.md` +

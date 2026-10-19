@@ -2,7 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — package_module.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-18
+# Last updated: 2026-10-19
 # ============================================================
 # Build the final Magisk / KernelSU / APatch ZIP for release.
 #

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 
 ---
 
@@ -17,7 +17,7 @@ _No pending changes._
 
 ---
 
-## [v1.5.0] - 2026-10-13
+## [v1.5.0] - 2026-10-19
 
 **Feature release** — companion app one-tap root install, twelve
 frontend state fixes, nine server-side code-review corrections,

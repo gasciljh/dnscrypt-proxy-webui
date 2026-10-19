@@ -1,7 +1,7 @@
 # User Guide — DNSCrypt Smart Filter
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Audience**: End users installing, using, upgrading, and troubleshooting the module.
 
 > This file replaces `docs/INSTALL.md`, `docs/UPGRADE.md`,

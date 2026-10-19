@@ -1,7 +1,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Release PR Template
      Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-18
+     Last updated: 2026-10-19
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -637,7 +637,7 @@ gh release view vX.Y.Z
        docs/GUIDE.md §8                       - Emergency recovery
 
      Current version line: v1.5.0
-     Last updated: 2026-10-18
+     Last updated: 2026-10-19
 
      🎉 This is a RELEASE PR — the reviewer should approve quickly
      if the checklists above pass. Nothing else blocks the merge.

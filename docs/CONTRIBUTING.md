@@ -3,7 +3,7 @@
 Guidance for contributing effectively to the project.
 
 **Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -1531,7 +1531,7 @@ The v1.5.0 release includes 9 backend code-review corrections + 12 frontend stat
 
 ## Footer
 
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 **Version**: v1.5.0 (Global Edition)
 **Author**: gasciljh
 

@@ -5,7 +5,7 @@
 **License**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
-**Last updated**: 2026-10-18
+**Last updated**: 2026-10-19
 
 > For contribution workflow, see
 > [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
@@ -197,6 +197,6 @@ https://www.contributor-covenant.org/ar/version/2/1/code_of_conduct/
 
 ---
 
-*Last updated: 2026-10-18*
+*Last updated: 2026-10-19*
 *Version: v1.5.0 (Global Edition)*
 *Maintainer: [@gasciljh](https://github.com/gasciljh)*
