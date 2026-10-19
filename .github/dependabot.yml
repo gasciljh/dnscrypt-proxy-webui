@@ -233,7 +233,7 @@
 #      ─ The upstream dnscrypt-proxy version (e.g. "2.1.18").
 #      ─ Managed by scripts/fetch_dns_binaries.sh.
 #      ─ Updated manually when the upstream DNSCrypt project
-#        ships a new release. See docs/DNS_BINARIES.md §10.
+#        ships a new release. See docs/REFERENCE.md §6.
 #
 #   2. proxy/app-apk.version
 #      ─ The companion Android app version (e.g. "1.0.0").

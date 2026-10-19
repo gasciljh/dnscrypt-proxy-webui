@@ -32,7 +32,7 @@
 # ⚠️ Note:
 #   CODEOWNERS works on FILE PATHS only — it does NOT control
 #   branch rules. For branch policies, see:
-#     • docs/BRANCHING.md §6 (Branch Protection)
+#     • docs/CONTRIBUTING.md §12 (Branch Protection)
 #     • Repository Settings → Branches
 #     • Repository Settings → Rules → Rulesets
 # ============================================================
@@ -70,7 +70,9 @@
 #   • Added explicit ownership for data-preservation artifacts:
 #       /proxy/customize.sh, /proxy/functions.sh, /proxy/service.sh,
 #       /proxy/status.sh, /proxy/main.go.
-#   • Added /docs/BACKUP.md, /docs/EMERGENCY.md, /docs/UPGRADE.md.
+#   • Added backup / emergency / upgrade documentation.
+#     (v1.5.0 consolidation: content now in docs/REFERENCE.md §4,
+#      docs/GUIDE.md §8, docs/GUIDE.md §5).
 #   • Added /.github/workflows/upgrade-test.yml (42-scenario matrix).
 #   • Regrouped core shell scripts into lifecycle vs runtime.
 #   • All comments English-only.
@@ -169,9 +171,9 @@
 # + SNAP-MTIME refinements, the v1.4.0 CodeQL go/path-injection
 # hardening, and the v1.5.0 companion-install endpoints + helpers.
 # Any change here requires alignment with:
-#   docs/ARCHITECTURE.md §4.13 (SNAP-*/ROT-*)
-#   docs/ARCHITECTURE.md §4.14 (companion install backend)
-#   docs/API.md §6.1.16, §6.1.17, §6.2.14, §6.2.15 (v1.5.0 endpoints)
+#   docs/REFERENCE.md §3 (SNAP-*/ROT-*)
+#   docs/REFERENCE.md §3.12 (companion install backend)
+#   docs/REFERENCE.md §2.7.14, §2.7.15, §2.6.16, §2.6.17 (v1.5.0 endpoints)
 /proxy/main.go              @gasciljh
 /proxy/go.mod               @gasciljh
 # CO-V15-01: go.sum pins the first (and only) external dependency
@@ -182,7 +184,7 @@
 # --- Data-preservation scripts (v1.2.0 — Layer 1–8) ---
 # These scripts implement the 10 defensive layers. Any change
 # requires a careful review of the corresponding section in
-# docs/BACKUP.md and docs/EMERGENCY.md.
+# docs/REFERENCE.md §4 and docs/GUIDE.md §8.
 /proxy/customize.sh         @gasciljh
 /proxy/service.sh           @gasciljh
 /proxy/post-fs-data.sh      @gasciljh
@@ -207,7 +209,7 @@
 # (bounded by a 75-second deadline; three-way trap split with
 # exit codes 130/143; SELinux staging; Play Protect restore).
 # Any change MUST keep the cascade order and the trap semantics
-# aligned with docs/SECURITY.md §5.36.
+# aligned with SECURITY.md §5.36.
 /proxy/install_app.sh       @gasciljh
 
 # --- Build tooling inside proxy/ ---
@@ -272,7 +274,7 @@
 
 # CO-V15-03: Manifest Notes — canonical reference for every
 # `x-note-*` field extracted from web/manifest.json in v1.5.0.
-/docs/MANIFEST_NOTES.md     @gasciljh
+# (v1.5.0: MANIFEST_NOTES consolidated into docs/REFERENCE.md §7; covered by /docs/)
 
 # ============================================================
 # [7] Build tooling
@@ -342,7 +344,7 @@
 #
 #   • Data preservation:
 #       /proxy/customize.sh @gasciljh @data-guardian
-#       /docs/BACKUP.md     @gasciljh @data-guardian
+#       /docs/REFERENCE.md  @gasciljh @data-guardian
 #
 #   • Rotation semantics (v1.3.0):
 #       /proxy/functions.sh @gasciljh @data-guardian
@@ -356,8 +358,8 @@
 #
 #   • CO-V15-01: Companion install flow (v1.5.0):
 #       /proxy/install_app.sh     @gasciljh @release-manager @security-team
-#       — Reviewer MUST cross-check docs/SECURITY.md §5.36 and
-#         docs/ARCHITECTURE.md §5.8 before approving.
+#       — Reviewer MUST cross-check SECURITY.md §5.36 and
+#         docs/REFERENCE.md §3.12 before approving.
 #
 #   • CO-V15-01: Layered Bootstrap (v1.5.0):
 #       /proxy/boot-mini.sh       @gasciljh @shell-maintainer
@@ -399,7 +401,7 @@
 #       • SELinux staging still uses /data/local/tmp/
 #       • No `setenforce 0`
 #       • Play Protect trap restores `$_VERIFIER_ORIG`
-#     See docs/SECURITY.md §5.36 and docs/ARCHITECTURE.md §5.8.
+#     See SECURITY.md §5.36 and docs/REFERENCE.md §3.12.
 #
 # When a PR modifies /proxy/boot-mini.sh (CO-V15-01):
 #   → matched by /proxy/ and /proxy/boot-mini.sh.
@@ -412,7 +414,7 @@
 #   → A new external dependency requires its own ADR (ADR-0002
 #     compliance rule).
 #
-# When a PR modifies /docs/MANIFEST_NOTES.md (CO-V15-03):
+# When a PR modifies docs/REFERENCE.md §7 (manifest x-note fields, CO-V15-03):
 #   → Reviewer MUST verify that every `x-note-*` field extracted
 #     from web/manifest.json is still documented here.
 #

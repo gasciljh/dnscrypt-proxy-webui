@@ -290,7 +290,7 @@ body:
     attributes:
       label: 💾 How does this proposal interact with the 10 defensive layers?
       description: |
-        The 10 layers are documented in docs/BACKUP.md §1.3.
+        The 10 layers are documented in docs/REFERENCE.md §4.
         Choose the option that best describes your proposal.
       options:
         - 'No interaction — the proposal does not touch user data, backups, or restore logic'

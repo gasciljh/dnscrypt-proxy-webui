@@ -525,7 +525,7 @@ body:
         >     levels failed. Check the failing reason and hint
         >     fields (AR/EN).
         >
-        > See `docs/SECURITY.md §5.36` for the full model.
+        > See `SECURITY.md §5.36` for the full model.
 
   - type: input
     id: install_http_status
