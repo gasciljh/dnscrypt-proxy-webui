@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CodeQL Workflow
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -45,10 +45,15 @@
 #       → covered by format checkers (pre-commit)
 #
 # Repository hygiene:
-#   `proxy/.codeql-analyze` is a build artifact and must NOT
-#   be committed. Two independent protections:
-#     1. The Build step removes it via a `trap` on EXIT.
-#     2. `.gitignore` lists `proxy/.codeql-analyze`.
+#   The build output is written to /tmp/codeql-out/ — OUTSIDE
+#   the repository tree. This guarantees:
+#     1. No stray binary can accidentally end up in git.
+#     2. `go build -o <dir>/ ./...` works regardless of how
+#        many packages `./...` matches (each main package gets
+#        its own binary under the dir).
+#
+#   A `trap` on EXIT removes the temp directory on every path
+#   (success, failure, interrupt).
 # ============================================================
 
 name: CodeQL
@@ -93,8 +98,8 @@ jobs:
       # Build the whole package (`./...`), not just main.go:
       # CodeQL extracts the AST from every compiled file.
       #
-      # `trap` on EXIT ensures the artifact is removed on every
-      # path (success, failure, interrupt).
+      # `trap` on EXIT ensures the output directory is removed
+      # on every path (success, failure, interrupt).
       #
       # -buildvcs=false: no VCS stamping (deterministic).
       # -trimpath:       normalize paths for reproducibility
@@ -113,10 +118,14 @@ jobs:
             exit 1
           fi
 
-          # Ensure the artifact is removed on any exit path.
-          trap 'rm -f ./.codeql-analyze' EXIT
+          # Ensure the output directory is removed on any exit path.
+          # /tmp is outside the repo tree, so no stray binary can
+          # accidentally end up in git regardless of trap success.
+          OUT_DIR="/tmp/codeql-out"
+          trap 'rm -rf "$OUT_DIR"' EXIT
+          mkdir -p "$OUT_DIR"
 
-          go build -buildvcs=false -trimpath -o ./.codeql-analyze ./...
+          go build -buildvcs=false -trimpath -o "$OUT_DIR/" ./...
 
       - name: Perform Analysis
         uses: github/codeql-action/analyze@v3

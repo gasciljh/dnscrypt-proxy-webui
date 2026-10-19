@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — watchdog.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -300,6 +300,14 @@ _fb_start_webui() {
 # Every call site below uses the do_* names, never the
 # underlying functions directly. This lets the loop code read
 # identically whether functions.sh loaded or not.
+#
+# NOTE: do_get_token is intentionally NOT defined here. It
+# requires get_watchdog_token_fallback, which is only defined
+# in §[12] — after functions.sh has been sourced and the
+# fallback reader is available. Defining it here (as a
+# placeholder) would be dead code: §[12] always re-defines it
+# later in the same shell process. See §[12] for the canonical
+# definition.
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     do_log()           { log_msg "$1"; }
     do_is_port_open()  { is_port_open "$1" "${2:-tcp}"; }
@@ -311,19 +319,12 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
     else
         do_mem_hint()  { printf "unknown"; }
     fi
-
-    if command -v get_watchdog_token >/dev/null 2>&1; then
-        do_get_token() { get_watchdog_token; }
-    else
-        do_get_token() { return 1; }
-    fi
 else
     do_log()           { _fb_log "$1"; }
     do_is_port_open()  { _fb_is_port_open "$1" "${2:-tcp}"; }
     do_cleanup_webui() { _fb_cleanup_webui; }
     do_start_webui()   { _fb_start_webui "$1" "$2"; }
     do_mem_hint()      { printf "unknown"; }
-    do_get_token()     { return 1; }
 fi
 
 # ============================================================
@@ -392,16 +393,13 @@ fi
 # [10] Startup diagnostics (READ-ONLY)
 # ============================================================
 # Logs a structured snapshot of the module state at watchdog
-# startup. This makes the boot log a complete picture without
-# requiring the user to run status.sh manually.
-#
-# READ-ONLY: this block inspects the backup directory but does
-# NOT create, modify, or delete any files.
+# startup. READ-ONLY: this block inspects the backup directory
+# but does NOT create, modify, or delete any files.
 #
 # The snapshot counter requires BOTH a name match
 # (`^[0-9]{8}-[0-9]{6}-`) AND a `.manifest.json` file, matching
 # the canonical SNAP-MANIFEST detection rule. The `case`
-# statement below also skips `apk/` and `.restore_snap.*`.
+# statement also skips `apk/` and `.restore_snap.*`.
 _pending_msg=""
 if [ -f "$PENDING_NOTIFY_FILE" ]; then
     _pending_msg=$(cat "$PENDING_NOTIFY_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -450,11 +448,6 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
     [ -z "$_orphan_count" ] && _orphan_count=0
 fi
 
-_token_present="no"
-if do_get_token >/dev/null 2>&1; then
-    _token_present="yes"
-fi
-
 # --- Startup banner (structured) ---
 do_log "============================================"
 do_log "Watchdog started (PID: $$)"
@@ -467,10 +460,6 @@ do_log "   Auto-WebUI: $AUTO_RESTART_WEBUI"
 do_log "─── Paths ───"
 do_log "   RUN_DIR:    $RUN_DIR"
 do_log "   STATUS_FILE: $STATUS_FILE"
-do_log "─── Auth ───"
-do_log "   Token file: $WATCHDOG_TOKEN_FILE"
-do_log "   Token ready: $_token_present"
-do_log "   functions.sh: $([ "$FUNCTIONS_LOADED" = "1" ] && echo loaded || echo fallback)"
 do_log "─── Data Preservation (READ-ONLY) ───"
 do_log "   Snapshot dir:   $PERSISTENT_BACKUP"
 do_log "   Snapshots:      $_snap_count"
@@ -519,6 +508,12 @@ trap '_wd_terminate QUIT' QUIT
 # The token path is preferred over Basic Auth: independent of
 # the credentials file, constant-time-compared, localhost-
 # scoped, and not subject to the login rate limiter.
+#
+# This is the CANONICAL definition of do_get_token. It
+# replaces the (now-removed) placeholder that used to live in
+# §[7] — the placeholder was dead code, because this section
+# always re-defines do_get_token later in the same shell
+# process.
 #
 # Return values:
 #   0 — token read and looks valid (>= 32 chars); printed to

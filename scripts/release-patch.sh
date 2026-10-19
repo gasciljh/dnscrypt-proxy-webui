@@ -1,107 +1,79 @@
 #!/usr/bin/env bash
 # ============================================================
-# DNSCrypt Smart Filter – release-patch.sh
+# DNSCrypt Smart Filter — release-patch.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# Last updated: 2026-10-18
 # ============================================================
-# Automate a PATCH release (hotfix) from the `main` branch.
+# Automates a PATCH release (hotfix) from the `main` branch.
 #
-# A PATCH release is used ONLY when a critical bug exists in a
-# released version and cannot wait for the next scheduled
-# release. It increments the PATCH component of the version.
-#
-# This script is a THIN WRAPPER around scripts/release.sh. It
-# does NOT contain any version bump logic of its own. It adds
-# four safety checks on top:
+# PATCH releases are for critical bugs in a released version.
+# This script adds 4 safety checks on top of release.sh:
 #   1. Current branch MUST be `main`.
 #   2. MAJOR component MUST NOT change.
 #   3. MINOR component MUST NOT change.
 #   4. PATCH MUST be exactly current + 1 (no skipping).
 #
-# After those checks pass, it delegates to:
-#   scripts/release.sh <version> [--dry-run] [--no-push] --yes
+# Then delegates ALL bump logic to release.sh.
 #
 # Usage:
-#   ./scripts/release-patch.sh v1.5.1
-#   ./scripts/release-patch.sh v1.5.1 --dry-run
-#   ./scripts/release-patch.sh v1.5.1 --yes
-#   ./scripts/release-patch.sh v1.5.1 --skip-xnote
+#   ./scripts/release-patch.sh v1.5.1 [options]
+#
+# Options:
+#   --dry-run       Show changes without applying
+#   --no-push       Create commit + tag locally, skip push
+#   --skip-xnote    Skip the x-note-v<XYZ> presence check
+#   --yes, -y       Skip interactive confirmation
+#   --help, -h      Show this help
 #
 # Exit codes:
-#   0 = success
-#   1 = invalid arguments or environment
-#   2 = repository state invalid
-#   3 = version rules violated
-#   4 = user aborted
+#   0 = success · 1 = invalid arguments · 2 = repo state invalid
+#   3 = version rule violated · 4 = user aborted
 #
-# ============================================================
-# Post-release workflow
-# ============================================================
-# After a PATCH release is published, `release.yml` runs the
-# main → develop sync step as part of the release workflow.
-# The step runs on every tag push, regardless of whether the
-# tag came from main, develop, or a release/* branch.
+# Post-release: release.yml runs main → develop sync on every
+# tag push. If it fails, back-merge manually: `make sync`.
 #
-# If the sync step succeeds (the common case), nothing is
-# required. If it fails (e.g. a real merge conflict), the
-# operator must back-merge manually so `develop` does not
-# miss the fix:
-#
-#     make sync
-#
-# See docs/BRANCHING.md §8 for the PATCH branch model.
-# See docs/adr/0003-post-release-sync.md for the sync design.
+# See docs/CONTRIBUTING.md §13 (Hotfix Flow) for the PATCH branch model.
+# See docs/adr/0001-release-workflow.md §3 (Post-release sync) for the sync design.
 # ============================================================
 
 set -euo pipefail
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [1] Paths
-# ============================================================
+# ────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
 cd "$REPO_ROOT"
 
 RELEASE_SCRIPT="${SCRIPT_DIR}/release.sh"
 
-# ============================================================
-# [2] Colors
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [2] Colors (conditional on TTY and NO_COLOR)
+# ────────────────────────────────────────────────────────────
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 else
     RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [3] Logging
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
 log_ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⚠${NC}  $1" >&2; }
 log_error() { echo -e "  ${RED}✗${NC} $1" >&2; }
 log_step()  { echo -e "\n${BOLD}${CYAN}━━━ $1 ━━━${NC}"; }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [4] Helpers
-# ============================================================
-# prompt_confirm <prompt>
-#   Returns 0 on y/Y, 1 on any other input (including EOF).
-#   Tolerates closed stdin — under `set -e`, a bare `read` on
-#   a closed pipe would otherwise abort the script.
+# ────────────────────────────────────────────────────────────
+# prompt_confirm — 0 on y/Y, 1 otherwise (incl. EOF).
 prompt_confirm() {
     local _reply=""
     read -rp "$1" -n 1 _reply || _reply=""
-    read -r _ || true    # drain rest of line
+    read -r _ || true
     echo ""
     case "$_reply" in
         [Yy]) return 0 ;;
@@ -116,12 +88,8 @@ is_numeric() {
     esac
 }
 
-# strip_leading_zeros <value>
-#   Removes leading zeros from a numeric string so arithmetic
-#   contexts do not interpret it as octal (e.g. "08" → 8).
-#
-#   An empty string or a string of only zeros becomes "0".
-#   This mirrors the behaviour of release.sh's calc_version_code().
+# strip_leading_zeros — "08" → 8 (avoids bash octal).
+# Empty / all-zeros → "0".
 strip_leading_zeros() {
     local _v
     _v=$(printf '%s' "$1" | sed 's/^0*//')
@@ -129,9 +97,9 @@ strip_leading_zeros() {
     printf '%s' "$_v"
 }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [5] Arguments
-# ============================================================
+# ────────────────────────────────────────────────────────────
 VERSION=""
 DRY_RUN=0
 NO_PUSH=0
@@ -146,8 +114,7 @@ Usage:
   release-patch.sh <version> [options]
 
 Arguments:
-  <version>          Semantic version with a PATCH bump
-                     (e.g. v1.5.1)
+  <version>          Semantic version with PATCH bump (e.g. v1.5.1)
 
 Options:
   --dry-run          Show what would happen, change nothing
@@ -164,11 +131,10 @@ Examples:
 Rules:
   • Current branch MUST be `main`.
   • Version MUST bump only the PATCH component.
-  • MINOR/MAJOR bumps are rejected — use `release.sh` for those.
+  • MINOR/MAJOR bumps are rejected — use release.sh for those.
   • PATCH must be exactly current + 1 (no skipping).
-  • After the release, `release.yml` attempts the main → develop
-    sync as part of its normal workflow. If it fails, back-merge
-    manually with `make sync`.
+  • release.yml runs main → develop sync on tag push.
+    If it fails, back-merge manually: make sync.
 
 Manual step — x-note-v<XYZ>:
   The per-release field "x-note-v<XYZ>" in update.json (e.g.
@@ -176,20 +142,16 @@ Manual step — x-note-v<XYZ>:
   shown in the auto-update metadata of the root manager.
 
   release.sh VERIFIES its presence and ABORTS if missing.
-  Pass --skip-xnote to bypass the check (not recommended —
-  end users will see a stale release note in their update UI).
+  Pass --skip-xnote to bypass the check (not recommended).
 
 Requirements:
-  • git (2.30+)
-  • scripts/release.sh (same repository)
-  • CHANGELOG.md updated with the new patch version
-  • update.json must contain x-note-v<XYZ> (unless --skip-xnote)
-  • jq (optional — inherited from release.sh)
+  git 2.30+, release.sh (same repo), CHANGELOG.md updated with
+  the new patch version, update.json with x-note-v<XYZ>.
 
 See:
-  docs/BRANCHING.md §8
-  docs/RELEASE_PROCESS.md §2.3
-  docs/adr/0003-post-release-sync.md
+  docs/CONTRIBUTING.md §13 (Hotfix Flow)
+  docs/CONTRIBUTING.md §11 (Release Process)
+  docs/adr/0001-release-workflow.md §3 (Post-release sync)
 EOF
     exit 0
 }
@@ -225,9 +187,9 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [6] Header
-# ============================================================
+# ────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  DNSCrypt Smart Filter – Patch Release Automation        ║${NC}"
@@ -239,9 +201,9 @@ echo -e "  ${BOLD}Target patch version:${NC} ${GREEN}${VERSION}${NC}"
 [ "$SKIP_XNOTE" = "1" ] && echo -e "  ${BOLD}x-note check:${NC}         ${YELLOW}SKIPPED${NC}"
 echo ""
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7] Environment check
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[1/6] Checking environment"
 
 for tool in git sed; do
@@ -255,23 +217,16 @@ log_ok "Required tools: git, sed"
 if command -v jq >/dev/null 2>&1; then
     log_ok "jq available (release.sh will update update.json)"
 else
-    log_warn "jq not found — release.sh will skip update.json"
+    log_warn "jq NOT found — release.sh will skip update.json"
     log_warn "  The x-note-v<XYZ> presence check will ALSO be skipped."
-    log_warn "  release.sh updates 6 fields in update.json:"
-    log_warn "    • version, versionCode, versionName"
-    log_warn "    • releaseDate, zipUrl, x-note-last-updated"
     log_info "The PATCH release can still proceed"
     log_info "You MUST update update.json manually after the release"
-    log_info "Install jq to enable automatic updates:"
-    log_info "  • Debian/Ubuntu:  sudo apt install jq"
-    log_info "  • macOS:          brew install jq"
-    log_info "  • Termux:         pkg install jq"
+    log_info "Install jq: apt install jq / brew install jq / pkg install jq"
 fi
 
 if [ ! -f "$RELEASE_SCRIPT" ]; then
     log_error "Missing dependency: $RELEASE_SCRIPT"
     log_info "release-patch.sh delegates the bump logic to release.sh"
-    log_info "Ensure scripts/release.sh exists in the repository"
     exit 1
 fi
 
@@ -282,24 +237,23 @@ fi
 
 log_ok "release.sh found: $RELEASE_SCRIPT"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [8] Version format validation
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[2/6] Validating version format"
 
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
     log_error "Invalid version: '$VERSION'"
-    log_info "Patch versions must be in the form: vMAJOR.MINOR.PATCH"
-    log_info "Prerelease suffixes (e.g. -beta1) are NOT allowed for patch releases"
-    log_info "Examples: v1.5.1, v1.4.1"
+    log_info "Patch versions: vMAJOR.MINOR.PATCH (e.g. v1.5.1)"
+    log_info "Prerelease suffixes (e.g. -beta1) are NOT allowed here"
     exit 3
 fi
 
 log_ok "Version format valid: $VERSION"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [9] PATCH bump rules
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[3/6] Verifying PATCH bump rules"
 
 if [ ! -f "VERSION" ]; then
@@ -314,9 +268,8 @@ if [ -z "$CURRENT_VERSION" ]; then
     exit 2
 fi
 
-# Validate the current VERSION format before parsing. A
-# malformed file (e.g. "1.2" with only two components) would
-# otherwise produce a cryptic bash arithmetic error.
+# Validate current VERSION before parsing (a malformed file
+# like "1.2" would produce a cryptic arithmetic error).
 if ! echo "$CURRENT_VERSION" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
     log_error "Current VERSION file has an invalid format: '$CURRENT_VERSION'"
     log_info "Expected: vMAJOR.MINOR.PATCH (e.g. v1.5.0)"
@@ -324,10 +277,9 @@ if ! echo "$CURRENT_VERSION" | grep -qE '^v?[0-9]+\.[0-9]+\.[0-9]+$'; then
     exit 2
 fi
 
-# Parse current. Leading zeros are stripped before any
-# arithmetic, so a version file containing "v1.5.08" is
-# handled correctly (bash would otherwise interpret "08" as
-# an invalid octal literal).
+# Parse current. Leading zeros stripped before arithmetic
+# so "v1.5.08" is handled correctly (bash would reject "08"
+# as an invalid octal literal).
 CURRENT_NO_V="${CURRENT_VERSION#v}"
 CUR_MAJOR=$(strip_leading_zeros "$(echo "$CURRENT_NO_V" | cut -d. -f1)")
 CUR_MINOR=$(strip_leading_zeros "$(echo "$CURRENT_NO_V" | cut -d. -f2)")
@@ -339,7 +291,7 @@ NEW_MAJOR=$(strip_leading_zeros "$(echo "$TARGET_NO_V" | cut -d. -f1)")
 NEW_MINOR=$(strip_leading_zeros "$(echo "$TARGET_NO_V" | cut -d. -f2)")
 NEW_PATCH=$(strip_leading_zeros "$(echo "$TARGET_NO_V" | cut -d. -f3)")
 
-# Defensive numeric guard. The format checks above already
+# Defensive numeric guard. Format checks above already
 # guarantee digits, but a non-numeric value here would
 # indicate an internal inconsistency.
 for _v in "$CUR_MAJOR" "$CUR_MINOR" "$CUR_PATCH" \
@@ -383,9 +335,9 @@ fi
 
 log_ok "PATCH bump valid: $CUR_PATCH → $NEW_PATCH"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [10] Branch check
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[4/6] Verifying branch"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -434,8 +386,8 @@ fi
 log_ok "Tag ${VERSION} is available"
 
 # --- CHANGELOG check ---
-# Escape the dots in the version string before using it in the
-# regex. Without this, `## [1.5.1]` would match `## [1x5y1]`.
+# Escape dots before regex — without this, "## [1.5.1]" would
+# match "## [1x5y1]".
 CHANGELOG_VER_ESCAPED=$(printf '%s' "${VERSION#v}" | sed 's/\./\\./g')
 if ! grep -qE "^## \[v?${CHANGELOG_VER_ESCAPED}\]|^## \[Unreleased\]" CHANGELOG.md 2>/dev/null; then
     log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
@@ -448,14 +400,33 @@ else
     log_ok "CHANGELOG.md contains a relevant section"
 fi
 
-# ============================================================
-# [11] Confirmation
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [11] Confirmation (BUG-13, BUG-14)
+# ────────────────────────────────────────────────────────────
 log_step "[5/6] Confirmation"
 
 # Derive the x-note key for display.
 #   v1.5.1 → x-note-v151
 XNOTE_KEY="x-note-v${TARGET_NO_V//./}"
+
+# Manual fields NOT touched by release.sh (or by this wrapper).
+# They MUST be updated before tagging, or the release ships
+# stale values — `sw.js CACHE_VERSION` is the critical one:
+# without it, the PWA cache is never invalidated and every
+# user keeps the old assets until they manually clear site
+# data. See docs/REFERENCE.md §7.7.6 for the SW-PRECACHE
+# rationale.
+_print_manual_fields() {
+    local _title="${1:-update before proceeding}"
+    echo -e "  ${BOLD}Manual fields NOT touched by release.sh — ${_title}:${NC}"
+    echo -e "    ${DIM}• ${XNOTE_KEY}         (verified — present in update.json)${NC}"
+    echo -e "    ${DIM}• web/manifest.json   → version  (strip 'v' prefix)${NC}"
+    echo -e "    ${DIM}• web/sw.js           → CACHE_VERSION  (critical for PWA)${NC}"
+    echo -e "    ${DIM}• web/index.html      → var VERSION${NC}"
+    echo -e "    ${DIM}• web/dashboard.html  → var VERSION + <title>${NC}"
+    echo -e "    ${DIM}• proxy/app-apk.version        (only if companion app changed)${NC}"
+    echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if DNS engine changed)${NC}"
+}
 
 echo -e "  ${BOLD}Patch release summary:${NC}"
 echo ""
@@ -465,7 +436,7 @@ echo -e "    Branch:           ${CYAN}main${NC}"
 echo ""
 echo -e "  ${YELLOW}${BOLD}Important:${NC}"
 echo ""
-echo "    1. This wrapper will delegate to scripts/release.sh"
+echo "    1. This wrapper delegates to scripts/release.sh"
 echo "    2. release.sh will bump:"
 echo "         • VERSION       → ${VERSION}"
 echo "         • module.prop   → version + versionCode"
@@ -481,11 +452,14 @@ echo "       in update.json and ABORTS if missing (exit 3)."
 if [ "$SKIP_XNOTE" = "1" ]; then
     echo -e "       ${YELLOW}(SKIPPED — --skip-xnote was passed)${NC}"
 fi
-echo "    4. release.sh will create a commit + an ANNOTATED tag on 'main'"
+echo "    4. release.sh creates a commit + ANNOTATED tag on 'main'"
 echo "    5. GitHub Actions will publish the release"
 echo "    6. release.yml runs the main → develop sync on every tag push."
-echo "       If the sync succeeds, nothing else is required. If it fails,"
-echo "       back-merge manually with: make sync"
+echo "       If it fails, back-merge manually: make sync"
+echo ""
+echo -e "  ${DIM}Files that MUST be updated before tagging (release.sh does NOT touch them):${NC}"
+echo ""
+_print_manual_fields "update before proceeding"
 echo ""
 
 if [ "$SKIP_XNOTE" = "1" ]; then
@@ -500,12 +474,12 @@ if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
         || { log_warn "Aborted by user"; exit 4; }
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [12] Delegate to release.sh
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # All version bump logic, file updates, verification, commit,
 # tag, and push are handled by release.sh. This script only
-# adds the pre-flight checks above.
+# adds the 3 pre-flight PATCH rules above.
 #
 # The exact exit code of release.sh is propagated so a caller
 # can distinguish user abort (4), version-rule violation (3),
@@ -516,7 +490,7 @@ RELEASE_ARGS=("$VERSION")
 [ "$DRY_RUN" = "1" ] && RELEASE_ARGS+=("--dry-run")
 [ "$NO_PUSH" = "1" ] && RELEASE_ARGS+=("--no-push")
 [ "$SKIP_XNOTE" = "1" ] && RELEASE_ARGS+=("--skip-xnote")
-RELEASE_ARGS+=("--yes")  # already confirmed here
+RELEASE_ARGS+=("--yes")  # already confirmed above
 
 log_info "Running: release.sh ${RELEASE_ARGS[*]}"
 echo ""
@@ -538,11 +512,9 @@ if [ "$_rc" -ne 0 ]; then
     exit "$_rc"
 fi
 
-# ============================================================
-# [13] Post-release reminder
-# ============================================================
-# The back-merge reminder is only meaningful when a push
-# actually occurred. --dry-run and --no-push skip it.
+# ────────────────────────────────────────────────────────────
+# [13] Post-release reminder (BUG-12, BUG-13, BUG-14)
+# ────────────────────────────────────────────────────────────
 if [ "$DRY_RUN" = "1" ]; then
     echo ""
     echo -e "${YELLOW}${BOLD}Note: --dry-run was passed.${NC}"
@@ -568,10 +540,9 @@ if [ "$NO_PUSH" = "1" ]; then
     echo -e "  If the sync step fails, back-merge manually:"
     echo -e "    ${DIM}make sync${NC}"
     echo ""
-    echo -e "  ${DIM}Manual fields NOT touched by release.sh:${NC}"
-    echo -e "    ${DIM}• x-note-version-history       (append if desired)${NC}"
-    echo -e "    ${DIM}• proxy/app-apk.version        (only if the companion app changed)${NC}"
-    echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if the DNS engine changed)${NC}"
+    echo -e "  ${DIM}Verify these fields match the tag (release.sh did NOT touch them):${NC}"
+    echo ""
+    _print_manual_fields "verify these match the tag"
     echo ""
     exit 0
 fi
@@ -599,12 +570,11 @@ echo "      git pull origin develop"
 echo "      git merge origin/main --no-edit"
 echo "      git push origin develop"
 echo ""
-echo -e "  ${DIM}See docs/adr/0003-post-release-sync.md for the sync design.${NC}"
+echo -e "  ${DIM}See docs/adr/0001-release-workflow.md §3 for the sync design.${NC}"
 echo ""
-echo -e "  ${BOLD}Manual fields NOT touched by release.sh:${NC}"
-echo -e "    ${DIM}• x-note-version-history       (append if desired)${NC}"
-echo -e "    ${DIM}• proxy/app-apk.version        (only if the companion app changed)${NC}"
-echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if the DNS engine changed)${NC}"
+echo -e "  ${DIM}Verify these fields match the tag (release.sh did NOT touch them):${NC}"
+echo ""
+_print_manual_fields "verify these match the tag"
 echo ""
 
 exit 0

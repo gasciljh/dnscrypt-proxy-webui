@@ -1,40 +1,26 @@
 #!/usr/bin/env bash
 # ============================================================
-# DNSCrypt Smart Filter – release.sh
+# DNSCrypt Smart Filter — release.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# Last updated: 2026-10-18
 # ============================================================
-# Automate a new release locally: bump version files, create
-# an ANNOTATED tag, push to origin. GitHub Actions
-# (.github/workflows/release.yml) publishes the rest.
+# Automates a local release: bump version files, create an
+# ANNOTATED tag, push to origin. GitHub Actions
+# (.github/workflows/release.yml) publishes the release.
 #
-# Workflow:
-#   1. Work on develop or a release/* branch.
-#   2. Ensure CHANGELOG.md has an [Unreleased] or [vX.Y.Z]
-#      section.
-#   3. Add the "x-note-v<XYZ>" field to update.json — MANUAL
-#      step, cannot be auto-generated. This script verifies
-#      its presence and aborts if missing (see --skip-xnote).
-#   4. Run: ./scripts/release.sh v1.5.0
-#   5. GitHub Actions publishes the release automatically.
+# For PATCH-only releases (hotfixes), use release-patch.sh.
 #
 # Usage:
-#   ./scripts/release.sh v1.5.0
-#   ./scripts/release.sh v1.5.0-beta1
-#   ./scripts/release.sh v1.5.0 --dry-run
-#   ./scripts/release.sh v1.5.0 --no-push
-#   ./scripts/release.sh v1.5.0 --skip-xnote
-#   ./scripts/release.sh v1.5.0 --yes
+#   ./scripts/release.sh v1.5.0 [options]
 #
-# Requirements:
-#   git (2.30+), sed, awk, jq (recommended).
+# Options:
+#   --dry-run       Show changes without applying
+#   --no-push       Create commit + tag locally, skip push
+#   --skip-xnote    Skip the x-note-v<XYZ> presence check
+#   --yes, -y       Skip interactive confirmation
+#   --help, -h      Show this help
 #
-#   Without jq, update.json is skipped entirely and end users
-#   will NOT see the update through the Magisk/KernelSU
-#   auto-update channel until update.json is regenerated.
-#   Without jq, the x-note-v<XYZ> check is also skipped.
+# Requirements: git 2.30+, sed, awk, jq (recommended).
 #
 # Exit codes:
 #   0 = success
@@ -43,67 +29,47 @@
 #   3 = version metadata mismatch
 #   4 = user aborted
 #
-# For PATCH-only releases (hotfixes), use release-patch.sh.
-#
-# versionCode formula:
-#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
-#
-#   Canonical examples:
-#     v1.0.0 → 1000000
-#     v1.4.0 → 1040000
-#     v1.5.0 → 1050000
-#     v1.5.1 → 1050100
-#     v1.6.0 → 1060000
-#
-#   Constraints: PATCH ≤ 99 and MINOR ≤ 99, so neither
-#   component overflows into the next.
+# versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
+#   v1.5.0 → 1050000 · v1.5.1 → 1050100 · v1.6.0 → 1060000
+#   Constraints: PATCH ≤ 99, MINOR ≤ 99
 # ============================================================
 
 set -euo pipefail
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [1] Paths
-# ============================================================
+# ────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-
 cd "$REPO_ROOT"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [2] Colors (conditional on TTY and NO_COLOR)
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-    RED='\033[0;31m'
-    GREEN='\033[0;32m'
-    YELLOW='\033[0;33m'
-    CYAN='\033[0;36m'
-    BOLD='\033[1m'
-    DIM='\033[2m'
-    NC='\033[0m'
+    RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
+    CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 else
     RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [3] Logging
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
 log_ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⚠${NC}  $1" >&2; }
 log_error() { echo -e "  ${RED}✗${NC} $1" >&2; }
 log_step()  { echo -e "\n${BOLD}${CYAN}━━━ $1 ━━━${NC}"; }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [4] Helpers
-# ============================================================
-# prompt_confirm <prompt>
-#   Returns 0 on y/Y, 1 on any other input (including EOF).
-#   Tolerates closed stdin — under `set -e`, a bare `read`
-#   on a closed pipe would otherwise abort the script.
+# ────────────────────────────────────────────────────────────
+# prompt_confirm — 0 on y/Y, 1 otherwise (incl. EOF).
 prompt_confirm() {
     local _reply=""
     read -rp "$1" -n 1 _reply || _reply=""
-    read -r _ || true    # drain rest of line
+    read -r _ || true
     echo ""
     case "$_reply" in
         [Yy]) return 0 ;;
@@ -111,13 +77,13 @@ prompt_confirm() {
     esac
 }
 
-# calc_version_code <semver>
-#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100.
-#   Leading zeros are stripped before arithmetic to avoid
-#   bash octal interpretation ("010" → 8).
+# calc_version_code — MAJOR*1M + MINOR*10K + PATCH*100.
+# Leading zeros stripped. Prerelease + build suffixes stripped
+# defensively (the caller's regex already rejects them).
 calc_version_code() {
     local _core="${1#v}"
     _core="${_core%%-*}"
+    _core="${_core%%+*}"
     local _major _minor _patch
     _major=$(echo "$_core" | cut -d. -f1 | sed 's/^0*//')
     _minor=$(echo "$_core" | cut -d. -f2 | sed 's/^0*//')
@@ -128,9 +94,9 @@ calc_version_code() {
     echo $((_major * 1000000 + _minor * 10000 + _patch * 100))
 }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [5] Arguments
-# ============================================================
+# ────────────────────────────────────────────────────────────
 VERSION=""
 DRY_RUN=0
 NO_PUSH=0
@@ -156,10 +122,8 @@ Options:
 
 Examples:
   ./scripts/release.sh v1.5.0
-  ./scripts/release.sh v1.5.0-beta1
   ./scripts/release.sh v1.5.0 --dry-run
   ./scripts/release.sh v1.5.0 --yes
-  ./scripts/release.sh v1.5.0 --skip-xnote
 
 Manual step — x-note-v<XYZ>:
   The per-release field "x-note-v<XYZ>" in update.json (e.g.
@@ -168,8 +132,7 @@ Manual step — x-note-v<XYZ>:
   It cannot be auto-generated.
 
   This script VERIFIES its presence and ABORTS if missing.
-  Pass --skip-xnote to bypass the check (not recommended —
-  end users will see a stale release note in their update UI).
+  Pass --skip-xnote to bypass the check (not recommended).
 
 For PATCH-only releases (hotfixes), use release-patch.sh.
 EOF
@@ -207,9 +170,9 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [6] Header
-# ============================================================
+# ────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  DNSCrypt Smart Filter – Release Automation      ║${NC}"
@@ -221,9 +184,9 @@ echo -e "  ${BOLD}Target version:${NC} ${GREEN}${VERSION}${NC}"
 [ "$SKIP_XNOTE" = "1" ] && echo -e "  ${BOLD}x-note check:${NC}   ${YELLOW}SKIPPED${NC}"
 echo ""
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7] Environment check
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[1/9] Checking environment"
 
 for tool in git sed awk; do
@@ -242,30 +205,27 @@ else
     log_warn "jq NOT found — update.json will NOT be updated automatically"
     log_warn "  End users will NOT see the update through the Magisk/"
     log_warn "  KernelSU auto-update channel until update.json is"
-    log_warn "  regenerated by hand or on a jq-equipped environment."
+    log_warn "  regenerated on a jq-equipped environment."
     log_warn "  The x-note-v<XYZ> check will also be skipped."
-    log_info "Install jq to enable automatic update.json updates:"
-    log_info "  • Debian/Ubuntu:  sudo apt install jq"
-    log_info "  • macOS:          brew install jq"
-    log_info "  • Termux:         pkg install jq"
+    log_info "Install jq: apt install jq / brew install jq / pkg install jq"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [8] Version format validation
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[2/9] Validating version format"
 
 if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
     log_error "Invalid version: '$VERSION'"
-    log_info "Required format: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]"
+    log_info "Required: v<MAJOR>.<MINOR>.<PATCH>[-prerelease]"
     log_info "Examples: v1.5.0, v1.5.0-beta1, v2.0.0-rc1"
     exit 1
 fi
 log_ok "Version format valid: $VERSION"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [9] Compute versionCode
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[3/9] Computing versionCode"
 
 VERSION_NO_V="${VERSION#v}"
@@ -296,16 +256,13 @@ fi
 VERSION_CODE=$(calc_version_code "$VERSION")
 log_ok "versionCode = $VERSION_CODE (from $VERSION_CORE)"
 
-# The x-note key that must exist in update.json for this
-# release. Dots stripped; leading "v" kept.
-#   v1.5.0 → x-note-v150
-#   v1.5.1 → x-note-v151
+# x-note key format: v1.5.0 → x-note-v150
 XNOTE_KEY="x-note-v${VERSION_CORE//./}"
 log_info "Required x-note key: ${XNOTE_KEY}"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [10] Git repository state
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[4/9] Checking Git repository state"
 
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -364,8 +321,6 @@ fi
 log_ok "Required files present: VERSION, module.prop, update.json, CHANGELOG.md"
 
 # --- CHANGELOG check ---
-# Escape regex meta-characters before embedding in the pattern,
-# so `[1.2.0]` does not accidentally match `[1x2y0]`.
 CHANGELOG_VER_ESCAPED=$(printf '%s' "${VERSION#v}" | sed 's/\./\\./g')
 if ! grep -qE "^## \[v?${CHANGELOG_VER_ESCAPED}\]|^## \[Unreleased\]" CHANGELOG.md; then
     log_warn "CHANGELOG.md does not contain a section for [${VERSION#v}] or [Unreleased]"
@@ -378,22 +333,6 @@ else
 fi
 
 # --- x-note-v<XYZ> check (HARD REQUIREMENT) ---
-#
-# The per-release documentation field. It is manually written
-# and cannot be auto-generated. Without it, the auto-update
-# metadata shown by the root manager will display a stale
-# release note.
-#
-# Behaviour:
-#   • jq unavailable  → check skipped (already warned in [1])
-#   • --skip-xnote    → check skipped with an explicit warning
-#   • field missing   → HARD ABORT (exit 3)
-#   • field present   → continue
-#
-# This is a hard requirement because the field is documented as
-# a REQUIRED manual step in the module's release process. The
-# pre-fix revision only warned, which meant a maintainer using
-# --yes could ship a release with a stale auto-update note.
 if [ "$SKIP_XNOTE" = "1" ]; then
     log_warn "x-note check skipped (--skip-xnote)"
     log_warn "  update.json may not contain a fresh ${XNOTE_KEY} entry."
@@ -404,10 +343,6 @@ elif [ "$HAS_JQ" = "1" ]; then
     else
         echo ""
         log_error "update.json is missing the required '${XNOTE_KEY}' field."
-        echo ""
-        log_info "This field documents the release in the auto-update"
-        log_info "metadata shown by the root manager. It is a REQUIRED"
-        log_info "manual step — add it BEFORE running this script."
         echo ""
         log_info "Expected format (single-line string):"
         echo -e "    ${DIM}\"${XNOTE_KEY}\": \"v${VERSION_NO_V} — <short release note>\",${NC}"
@@ -422,14 +357,11 @@ elif [ "$HAS_JQ" = "1" ]; then
     fi
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [11] Read current version + regression check
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[5/9] Reading current version"
 
-# Read file values. The `|| true` guards against a missing
-# file; the explicit non-empty check normalizes a silent
-# empty stdout to "unknown".
 CURRENT_VERSION=$(tr -d '\r\n' < VERSION 2>/dev/null || true)
 [ -z "$CURRENT_VERSION" ] && CURRENT_VERSION="unknown"
 
@@ -445,10 +377,7 @@ echo ""
 log_info "New VERSION:         ${VERSION}"
 log_info "New versionCode:     ${VERSION_CODE}$([ "$DRY_RUN" = "1" ] && echo " (dry-run: not applied)")"
 
-# --- Equality check FIRST ---
-# Re-running with the same version on an already-released tree
-# is not a regression. Handle it explicitly so the message
-# matches the situation.
+# --- Equality check ---
 if [ "$CURRENT_VERSION" = "$VERSION" ]; then
     log_warn "Current version is already ${VERSION}"
     if [ "$DRY_RUN" != "1" ]; then
@@ -460,10 +389,6 @@ if [ "$CURRENT_VERSION" = "$VERSION" ]; then
 fi
 
 # --- Regression check ---
-# versionCode must be strictly greater than the current one.
-# A regression would break Magisk's update detection for every
-# installed user. `-lt` (strict) so equality is not misreported
-# as regression (equality is handled above).
 if [ "$CURRENT_VC" != "unknown" ] && echo "$CURRENT_VC" | grep -qE '^[0-9]+$'; then
     if [ "$VERSION_CODE" -lt "$CURRENT_VC" ]; then
         log_error "Version regression detected"
@@ -478,9 +403,15 @@ if [ "$CURRENT_VC" != "unknown" ] && echo "$CURRENT_VC" | grep -qE '^[0-9]+$'; t
     fi
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [12] Confirmation
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# Manual fields NOT touched here (updated separately by hand
+# before tagging, or covered by `make check-all`):
+#   • web/manifest.json  → version (strip 'v')
+#   • web/sw.js          → CACHE_VERSION (invalidates PWA cache)
+#   • web/index.html     → var VERSION
+#   • web/dashboard.html → var VERSION + <title>
 if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
     echo ""
     log_warn "This will:"
@@ -503,21 +434,33 @@ if [ "$SKIP_CONFIRM" != "1" ] && [ "$DRY_RUN" != "1" ]; then
         log_info "GitHub Actions will then publish the release automatically."
     fi
     echo ""
-    echo -e "  ${DIM}Manual fields NOT touched by this script:${NC}"
-    echo -e "    ${DIM}• ${XNOTE_KEY}             (verified in step [4])${NC}"
-    echo -e "    ${DIM}• x-note-version-history     (append manually if desired)${NC}"
-    echo -e "    ${DIM}• proxy/app-apk.version      (only if the companion app changed)${NC}"
-    echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if the DNS engine changed)${NC}"
+    echo -e "  ${DIM}Manual fields NOT touched by this script (update before tagging):${NC}"
+    echo -e "    ${DIM}• web/manifest.json  → version  (strip 'v' prefix — PWA spec)${NC}"
+    echo -e "    ${DIM}• web/sw.js          → CACHE_VERSION  (invalidates PWA cache)${NC}"
+    echo -e "    ${DIM}• web/index.html     → var VERSION${NC}"
+    echo -e "    ${DIM}• web/dashboard.html → var VERSION + <title>${NC}"
+    echo -e "    ${DIM}• proxy/app-apk.version        (only if companion app changed)${NC}"
+    echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if DNS engine changed)${NC}"
     echo ""
     prompt_confirm "  Proceed? (y/N) " || { log_warn "Aborted by user"; exit 4; }
 fi
 
-# ============================================================
-# [13] Backup current values + ERR trap
-# ============================================================
-# Captures originals so rollback() can restore them if any
-# subsequent step fails. TMP_FILES tracks every mktemp-created
-# file so rollback can clean up leftovers.
+# ────────────────────────────────────────────────────────────
+# [13] Backup + rollback (BUG-9, BUG-10)
+# ────────────────────────────────────────────────────────────
+# Captures originals so rollback() can restore on failure.
+# TMP_FILES tracks mktemp artifacts to clean up.
+#
+# `git checkout HEAD --` (not `git checkout --`): restores from
+# the HEAD commit, not the index. After a partial `git add`, the
+# index contains the NEW values — restoring from it would leave
+# the working tree in the opposite state.
+#
+# BUG-10: `printf '%s\n'` — `$(cat VERSION)` strips trailing
+# newlines; writing without `\n` produces a file that
+# `grep '^versionCode='` may not match at end-of-line.
+# BUG-9: callers in [17] must invoke `rollback` explicitly
+# before `exit 3` — `exit` bypasses the ERR trap.
 log_step "[6/9] Updating version files"
 
 ORIG_VERSION=""
@@ -531,13 +474,13 @@ if [ "$DRY_RUN" = "0" ]; then
     ORIG_MODULE_PROP=$(cat module.prop 2>/dev/null || true)
     ORIG_UPDATE_JSON=$(cat update.json 2>/dev/null || true)
 
-    # shellcheck disable=SC2329  # invoked via trap on ERR
+    # shellcheck disable=SC2329
     rollback() {
         log_warn "Rolling back changes..."
-        [ -n "$ORIG_VERSION" ]     && printf '%s' "$ORIG_VERSION"     > VERSION
-        [ -n "$ORIG_MODULE_PROP" ] && printf '%s' "$ORIG_MODULE_PROP" > module.prop
-        [ -n "$ORIG_UPDATE_JSON" ] && printf '%s' "$ORIG_UPDATE_JSON" > update.json
-        git checkout -- VERSION module.prop update.json 2>/dev/null || true
+        [ -n "$ORIG_VERSION" ]     && printf '%s\n' "$ORIG_VERSION"     > VERSION
+        [ -n "$ORIG_MODULE_PROP" ] && printf '%s\n' "$ORIG_MODULE_PROP" > module.prop
+        [ -n "$ORIG_UPDATE_JSON" ] && printf '%s\n' "$ORIG_UPDATE_JSON" > update.json
+        git checkout HEAD -- VERSION module.prop update.json 2>/dev/null || true
         for _tf in $TMP_FILES; do
             [ -f "$_tf" ] && rm -f "$_tf"
         done
@@ -546,9 +489,9 @@ if [ "$DRY_RUN" = "0" ]; then
     trap 'rollback' ERR
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [14] Update VERSION
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ "$DRY_RUN" = "0" ]; then
     printf '%s\n' "$VERSION" > VERSION
     log_ok "VERSION → ${VERSION}"
@@ -556,11 +499,9 @@ else
     log_info "[dry-run] Would update VERSION → ${VERSION}"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [15] Update module.prop
-# ============================================================
-# Portable mktemp — full path with X's at the end. The `-t`
-# flag is NOT portable (BSD treats its argument as a prefix).
+# ────────────────────────────────────────────────────────────
 if [ "$DRY_RUN" = "0" ]; then
     tmp_prop="$(mktemp "${TMPDIR:-/tmp}/module.prop.XXXXXX")"
     TMP_FILES="$TMP_FILES $tmp_prop"
@@ -574,11 +515,14 @@ else
     log_info "[dry-run] Would update module.prop"
 fi
 
-# ============================================================
-# [16] Update update.json (requires jq)
-# ============================================================
-# Compute values once, before the dry-run branch, instead of
-# duplicating the same expressions in both arms.
+# ────────────────────────────────────────────────────────────
+# [16] Update update.json (requires jq) — BUG-13, BUG-14
+# ────────────────────────────────────────────────────────────
+# The 4 web files below are NOT touched by this script. They
+# must be updated BEFORE running it (see [12] Confirmation).
+# `sw.js CACHE_VERSION` is the critical one — without it, the
+# PWA cache is never invalidated and users keep stale assets
+# after the release.
 NEW_ZIP_URL="https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/${VERSION}/dnscrypt-webui-${VERSION#v}-module.zip"
 NEW_VERSION_NAME="${VERSION} (Global Edition)"
 NEW_RELEASE_DATE="$(date -u +%Y-%m-%d)"
@@ -608,11 +552,14 @@ if [ "$HAS_JQ" = "1" ]; then
         log_ok "update.json → x-note-last-updated=${NEW_RELEASE_DATE}"
 
         echo ""
-        log_info "Manual fields NOT touched by this script:"
-        log_info "  • ${XNOTE_KEY}           (verified earlier — present)"
-        log_info "  • x-note-version-history   (append the new entry if desired)"
-        log_info "  • proxy/app-apk.version    (only if the companion app changed)"
-        log_info "  • proxy/dnscrypt-proxy.version (only if the DNS engine changed)"
+        log_info "Fields NOT touched by this script (verify before tagging):"
+        log_info "  • ${XNOTE_KEY}         (verified in [10] — present)"
+        log_info "  • web/manifest.json    → version  (strip 'v' prefix)"
+        log_info "  • web/sw.js            → CACHE_VERSION  (critical for PWA)"
+        log_info "  • web/index.html       → var VERSION"
+        log_info "  • web/dashboard.html   → var VERSION + <title>"
+        log_info "  • proxy/app-apk.version        (only if companion app changed)"
+        log_info "  • proxy/dnscrypt-proxy.version (only if DNS engine changed)"
     else
         log_info "[dry-run] Would update update.json (6 fields):"
         log_info "[dry-run]   version=${VERSION}"
@@ -624,18 +571,18 @@ if [ "$HAS_JQ" = "1" ]; then
     fi
 else
     log_warn "Skipping update.json (jq not available)"
-    log_warn "  The following fields will remain stale in update.json:"
-    log_warn "    • version, versionCode, versionName"
-    log_warn "    • releaseDate, zipUrl, x-note-last-updated"
-    log_info "Install jq and re-run this script to fix them:"
-    log_info "  • Debian/Ubuntu:  sudo apt install jq"
-    log_info "  • macOS:          brew install jq"
-    log_info "  • Termux:         pkg install jq"
+    log_warn "  Fields left stale: version, versionCode, versionName,"
+    log_warn "  releaseDate, zipUrl, x-note-last-updated"
+    log_info "Install jq and re-run: apt install jq / brew install jq / pkg install jq"
 fi
 
-# ============================================================
-# [17] Verify changes
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [17] Verify changes (BUG-9)
+# ────────────────────────────────────────────────────────────
+# Every `exit 3` here MUST be preceded by `rollback` — `exit`
+# bypasses the ERR trap. Without this, a silent update.json
+# write failure leaves VERSION + module.prop at the new value
+# while update.json stays old → inconsistent release state.
 log_step "[7/9] Verifying changes"
 
 if [ "$DRY_RUN" = "0" ]; then
@@ -645,24 +592,24 @@ if [ "$DRY_RUN" = "0" ]; then
 
     if [ -z "$NEW_PROP_VER" ]; then
         log_error "module.prop has no 'version=' line after update"
-        exit 3
+        rollback; exit 3
     fi
     if [ -z "$NEW_PROP_VC" ]; then
         log_error "module.prop has no 'versionCode=' line after update"
-        exit 3
+        rollback; exit 3
     fi
 
     if [ "$NEW_VERSION_FILE" != "$VERSION" ]; then
         log_error "VERSION file mismatch: expected '$VERSION', got '$NEW_VERSION_FILE'"
-        exit 3
+        rollback; exit 3
     fi
     if [ "$NEW_PROP_VER" != "$VERSION" ]; then
         log_error "module.prop version mismatch: expected '$VERSION', got '$NEW_PROP_VER'"
-        exit 3
+        rollback; exit 3
     fi
     if [ "$NEW_PROP_VC" != "$VERSION_CODE" ]; then
         log_error "module.prop versionCode mismatch: expected '$VERSION_CODE', got '$NEW_PROP_VC'"
-        exit 3
+        rollback; exit 3
     fi
     log_ok "VERSION, module.prop verified"
 
@@ -674,19 +621,19 @@ if [ "$DRY_RUN" = "0" ]; then
 
         if [ "$JSON_VER" != "$VERSION" ]; then
             log_error "update.json version mismatch: expected '$VERSION', got '$JSON_VER'"
-            exit 3
+            rollback; exit 3
         fi
         if [ "$JSON_VC" != "$VERSION_CODE" ]; then
             log_error "update.json versionCode mismatch: expected '$VERSION_CODE', got '$JSON_VC'"
-            exit 3
+            rollback; exit 3
         fi
         if [ "$JSON_VN" != "$NEW_VERSION_NAME" ]; then
             log_error "update.json versionName mismatch: expected '$NEW_VERSION_NAME', got '$JSON_VN'"
-            exit 3
+            rollback; exit 3
         fi
         if [ "$JSON_RD" != "$NEW_RELEASE_DATE" ]; then
             log_error "update.json releaseDate mismatch: expected '$NEW_RELEASE_DATE', got '$JSON_RD'"
-            exit 3
+            rollback; exit 3
         fi
         log_ok "update.json verified (version, versionCode, versionName, releaseDate)"
     fi
@@ -694,9 +641,9 @@ else
     log_info "[dry-run] Skipping verification"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [18] Commit + tag
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[8/9] Creating commit and tag"
 
 COMMIT_MSG="release: ${VERSION}"
@@ -712,15 +659,18 @@ if [ "$DRY_RUN" = "0" ]; then
     else
         git commit -m "$COMMIT_MSG"
         log_ok "Commit created: ${COMMIT_MSG}"
+
+        # Disable ERR trap NOW: the commit has landed. A later
+        # failure must NOT rewrite files back to ORIG_VERSION —
+        # rollback after a successful commit would leave an
+        # uncommitted revert of the committed changes.
+        trap - ERR 2>/dev/null || true
     fi
 else
     log_info "[dry-run] Would commit: ${COMMIT_MSG}"
 fi
 
 # Annotated tag (`git tag -a`), not signed (`git tag -s`).
-# The repository does not have a release signing key configured,
-# and release.yml's header explicitly documents this as a
-# non-goal.
 TAG_MSG="Release ${VERSION}"
 
 if [ "$DRY_RUN" = "0" ]; then
@@ -734,17 +684,13 @@ if [ "$DRY_RUN" = "0" ]; then
         exit 1
     fi
     log_ok "Annotated tag created: ${VERSION}"
-
-    # Only now is it safe to disable the ERR trap — commit AND
-    # tag both exist, so rollback() would be destructive.
-    trap - ERR 2>/dev/null || true
 else
     log_info "[dry-run] Would create annotated tag: ${VERSION}"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [19] Push
-# ============================================================
+# ────────────────────────────────────────────────────────────
 log_step "[9/9] Pushing to origin"
 
 if [ "$NO_PUSH" = "1" ]; then
@@ -779,9 +725,9 @@ else
     log_info "[dry-run] Would push: ${VERSION}"
 fi
 
-# ============================================================
-# [20] Final summary
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [20] Final summary (BUG-13, BUG-14)
+# ────────────────────────────────────────────────────────────
 trap - ERR 2>/dev/null || true
 
 echo ""
@@ -794,10 +740,6 @@ if [ "$DRY_RUN" = "1" ]; then
     if [ "$HAS_JQ" != "1" ]; then
         echo ""
         echo -e "  ${YELLOW}⚠${NC}  update.json will NOT be updated (jq unavailable)."
-        echo -e "     ${DIM}Users will not see the update through the${NC}"
-        echo -e "     ${DIM}Magisk/KernelSU auto-update channel until${NC}"
-        echo -e "     ${DIM}update.json is regenerated on a jq-equipped${NC}"
-        echo -e "     ${DIM}environment.${NC}"
     fi
     if [ "$SKIP_XNOTE" = "1" ]; then
         echo ""
@@ -821,11 +763,9 @@ if [ "$HAS_JQ" != "1" ]; then
     echo ""
     echo -e "  ${YELLOW}⚠${NC}  update.json was NOT updated (jq unavailable)."
     echo -e "     ${DIM}Users who already installed the module will NOT${NC}"
-    echo -e "     ${DIM}see the update until update.json is regenerated${NC}"
-    echo -e "     ${DIM}by hand or on a jq-equipped environment.${NC}"
-    echo -e "     ${DIM}Fields left stale:${NC}"
-    echo -e "     ${DIM}  • version, versionCode, versionName${NC}"
-    echo -e "     ${DIM}  • releaseDate, zipUrl, x-note-last-updated${NC}"
+    echo -e "     ${DIM}see the update until update.json is regenerated.${NC}"
+    echo -e "     ${DIM}Fields left stale: version, versionCode,${NC}"
+    echo -e "     ${DIM}versionName, releaseDate, zipUrl, x-note-last-updated.${NC}"
 fi
 
 if [ "$SKIP_XNOTE" = "1" ]; then
@@ -836,11 +776,14 @@ if [ "$SKIP_XNOTE" = "1" ]; then
 fi
 
 echo ""
-echo -e "  ${BOLD}Manual fields NOT touched by this script:${NC}"
-echo -e "    ${DIM}• ${XNOTE_KEY}             (verified in step [4])${NC}"
-echo -e "    ${DIM}• x-note-version-history     (append manually if desired)${NC}"
-echo -e "    ${DIM}• proxy/app-apk.version      (only if the companion app changed)${NC}"
-echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if the DNS engine changed)${NC}"
+echo -e "  ${BOLD}Fields NOT touched by this script:${NC}"
+echo -e "    ${DIM}• ${XNOTE_KEY}         (verified in [10] — present)${NC}"
+echo -e "    ${DIM}• web/manifest.json    → version  (strip 'v' prefix)${NC}"
+echo -e "    ${DIM}• web/sw.js            → CACHE_VERSION  (critical for PWA)${NC}"
+echo -e "    ${DIM}• web/index.html       → var VERSION${NC}"
+echo -e "    ${DIM}• web/dashboard.html   → var VERSION + <title>${NC}"
+echo -e "    ${DIM}• proxy/app-apk.version        (only if companion app changed)${NC}"
+echo -e "    ${DIM}• proxy/dnscrypt-proxy.version (only if DNS engine changed)${NC}"
 
 if [ "$NO_PUSH" = "0" ]; then
     echo ""
@@ -849,9 +792,8 @@ if [ "$NO_PUSH" = "0" ]; then
     echo "  • It will build 4 architectures, package the module, and"
     echo "    publish the release."
     echo "  • It also runs the sync main → develop step at the end of"
-    echo "    the release. If that step succeeds, nothing is required"
-    echo "    from you. If it fails (e.g. a merge conflict), back-merge"
-    echo "    manually with:"
+    echo "    the release. If that step fails (e.g. a merge conflict),"
+    echo "    back-merge manually with:"
     echo "        make sync"
     echo ""
     echo -e "${DIM}  Monitor: https://github.com/gasciljh/dnscrypt-proxy-webui/actions${NC}"

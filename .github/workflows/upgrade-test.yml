@@ -1,14 +1,14 @@
 # ============================================================
 # DNSCrypt Smart Filter — Data Preservation & Upgrade Test
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Verify the 9 tested data-preservation layers introduced in
 # v1.2.0 WITHOUT a real Android device. Each scenario runs in a
-# controlled Ubuntu sandbox with mocked paths, and exercises
-# the same shell functions that run on-device.
+# controlled Ubuntu sandbox with mocked paths, and exercises the
+# same shell functions that run on-device.
 #
 # Note: the v1.2.0 architecture has TEN layers, but Layer 10
 # (Observability — status.sh --diagnose + runtime_info.backups)
@@ -27,6 +27,32 @@
 #     mirrored here, or the parity tests will no longer
 #     represent the real behavior.
 #
+# v1.5.0 fixes (UPG-1..UPG-3):
+#   • UPG-1 — boot-mini.sh is now staged into the sandbox. It
+#     is a hard dependency of functions.sh (sourced at load
+#     time); without it, ~20 of the 42 scenarios abort with
+#     "command not found" on the first backup / rotation call.
+#   • UPG-2 — MODDIR is exported before sourcing functions.sh,
+#     so functions.sh resolves boot-mini.sh via the
+#     caller-supplied path instead of deriving it from $0
+#     (which, in this dispatcher, is /tmp/run-scenario.sh).
+#   • UPG-3 — load_functions() now fails fast if Layer 1 does
+#     not define the expected helpers, converting a silent
+#     misconfiguration into a clear assertion error.
+#
+# L5 fix (v1.5.0):
+#   • L5-01..L5-03 previously only verified that the env var
+#     was set, not that the detection logic ran. This was a
+#     weak test: the env var would be set even if the
+#     detection code were deleted.
+#   • Now: each L5 scenario writes a real manifest via
+#     write_manifest() and asserts that its `root_solution`
+#     field equals the expected lowercase string
+#     (magisk / kernelsu / apatch).
+#   • write_manifest's inline detection is the ONLY place in
+#     functions.sh that chooses a root solution; the codebase
+#     has no standalone detect_root_solution() in that file.
+#
 # Scenario categories (42 total, across 9 tested layers):
 #   Layer 1 — Multi-source detection       L1-01..L1-10 (10)
 #   Layer 2 — Persistent backup            L2-01..L2-07  (7)
@@ -44,7 +70,7 @@
 #   This workflow is NOT triggered on push or on pull requests.
 #   The 42-scenario matrix is expensive and the failures it
 #   detected were unrelated to the data-preservation layers
-#   (mocked-path noise). The matrix is now manual-only.
+#   (mocked-path noise). The matrix is manual-only.
 #
 #   When to trigger manually:
 #     • Before any release.
@@ -123,9 +149,9 @@ jobs:
           - { id: 'L4-07', name: 'Concurrent txn dirs (PID suffix)' }
 
           # ─── Layer 5 — Root-solution compat (3) ───
-          - { id: 'L5-01', name: 'Magisk detection' }
-          - { id: 'L5-02', name: 'KernelSU detection' }
-          - { id: 'L5-03', name: 'APatch detection' }
+          - { id: 'L5-01', name: 'write_manifest: root_solution = magisk' }
+          - { id: 'L5-02', name: 'write_manifest: root_solution = kernelsu' }
+          - { id: 'L5-03', name: 'write_manifest: root_solution = apatch' }
 
           # ─── Layer 6 — SELinux (2) ───
           - { id: 'L6-01', name: 'copy_with_context uses restorecon' }
@@ -158,13 +184,36 @@ jobs:
       # ============================================================
       # [1.1] Prepare sandbox
       # ============================================================
-      # Mock the on-device paths under /data and /sdcard. The
-      # GitHub-hosted runner permits `sudo`, so the standard
-      # Android directory layout can be recreated verbatim.
+      # Two responsibilities:
+      #   1. Fail fast if any required script is missing from
+      #      the repo checkout. A future refactor that renames
+      #      or removes one of these files should produce a
+      #      clear CI error, not a cascade of "command not
+      #      found" failures inside the scenarios.
+      #   2. Mock the on-device paths under /data and /sdcard.
+      #      The GitHub-hosted runner permits `sudo`, so the
+      #      standard Android directory layout can be recreated
+      #      verbatim.
+      #
+      # boot-mini.sh is required since v1.5.0 Phase 0 —
+      # functions.sh sources it at load time. Without it at
+      # $MODDIR/boot-mini.sh, the source aborts and ~20
+      # scenarios that call backup / rotation helpers fail
+      # with "command not found" (UPG-1).
       # ============================================================
       - name: Prepare sandbox
         run: |
           set -euo pipefail
+
+          # Verify every required script exists in the repo
+          # before creating any sandbox state.
+          REQUIRED_SCRIPTS="functions.sh customize.sh uninstall.sh boot-mini.sh"
+          for f in $REQUIRED_SCRIPTS; do
+            [ -s "proxy/$f" ] || {
+              echo "::error::proxy/$f missing or empty"
+              exit 1
+            }
+          done
 
           sudo mkdir -p /data/adb/modules/dnscrypt-proxy-webui/proxy
           sudo mkdir -p /data/local/tmp
@@ -172,9 +221,13 @@ jobs:
 
           sudo chmod -R 0777 /data/adb /data/local/tmp /sdcard
 
-          cp proxy/functions.sh /data/adb/modules/dnscrypt-proxy-webui/functions.sh
-          cp proxy/customize.sh /data/adb/modules/dnscrypt-proxy-webui/customize.sh
-          cp proxy/uninstall.sh /data/adb/modules/dnscrypt-proxy-webui/uninstall.sh
+          # Copy every script the scenarios source. The
+          # canonical post-install layout puts shell scripts at
+          # the module root (not under proxy/), matching
+          # customize.sh §[9] and main.go's getInstallScript().
+          for f in $REQUIRED_SCRIPTS; do
+            cp "proxy/$f" "/data/adb/modules/dnscrypt-proxy-webui/$f"
+          done
 
           touch /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml
           touch /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf
@@ -243,14 +296,26 @@ jobs:
           }
 
           # ------------------------------------------------------------
-          # Load functions.sh into the current shell, then override
-          # the sandbox-relevant paths. functions.sh hardcodes the
-          # production paths, but every helper reads the variable by
-          # name — reassignment works.
+          # Load functions.sh into the current shell.
+          #
+          # MODDIR is exported BEFORE sourcing so functions.sh
+          # resolves boot-mini.sh via the caller-supplied path
+          # instead of deriving it from $0 — which, in this
+          # dispatcher, is /tmp/run-scenario.sh (UPG-2).
+          #
+          # The command -v guard after the source converts a
+          # silent "functions.sh failed to load" (e.g. because
+          # boot-mini.sh is missing) into a clear assertion
+          # error (UPG-3).
           # ------------------------------------------------------------
           load_functions() {
+            export MODDIR="$MODULE_DIR"
             source "$MODULE_DIR/functions.sh" 2>/dev/null || true
-            MODDIR="$MODULE_DIR"
+
+            if ! command -v ensure_backup_dir >/dev/null 2>&1; then
+              fail "functions.sh did not load — boot-mini.sh missing at $MODDIR?"
+            fi
+
             PERSISTENT_BACKUP="$BACKUP_DIR"
             RUN_DIR="$MODULE_DIR/proxy/run"
             TOML_FILE="$MODULE_DIR/proxy/dnscrypt-proxy.toml"
@@ -300,14 +365,62 @@ jobs:
             done
           }
 
+          # ------------------------------------------------------------
+          # run_manifest_root_check <expected>
+          #
+          # Verifies write_manifest's inline root detection by
+          # writing a real manifest and reading back the
+          # `root_solution` field.
+          #
+          # Why write_manifest and not detect_root_solution():
+          #   functions.sh has NO standalone detect_root_solution()
+          #   function. Root detection is inlined inside
+          #   write_manifest (§[25]), which is the ONLY place in
+          #   functions.sh that picks a root solution. So testing
+          #   write_manifest is testing the real code path.
+          #
+          #   customize.sh and status.sh each have their own
+          #   detect_root_solution(), but those functions are
+          #   local to their files and not available to
+          #   functions.sh consumers — testing them here would
+          #   not reflect on-device behavior of the manifest
+          #   writer.
+          #
+          # ROOT_SOLUTION is unset before the call: write_manifest
+          # uses "${ROOT_SOLUTION:-}" as an override; clearing it
+          # forces the inline detection block to run.
+          # ------------------------------------------------------------
+          run_manifest_root_check() {
+            local expected="$1"
+            local test_dir="$BACKUP_DIR/l5-check-$expected"
+
+            sudo rm -rf "$test_dir"
+            mkdir -p "$test_dir"
+            seed_user_files "$test_dir"
+
+            load_functions
+            unset ROOT_SOLUTION
+
+            write_manifest "$test_dir" "$test_dir" 5
+
+            local manifest="$test_dir/.manifest.json"
+            assert_file_exists "$manifest"
+
+            local actual
+            actual=$(grep -o '"root_solution"[[:space:]]*:[[:space:]]*"[^"]*"' "$manifest" \
+                     | head -n1 \
+                     | sed 's/.*"\([^"]*\)"$/\1/')
+
+            assert_eq "$expected" "$actual"
+          }
+
           # ============================================================
           # Scenario dispatcher
           # ============================================================
           # All scenario bodies run inside this function so that
           # per-scenario `local` declarations are valid. In bash,
           # `local` outside a function is a fatal error under
-          # `set -e`, which is why the pre-fix revision silently
-          # aborted in every scenario that declared one.
+          # `set -e`.
           # ============================================================
           run_scenario() {
             local scenario="$1"
@@ -388,8 +501,6 @@ jobs:
 
               L1-09)
                 # APatch-specific discovery path: modules_update.
-                # The candidate list in run_discovery() now includes
-                # this path — the scenario is a real assertion.
                 reset_module_proxy
                 reset_backup
                 sudo rm -rf /data/adb/modules_update
@@ -605,8 +716,6 @@ jobs:
                 ;;
 
               L4-02)
-                # Conceptual — mirrors uninstall.sh's resolver
-                # inline. Does not call the function.
                 reset_backup
                 mkdir -p "$BACKUP_DIR/txn-20260927-120001-2000"
                 echo "COMMIT" > "$BACKUP_DIR/txn-20260927-120001-2000/.state"
@@ -616,8 +725,6 @@ jobs:
                 ;;
 
               L4-03)
-                # Conceptual — mirrors uninstall.sh's resolver
-                # inline. Does not call the function.
                 reset_backup
                 mkdir -p "$BACKUP_DIR/txn-20260927-120002-3000"
                 echo "ROLLBACK" > "$BACKUP_DIR/txn-20260927-120002-3000/.state"
@@ -648,8 +755,6 @@ jobs:
                 ;;
 
               L4-05)
-                # Conceptual — pre-existing orphan preservation
-                # is enforced by uninstall.sh, not by this snippet.
                 reset_backup
                 mkdir -p "$BACKUP_DIR/orphan-txn-20260927-115959-999"
                 echo "START" > "$BACKUP_DIR/orphan-txn-20260927-115959-999/.state"
@@ -687,30 +792,42 @@ jobs:
               # ═══════════════════════════════════════════════
               # L5 — Root-solution compatibility
               # ═══════════════════════════════════════════════
+              # These tests exercise write_manifest's inline root
+              # detection (functions.sh §[25]). The lowercase
+              # values below match that function's output.
+              #
+              # Detection order in write_manifest:
+              #   KSU_VER / /data/adb/ksu   → "kernelsu"
+              #   APATCH / /data/adb/ap     → "apatch"
+              #   MAGISK_VER_CODE / magisk  → "magisk"
+              #   otherwise                 → "unknown"
+              #
+              # Each scenario clears the other two environment
+              # variables AND their respective directories, so
+              # only the target signal remains.
+              # ═══════════════════════════════════════════════
               L5-01)
                 unset KSU_VER APATCH 2>/dev/null || true
                 export MAGISK_VER_CODE=27000
-                sudo rm -rf /data/adb/ksu /data/adb/ap
-                if [ -d /data/adb/magisk ]; then
-                  pass "Magisk detected (existing dir)"
-                else
-                  assert_eq "27000" "$MAGISK_VER_CODE"
-                  pass "Magisk detected via MAGISK_VER_CODE"
-                fi
+                sudo rm -rf /data/adb/ksu /data/adb/ap /data/adb/magisk
+                run_manifest_root_check "magisk"
+                pass "write_manifest: root_solution = magisk"
                 ;;
 
               L5-02)
                 unset MAGISK_VER_CODE APATCH 2>/dev/null || true
                 export KSU_VER=10000
-                assert_eq "10000" "$KSU_VER"
-                pass "KernelSU detected via KSU_VER"
+                sudo rm -rf /data/adb/magisk /data/adb/ap
+                run_manifest_root_check "kernelsu"
+                pass "write_manifest: root_solution = kernelsu"
                 ;;
 
               L5-03)
                 unset MAGISK_VER_CODE KSU_VER 2>/dev/null || true
                 export APATCH=1
-                assert_eq "1" "$APATCH"
-                pass "APatch detected via APATCH"
+                sudo rm -rf /data/adb/magisk /data/adb/ksu
+                run_manifest_root_check "apatch"
+                pass "write_manifest: root_solution = apatch"
                 ;;
 
               # ═══════════════════════════════════════════════
@@ -805,11 +922,6 @@ jobs:
               # ═══════════════════════════════════════════════
               # L9 — Auto-backup + rotation
               # ═══════════════════════════════════════════════
-              # L9-02 and L9-03 seed an apk/ subfolder — the
-              # companion APK mirror. The rotation MUST ignore it:
-              #   (a) ROT-MANIFEST: no `.manifest.json` → not a
-              #       snapshot.
-              #   (b) Explicit `case` skip in rotate_backups().
               L9-01)
                 reset_backup
                 reset_module_proxy
@@ -825,20 +937,14 @@ jobs:
 
               L9-02)
                 reset_backup
-                # Create 30 snapshot directories, each with a valid
-                # name (YYYYMMDD-HHMMSS-v<digit>) AND a
-                # `.manifest.json` file. Both are required:
-                #   • The manifest satisfies the SNAP-MANIFEST
-                #     detection rule used by rotate_backups.
-                #   • The name satisfies the ROT-PROTECT "newest
-                #     install" pattern (`-v<digit>`).
+                # 30 snapshot directories, each with a valid name
+                # (YYYYMMDD-HHMMSS-v<digit>) AND a .manifest.json.
                 for i in $(seq -w 1 30); do
                   local ts="20260901-0000${i}"
                   mkdir -p "$BACKUP_DIR/${ts}-v1.2.0-100"
                   echo '{}' > "$BACKUP_DIR/${ts}-v1.2.0-100/.manifest.json"
                 done
-                # Also seed an apk/ subfolder — must NOT be
-                # counted by rotate_backups.
+                # Seed an apk/ subfolder — must NOT be counted.
                 mkdir -p "$BACKUP_DIR/apk"
                 echo "fake apk"  > "$BACKUP_DIR/apk/app-debug.apk"
                 echo "deadbeef"  > "$BACKUP_DIR/apk/app-debug.apk.sha256"
@@ -847,7 +953,6 @@ jobs:
                 local remaining
                 remaining=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name '20*' | wc -l)
                 assert_eq "21" "$remaining"
-                # The apk/ subfolder must survive the rotation.
                 assert_dir_exists  "$BACKUP_DIR/apk"
                 assert_file_exists "$BACKUP_DIR/apk/app-debug.apk"
                 assert_file_exists "$BACKUP_DIR/apk/app-debug.apk.sha256"
@@ -874,8 +979,6 @@ jobs:
                 assert_file_exists "$BACKUP_DIR/.last_stable"
                 assert_file_exists "$BACKUP_DIR/README.md"
                 assert_file_exists "$BACKUP_DIR/.upgrade_history.json"
-                # The apk/ mirror is preserved alongside current/
-                # and the metadata files.
                 assert_dir_exists  "$BACKUP_DIR/apk"
                 assert_file_exists "$BACKUP_DIR/apk/app-debug.apk"
                 assert_file_exists "$BACKUP_DIR/apk/app-debug.apk.sha256"

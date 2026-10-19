@@ -2,7 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – fetch_dns_binaries.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -223,8 +223,15 @@ MANIFEST_FILE="$CACHE_DIR/.manifest.json"
 # [7] Read DNS version (SSOT)
 # ============================================================
 # Resolution: --version override → file → hardcoded fallback.
+#
+# When --version is used, it BYPASSES proxy/dnscrypt-proxy.version
+# (the Single Source of Truth). A warning is emitted so the
+# bypass is visible in logs and CI output — otherwise a stale
+# override could silently ship binaries from a version the
+# repo does not agree with.
 read_dns_version() {
     if [ -n "$VERSION_OVERRIDE" ]; then
+        log_warn "Using --version override: $VERSION_OVERRIDE (bypasses proxy/dnscrypt-proxy.version)"
         printf '%s' "$VERSION_OVERRIDE"
         return 0
     fi
@@ -492,66 +499,61 @@ download_url() {
 # ============================================================
 # [15] Extract binary from ZIP
 # ============================================================
-# Uses an EXIT trap with explicit cleanup on each return path.
-# The previous trap (if any) is saved and restored so a future
-# caller that installs its own EXIT trap is not silently
-# clobbered.
+# Entire body runs inside a subshell ( `( ... )` ) so any EXIT
+# trap installed inside is isolated from the caller's traps.
+# This replaces the previous approach of capturing the caller's
+# EXIT trap via `trap -p` and re-installing it with `eval`,
+# which was fragile against traps containing shell
+# metacharacters.
+#
+# The subshell's EXIT trap removes $tmp_extract on every path
+# — success, failure, and signals — without needing manual
+# cleanup on each `return 1`.
 extract_binary() {
     local zip_path="$1"
     local output_path="$2"
 
-    local tmp_extract
-    tmp_extract=$(mktemp -d "${TMPDIR:-/tmp}/dns-extract.XXXXXX")
+    (
+        set -e
 
-    local prev_exit_trap
-    prev_exit_trap=$(trap -p EXIT)
+        tmp_extract=$(mktemp -d "${TMPDIR:-/tmp}/dns-extract.XXXXXX")
+        # Single-quoted body: $tmp_extract is expanded at trap
+        # fire time, not install time.
+        trap 'rm -rf "$tmp_extract" 2>/dev/null' EXIT
 
-    # shellcheck disable=SC2064
-    trap "rm -rf '$tmp_extract' 2>/dev/null" EXIT
-
-    _restore_exit_trap() {
-        if [ -n "$prev_exit_trap" ]; then
-            eval "$prev_exit_trap"
-        else
-            trap - EXIT
+        if ! unzip -q -o "$zip_path" -d "$tmp_extract" 2>/dev/null; then
+            log_error "Failed to unzip: $zip_path"
+            exit 1
         fi
-    }
 
-    if ! unzip -q -o "$zip_path" -d "$tmp_extract" 2>/dev/null; then
-        log_error "Failed to unzip: $zip_path"
-        rm -rf "$tmp_extract" 2>/dev/null
-        _restore_exit_trap
-        return 1
-    fi
+        # Prefer a file named dnscrypt-proxy* (excluding docs);
+        # fall back to any ELF file.
+        found=""
+        found=$(find "$tmp_extract" -type f -name "dnscrypt-proxy*" \
+            ! -name "*.txt" ! -name "*.md" 2>/dev/null | head -n1)
 
-    # Prefer a file named dnscrypt-proxy* (excluding docs);
-    # fall back to any ELF file.
-    local found=""
-    found=$(find "$tmp_extract" -type f -name "dnscrypt-proxy*" \
-        ! -name "*.txt" ! -name "*.md" 2>/dev/null | head -n1)
+        if [ -z "$found" ]; then
+            found=$(find "$tmp_extract" -type f 2>/dev/null | while IFS= read -r f; do
+                if file "$f" 2>/dev/null | grep -qi "ELF"; then
+                    echo "$f"
+                    break
+                fi
+            done | head -n1)
+        fi
 
-    if [ -z "$found" ]; then
-        found=$(find "$tmp_extract" -type f 2>/dev/null | while IFS= read -r f; do
-            if file "$f" 2>/dev/null | grep -qi "ELF"; then
-                echo "$f"
-                break
-            fi
-        done | head -n1)
-    fi
+        if [ -z "$found" ] || [ ! -f "$found" ]; then
+            log_error "No binary found in ZIP"
+            exit 1
+        fi
 
-    if [ -z "$found" ] || [ ! -f "$found" ]; then
-        log_error "No binary found in ZIP"
-        rm -rf "$tmp_extract" 2>/dev/null
-        _restore_exit_trap
-        return 1
-    fi
+        if ! cp "$found" "$output_path"; then
+            log_error "Failed to copy extracted binary to $output_path"
+            exit 1
+        fi
+        chmod 0755 "$output_path"
 
-    cp "$found" "$output_path"
-    chmod 0755 "$output_path"
-
-    rm -rf "$tmp_extract" 2>/dev/null
-    _restore_exit_trap
-    return 0
+        exit 0
+    )
 }
 
 # ============================================================

@@ -1,7 +1,7 @@
 # ============================================================
 # EditorConfig for DNSCrypt Smart Filter
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # Reference: https://editorconfig.org
@@ -158,15 +158,17 @@ insert_final_newline = false
 insert_final_newline = false
 
 # ============================================================
-# Binary assets
+# Binary assets — APK
 # ============================================================
+# Matches web/app-debug.apk (staged by release.yml) and any
+# *.apk that lands in dist/ or elsewhere.
 [web/*.png]
 insert_final_newline = false
 
 [web/*.ico]
 insert_final_newline = false
 
-[web/*.apk]
+[*.apk]
 insert_final_newline = false
 trim_trailing_whitespace = false
 end_of_line = unset

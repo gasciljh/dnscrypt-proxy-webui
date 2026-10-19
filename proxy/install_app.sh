@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — install_app.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -29,52 +29,25 @@
 #   130 = interrupted by SIGINT   (128 + 2)
 #   143 = terminated by SIGTERM   (128 + 15)
 #
-# Install cascade: 5 strategies, bounded by a wall-clock
-# deadline. Every `pm` subprocess is wrapped in a `timeout`
-# whose value is computed from the remaining cascade budget,
-# so no single command can consume more than its share.
+# Timeout hierarchy (must stay in sync with main.go):
+#   • WebUI client   : 120 s  (web/index.html)
+#   • Server         :  90 s  (main.go INSTALL_TIMEOUT)
+#   • Cascade        :  75 s  (§[2b])
+#   • Per-strategy   :  20 s  (STRATEGY_TIMEOUT)
+# The cascade deadline < server timeout, so the EXIT/INT/TERM
+# traps always fire before main.go sends SIGKILL (uncatchable).
 #
-# Deadline hierarchy (must stay in sync with main.go):
-#   • WebUI client timeout  : 120 s  (web/index.html)
-#   • Server timeout        :  90 s  (main.go INSTALL_TIMEOUT)
-#   • Cascade deadline      :  75 s  (this script)
-#   • Per-strategy cap      :  20 s  (STRATEGY_TIMEOUT)
-#
-# The cascade deadline is strictly less than the server
-# timeout, so the EXIT/INT/TERM traps always fire before
-# main.go's context deadline sends SIGKILL (uncatchable).
-#
-# ============================================================
-# Why this script does NOT use `set -e`
-# ============================================================
-# The absence of `set -e` is DELIBERATE, not an oversight.
-#
-# Adding `set -e` to this script would BREAK the cascade:
-#
-#   • The 5-level cascade in §[14] relies on each strategy
-#     returning non-zero to fall through to the next one.
-#     Under `set -e`, the first failed `pm install` would
-#     abort the script before strategies 2-5 could be tried.
-#
-#   • Every command in the script already has explicit error
-#     handling (`|| return 1`, `if command; then`, `case`
-#     branches). There is no code path where a silent failure
-#     could propagate unnoticed.
-#
-#   • The three-way signal trap (EXIT / INT / TERM) provides
-#     the cleanup guarantees that `set -e` would otherwise
-#     contribute — on every catchable exit path, the staged
-#     APK is removed and the Play Protect verifier is
-#     restored.
-#
-#   • Many `pm` invocations are EXPECTED to fail (e.g.
-#     strategy 1 on a ROM where it is blocked). Treating an
-#     expected failure as a fatal error would defeat the
-#     purpose of the cascade.
-#
-# If a future change introduces a new command that genuinely
-# requires `set -e` semantics, use an explicit `|| exit 1`
-# on that line — do NOT enable `set -e` globally.
+# Why this script does NOT use `set -e`:
+#   The 5-level cascade in §[14] relies on non-zero returns
+#   to fall through to the next strategy. Under `set -e`,
+#   the first failed `pm install` would abort the script
+#   before strategies 2-5 could be tried. Every command has
+#   explicit `|| return 1` / `if command; then` handling;
+#   the EXIT/INT/TERM traps provide the cleanup guarantees
+#   that `set -e` would otherwise contribute. If a future
+#   change genuinely needs `set -e` semantics, use an
+#   explicit `|| exit 1` on that line — do NOT enable
+#   `set -e` globally.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -112,7 +85,24 @@ unset _self_dir _cand
 # ============================================================
 # [2] Constants
 # ============================================================
-SCRIPT_VERSION="v1.5.0"
+# get_version — reads `version=` from module.prop. Dynamic
+# version avoids a stale `--version` output after an upgrade
+# (the script is extracted alongside module.prop by
+# customize.sh §[9]).
+get_version() {
+    local vf="$MODDIR/module.prop"
+    if [ -f "$vf" ]; then
+        local v
+        v=$(grep "^version=" "$vf" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r ')
+        if [ -n "$v" ]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    fi
+    printf 'v0.0.0-unknown'
+}
+
+SCRIPT_VERSION="$(get_version)"
 APK_PATH="$MODDIR/web/app-debug.apk"
 SHA_PATH="$MODDIR/web/app-debug.apk.sha256"
 APP_VERSION_FILE="$MODDIR/proxy/app-apk.version"
@@ -133,9 +123,7 @@ CASCADE_DEADLINE_SECONDS=75
 
 # Per-`pm` invocation cap. The effective value is
 # min(STRATEGY_TIMEOUT, remaining_cascade_budget), computed at
-# call time by _run_pm. This means a hung `pm install` cannot
-# consume more than its share of the cascade, including the
-# three sub-commands of strategy 3.
+# call time by _run_pm.
 STRATEGY_TIMEOUT=20
 
 # Minimum remaining budget required to start a subprocess.
@@ -143,11 +131,6 @@ STRATEGY_TIMEOUT=20
 # do useful work; _run_pm short-circuits and returns the same
 # exit code that timeout(1) uses (124).
 MIN_STRATEGY_BUDGET=3
-
-# Cascade deadline, computed once at script start. Initialized
-# before any _run_pm call so --status and --uninstall modes
-# also have a valid deadline.
-_CASCADE_DEADLINE=$(( $(date +%s) + CASCADE_DEADLINE_SECONDS ))
 
 # Package name candidates. Tried in order; the debug variant is
 # the default for a fresh install.
@@ -158,6 +141,28 @@ COMPANION_PKG_CANDIDATES="com.gasciljh.dnsproxy.debug com.gasciljh.dnsproxy com.
 # which it can. Staging here avoids SELinux errors without ever
 # disabling SELinux.
 STAGING_APK="/data/local/tmp/dnscrypt-companion.apk"
+
+# ============================================================
+# [2b] Cascade deadline computation
+# ============================================================
+# _CASCADE_START must be a non-negative integer. `date +%s` can
+# theoretically fail (broken clock, restricted shell, ...). If it
+# does, we set _CASCADE_DEADLINE to a very large sentinel value
+# (9999999999 — year 2286) so the cascade runs to completion
+# without timing out. The EXIT/INT/TERM trap still fires on any
+# catchable exit path — the deadline is a secondary protection
+# that ensures the trap fires before main.go's 90-second SIGKILL,
+# not the primary protection.
+_CASCADE_START=$(date +%s 2>/dev/null)
+case "$_CASCADE_START" in
+    ''|*[!0-9]*) _CASCADE_START=0 ;;
+esac
+if [ "$_CASCADE_START" -le 0 ]; then
+    _CASCADE_DEADLINE=9999999999
+else
+    _CASCADE_DEADLINE=$(( _CASCADE_START + CASCADE_DEADLINE_SECONDS ))
+fi
+unset _CASCADE_START
 
 # ============================================================
 # [3] Argument parsing
@@ -400,6 +405,10 @@ _pkg_version_name() {
 # Polls `pm list packages` until the package appears or the
 # timeout / absolute deadline is hit. Some ROMs return
 # "Success" from `pm install` but delay package registration.
+#
+# Two independent bounds:
+#   • _i < _timeout            (iteration count; `while` condition)
+#   • now >= _deadline         (wall-clock; checked each iteration)
 _wait_for_install() {
     local _timeout="${1:-15}"
     local _deadline="${2:-0}"
@@ -558,6 +567,8 @@ if [ -f "$SHA_PATH" ] && command -v sha256sum >/dev/null 2>&1; then
     fi
 elif [ ! -f "$SHA_PATH" ]; then
     log_msg "INSTALL: SHA256 sidecar missing — skipping verification (advisory)"
+else
+    log_msg "INSTALL: sha256sum unavailable — cannot verify APK integrity (advisory)"
 fi
 
 if command -v df >/dev/null 2>&1; then
@@ -592,8 +603,8 @@ _CLEANED_UP=0
 #
 # _VERIFIER_ORIG
 #   The exact value captured BEFORE the change. One of:
-#     "0"    — was enabled
-#     "1"    — was disabled
+#     "0"    — was disabled
+#     "1"    — was enabled
 #     "null" — key was unset (cleanup uses `settings delete`)
 #     ""     — read failed (treated as "do not touch")
 _VERIFIER_RESTORE=0

@@ -6,10 +6,9 @@
   "minMagiskVersion": 20400,
   "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.5.0/dnscrypt-webui-1.5.0-module.zip",
   "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md",
-  "changelogUrl": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md",
   "homepageUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui",
   "supportUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/issues",
   "donateUrl": "",
   "x-note-last-updated": "2026-10-13",
-  "x-note-v150": "v1.5.0 — Companion app one-tap root install (5-level pm install cascade + install-method modal), Layered Bootstrap Phase 0 (boot-mini.sh), 4 new companion-app endpoints, 12 frontend state fixes, 8 server-side code-review corrections. No breaking changes."
+  "x-note-v150": "v1.5.0 — Companion app one-tap root install (5-level pm install cascade + install-method modal), Layered Bootstrap Phase 0 (boot-mini.sh), 4 new companion-app endpoints, 12 frontend state fixes, 9 server-side code-review corrections. No breaking changes."
 }

@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — .shellcheckrc
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -58,30 +58,14 @@ disable=SC2012,SC1091
 # specific files that need them. Hoisting these to the global
 # scope would hide real issues elsewhere.
 #
-#   SC1090 — non-constant source (variable path).
-#            Applies to `. "$MODDIR/functions.sh"` in
-#            proxy/*.sh. Distinct from SC1091 (which is global).
+#   SC2059 — printf format string is a variable.
+#            Applies to color-code helpers in proxy/*.sh.
+#
+#   SC2329 — function never invoked directly (invoked via
+#            `trap`). Applies to scripts/release*.sh and
+#            proxy/install_app.sh.
 #
 #   SC2034 — variable appears unused (intentionally kept for
 #            readability or consumed by Magisk at runtime).
 #            Applies to specific variables in proxy/*.sh.
-#
-#   SC2059 — printf format string is a variable.
-#            Applies to color-code helpers in proxy/status.sh.
-#
-#   SC2064 — trap with double-quotes expands at definition time.
-#            Applies to scripts/fetch_dns_binaries.sh where the
-#            temporary directory must be captured at trap install.
-#
-#   SC2086 — word splitting on purpose (e.g. TIMEOUT_CMD).
-#            Applies to proxy/install_app.sh and proxy/build.sh.
-#
-#   SC2317 — unreachable code (return-or-exit idiom in
-#            boot-mini.sh and functions.sh).
-#
-#   SC2329 — function never invoked directly (invoked via
-#            `trap`). Applies to scripts/release*.sh,
-#            scripts/generate-icons.sh,
-#            scripts/package_module.sh, and
-#            proxy/install_app.sh.
 # ------------------------------------------------------------

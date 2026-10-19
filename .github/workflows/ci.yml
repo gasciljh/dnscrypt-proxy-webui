@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -25,9 +25,6 @@
 #   CodeQL runs on ALL changes (see codeql.yml), so docs PRs
 #   still get a security review. PRs always run CI regardless
 #   of paths — a PR can never merge without a green build.
-#
-#   .github/workflows/** is deliberately NOT in the ignore
-#   list — a workflow change MUST be validated by running it.
 #
 # Concurrency:
 #   One CI run per branch. A new push cancels the older run.
@@ -102,23 +99,6 @@ jobs:
   # ============================================================
   # [2] Backup smoke test
   # ============================================================
-  # Validates the shell scripts and the cross-file invariants
-  # that are not exercised by the build matrix.
-  #
-  # Catches:
-  #   • Shell syntax errors in module scripts
-  #   • Lost shebangs
-  #   • Missing function names that other scripts depend on
-  #   • Missing constants
-  #   • Inconsistent paths across scripts AND main.go
-  #   • Version drift across 5 files
-  #   • Companion install-script regressions
-  #   • Layered Bootstrap drift (Phase 0)
-  #   • Reserved-port constant drift (shell ↔ Go)
-  #   • Truncated or placeholder web assets (Step 5)
-  #
-  # This is NOT a full data-preservation test — that runs on a
-  # real device via .github/workflows/upgrade-test.yml.
   backup-smoke-test:
     name: Backup Smoke Test
     runs-on: ubuntu-22.04
@@ -161,12 +141,12 @@ jobs:
 
             SB="$(head -n1 "$f" || true)"
             case "$SB" in
-              "$EXPECTED_SHEBANG"*) : ;;
+              "$EXPECTED_SHEBANG") : ;;
               '') : ;;
               *)
                 echo "::error::unexpected shebang in $f"
-                echo "::error::  expected: $EXPECTED_SHEBANG"
-                echo "::error::  found:    $SB"
+                echo "::error::  expected (exact): $EXPECTED_SHEBANG"
+                echo "::error::  found:            $SB"
                 exit 1
                 ;;
             esac
@@ -178,14 +158,6 @@ jobs:
       # ============================================================
       # Step 2 — Verify Layer 1-10 function presence
       # ============================================================
-      # Each check is a hard failure. The pre-fix revision used
-      # `grep -q PATTERN file && echo "✅"`, which is silently
-      # exempt from `set -e` (Bash exempts any command that
-      # precedes the last `&&`/`||` in an AND-OR list). The step
-      # exited 0 even when every required function was missing.
-      #
-      # The helper below converts each check into an unconditional
-      # assertion: file missing or pattern absent → exit 1.
       - name: Verify Layer 1-10 function presence
         run: |
           set -euo pipefail
@@ -272,87 +244,64 @@ jobs:
           echo "✅ PERSISTENT_BACKUP path consistent"
 
       # ============================================================
-      # Step 4 — Verify v1.2.0 documentation references
+      # Step 4 — Verify consolidated documentation referenced
       # ============================================================
-      # Converted from `test -f ... && echo "✅"` (silent under
-      # `set -e`) to hard assertions.
-      - name: Verify v1.2.0 docs referenced
+      # After the v1.5.0 consolidation (15 markdown files), the
+      # authoritative user-facing docs are GUIDE.md, REFERENCE.md,
+      # CONTRIBUTING.md, and MAP.md. customize.sh's generated
+      # README.md points at REFERENCE.md §4 and GUIDE.md §8.
+      - name: Verify consolidated docs referenced
         run: |
           set -euo pipefail
-          echo "::group::Verifying v1.2.0 documentation references"
+          echo "::group::Verifying consolidated documentation references"
 
-          if [ ! -f docs/BACKUP.md ]; then
-            echo "::error::docs/BACKUP.md missing"
+          if [ ! -f docs/REFERENCE.md ]; then
+            echo "::error::docs/REFERENCE.md missing"
             exit 1
           fi
-          echo "  ✅ docs/BACKUP.md present"
+          echo "  ✅ docs/REFERENCE.md present"
 
-          if [ ! -f docs/EMERGENCY.md ]; then
-            echo "::error::docs/EMERGENCY.md missing"
+          if [ ! -f docs/GUIDE.md ]; then
+            echo "::error::docs/GUIDE.md missing"
             exit 1
           fi
-          echo "  ✅ docs/EMERGENCY.md present"
+          echo "  ✅ docs/GUIDE.md present"
 
-          if ! grep -q 'BACKUP.md' proxy/customize.sh; then
-            echo "::error::customize.sh does not reference BACKUP.md"
+          if [ ! -f docs/CONTRIBUTING.md ]; then
+            echo "::error::docs/CONTRIBUTING.md missing"
             exit 1
           fi
-          echo "  ✅ customize.sh → BACKUP.md"
+          echo "  ✅ docs/CONTRIBUTING.md present"
 
-          if ! grep -q 'EMERGENCY.md' proxy/customize.sh; then
-            echo "::error::customize.sh does not reference EMERGENCY.md"
+          if [ ! -f docs/MAP.md ]; then
+            echo "::error::docs/MAP.md missing"
             exit 1
           fi
-          echo "  ✅ customize.sh → EMERGENCY.md"
+          echo "  ✅ docs/MAP.md present"
+
+          if ! grep -q 'REFERENCE\.md' proxy/customize.sh; then
+            echo "::error::customize.sh does not reference REFERENCE.md"
+            exit 1
+          fi
+          echo "  ✅ customize.sh → REFERENCE.md"
+
+          if ! grep -q 'GUIDE\.md' proxy/customize.sh; then
+            echo "::error::customize.sh does not reference GUIDE.md"
+            exit 1
+          fi
+          echo "  ✅ customize.sh → GUIDE.md"
 
           echo "::endgroup::"
-          echo "✅ v1.2.0 documentation references verified"
+          echo "✅ Consolidated documentation references verified"
 
       # ============================================================
       # Step 5 — Verify web asset files exist and have sane sizes
       # ============================================================
-      # A `-s` check (non-empty) alone is insufficient: a
-      # truncated download, a placeholder stub, or an HTML error
-      # page saved as a binary asset all satisfy "size > 0" but
-      # break the module at runtime. This step therefore
-      # enforces a per-file MINIMUM SIZE that any legitimate
-      # asset is expected to exceed by a wide margin.
-      #
-      # The minimums below are deliberately conservative — they
-      # only catch genuinely broken files. A legitimate asset is
-      # normally 5–100× the minimum.
-      #
-      #   Asset                       Typical     Minimum
-      #   --------------------------- ----------- ---------
-      #   index.html                  ~160 KB     10 KB
-      #   dashboard.html              ~86 KB      10 KB
-      #   manifest.json               ~3 KB       200 B
-      #   sw.js                       ~24 KB      2 KB
-      #   offline.html                ~18 KB      2 KB
-      #   icon-192.svg                ~9 KB       500 B
-      #   icon-512.svg                ~9 KB       500 B
-      #   icon-192.png                ~14 KB      500 B
-      #   icon-512.png                ~78 KB      1 KB
-      #   apple-touch-icon.png        ~18 KB      500 B
-      #   favicon-32x32.png           ~1.4 KB     200 B
-      #   favicon-16x16.png           ~553 B      100 B
-      #   favicon.ico                 ~4.7 KB     500 B
-      #
-      # Files not listed in the table are still checked for
-      # non-emptiness. Adding a new required web asset to
-      # main.go means adding it to the MANIFEST below.
       - name: Verify web asset files exist and have sane sizes
         run: |
           set -euo pipefail
           echo "::group::Verifying web assets referenced by main.go"
 
-          # _require_min_size <path> <min_bytes> <label>
-          #
-          # Fails with a distinct error for each of the three
-          # possible states:
-          #   • missing
-          #   • empty (0 bytes)
-          #   • present but smaller than the required minimum
           _require_min_size() {
             local path="$1" min="$2" label="$3"
 
@@ -371,36 +320,22 @@ jobs:
 
             if [ "$size" -lt "$min" ]; then
               echo "::error::${label}: suspiciously small (${size} < ${min} bytes) — $path"
-              echo "::error::  A file this small is likely a truncated download, a"
-              echo "::error::  placeholder stub, or an HTML error page saved as a"
-              echo "::error::  binary asset. Re-run the corresponding tool:"
-              echo "::error::    • HTML/JS/JSON — verify your checkout (git status web/)"
-              echo "::error::    • PNG/ICO      — ./scripts/generate-icons.sh --force"
               exit 1
             fi
 
             echo "  ✅ ${label} (${size} bytes)"
           }
 
-          # --- Primary HTML ---
           _require_min_size "web/index.html"      10240 "index.html"
           _require_min_size "web/dashboard.html"  10240 "dashboard.html"
-
-          # --- PWA assets ---
           _require_min_size "web/manifest.json"     200 "manifest.json"
           _require_min_size "web/sw.js"            2048 "sw.js"
           _require_min_size "web/offline.html"     2048 "offline.html"
-
-          # --- SVG icons ---
           _require_min_size "web/icon-192.svg"      500 "icon-192.svg"
           _require_min_size "web/icon-512.svg"      500 "icon-512.svg"
-
-          # --- PNG icons ---
           _require_min_size "web/icon-192.png"      500 "icon-192.png"
           _require_min_size "web/icon-512.png"     1024 "icon-512.png"
           _require_min_size "web/apple-touch-icon.png" 500 "apple-touch-icon.png"
-
-          # --- Favicons ---
           _require_min_size "web/favicon-32x32.png" 200 "favicon-32x32.png"
           _require_min_size "web/favicon-16x16.png" 100 "favicon-16x16.png"
           _require_min_size "web/favicon.ico"       500 "favicon.ico"
@@ -409,12 +344,12 @@ jobs:
           echo "✅ All web assets present and satisfy minimum size requirements"
 
       # ============================================================
-      # Step 6 — Verify version consistency (5 files)
+      # Step 6 — Verify version consistency (9 files)
       # ============================================================
       - name: Verify version consistency
         run: |
           set -euo pipefail
-          echo "::group::Verifying version consistency"
+          echo "::group::Verifying version consistency (9 files)"
 
           if [ ! -s VERSION ]; then
             echo "  ❌ VERSION file is missing or empty"
@@ -424,6 +359,7 @@ jobs:
           echo "  VERSION file:           $V"
           V_NO_V="${V#v}"
 
+          # --- 1. module.prop ---
           if [ ! -s module.prop ]; then
             echo "  ❌ module.prop is missing or empty"
             exit 1
@@ -433,11 +369,10 @@ jobs:
             echo "  ✅ module.prop version:          $MP_V"
           else
             echo "  ❌ module.prop version mismatch"
-            echo "     expected: $V"
-            echo "     found:    $MP_V"
             exit 1
           fi
 
+          # --- 2. update.json ---
           if [ ! -s update.json ]; then
             echo "  ❌ update.json is missing or empty"
             exit 1
@@ -448,11 +383,10 @@ jobs:
             echo "  ✅ update.json version:          $UJ_V"
           else
             echo "  ❌ update.json version mismatch"
-            echo "     expected: $V"
-            echo "     found:    $UJ_V"
             exit 1
           fi
 
+          # --- 3. web/manifest.json ---
           if [ ! -s web/manifest.json ]; then
             echo "  ❌ web/manifest.json is missing or empty"
             exit 1
@@ -463,11 +397,10 @@ jobs:
             echo "  ✅ web/manifest.json version:    $MF_V"
           else
             echo "  ❌ web/manifest.json version mismatch"
-            echo "     expected (no v): $V_NO_V"
-            echo "     found:           $MF_V"
             exit 1
           fi
 
+          # --- 4. web/sw.js ---
           if [ ! -s web/sw.js ]; then
             echo "  ❌ web/sw.js is missing or empty"
             exit 1
@@ -483,13 +416,79 @@ jobs:
             echo "  ✅ web/sw.js CACHE_VERSION:      $SW_V"
           else
             echo "  ❌ web/sw.js CACHE_VERSION mismatch"
-            echo "     expected: $V"
-            echo "     found:    $SW_V"
             exit 1
           fi
 
+          # --- 5. web/index.html ---
+          if [ ! -s web/index.html ]; then
+            echo "  ❌ web/index.html is missing or empty"
+            exit 1
+          fi
+          IDX_V="$(grep -oE "var VERSION[[:space:]]*=[[:space:]]*'[^']*'" web/index.html \
+                   | head -n1 | cut -d"'" -f2)"
+          if [ -z "$IDX_V" ]; then
+            echo "  ❌ could not extract VERSION from web/index.html"
+            exit 1
+          fi
+          if [ "$IDX_V" = "$V" ]; then
+            echo "  ✅ web/index.html VERSION:       $IDX_V"
+          else
+            echo "  ❌ web/index.html VERSION mismatch"
+            exit 1
+          fi
+
+          # --- 6. web/dashboard.html ---
+          if [ ! -s web/dashboard.html ]; then
+            echo "  ❌ web/dashboard.html is missing or empty"
+            exit 1
+          fi
+          DB_V="$(grep -oE "var VERSION[[:space:]]*=[[:space:]]*'[^']*'" web/dashboard.html \
+                  | head -n1 | cut -d"'" -f2)"
+          if [ -z "$DB_V" ]; then
+            echo "  ❌ could not extract VERSION from web/dashboard.html"
+            exit 1
+          fi
+          if [ "$DB_V" = "$V" ]; then
+            echo "  ✅ web/dashboard.html VERSION:   $DB_V"
+          else
+            echo "  ❌ web/dashboard.html VERSION mismatch"
+            exit 1
+          fi
+
+          # --- 7. proxy/app-apk.version ---
+          if [ ! -s proxy/app-apk.version ]; then
+            echo "  ❌ proxy/app-apk.version is missing or empty"
+            exit 1
+          fi
+          APK_V="$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if printf '%s' "$APK_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "  ✅ proxy/app-apk.version:        $APK_V (valid format)"
+          else
+            echo "  ❌ proxy/app-apk.version format invalid"
+            exit 1
+          fi
+
+          # --- 8. proxy/go.mod (ADR-0002 pin) ---
+          if [ ! -s proxy/go.mod ]; then
+            echo "  ❌ proxy/go.mod is missing or empty"
+            exit 1
+          fi
+          if grep -qE '^\s*require\s+github\.com/cyphar/filepath-securejoin\s+v[0-9]+\.[0-9]+\.[0-9]+' proxy/go.mod; then
+            GO_DEP="$(grep -oE 'filepath-securejoin[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+' proxy/go.mod | head -n1)"
+            echo "  ✅ proxy/go.mod pin (ADR-0002):  $GO_DEP"
+          else
+            echo "  ❌ proxy/go.mod: filepath-securejoin pin missing (ADR-0002)"
+            exit 1
+          fi
+
+          if [ ! -s proxy/go.sum ]; then
+            echo "  ❌ proxy/go.sum is missing or empty"
+            exit 1
+          fi
+          echo "  ✅ proxy/go.sum present"
+
           echo "::endgroup::"
-          echo "✅ Version consistency verified across 5 files"
+          echo "✅ Version consistency verified across 9 files"
 
       # ============================================================
       # Step 7 — Verify companion app metadata
@@ -507,8 +506,6 @@ jobs:
               echo "  ✅ proxy/app-apk.version:        $APP_V (valid format)"
             else
               echo "  ❌ proxy/app-apk.version format invalid"
-              echo "     expected: X.Y.Z (e.g. 1.0.0)"
-              echo "     found:    $APP_V"
               exit 1
             fi
           fi
@@ -523,7 +520,7 @@ jobs:
           echo "✅ Companion app metadata verified"
 
       # ============================================================
-      # Step 8 — Verify companion install script
+      # Step 8 — Verify companion install script (v1.5.0)
       # ============================================================
       - name: Verify companion install script
         run: |
@@ -548,7 +545,7 @@ jobs:
           echo "  Verifying cascade-level markers..."
           MARKERS=(
             "pm install -r --user 0|level 1"
-            "pm install -r -i com.android.shell|level 2"
+            "pm install -r --user 0 -i com.android.shell|level 2"
             "pm install-create|level 3"
             "magisk su|level 4"
             "cmd package install|level 5"
@@ -586,6 +583,13 @@ jobs:
             exit 1
           fi
 
+          if grep -q '_VERIFIER_ORIG' proxy/install_app.sh; then
+            echo "  ✓ Play Protect restore: _VERIFIER_ORIG"
+          else
+            echo "::error::_VERIFIER_ORIG missing"
+            exit 1
+          fi
+
           # ---- SELinux staging path ----
           if grep -q '/data/local/tmp/dnscrypt-companion.apk' proxy/install_app.sh; then
             echo "  ✓ SELinux staging: /data/local/tmp/dnscrypt-companion.apk"
@@ -601,6 +605,33 @@ jobs:
             exit 1
           fi
           echo "  ✓ SELinux posture: no active 'setenforce 0'"
+
+          # ---- Three-way trap split ----
+          echo ""
+          if grep -q "trap '_cleanup_app' EXIT" proxy/install_app.sh; then
+            echo "  ✓ trap: EXIT"
+          else
+            echo "::error::EXIT trap missing"
+            exit 1
+          fi
+          if grep -q "trap '_cleanup_app; exit 130' INT" proxy/install_app.sh; then
+            echo "  ✓ trap: INT exits 130"
+          else
+            echo "::error::INT trap (exit 130) missing"
+            exit 1
+          fi
+          if grep -q "trap '_cleanup_app; exit 143' TERM" proxy/install_app.sh; then
+            echo "  ✓ trap: TERM exits 143"
+          else
+            echo "::error::TERM trap (exit 143) missing"
+            exit 1
+          fi
+          if grep -q '_CLEANED_UP=1' proxy/install_app.sh; then
+            echo "  ✓ trap: re-entry guard"
+          else
+            echo "::error::_CLEANED_UP re-entry guard missing"
+            exit 1
+          fi
 
           # ---- CSH-22 integration ----
           echo ""
@@ -626,29 +657,17 @@ jobs:
       # ============================================================
       # Step 9 — Verify boot-mini.sh integration (Layered Bootstrap)
       # ============================================================
-      # Layer 0 / Layer 1 split:
-      #   • boot-mini.sh defines the 5 primitives.
-      #   • boot-mini.sh is the single source of truth for
-      #     _MONITORING_UI_PORT.
-      #   • functions.sh sources boot-mini.sh.
-      #   • functions.sh does NOT redefine the 5 primitives.
-      #
-      # log_msg is checked differently: functions.sh may keep a
-      # deprecated `log_fn` alias, but must not reimplement
-      # `log_msg` itself.
       - name: Verify boot-mini.sh integration
         run: |
           set -euo pipefail
           echo "::group::Verifying boot-mini.sh integration"
 
-          # ---- Presence ----
           if [ ! -s proxy/boot-mini.sh ]; then
             echo "::error::proxy/boot-mini.sh missing or empty"
             exit 1
           fi
           echo "  ✓ present: proxy/boot-mini.sh"
 
-          # ---- 5 primitives ----
           for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do
             if grep -qE "^${fn}\(\)" proxy/boot-mini.sh; then
               echo "  ✓ primitive: $fn"
@@ -658,7 +677,6 @@ jobs:
             fi
           done
 
-          # ---- _MONITORING_UI_PORT defined here ----
           if grep -q '^_MONITORING_UI_PORT=' proxy/boot-mini.sh; then
             echo "  ✓ _MONITORING_UI_PORT defined in boot-mini.sh"
           else
@@ -666,7 +684,6 @@ jobs:
             exit 1
           fi
 
-          # ---- functions.sh sources boot-mini.sh ----
           if grep -q 'boot-mini.sh' proxy/functions.sh; then
             echo "  ✓ functions.sh sources boot-mini.sh"
           else
@@ -674,9 +691,6 @@ jobs:
             exit 1
           fi
 
-          # ---- functions.sh must NOT redefine Layer-0 primitives ----
-          # Exception: log_msg may be aliased as log_fn, but not
-          # reimplemented. The other four must be absent entirely.
           for fn in get_run_dir read_conf is_port_open get_webui_port; do
             if grep -qE "^${fn}[[:space:]]*\(\)" proxy/functions.sh; then
               echo "::error::functions.sh redefines Layer-0 primitive: $fn"
@@ -685,7 +699,6 @@ jobs:
           done
           echo "  ✓ functions.sh does not redefine Layer-0 primitives"
 
-          # ---- _MONITORING_UI_PORT must not be redefined ----
           if grep -qE '^_MONITORING_UI_PORT=' proxy/functions.sh; then
             echo "::error::functions.sh redefines _MONITORING_UI_PORT"
             exit 1
@@ -698,23 +711,6 @@ jobs:
       # ============================================================
       # Step 10 — Verify reserved-port constant sync
       # ============================================================
-      # The reserved port (8080) appears in two places:
-      #   • boot-mini.sh — _MONITORING_UI_PORT="8080"
-      #   • main.go      — MONITORING_UI_PORT = "8080"
-      #
-      # Other scripts that need the constant MUST either:
-      #   • inherit it from boot-mini.sh (via functions.sh), OR
-      #   • use the fallback pattern ${_MONITORING_UI_PORT:-...},
-      #   • OR leave it empty and finalize after sourcing.
-      #
-      # Any hardcoded numeric literal in a shell script other
-      # than boot-mini.sh is a drift and fails the build.
-      #
-      # The accepted-pattern case below uses a trailing `"` in
-      # the match — the actual scripts end their fallback lines
-      # with `}"`, not just `}`. The pre-fix revision omitted
-      # the trailing quote and therefore failed on every
-      # script that used the accepted pattern.
       - name: Verify reserved-port constant sync
         run: |
           set -euo pipefail
@@ -756,12 +752,6 @@ jobs:
 
             [ -f "$f" ] || continue
 
-            # Any line of the form `_MONITORING_UI_PORT=<value>`
-            # is checked. Accepted forms:
-            #   _MONITORING_UI_PORT=""                          (empty)
-            #   _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-...}" (fallback)
-            # Anything else (a hardcoded literal like "8080" or
-            # any other number) is drift.
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               case "$line" in
@@ -774,7 +764,6 @@ jobs:
                 *)
                   echo "::error::$f has an unsafe _MONITORING_UI_PORT definition:"
                   echo "::error::  $line"
-                  echo "::error::Accepted: empty or \${_MONITORING_UI_PORT:-...} fallback"
                   exit 1
                   ;;
               esac

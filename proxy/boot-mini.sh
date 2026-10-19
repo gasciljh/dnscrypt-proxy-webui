@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — boot-mini.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -100,6 +100,12 @@ LOG_PREFIX="${LOG_PREFIX:-[module]}"
 # every Port Guard in the tree (main.go, customize.sh, action.sh,
 # status.sh, service.sh, uninstall.sh) and by get_webui_port
 # below.
+#
+# Exception: customize.sh §[2] sets a fallback pattern
+#   _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
+# because it runs BEFORE boot-mini.sh is extracted from the ZIP.
+# This is the sole documented duplicate; ci.yml Step 10 enforces
+# that no other script redeclares the constant.
 _MONITORING_UI_PORT="8080"
 
 # ============================================================

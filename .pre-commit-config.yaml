@@ -1,174 +1,144 @@
 # ============================================================
-# Pre-commit Configuration for DNSCrypt Smart Filter
+# DNSCrypt Smart Filter — Pre-commit Configuration
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# Last updated: 2026-10-18
 # ============================================================
-# Purpose:
-#   Runs automated checks before each commit to catch common
-#   issues early (formatting, syntax, merge conflicts, shell
-#   linting, docs presence).
+# Runs automated checks before each commit.
 #
-# Installation:
+# Install:
 #   pip install pre-commit
 #   pre-commit install
-#   pre-commit install --hook-type commit-msg
 #
-# Manual run:
+# Run manually:
 #   pre-commit run --all-files
 #
-# Skip a hook (temporarily):
+# Skip a hook for one commit:
 #   SKIP=<hook-id> git commit -m "..."
-#
-# Hooks:
-#   [1] Official pre-commit-hooks           — 9 hooks
-#   [2] shellcheck-py                       — 1 hook
-#   [3] pre-commit-golang (go-fmt only)     — 1 hook
-#   [4] Local hooks (repo: local)           — 4 hooks
 # ============================================================
 
 minimum_pre_commit_version: '3.5.0'
 
 repos:
-  # ============================================================
-  # [1] Official pre-commit hooks
-  # ============================================================
+  # ────────────────────────────────────────────────────────────
+  # [1] Standard hooks
+  # ────────────────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
-      # --- Whitespace and newlines ---
       - id: trailing-whitespace
       - id: end-of-file-fixer
         exclude: '\.(svg|json|apk)$'
-
-      # --- Syntax validation ---
       - id: check-yaml
         args: ['--allow-multiple-documents', '--unsafe']
       - id: check-json
         exclude: '^\.secrets\.baseline$'
       - id: check-toml
-
-      # --- Merge safety ---
       - id: check-merge-conflict
-
-      # --- File size guard (500 KB) ---
-      # Companion APK (~3 MB) is excluded by .gitignore §[20];
-      # this hook is a second safety net.
       - id: check-added-large-files
         args: ['--maxkb=500']
-
-      # --- Line endings ---
       - id: mixed-line-ending
         args: ['--fix=lf']
         exclude: '\.(apk|png|ico)$'
-
-      # --- Shebang validation ---
       - id: check-executables-have-shebangs
 
-  # ============================================================
-  # [2] ShellCheck (system binary)
-  # ============================================================
-  # Uses the system `shellcheck` instead of shellcheck-py.
-  # Rationale: shellcheck-py does not ship binaries for
-  # android/aarch64, so it cannot be installed on Termux.
-  # The system binary is available via `pkg install shellcheck`
-  # (currently v0.11.0 on Termux).
-  - repo: local
+  # ────────────────────────────────────────────────────────────
+  # [2] ShellCheck
+  # ────────────────────────────────────────────────────────────
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        name: shellcheck
-        entry: shellcheck --severity=warning
-        language: system
-        types: [shell]
+        args: ['--severity=warning']
 
-  # ============================================================
+  # ────────────────────────────────────────────────────────────
   # [3] Go formatting
-  # ============================================================
+  # ────────────────────────────────────────────────────────────
   - repo: https://github.com/dnephin/pre-commit-golang
     rev: v0.5.1
     hooks:
       - id: go-fmt
         files: ^proxy/.*\.go$
 
-  # ============================================================
-  # [4] Local hooks
-  # ============================================================
+  # ────────────────────────────────────────────────────────────
+  # [4] Project-specific hooks
+  # ────────────────────────────────────────────────────────────
   - repo: local
     hooks:
       # --- [4.1] Go compilation ---
       - id: go-build-proxy
         name: go build (proxy module)
-        description: Compile the Go package under proxy/ to catch syntax and type errors early.
         entry: bash -c 'cd proxy && go build ./...'
         language: system
         files: ^proxy/.*\.go$
         pass_filenames: false
 
-      # --- [4.2] v1.2.0 documentation presence ---
-      - id: check-v120-docs
-        name: check v1.2.0 docs (BACKUP, EMERGENCY, UPGRADE)
-        description: Verify that the three v1.2.0 data-preservation documentation files exist.
+      # --- [4.2] Documentation consistency (per docs/MAP.md §1 + §5) ---
+      # Positive: the 9 user-facing docs + 4 ADRs must exist.
+      # Negative: the 26 removed docs must NOT exist.
+      - id: check-docs
+        name: docs consistency (presence + absence)
         entry: >-
           bash -c '
-            missing=0;
-            for f in docs/BACKUP.md docs/EMERGENCY.md docs/UPGRADE.md; do
-              if [ ! -f "$f" ]; then
-                echo "Missing required v1.2.0 doc: $f";
-                missing=$((missing + 1));
-              fi;
+            miss=0;
+            for f in docs/GUIDE.md docs/REFERENCE.md docs/CONTRIBUTING.md
+                     docs/MAP.md docs/ROADMAP.md docs/adr/README.md
+                     docs/adr/0001-release-workflow.md
+                     docs/adr/0002-external-dependency.md
+                     docs/adr/0003-layered-bootstrap.md; do
+              [ -f "$f" ] || { echo "Missing doc: $f"; miss=$((miss+1)); }
             done;
-            if [ "$missing" -gt 0 ]; then
-              exit 1;
-            fi
+            for f in docs/INSTALL.md docs/UPGRADE.md docs/TROUBLESHOOTING.md
+                     docs/FAQ.md docs/EMERGENCY.md docs/API.md
+                     docs/ARCHITECTURE.md docs/BACKUP.md docs/COMPATIBILITY.md
+                     docs/DNS_BINARIES.md docs/MANIFEST_NOTES.md docs/GLOSSARY.md
+                     docs/DEVELOPMENT.md docs/BRANCHING.md docs/RELEASE_PROCESS.md
+                     docs/HALL_OF_FAME.md docs/SECURITY.md .github/SECURITY.md
+                     docs/adr/0001-two-branch-model.md
+                     docs/adr/0002-automated-releases.md
+                     docs/adr/0003-post-release-sync.md
+                     docs/adr/0004-unified-pr-template.md
+                     docs/adr/0005-release-specific-pr-template.md
+                     docs/adr/0006-rename-hotfix-to-release-patch.md
+                     docs/adr/0007-external-dependency-securejoin.md
+                     docs/adr/0008-layered-bootstrap.md
+                     docs/adr/0009-documentation-budget.md; do
+              [ -e "$f" ] && { echo "Must not exist: $f"; miss=$((miss+1)); }
+            done;
+            [ "$miss" -eq 0 ]
           '
         language: system
         pass_filenames: false
         always_run: true
 
-      # --- [4.3] v1.4.0 companion APK files presence + format ---
-      - id: check-v140-apk
-        name: check v1.4.0 companion APK files
-        description: Verify the presence of the v1.4.0 companion app files and validate the version format.
+      # --- [4.3] Companion APK files ---
+      - id: check-apk
+        name: companion APK files present and valid
         entry: >-
           bash -c '
-            missing=0;
+            miss=0;
             for f in scripts/fetch_app_apk.sh proxy/app-apk.version; do
-              if [ ! -f "$f" ]; then
-                echo "Missing required v1.4.0 file: $f";
-                missing=$((missing + 1));
-              fi;
+              [ -f "$f" ] || { echo "Missing: $f"; miss=$((miss+1)); }
             done;
-            if [ "$missing" -gt 0 ]; then
-              exit 1;
-            fi;
-            APP_V=$(tr -d "\r\n" < proxy/app-apk.version | sed "s/^[[:space:]]*//;s/[[:space:]]*$//");
-            if ! printf "%s" "$APP_V" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+$"; then
-              echo "Invalid proxy/app-apk.version format: $APP_V";
-              echo "Expected: X.Y.Z (e.g. 1.0.0)";
-              exit 1;
-            fi
+            [ "$miss" -eq 0 ] || exit 1;
+            v=$(tr -d "\r\n" < proxy/app-apk.version | sed "s/^[[:space:]]*//;s/[[:space:]]*$//");
+            printf "%s" "$v" | grep -qE "^[0-9]+\.[0-9]+\.[0-9]+$" || {
+              echo "Invalid proxy/app-apk.version: $v"; exit 1;
+            }
           '
         language: system
         pass_filenames: false
         always_run: true
 
-      # --- [4.4] v1.5.0 Layered Bootstrap files presence ---
-      - id: check-v150-boot-mini
-        name: check v1.5.0 Layered Bootstrap
-        description: Verify boot-mini.sh and install_app.sh exist and contain the expected markers.
+      # --- [4.4] Layered Bootstrap files ---
+      - id: check-boot-mini
+        name: Layered Bootstrap files present
         entry: >-
           bash -c '
-            missing=0;
+            miss=0;
             for f in proxy/boot-mini.sh proxy/install_app.sh; do
-              if [ ! -f "$f" ]; then
-                echo "Missing required v1.5.0 file: $f";
-                missing=$((missing + 1));
-              fi;
+              [ -f "$f" ] || { echo "Missing: $f"; miss=$((miss+1)); }
             done;
-            if [ "$missing" -gt 0 ]; then
-              exit 1;
-            fi
+            [ "$miss" -eq 0 ]
           '
         language: system
         pass_filenames: false

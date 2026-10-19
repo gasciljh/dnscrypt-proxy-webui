@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — post-fs-data.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -28,6 +28,9 @@
 #   • Idempotent — safe to run multiple times.
 #   • Log helper with 50 MB emergency rotation and a
 #     `_LOG_DISABLED` short-circuit for unwritable locations.
+#   • Uses `local` inside `inline_firewall_cleanup` — supported
+#     by mksh, busybox ash, bash, dash, and ksh (every shell
+#     Android ships).
 #
 # Non-responsibilities (deliberately NOT done here):
 #   • private_dns_mode reset       → service.sh
@@ -45,12 +48,7 @@
 #   • proxy/functions.sh         — canonical shell library
 #   • proxy/service.sh           — boot service
 #   • proxy/uninstall.sh         — teardown
-#   • docs/ARCHITECTURE.md       — architecture reference
-#
-# POSIX note on `local`:
-#   This script uses `local` inside `inline_firewall_cleanup`.
-#   Supported by mksh, busybox ash, bash, dash, ksh — every
-#   shell Android ships.
+#   • docs/REFERENCE.md §1, §3   — architecture reference
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -84,14 +82,12 @@ fi
 LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 RUN_DIR="$MODDIR/proxy/run"
 
-# MOD_NAME after basename; falls back to the canonical id if
-# basename is unavailable or returns empty.
+# Fallback to the canonical module ID if basename fails.
 MOD_NAME=$(basename "$MODDIR" 2>/dev/null)
 if [ -z "$MOD_NAME" ]; then
     MOD_NAME="dnscrypt-proxy-webui"
 fi
 
-# --- Determine active run directory ---
 # Prefers $RUN_DIR when writable; falls back to /data/local/tmp.
 # If neither is writable, `_RUN_DIR_FALLBACK_UNWRITABLE` is set
 # and [3b] emits a single warning once log_msg is available.
@@ -118,10 +114,6 @@ fi
 # ============================================================
 # [3] Protected log_msg (with 50 MB emergency rotation)
 # ============================================================
-# At post-fs-data phase, the filesystem may not be fully ready:
-#   • /data/local/tmp may not exist yet (rare)
-#   • The log file may not be writable (very rare)
-#
 # `_LOG_DISABLED` is a per-process short-circuit. Once a write
 # has failed, subsequent calls do nothing. The rotation path
 # runs BEFORE the flag check, so a prior append failure does
@@ -171,8 +163,6 @@ log_msg() {
 # ============================================================
 # [3b] Deferred fallback warning
 # ============================================================
-# §[2] could not log this warning because log_msg was not yet
-# defined. Emit it now if both locations were unwritable.
 if [ "${_RUN_DIR_FALLBACK_UNWRITABLE:-0}" = "1" ]; then
     log_msg "⚠️ Neither $RUN_DIR nor /data/local/tmp is writable — STATUS_FILE writes may fail"
 fi
@@ -180,29 +170,16 @@ fi
 # ============================================================
 # [4] Custom Chain cleanup (orphan prevention)
 # ============================================================
-# Strategy:
-#   1. Delete the DNSCRYPT_OUT / DNSCRYPT_OUT6 Custom Chains
-#      entirely.
-#   2. Best-effort legacy cleanup (rules from older versions).
-#   3. No dependency on functions.sh (it may not be ready yet).
+# Removes the same SET of rules as customize.sh, uninstall.sh,
+# and functions.sh:manage_firewall 0. They differ only in the
+# comment tag applied to loopback rules during best-effort
+# legacy cleanup. Any change to the RULES removed here MUST be
+# applied consistently to all four.
 #
-# Synchronization note:
-#   The cleanup list below is FUNCTIONALLY EQUIVALENT to:
-#     • customize.sh  : _inline_cleanup_firewall
-#     • uninstall.sh  : _inline_cleanup_firewall
-#     • functions.sh  : manage_firewall 0
-#   "Functionally equivalent" means all four files remove the
-#   same SET of rules. They differ only in the comment tag
-#   applied to the loopback (127.0.0.1) rules during the
-#   best-effort legacy cleanup. Any change to the RULES
-#   removed here MUST be applied consistently to all four.
-#
-# The hard-coded legacy IP list below duplicates the list in
-# customize.sh and uninstall.sh. The duplication is DELIBERATE:
-# this file must remain self-contained because it runs before
-# functions.sh is guaranteed to be sourceable. The list is the
-# pre-v1.2.0 default bootstrap set; new installs use the
-# bootstrap_resolvers value from the TOML instead.
+# The hard-coded legacy IP list duplicates the pre-v1.2.0
+# default bootstrap set. Deliberate: this file must remain
+# self-contained because it runs before functions.sh is
+# guaranteed to be sourceable.
 #
 # `_ip` is declared `local` to prevent it from leaking to the
 # global scope after the loop finishes.
@@ -309,11 +286,11 @@ inline_firewall_cleanup() {
 if [ -f "$MODDIR/disable" ]; then
     log_msg "Module '$MOD_NAME' is DISABLED. Starting emergency cleanup..."
 
-    # --- 1) Firewall cleanup (Custom Chain + Legacy) ---
+    # 1) Firewall cleanup (Custom Chain + Legacy)
     inline_firewall_cleanup
     log_msg "✅ Firewall cleaned (Custom Chain + Legacy)"
 
-    # --- 2) Kill remaining processes ---
+    # 2) Kill remaining processes
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-proxy 2>/dev/null
         log_msg "🔪 Killed lingering dnscrypt-proxy"
@@ -323,7 +300,7 @@ if [ -f "$MODDIR/disable" ]; then
         log_msg "🔪 Killed lingering dnscrypt-webui"
     fi
 
-    # --- 3) Remove PID files from both locations ---
+    # 3) Remove PID files from both locations
     rm -f "$RUN_DIR/dnscrypt.pid" 2>/dev/null
     rm -f "$RUN_DIR/webui.pid" 2>/dev/null
     rm -f "$RUN_DIR/watchdog.pid" 2>/dev/null
@@ -334,8 +311,8 @@ if [ -f "$MODDIR/disable" ]; then
 
     log_msg "✅ PID files removed"
 
-    # --- 4) Write STATUS_FILE in both locations ---
-    # Verify that at least one write succeeded.
+    # 4) Write STATUS_FILE in both locations (verify at least
+    # one succeeded).
     _status_written=0
 
     if echo "OFF" > "$STATUS_FILE" 2>/dev/null; then
@@ -360,7 +337,6 @@ if [ -f "$MODDIR/disable" ]; then
     log_msg "   transaction cleanup (main.go + service.sh), companion install (main.go)"
 else
     # Module is enabled — nothing to do in this phase.
-    # The active state is set up later by service.sh after boot.
     #
     # A single informational line makes the boot log
     # self-documenting. Without it, an empty [post-fs-data]

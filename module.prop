@@ -1,19 +1,27 @@
 # ============================================================
 # DNSCrypt Smart Filter — module.prop
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Magisk / KernelSU / APatch module definition.
 #
-# versionCode formula:
-#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
-#   v1.5.0 → 1 × 1,000,000 + 5 × 10,000 + 0 = 1050000
+# Standard keys (read by every root manager):
+#   id, name, version, versionCode, author, description
 #
-# Managed by scripts/release.sh — do not edit manually.
+# Optional key (Magisk 24+, KernelSU, APatch):
+#   updateJson — URL of the auto-update metadata file
+#
+# ⚠️ Non-standard keys (minMagiskVersion, supportUrl,
+#    donateUrl) belong in update.json, NOT here. Root managers
+#    silently ignore them in module.prop. Adding them here
+#    duplicates state and risks drift with update.json.
 #
 # ⚠️ No spaces around `=`. No trailing comments on value lines.
+#
+# versionCode formula (maintained by scripts/release.sh):
+#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
 # ============================================================
 
 id=dnscrypt-proxy-webui
@@ -23,6 +31,3 @@ versionCode=1050000
 author=gasciljh
 description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile HaGeZi blocklists (Light→Ultimate), bilingual WebUI (EN/AR), JSON metrics Dashboard, installable PWA, 10-layer user-data preservation with transactional upgrades and recovery mode. v1.5.0 adds one-tap root install for the optional companion Android app. Zero telemetry.
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json
-minMagiskVersion=20400
-supportUrl=https://github.com/gasciljh/dnscrypt-proxy-webui/issues
-donateUrl=

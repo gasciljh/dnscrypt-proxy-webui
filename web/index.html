@@ -2,24 +2,9 @@
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
      Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-15
+     Last updated: 2026-10-18
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-     ============================================================
-     Bilingual WebUI (English default / Arabic toggle).
-
-     Features:
-       • Login (POST-only, CSRF-protected)
-       • Service toggle/restart
-       • Blocklist profile selection
-       • Custom rules editor (Allowlist + Denylist)
-       • Runtime info (dynamic ports + profile + memory + backups)
-       • Diagnostic file viewer
-       • Live status via SSE
-       • PWA support (installable, offline-capable)
-       • Smart Edit Mode with draft auto-save and rollback
-       • Service Worker update banner
-       • Companion Android app (one-tap root install)
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -36,7 +21,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Proxy v1.5.0</title>
+    <title>DNSCrypt Proxy</title>
 
     <script>
       (function(){
@@ -306,7 +291,7 @@
         .custom-modal-box { background:var(--bg-card); border-radius:var(--radius); padding:28px 24px; max-width:400px; width:90%; border:1px solid var(--border); box-shadow:0 30px 80px rgba(0,0,0,0.8); text-align:center; animation:modalIn 0.25s ease-out; }
         @keyframes modalIn { from{opacity:0;transform:scale(0.92) translateY(10px);} to{opacity:1;transform:scale(1) translateY(0);} }
         .custom-modal-box h3 { color:var(--text); margin-bottom:12px; font-size:18px; }
-        .custom-modal-box p { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
+        .custom-modal-box #modalMessage { color:var(--text-muted); font-size:14px; margin-bottom:20px; line-height:1.5; white-space:pre-wrap; }
         .custom-modal-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
         .custom-modal-actions button { padding:10px 28px; border:none; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; font-family:inherit; }
         .custom-modal-actions .modal-confirm { background:var(--danger); color:white; }
@@ -352,7 +337,6 @@
         .install-btn-github-direct:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(35,134,54,0.4); }
         .install-modal-cancel { width:100%; margin-top:6px; padding:10px; background:rgba(255,255,255,0.06); border:1px solid var(--border); color:var(--text-muted); border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; transition:0.2s; }
         .install-modal-cancel:hover { background:rgba(248,81,73,0.1); border-color:rgba(248,81,73,0.3); color:var(--danger); }
-
     </style>
 </head>
 <body>
@@ -360,7 +344,7 @@
 <div id="customModal" class="custom-modal-overlay">
     <div class="custom-modal-box">
         <h3 id="modalTitle">Confirm</h3>
-        <p id="modalMessage">Are you sure?</p>
+        <div id="modalMessage">Are you sure?</div>
         <div class="custom-modal-actions">
             <button class="modal-cancel" id="modalCancelBtn">Cancel</button>
             <button class="modal-confirm" id="modalConfirmBtn">Confirm</button>
@@ -578,34 +562,17 @@
 // ============================================================
     var VERSION = 'v1.5.0';
 
-    // Official GitHub URLs for the companion app.
-    //
-    // APP_GITHUB_PAGE_URL is a fixed URL (the release page).
-    //
-    // APP_GITHUB_APK_URL is built dynamically by
-    // getCompanionApkUrl() from companionState.expected_version
-    // (which mirrors proxy/app-apk.version, the SSOT). This
-    // matches main.go's design goal: a version bump in
-    // app-apk.version propagates to the WebUI without editing
-    // any HTML.
     var APP_GITHUB_PAGE_URL = 'https://github.com/gasciljh/dnscrypt-proxy-app';
 
     function getCompanionApkUrl() {
-        // Primary source: companionState.expected_version, populated
-        // by refreshCompanionState() from /api?action=companion_app_state.
         var v = companionState && companionState.expected_version;
         if (!v || v === 'unknown') {
-            // Fallback: runtime_info.app_version (same SSOT, different
-            // endpoint). Populated by loadRuntimeInfo().
             if (runtimeInfoData && runtimeInfoData.app_version &&
                 runtimeInfoData.app_version !== 'unknown') {
                 v = runtimeInfoData.app_version;
             }
         }
         if (!v || v === 'unknown') {
-            // Last-resort default. A missing version should not
-            // produce a broken URL — this default matches the
-            // value shipped in v1.5.0.
             v = '1.0.0';
         }
         return 'https://github.com/gasciljh/dnscrypt-proxy-app/releases/download/v'
@@ -620,7 +587,7 @@
     var translations = {
         en: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter v1.5.0',
+            welcomeMsg: '👋 Welcome to DNSCrypt Proxy Smart Filter',
             dashboardLinkText: 'Dashboard', authConnected: '🔐 Connected',
             loginTitle: 'Login', username: 'Username', password: 'Password',
             loginBtn: 'Login', logoutBtn: '🚪 Logout', loginError: '❌ Invalid credentials.',
@@ -729,7 +696,7 @@
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
-            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter v1.5.0',
+            welcomeMsg: '👋 مرحباً بك في DNSCrypt Proxy Smart Filter',
             dashboardLinkText: 'لوحة المراقبة', authConnected: '🔐 متصل',
             loginTitle: 'تسجيل الدخول', username: 'اسم المستخدم', password: 'كلمة المرور',
             loginBtn: 'دخول', logoutBtn: '🚪 تسجيل خروج', loginError: '❌ بيانات الدخول غير صحيحة.',
@@ -876,19 +843,9 @@
     var networkDownActive = false;
 
     // Companion app state — single source of truth.
-    //
-    // Populated by refreshCompanionState() and consumed by
-    // renderCompanionButton(). Cached in sessionStorage so the
-    // correct label paints on hard reload before the async XHR
-    // finishes.
-    //
-    // companionInstallInFlight guards against a race:
-    // renderCompanionButton() re-enables the button in the
-    // "not installed" state; if it were called (e.g. by a
-    // language toggle) while the CSRF-token XHR is in flight,
-    // it would defeat handleCompanionInstall()'s own
-    // double-click guard. While the flag is true, the renderer
-    // keeps the button disabled.
+    // companionInstallInFlight guards against a race: the explicit
+    // renderCompanionButton() calls in doCompanionInstall() act as a
+    // safety net if refreshCompanionState() fails (network / 401).
     var COMPANION_CACHE_KEY = 'companion-state';
     var companionState = {
         installed: false,
@@ -900,12 +857,13 @@
     // installModalActive — set true by showInstallModal().
     //
     // While true, the shared backdrop-click handler in §[28]
-    // MUST NOT close the modal. Unlike the generic confirm
-    // dialog, the install-method modal is a critical decision
-    // point: it holds the one-shot CSRF token, and its only
-    // valid exits are its own buttons (each of which resets
-    // companionInstallInFlight). A backdrop close would strand
-    // the install button in a permanently disabled state.
+    // MUST NOT close the modal. Its only valid exits are its own
+    // buttons (each resets companionInstallInFlight). A backdrop
+    // close would strand the install button in a disabled state.
+    //
+    // INVARIANT: installModalActive === true ⇒ the install modal is
+    // the one currently visible. Enforced by resetting the flag in
+    // both closeConfirmModal() and showConfirmModal().
     var installModalActive = false;
 
     var $ = function(id) { return document.getElementById(id); };
@@ -954,6 +912,12 @@
 // ============================================================
 // [3] Token helpers — cookie-only
 // ============================================================
+    // Auth is cookie-only (HttpOnly `dnscrypt_session`). These are
+    // intentional no-ops kept for backward compatibility with the
+    // XHR helper's `Authorization: Bearer` code path, which is
+    // dormant because getStoredToken() always returns null.
+    // Do NOT add Bearer token support here — the server never
+    // issues one (see SECURITY.md §8.1).
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
     function clearStoredToken() { }
@@ -1173,12 +1137,11 @@
 // [10] Save with optimistic UI
 // ============================================================
 // The new hash comes from the server response, not from a
-// client-side SHA-256 computation. This removes the only
-// dependency on window.crypto.subtle, which is unavailable
-// on non-secure contexts (LAN access via BIND_ADDR=0.0.0.0
-// over plain HTTP). The optimistic-concurrency protocol is
-// unchanged: we send the previously-known hash as
-// expected_hash, and the server returns the new hash.
+// client-side SHA-256 computation — crypto.subtle is unavailable
+// on non-secure contexts (LAN via BIND_ADDR=0.0.0.0 over HTTP).
+// The optimistic-concurrency protocol is unchanged: send the
+// previously-known hash as expected_hash; the server returns the
+// new hash.
 function saveWithOptimistic(listType) {
     var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
     var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
@@ -1259,17 +1222,32 @@ document.addEventListener('keydown', function(e) {
 // ============================================================
 // [12] Modal
 // ============================================================
-// showConfirmModal() calls _resetModalLayout() FIRST, so any
-// confirm dialog shown after the install-method modal
-// renders into the standard layout.
+// Two flags must be reset whenever a generic confirm modal is
+// opened or closed:
 //
-// pendingConfirmCallback is ALWAYS set to a function — never
-// null. Callers may pass `null`; the no-op fallback keeps
-// the click listeners in §[28] functional, so Cancel /
-// Confirm / backdrop always close the dialog.
+//   installModalActive
+//     Prevents the shared backdrop-click handler in §[28] from
+//     closing the install-method modal. Its only valid exits are
+//     its own buttons — each resets companionInstallInFlight.
+//     A backdrop close would strand the install button in a
+//     disabled state.
+//
+//   companionInstallInFlight
+//     Guards the one-shot CSRF-token fetch in
+//     handleCompanionInstall(). If a generic confirm modal
+//     replaces the install modal (e.g. session-expired while
+//     installing), the flag must be cleared — otherwise the
+//     install button stays disabled after re-login.
+//
+// Resetting both in BOTH showConfirmModal() and
+// closeConfirmModal() enforces the invariant structurally:
+//   installModalActive === true ⇒ the install modal is the one
+//   currently visible.
 function showConfirmModal(message, callback, options) {
     options = options || {};
     _resetModalLayout();
+    installModalActive = false;
+    companionInstallInFlight = false;
     $('modalMessage').textContent = message;
     $('modalTitle').textContent = options.title || t('confirmTitle');
     $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
@@ -1296,6 +1274,7 @@ function showConfirmModal(message, callback, options) {
 function closeConfirmModal() {
     $('customModal').style.display = 'none';
     pendingConfirmCallback = null;
+    installModalActive = false;
 }
 
 // ============================================================
@@ -1396,7 +1375,6 @@ function setupSWUpdateHandler() {
 
     navigator.serviceWorker.addEventListener('message', function(event) {
         if (!event.data) return;
-
         if (event.data.type === 'UPDATE_AVAILABLE') {
             if (event.data.waiting) {
                 showSWUpdateBanner();
@@ -1468,19 +1446,10 @@ function bindSWUpdateButtons() {
 }
 
 // ============================================================
-// [13c] Companion Install Button — root pm install
+// [13c] Companion Install Button
 // ============================================================
-// The install button is a <button> that triggers a root-level
-// install via /api/install_companion_app. The actual install
-// work happens in proxy/install_app.sh, invoked by main.go
-// with a 5-level pm install cascade.
-//
-// On boot: refreshCompanionState() queries the server for
-// the current install state and adjusts the button label
-// (Install App / Installed / Update App).
-//
-// On failure: the modal offers a manual download fallback
-// pointing at /app-debug.apk.
+// The install button opens the install-method modal (IDX-24).
+// See §[27b]/§[27c] for state and install flow.
 
 // ============================================================
 // [14] Runtime Info
@@ -1511,6 +1480,7 @@ function loadRuntimeInfo() {
 
         if (data.version && data.version !== 'dev') {
             VERSION = data.version;
+            document.title = 'DNSCrypt Proxy ' + VERSION;
             var badge = $('versionBadge');
             if (badge) badge.textContent = VERSION;
             var footer = $('footerVersion');
@@ -1880,10 +1850,10 @@ function updateUIStrings() {
     $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
 
     // Every element whose text depends on BOTH the current
-    // language AND runtime state is re-rendered through a
-    // single entry point (renderAllDynamic). This removes
-    // the ~3 s delay on the status card (SSE-driven) and
-    // the revert-to-default bug on the companion button.
+    // language AND runtime state is re-rendered via a single
+    // entry point (renderAllDynamic). This removes the ~3 s
+    // delay on the status card and the revert-to-default bug
+    // on the companion button.
     renderAllDynamic();
 
     var ab = $('authBadge');
@@ -1894,17 +1864,12 @@ function updateUIStrings() {
 // [16b] renderAllDynamic — single re-render entry point
 // ============================================================
 // Called from updateUIStrings() on every language toggle.
-// Re-renders every element whose visible text depends on
-// BOTH the current language AND runtime state, from the
-// cached state — WITHOUT waiting for SSE / poll cycles.
-//
-// Adding a new dynamic element? Add its render call here.
-// Never touch its text directly inside updateUIStrings().
+// Re-renders every element whose visible text depends on BOTH
+// the current language AND runtime state, from cached state —
+// WITHOUT waiting for SSE / poll cycles.
 function renderAllDynamic() {
-    // Companion Android app button
     renderCompanionButton();
 
-    // Status area — dot + text + toggle button
     if (networkDownActive) {
         setNetworkDownUI(true);
         updateStatsDisplay();
@@ -1914,10 +1879,8 @@ function renderAllDynamic() {
         updateStatsDisplay();
     }
 
-    // Diagnostic file list — labels inside each row
     if (logFilesData) renderLogFiles();
 
-    // Dashboard link label
     var dashText = $('dashboardLinkText');
     if (dashText) dashText.textContent = t('dashboardLinkText');
 }
@@ -2081,8 +2044,6 @@ function verifyAuth() {
             loadLogFiles();
             appInitialized = true;
         }
-        // Refresh companion state after auth so the button
-        // reflects "Installed" when the package exists.
         refreshCompanionState();
     });
 }
@@ -2153,17 +2114,31 @@ function handleSessionExpired() {
         return 15000;
     }
 
-    // isInstallFamilyUrl — identifies install-family endpoints.
+    // isInstallFamilyUrl gates the session-expired modal in
+    // xhrRequest(). It MUST list only **token-consuming**
+    // endpoints:
     //
-    // A 401 from these endpoints is a token-expiry signal (the
-    // one-shot CSRF token is single-use, 60 s TTL). It is NOT a
-    // session-expiry signal, so the generic "Session Expired"
-    // modal must be suppressed. The 401 still surfaces to the
-    // caller via err.code.
+    //   • uninstall_companion_app — consumes a session; a 401
+    //     means the install-flow token expired.
+    //   • install_companion_app   — same.
+    //
+    // It MUST NOT list `install_token`:
+    //
+    //   • install_token **issues** tokens; it never consumes one.
+    //   • A 401 from install_token therefore means the **session**
+    //     expired (cookie/bearer), NOT the one-shot install token.
+    //   • Such a 401 MUST go through the standard session-expired
+    //     path (handleSessionExpired), exactly like every other
+    //     non-install endpoint. Suppressing it would leave the
+    //     user with an unresponsive install button and no
+    //     re-login prompt.
+    //
+    // O2: `uninstall_companion_app` contains `install_companion_app`
+    // as a substring, so the install_companion_app check would also
+    // match uninstall_companion_app URLs. Listed first for clarity.
     function isInstallFamilyUrl(url) {
-        return url.indexOf('install_companion_app') !== -1 ||
-               url.indexOf('install_token') !== -1 ||
-               url.indexOf('uninstall_companion_app') !== -1;
+        return url.indexOf('uninstall_companion_app') !== -1 ||
+               url.indexOf('install_companion_app') !== -1;
     }
 
     function xhrRequest(method, url, data, cb, retries, delay) {
@@ -2186,9 +2161,9 @@ function handleSessionExpired() {
                 } else if (xhr.status === 401) {
                     var e401 = new Error('HTTP 401'); e401.code = 401;
                     cb(e401, null);
-                    // Suppress the session-expired modal for
-                    // install-family URLs. The 401 is a
-                    // token-expiry signal, not a session-expiry one.
+                    // Suppress session-expired modal for
+                    // install-family URLs: 401 is a token-expiry
+                    // signal, not a session-expiry signal.
                     if (!isInstallFamilyUrl(url)) {
                         handleSessionExpired();
                     }
@@ -2207,8 +2182,6 @@ function handleSessionExpired() {
                     cb(e413, null);
                     showMsg('❌ File too large (> 5 MB)', 'error', 4000);
                 } else if (xhr.status === 429) {
-                    // Surface 429 distinctly so the install flow
-                    // can render t('installRateLimited').
                     var e429 = new Error('HTTP 429'); e429.code = 429;
                     cb(e429, null);
                 } else {
@@ -2230,7 +2203,7 @@ function handleSessionExpired() {
     }
     function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
     function xhrPost(url, data, cb) {
-        // Install_companion_app must NOT retry. The first request
+        // install_companion_app must NOT retry. The first request
         // consumes the one-shot CSRF token; retrying produces
         // "Invalid or expired install token" even when the first
         // install is still in progress.
@@ -2479,16 +2452,9 @@ function handleSessionExpired() {
     }
 
     // loadCustomRules — fetches rule content and hashes in
-    // parallel.
-    //
-    // The pre-v1.5.0 revision computed the SHA-256 hashes
-    // client-side via crypto.subtle. That API is unavailable on
-    // non-secure contexts — the LAN access case
-    // (BIND_ADDR=0.0.0.0 over plain HTTP) had no way to save
-    // rules. The optimistic-concurrency protocol does not
-    // require a client-side hash: the server exposes its own
-    // hashes via /api?action=get_rules_state, and the client
-    // echoes them back as expected_hash on save.
+    // parallel. The hashes come from /api?action=get_rules_state,
+    // not from client-side crypto.subtle (unavailable on
+    // non-secure contexts — LAN via BIND_ADDR=0.0.0.0 over HTTP).
     function loadCustomRules() {
         var pending = 2;
         var content = { allow: '', deny: '' };
@@ -2535,7 +2501,21 @@ function handleSessionExpired() {
             return;
         }
         var name = select.options[select.selectedIndex].text;
-        showConfirmModal(t('applyConfirm') + '"' + name + '"?', function(confirmed) {
+        // L-5: warn about unsaved rule edits before the profile
+        // switch replaces the current blocklist.
+        //
+        // The warning is prepended to the SAME confirm dialog as
+        // the apply prompt, rather than opening a second modal.
+        // Rationale: showConfirmModal() now resets
+        // installModalActive and companionInstallInFlight on every
+        // call (BUG-1/BUG-3 invariant). Opening a second modal
+        // from inside the first would break that invariant mid-
+        // flow. Combining the two messages into one dialog keeps
+        // the state machine linear.
+        var warningPrefix = hasUnsavedChanges()
+            ? (t('unsavedWarning') + '\n\n')
+            : '';
+        showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
             isProcessing = true;
             $('applyBtn').disabled = true;
@@ -2633,6 +2613,7 @@ function handleSessionExpired() {
             });
         });
     }
+
 
 // ============================================================
 // [24] Logs
@@ -2785,9 +2766,7 @@ function handleSessionExpired() {
 // ============================================================
 // [27b] Companion app state + render
 // ============================================================
-// Single source of truth: companionState (declared in §[1]).
 // Two responsibilities, strictly separated:
-//
 //   refreshCompanionState()  — writes companionState, calls
 //                              renderCompanionButton()
 //   renderCompanionButton()  — reads companionState + t(),
@@ -2796,13 +2775,6 @@ function handleSessionExpired() {
 // This split is what fixes the language-toggle bug: a
 // language switch can call renderCompanionButton() without
 // clobbering the cached "Installed" / "Update App" state.
-//
-// companionInstallInFlight — set by handleCompanionInstall()
-// while the CSRF token is being fetched. renderCompanionButton()
-// respects it: the button stays disabled, and a concurrent
-// language toggle or verifyAuth re-entry cannot re-enable it
-// mid-fetch. This closes a race where the user could trigger
-// a second /api?action=install_token call.
     function _companionCacheWrite() {
         try {
             sessionStorage.setItem(COMPANION_CACHE_KEY, JSON.stringify(companionState));
@@ -2856,8 +2828,6 @@ function handleSessionExpired() {
             txt.textContent = t('pwaInstallBtn');
             btn.setAttribute('aria-label', t('pwaInstallAriaLabel'));
             btn.dataset.mode = 'install';
-            // Respect the in-flight flag: a concurrent language
-            // toggle must not re-enable the button mid-fetch.
             btn.disabled = companionInstallInFlight;
         } else if (vname && expected && vname === expected) {
             if (icon) icon.textContent = '\u2705';                  // ✅
@@ -2884,12 +2854,6 @@ function handleSessionExpired() {
 // renders). Every exit path resets the flag AND calls
 // renderCompanionButton() so the button reflects the current
 // state — not the transient "install in flight" state.
-//
-// handleCompanionInstall() does NOT handle HTTP 429. The
-// /api?action=install_token endpoint is not rate-limited
-// (documented in API.md §6.1.16). Only the install POST
-// (see doCompanionInstall below) is rate-limited, and only
-// that path renders t('installRateLimited').
     function handleCompanionInstall() {
         var btn = $('pwaInstallBtn');
         if (!btn || btn.dataset.mode === 'none') return;
@@ -2902,6 +2866,14 @@ function handleSessionExpired() {
             if (err || !data || !data.token) {
                 companionInstallInFlight = false;
                 renderCompanionButton();
+                // A 401 from install_token means the SESSION
+                // expired — not the one-shot install token.
+                // install_token issues tokens; it never consumes
+                // one, so it is deliberately excluded from
+                // isInstallFamilyUrl(). xhrRequest() already
+                // called handleSessionExpired(), so showing
+                // installTokenError here would stack two modals.
+                if (err && err.code === 401) return;
                 showMsg(t('installTokenError'), 'error', 3000);
                 return;
             }
@@ -2919,8 +2891,8 @@ function handleSessionExpired() {
     // installModalActive is set true for the duration of the
     // modal's lifetime. The shared backdrop-click handler in
     // §[28] checks this flag before closing — a stray tap
-    // outside the modal MUST NOT dismiss it, because every valid
-    // exit path is responsible for resetting
+    // outside the modal MUST NOT dismiss it, because every
+    // valid exit path is responsible for resetting
     // companionInstallInFlight. A backdrop close would strand
     // the install button in a permanently disabled state.
     function showInstallModal(token) {
@@ -3016,9 +2988,6 @@ function handleSessionExpired() {
     // Called from showConfirmModal() at the start of every
     // confirm dialog. Idempotent: safe to call even when the
     // standard layout is already in place.
-    //
-    // Does NOT touch installModalActive — that flag is managed
-    // exclusively by showInstallModal() and its action buttons.
     function _resetModalLayout() {
         var modal = $('customModal');
         var box = modal.querySelector('.custom-modal-box');
@@ -3032,6 +3001,18 @@ function handleSessionExpired() {
         actionsBox.style.display = '';
     }
 
+    // doCompanionInstall() distinguishes three failure shapes:
+    //
+    //   429 → rate limit (per-IP, 5 / 15 min)
+    //   401 → token expired (one-shot CSRF, 60 s TTL)
+    //   other → generic install failure
+    //
+    // The 401 branch renders t('installTokenError') — NOT
+    // t('installError') — matching docs/REFERENCE.md §2.4.6 and
+    // CHANGELOG.md's IDX-401-DISTINCT entry. A 401 from this
+    // endpoint is a token-expiry signal, not a session-expiry
+    // signal; the session-expired modal is already suppressed
+    // upstream in xhrRequest() via isInstallFamilyUrl().
     function doCompanionInstall(token) {
         var txt = $('pwaInstallText');
         var btn = $('pwaInstallBtn');
@@ -3045,10 +3026,10 @@ function handleSessionExpired() {
                 companionInstallInFlight = false;
 
                 if (err || !data) {
-                    // Distinguish rate limit from generic failure.
-                    // The server returns 429 for per-IP rate limit.
                     if (err && err.code === 429) {
                         showMsg(t('installRateLimited'), 'error', 4000);
+                    } else if (err && err.code === 401) {
+                        showMsg(t('installTokenError'), 'error', 4000);
                     } else {
                         showMsg(t('installError'), 'error', 4000);
                     }
@@ -3103,10 +3084,10 @@ function handleSessionExpired() {
 //
 // The backdrop-click handler is guarded by installModalActive:
 // when the install-method modal is open, a stray click outside
-// the modal MUST NOT close it, because the modal's own
-// buttons are the only paths that reset companionInstallInFlight.
-// A backdrop close would strand the install button in a
-// permanently disabled state until page reload.
+// the modal MUST NOT close it. Its own buttons are the only
+// paths that reset companionInstallInFlight. A backdrop close
+// would strand the install button in a permanently disabled
+// state until page reload.
     function bindEvents() {
         $('langToggle').addEventListener('click', toggleLanguage);
         $('logoutBtn').addEventListener('click', logout);
@@ -3119,10 +3100,6 @@ function handleSessionExpired() {
         var _pwaBtn = $('pwaInstallBtn');
         if (_pwaBtn) {
             _pwaBtn.addEventListener('click', handleCompanionInstall);
-            // refreshCompanionState() is intentionally NOT called
-            // here — it fires from verifyAuth() (and from
-            // performLogin() on the post-login path) so the XHR
-            // does not 401 before the session is established.
         }
 
         $('toggleBtn').addEventListener('click', handleToggle);
@@ -3197,8 +3174,7 @@ function handleSessionExpired() {
 // [29] Boot
 // ============================================================
 // installControllerChangeHandler() is invoked from
-// setupSWUpdateHandler() below — no direct call here (was a
-// silent no-op).
+// setupSWUpdateHandler() below — no direct call here.
     function boot() {
         document.documentElement.lang = currentLang;
         document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';

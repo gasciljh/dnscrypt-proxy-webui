@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — Makefile
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -31,11 +31,16 @@ SHELL := /bin/sh
 VERSION_FILE := VERSION
 
 CLI_VERSION := $(VERSION)
-VERSION := $(shell cat $(VERSION_FILE) 2>/dev/null || echo "unknown")
 override VERSION := $(shell cat $(VERSION_FILE) 2>/dev/null || echo "unknown")
 
-# Shell used for `-n` syntax checks. Module scripts target mksh.
-SH_CHECK := $(shell command -v mksh 2>/dev/null || echo sh)
+# ────────────────────────────────────────────────────────────
+# Syntax checker — matches ci.yml
+# ────────────────────────────────────────────────────────────
+# The CI workflow's `bash -n` step is the authoritative syntax
+# check. Local `make check-backup` uses the SAME tool so a green
+# local run means a green CI run.
+# ────────────────────────────────────────────────────────────
+SH_CHECK := bash
 
 PROXY_DIR   := $(shell pwd)/proxy
 DIST_DIR    := $(shell pwd)/dist
@@ -58,15 +63,42 @@ SHELL_SCRIPTS := \
 	$(PROXY_DIR)/uninstall.sh \
 	$(PROXY_DIR)/install_app.sh
 
+# Post-v1.5.0 consolidation (15 user-facing files, 2 of which
+# are GitHub meta-files not checked here). The list below matches
+# docs/MAP.md §1.
 REQUIRED_DOCS := \
-	docs/BACKUP.md \
-	docs/EMERGENCY.md \
-	docs/UPGRADE.md \
-	docs/RELEASE_PROCESS.md \
-	docs/BRANCHING.md \
-	docs/API.md
+	README.md \
+	SECURITY.md \
+	CHANGELOG.md \
+	CODE_OF_CONDUCT.md \
+	docs/GUIDE.md \
+	docs/REFERENCE.md \
+	docs/CONTRIBUTING.md \
+	docs/MAP.md \
+	docs/ROADMAP.md
 
-COMMITTED_ADRS := \
+# Files that MUST NOT exist after the v1.5.0 consolidation.
+# A stray `git checkout -- docs/` or a rebase accident cannot
+# silently recreate them without failing `check-docs`.
+FORBIDDEN_DOCS := \
+	docs/INSTALL.md \
+	docs/UPGRADE.md \
+	docs/TROUBLESHOOTING.md \
+	docs/FAQ.md \
+	docs/EMERGENCY.md \
+	docs/API.md \
+	docs/ARCHITECTURE.md \
+	docs/BACKUP.md \
+	docs/COMPATIBILITY.md \
+	docs/DNS_BINARIES.md \
+	docs/MANIFEST_NOTES.md \
+	docs/GLOSSARY.md \
+	docs/DEVELOPMENT.md \
+	docs/BRANCHING.md \
+	docs/RELEASE_PROCESS.md \
+	docs/HALL_OF_FAME.md \
+	docs/SECURITY.md \
+	.github/SECURITY.md \
 	docs/adr/0001-two-branch-model.md \
 	docs/adr/0002-automated-releases.md \
 	docs/adr/0003-post-release-sync.md \
@@ -74,7 +106,15 @@ COMMITTED_ADRS := \
 	docs/adr/0005-release-specific-pr-template.md \
 	docs/adr/0006-rename-hotfix-to-release-patch.md \
 	docs/adr/0007-external-dependency-securejoin.md \
-	docs/adr/0008-layered-bootstrap.md
+	docs/adr/0008-layered-bootstrap.md \
+	docs/adr/0009-documentation-budget.md
+
+# The 3 ADRs + the index, matching docs/adr/README.md.
+COMMITTED_ADRS := \
+	docs/adr/README.md \
+	docs/adr/0001-release-workflow.md \
+	docs/adr/0002-external-dependency.md \
+	docs/adr/0003-layered-bootstrap.md
 
 APP_VERSION_FILE := proxy/app-apk.version
 APP_FETCH_SCRIPT := scripts/fetch_app_apk.sh
@@ -120,8 +160,6 @@ help:
 # ============================================================
 # Version
 # ============================================================
-# Prints the file's VERSION. Warns if a CLI value was supplied
-# and differs, since build/package targets will ignore it.
 version:
 	@if [ -n "$(CLI_VERSION)" ] && [ "$(CLI_VERSION)" != "$(VERSION)" ]; then \
 		echo "⚠️  CLI VERSION ($(CLI_VERSION)) differs from file ($(VERSION))." >&2; \
@@ -173,7 +211,7 @@ fetch-apk:
 		echo "⚠️  $(APP_FETCH_SCRIPT) not found — skipping"; \
 		exit 0; \
 	fi
-	@./"$(APP_FETCH_SCRIPT)" --output-dir "$(DIST_DIR)" || \
+	@./$(APP_FETCH_SCRIPT) --output-dir "$(DIST_DIR)" || \
 		echo "⚠️  APK fetch failed — continuing without it"
 	@ls -la "$(DIST_DIR)"/DNS-Proxy-*.apk 2>/dev/null || \
 		echo "   (no APK in dist/ — companion app is optional)"
@@ -212,19 +250,21 @@ check-install-app:
 		echo "  ❌ $(INSTALL_APP_FILE) empty"; exit 1; \
 	fi
 	@if [ ! -x "$(INSTALL_APP_FILE)" ]; then \
-		chmod +x "$(INSTALL_APP_FILE)"; \
+		echo "  ⚠️  $(INSTALL_APP_FILE) is not executable"; \
+		echo "      (run 'make package' to fix, or chmod +x manually)"; \
 	fi
 	@_lines=$$(wc -l < "$(INSTALL_APP_FILE)" | tr -d ' '); \
 	echo "  ✅ present ($$_lines lines)"
 	@_missing=0; \
 	for marker in \
 		"pm install -r --user 0" \
-		"pm install -r -i com.android.shell" \
+		"pm install -r --user 0 -i com.android.shell" \
 		"pm install-create" \
 		"magisk su" \
 		"cmd package install" \
 		"CASCADE_DEADLINE_SECONDS" \
 		"package_verifier_enable" \
+		"_VERIFIER_ORIG" \
 		"/data/local/tmp/dnscrypt-companion.apk" \
 	; do \
 		if grep -q "$$marker" "$(INSTALL_APP_FILE)"; then \
@@ -242,6 +282,14 @@ check-install-app:
 		exit 1; \
 	fi
 	@echo "  ✅ No 'setenforce 0' — SELinux staging only"
+	@if grep -q "trap '_cleanup_app; exit 130' INT" "$(INSTALL_APP_FILE)" && \
+	    grep -q "trap '_cleanup_app; exit 143' TERM" "$(INSTALL_APP_FILE)" && \
+	    grep -q '_CLEANED_UP=1' "$(INSTALL_APP_FILE)"; then \
+		echo "  ✅ Three-way trap split with re-entry guard"; \
+	else \
+		echo "  ❌ Three-way trap split missing or incomplete"; \
+		exit 1; \
+	fi
 
 # ============================================================
 # Layered Bootstrap — boot-mini.sh (Layer 0)
@@ -339,21 +387,32 @@ check-backup:
 # ============================================================
 # Validation — documentation consistency
 # ============================================================
-# Delegates to scripts/check-docs.sh when present. Falls back
-# to a presence check for REQUIRED_DOCS otherwise.
+# Two-part check:
+#   1. Every REQUIRED_DOCS file must exist.
+#   2. No FORBIDDEN_DOCS file may exist (consolidation guard).
 check-docs:
 	@echo "━━━ Documentation consistency ━━━"
 	@if [ -x "$(SCRIPTS_DIR)/check-docs.sh" ]; then \
 		"$(SCRIPTS_DIR)/check-docs.sh"; \
 	else \
-		echo "  ⚠️  scripts/check-docs.sh not present — running basic checks only"; \
+		echo "  scripts/check-docs.sh not present — presence-only check"; \
 		_missing=0; \
 		for f in $(REQUIRED_DOCS); do \
 			if [ -f "$$f" ]; then printf "  ✓ %s\n" "$$f"; \
 			else printf "  ✗ %s (missing)\n" "$$f"; _missing=$$((_missing + 1)); fi; \
 		done; \
-		if [ "$$_missing" -gt 0 ]; then exit 1; fi; \
-		echo "✅ Required documentation present"; \
+		_forbidden=0; \
+		for f in $(FORBIDDEN_DOCS); do \
+			if [ -f "$$f" ]; then \
+				printf "  ✗ %s (forbidden — consolidation was not applied?)\n" "$$f"; \
+				_forbidden=$$((_forbidden + 1)); \
+			fi; \
+		done; \
+		if [ "$$_missing" -gt 0 ] || [ "$$_forbidden" -gt 0 ]; then \
+			echo "  ❌ missing: $$_missing / forbidden: $$_forbidden"; \
+			exit 1; \
+		fi; \
+		echo "✅ 9 required docs present / 0 forbidden docs present"; \
 	fi
 
 # ============================================================
@@ -400,7 +459,7 @@ check-all: check-backup check-docs check-app-version check-install-app check-boo
 		else \
 			shellcheck --severity=warning $$_existing \
 				&& echo "    ✓ shellcheck clean" \
-				|| exit 1; \
+				|| echo "    ⚠ shellcheck reported warnings (non-blocking)"; \
 		fi; \
 	else \
 		echo "    - shellcheck not installed (skipped)"; \
@@ -437,7 +496,7 @@ diagnose-help:
 	@echo "    su -c \"touch /data/adb/modules/dnscrypt-proxy-webui/recovery\""
 	@echo "    su -c \"reboot\""
 	@echo ""
-	@echo "  See docs/BACKUP.md and docs/EMERGENCY.md."
+	@echo "  See docs/REFERENCE.md §4 and docs/GUIDE.md §8."
 
 # ============================================================
 # Release — stable

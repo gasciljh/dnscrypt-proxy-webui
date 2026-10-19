@@ -1,7 +1,7 @@
 // ============================================================
 // DNSCrypt Smart Filter — main.go
 // Version: v1.5.0 (Global Edition)
-// Last updated: 2026-10-15
+// Last updated: 2026-10-18
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -26,8 +26,9 @@
 //   -buildid=, -mod=readonly, and injects the version via -X.
 //
 // ⚠️ MONITORING_UI_PORT (8080) is a cross-file constant. It
-//    must stay in sync with functions.sh, customize.sh,
-//    action.sh, status.sh, service.sh, and watchdog.sh.
+//    must stay in sync with boot-mini.sh, functions.sh,
+//    customize.sh, action.sh, status.sh, service.sh, and
+//    watchdog.sh.
 // ============================================================
 
 package main
@@ -166,9 +167,7 @@ const (
 	// server-side budget is INSTALL_TIMEOUT (90 s). It MUST be
 	// strictly greater than INSTALL_TIMEOUT + serialization +
 	// network drain, otherwise the client sees a connection reset
-	// while the server-side install has actually completed. 150 s
-	// leaves 60 s of headroom, which is generous even on slow
-	// ROMs with multi-second JSON serialization.
+	// while the server-side install has actually completed.
 	HTTP_WRITE_TIMEOUT = 150 * time.Second
 
 	SESSION_TTL          = 24 * time.Hour
@@ -355,11 +354,6 @@ func (w *httpServerLogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-type portCacheKey struct {
-	port  int
-	proto string
-}
-
 type portCacheEntry struct {
 	open bool
 	time time.Time
@@ -478,11 +472,12 @@ func resetDownloadClient() {
 // [7] run/ directory initialization
 // ============================================================
 // isRunDirUsable performs a live write test on RUN_DIR and caches
-// the result for RUN_DIR_USABLE_CACHE_TTL (30 s). The test — MkdirAll
-// + Chmod + a small WriteFile — matches the effective write-ability
-// semantics of boot-mini.sh:get_run_dir()'s `-w` check while being
-// strictly stronger: it catches SELinux contexts that allow the
-// directory to exist and be readable but reject file creation.
+// the result for RUN_DIR_USABLE_CACHE_TTL (30 s). The test —
+// MkdirAll + Chmod + a small WriteFile — matches the effective
+// write-ability semantics of boot-mini.sh:get_run_dir()'s `-w`
+// check while being strictly stronger: it catches SELinux
+// contexts that allow the directory to exist and be readable but
+// reject file creation.
 var (
 	runDirUsableCached bool
 	runDirUsableTime   time.Time
@@ -582,7 +577,7 @@ var (
 	resourceMutex sync.Mutex
 
 	portCacheMu  sync.Mutex
-	portCacheMap = make(map[portCacheKey]portCacheEntry)
+	portCacheMap = make(map[int]portCacheEntry)
 
 	cachedStatusVal  string
 	cachedStatusTime time.Time
@@ -649,36 +644,57 @@ var (
 // ============================================================
 // [9] Read webui.conf settings
 // ============================================================
-func readConfValue(key, defaultValue string) string {
+
+// readConfValue returns the value of key from webui.conf, or
+// defaultValue if the file, key, or value is missing.
+//
+// Named return + pre-initialization ensures defaultValue is
+// returned even if a panic occurs mid-read. A bare
+// `defer recover()` would return the zero value "" instead,
+// which would cascade into empty port strings and break
+// net.JoinHostPort callers.
+func readConfValue(key, defaultValue string) (result string) {
+	result = defaultValue
 	defer func() { recover() }()
-	if data, err := os.ReadFile(CONF_FILE); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "#") || line == "" {
-				continue
+
+	data, err := os.ReadFile(CONF_FILE)
+	if err != nil {
+		return
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, key+"=") {
+			val := strings.TrimSpace(strings.TrimPrefix(line, key+"="))
+			if idx := strings.Index(val, " #"); idx > 0 {
+				val = strings.TrimSpace(val[:idx])
 			}
-			if strings.HasPrefix(line, key+"=") {
-				val := strings.TrimSpace(strings.TrimPrefix(line, key+"="))
-				if idx := strings.Index(val, " #"); idx > 0 {
-					val = strings.TrimSpace(val[:idx])
-				}
-				if val != "" {
-					return val
-				}
+			if val != "" {
+				result = val
+				return
 			}
 		}
 	}
-	return defaultValue
+	return
 }
 
-func readConfPort(key, defaultPort string) string {
+// readConfPort reads a port from webui.conf and validates its
+// range. Named return + pre-initialization mirrors
+// readConfValue: on panic, defaultPort is returned rather than
+// the zero value "".
+func readConfPort(key, defaultPort string) (result string) {
+	result = defaultPort
 	defer func() { recover() }()
 	val := readConfValue(key, defaultPort)
 	n, err := strconv.Atoi(val)
 	if err != nil || n < 1 || n > 65535 {
-		return defaultPort
+		return
 	}
-	return val
+	result = val
+	return
 }
 
 // readConfPortCached wraps readConfPort with a 30-second TTL
@@ -1171,12 +1187,6 @@ func getSystemShell() string {
 
 // getFunctionsScript returns the absolute path to functions.sh.
 // Prefers $MODDIR/functions.sh, falls back to $PROXYDIR.
-//
-// Difference from getInstallScript(): functions.sh can live in
-// either MODDIR or PROXYDIR (depending on the invocation context),
-// so this function probes both. install_app.sh is always extracted
-// to MODDIR by customize.sh §[9], so getInstallScript() probes
-// MODDIR only.
 func getFunctionsScript() string {
 	funcScriptOnce.Do(func() {
 		candidates := []string{
@@ -1211,10 +1221,7 @@ func shellQuote(s string) string {
 
 // runShell runs a shell command with a conservative default
 // timeout (15 s). Callers that need a different budget use
-// runShellWithTimeout directly. The 15 s value comfortably
-// bounds the slowest firewall-application path
-// (manage_firewall 1 with up to 32 bootstrap RETURN rules, each
-// guarded by `iptables --wait 3`).
+// runShellWithTimeout directly.
 func runShell(cmd string) error {
 	return runShellWithTimeout(cmd, 15*time.Second)
 }
@@ -1287,6 +1294,15 @@ func broadcastEvent(event string, data string) {
 	}
 }
 
+// sseHandler streams Server-Sent Events to a single client.
+//
+// Ordering note: the initial snapshots (status/stats/resources)
+// are pushed into the channel BEFORE the channel is registered
+// in sseClients. A concurrent broadcastEvent could otherwise
+// fill the 100-slot buffer before the reader loop is reached,
+// and the blocking send would hang the connection forever
+// (defer cleanup would never run, and the client would stay in
+// sseClients until process restart).
 func sseHandler(w http.ResponseWriter, r *http.Request) {
 	if !checkAuth(r) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -1306,13 +1322,14 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ch := make(chan string, 100)
-	sseMutex.Lock()
-	sseClients[ch] = true
-	sseMutex.Unlock()
 
 	ch <- fmt.Sprintf("event: status\ndata: %s\n\n", getStatus())
 	ch <- fmt.Sprintf("event: stats\ndata: {\"blocked_today\":\"%s\"}\n\n", getBlockedStats())
 	ch <- fmt.Sprintf("event: resources\ndata: {\"ram\":\"%s\"}\n\n", getResourceUsage())
+
+	sseMutex.Lock()
+	sseClients[ch] = true
+	sseMutex.Unlock()
 
 	defer func() {
 		sseMutex.Lock()
@@ -1357,11 +1374,7 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 // The scan runs OUTSIDE the cache mutex. A full read of a
 // multi-megabyte log can take hundreds of milliseconds; holding
 // statsMutex for the duration would block every concurrent
-// SSE client that queries the stats. Instead we do a fast
-// cached-read under the lock, and only if the cache is stale
-// do we perform the expensive scan unlocked, then publish the
-// result under a short lock. A concurrent refresh may recompute
-// the same value — that is harmless.
+// SSE client that queries the stats.
 func getBlockedStats() string {
 	statsMutex.Lock()
 	if time.Since(statsTime) < 300*time.Second && statsCache != "" {
@@ -1469,13 +1482,26 @@ func getResourceUsage() string {
 // The host from net.SplitHostPort is always an IP literal (the
 // string "localhost" is resolved by the client before the TCP
 // handshake, so it never appears here).
+//
+// Uses net.IP.IsLoopback() rather than a string comparison
+// against "127.0.0.1" / "::1". This correctly accepts:
+//
+//   - any 127.0.0.0/8 address (not only 127.0.0.1),
+//   - IPv4-mapped IPv6 forms like ::ffff:127.0.0.1 that
+//     net.SplitHostPort produces for IPv6 dual-stack listeners.
+//
+// net.ParseIP returns nil for non-IP strings; those are rejected
+// (fail-closed).
 func isLocalRequest(r *http.Request) bool {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		host = r.RemoteAddr
 	}
 	host = strings.Trim(host, "[]")
-	return host == "127.0.0.1" || host == "::1"
+	if ip := net.ParseIP(host); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 func getClientIP(r *http.Request) string {
@@ -1558,8 +1584,18 @@ func parseTOMLValue(s string) string {
 
 // readMonitoringAuthFromFile parses ONLY the [monitoring_ui]
 // section. Credentials in other sections are ignored.
+//
+// On panic, both return values are reset to empty. A partial
+// read (one field populated, the other empty) MUST NOT reach
+// getMonitoringAuth's cache — that function only caches when at
+// least one field is non-empty, so a partial read would produce
+// permanently broken credentials until restart.
 func readMonitoringAuthFromFile() (username, password string) {
-	defer func() { recover() }()
+	defer func() {
+		if recover() != nil {
+			username, password = "", ""
+		}
+	}()
 
 	data, err := os.ReadFile(CONF)
 	if err != nil {
@@ -1567,9 +1603,7 @@ func readMonitoringAuthFromFile() (username, password string) {
 	}
 
 	inSection := false
-	lines := strings.Split(string(data), "\n")
-
-	for _, line := range lines {
+	for _, line := range strings.Split(string(data), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
@@ -1820,7 +1854,26 @@ func checkAuth(r *http.Request) bool {
 //   3. isInstallLockedOut(ip) — rate limiter
 //   4. validateAndConsumeInstallToken(tok) — one-shot
 
+// getInstallScript returns the absolute path to install_app.sh.
+// Searches two candidates (mirrors getFunctionsScript):
+//  1. $MODDIR/install_app.sh  — post-install layout
+//     (staged by customize.sh §[9])
+//  2. $PROXYDIR/install_app.sh — source-tree layout
+//     (running main.go from the repository root)
+//
+// Falls back to the post-install path when neither exists,
+// so the caller's "script_not_found" branch produces a
+// meaningful diagnostic.
 func getInstallScript() string {
+	candidates := []string{
+		filepath.Join(MODDIR, INSTALL_SCRIPT_REL),
+		filepath.Join(PROXYDIR, INSTALL_SCRIPT_REL),
+	}
+	for _, c := range candidates {
+		if _, err := os.Stat(c); err == nil {
+			return c
+		}
+	}
 	return filepath.Join(MODDIR, INSTALL_SCRIPT_REL)
 }
 
@@ -1852,22 +1905,51 @@ func generateInstallToken() string {
 
 // validateAndConsumeInstallToken marks a token as used so it
 // cannot be replayed. Returns false for expired/used/unknown.
+//
+// Comparison is constant-time (subtle.ConstantTimeCompare).
+// A plain map lookup would leak timing information about how
+// many bytes of a supplied token prefix match a stored entry.
+//
+// The comparison runs against EVERY stored token — including
+// expired and already-used ones — and is evaluated BEFORE the
+// expiry check, so every iteration has identical cost. Map
+// iteration order in Go is randomized per call, so the
+// comparison cost also does not reveal the entry's position.
+//
+// Complexity is O(n) with n ≤ MAX_INSTALL_ATTEMPTS (5) tokens
+// outstanding, so the extra work is negligible (~1 µs per
+// request even on constrained devices).
 func validateAndConsumeInstallToken(tok string) bool {
 	if tok == "" {
 		return false
 	}
+
 	installTokensMu.Lock()
 	defer installTokensMu.Unlock()
 
-	t, ok := installTokens[tok]
-	if !ok {
+	now := time.Now()
+	tokBytes := []byte(tok)
+
+	var matched *InstallToken
+
+	for k, v := range installTokens {
+		cmpResult := subtle.ConstantTimeCompare(tokBytes, []byte(k))
+
+		if v.ExpiresAt.Before(now) {
+			delete(installTokens, k)
+			continue
+		}
+
+		if cmpResult == 1 && !v.Used {
+			matched = v
+		}
+	}
+
+	if matched == nil {
 		return false
 	}
-	if t.Used || t.ExpiresAt.Before(time.Now()) {
-		delete(installTokens, tok)
-		return false
-	}
-	t.Used = true
+
+	matched.Used = true
 	return true
 }
 
@@ -2018,7 +2100,7 @@ func callInstallScript(mode string) map[string]interface{} {
 //
 // All error responses carry the `action` field so the client
 // can render a single unified install UI. The 429 message is
-// aligned with the docs (API.md §6.2.14, SECURITY.md §5.36.2).
+// aligned with docs/REFERENCE.md §2.3.2 and SECURITY.md §5.36.2.
 func installCompanionApp(r *http.Request) map[string]interface{} {
 	ip := getClientIP(r)
 
@@ -2320,20 +2402,18 @@ func isPortOpen(port int) bool {
 
 // isPortOpenCached wraps isPortOpen with a PORT_CACHE_TTL
 // window (5 s).
-func isPortOpenCached(port int, proto string) bool {
-	key := portCacheKey{port: port, proto: proto}
-
+func isPortOpenCached(port int) bool {
 	portCacheMu.Lock()
 	defer portCacheMu.Unlock()
 
-	if entry, ok := portCacheMap[key]; ok {
+	if entry, ok := portCacheMap[port]; ok {
 		if time.Since(entry.time) < PORT_CACHE_TTL {
 			return entry.open
 		}
 	}
 
 	open := isPortOpen(port)
-	portCacheMap[key] = portCacheEntry{open: open, time: time.Now()}
+	portCacheMap[port] = portCacheEntry{open: open, time: time.Now()}
 	return open
 }
 
@@ -2349,7 +2429,7 @@ func getStatusUncached() (status string) {
 	}()
 
 	_, found := isProcessRunning()
-	if !found || !isPortOpenCached(5354, "udp") {
+	if !found || !isPortOpenCached(5354) {
 		return "OFF"
 	}
 	return "ON"
@@ -2406,9 +2486,26 @@ func ensureExecutable(path string) bool {
 // ============================================================
 // startService launches the DNS engine, waits for it to bind,
 // installs firewall rules, and updates STATUS_FILE.
+//
+// Port-cache invalidation: getStatus() consults
+// isPortOpenCached(5354), which has a 5-second TTL. A stale
+// entry from a previous run (or a socket still held by a
+// dying process) could otherwise report "ON" and short-circuit
+// the start, leaving the module stuck with no working DNS.
+//
+// Firewall timeout: manage_firewall 1 iterates over up to 32
+// bootstrap IPs × 2 protocols × 2 strategies (chain + direct
+// DNAT fallback), each guarded by `iptables --wait 5`. Under
+// contention with netd this can exceed the 15 s default
+// runShell budget. 90 s gives headroom without hanging forever.
 func startService() {
 	defer func() { recover() }()
 	logEvent("▶️ Starting service...")
+
+	portCacheMu.Lock()
+	portCacheMap = make(map[int]portCacheEntry)
+	portCacheMu.Unlock()
+
 	invalidateStatusCache()
 	if getStatus() == "ON" {
 		return
@@ -2446,7 +2543,9 @@ func startService() {
 		return
 	}
 	runShell("settings delete global private_dns_mode")
-	runShell(". " + shellQuote(getFunctionsScript()) + "; manage_firewall 1")
+	runShellWithTimeout(
+		". "+shellQuote(getFunctionsScript())+"; manage_firewall 1",
+		90*time.Second)
 	atomicWriteFile(STATUS_FILE, []byte("ON"), 0666)
 	invalidateStatusCache()
 	logEvent("✅ Service started (PID: " + strconv.Itoa(pid) + ")")
@@ -2462,11 +2561,15 @@ func startService() {
 // PID file combined with the watchdog could cause a restart
 // attempt against an unrelated PID (mitigated by isPidAlive's
 // comm check, but the log line is the operator's only signal).
+//
+// Firewall timeout: same 90 s budget as startService — the
+// blind cleanup path (mode 0) is faster than mode 1 but still
+// issues multiple iptables calls that can contend with netd.
 func stopService() {
 	defer func() { recover() }()
 	logEvent("⏹️ Stopping service...")
 	portCacheMu.Lock()
-	portCacheMap = make(map[portCacheKey]portCacheEntry)
+	portCacheMap = make(map[int]portCacheEntry)
 	portCacheMu.Unlock()
 	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
 	invalidateStatusCache()
@@ -2476,7 +2579,9 @@ func stopService() {
 	if err := os.Remove(PID_FILE); err != nil && !os.IsNotExist(err) {
 		logWithLevel("warn", "stopService: could not remove PID file: "+err.Error())
 	}
-	runShell(". " + shellQuote(getFunctionsScript()) + "; manage_firewall 0")
+	runShellWithTimeout(
+		". "+shellQuote(getFunctionsScript())+"; manage_firewall 0",
+		90*time.Second)
 	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
 	invalidateStatusCache()
 	logEvent("✅ Service stopped")
@@ -3525,6 +3630,76 @@ func removeModule(modulePath string) map[string]interface{} {
 // ============================================================
 // [30] Log file management
 // ============================================================
+// Security model:
+//
+//   LOGS_DIR (/data/local/tmp/) is world-writable. Any local
+//   process can create a symlink named like a valid log file
+//   and point it at a sensitive path (e.g. proxy/webui.conf).
+//   Every read path below refuses such a symlink before any
+//   byte is returned, using a three-layer defence:
+//
+//     1. Lstat pre-check — rejects symlinks and non-regular
+//        files (fifos, sockets, devices) without following them.
+//     2. O_NOFOLLOW — the kernel rejects symlinks atomically
+//        at open time. Even if the file is swapped between
+//        Lstat and Open, the open fails with ELOOP.
+//     3. SameFile post-check — compares the Lstat inode to
+//        the opened file's inode. Catches a race where the
+//        symlink was replaced by a different regular file
+//        between check and open.
+//
+//   The two list/clear paths use the same three layers plus
+//   an entry-type check (ReadDir exposes Lstat semantics, so
+//   symlinks are skipped at scan time).
+//
+//   All error messages are intentionally identical for
+//   "symlink rejected", "file missing", and "not a regular
+//   file" — distinguishing them would leak information about
+//   an attacker's setup to the WebUI.
+
+// safeOpenRegular opens path for reading, refusing symlinks
+// and non-regular files.
+//
+// Used by every log-file read path in this section. See the
+// section header for the three-layer defence rationale.
+func safeOpenRegular(path string) (*os.File, os.FileInfo, error) {
+	lfi, err := os.Lstat(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	if lfi.Mode()&os.ModeSymlink != 0 {
+		return nil, nil, errors.New("symlink rejected")
+	}
+	if !lfi.Mode().IsRegular() {
+		return nil, nil, errors.New("not a regular file")
+	}
+
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, nil, err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		f.Close()
+		return nil, nil, errors.New("symlink rejected after open")
+	}
+	if !fi.Mode().IsRegular() {
+		f.Close()
+		return nil, nil, errors.New("not a regular file after open")
+	}
+	if !os.SameFile(lfi, fi) {
+		f.Close()
+		return nil, nil, errors.New("file changed between check and open")
+	}
+
+	return f, fi, nil
+}
+
 // sanitizeLogFileName returns a safe basename or ("", false).
 // Only files starting with "dnscrypt" and ending with a known
 // extension are accepted.
@@ -3603,6 +3778,14 @@ func isSensitiveFile(name string) bool {
 
 // listLogFiles returns the log files in LOGS_DIR, sorted by
 // mtime descending.
+//
+// Symlinks and non-regular files are skipped at scan time:
+// a world-writable LOGS_DIR lets a local attacker inject a
+// symlink named like a log file (e.g. dnscrypt-evil.log →
+// webui.conf). ReadDir exposes Lstat semantics, so entry.Type()
+// already reflects the symlink — no follow-up open is needed
+// here. The open path is protected separately by
+// safeOpenRegular.
 func listLogFiles() map[string]interface{} {
 	entries, err := os.ReadDir(LOGS_DIR)
 	if err != nil {
@@ -3617,12 +3800,18 @@ func listLogFiles() map[string]interface{} {
 		if entry.IsDir() {
 			continue
 		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			continue
+		}
 		name := entry.Name()
 		if !isAllowedLogFile(name) {
 			continue
 		}
 		info, err := entry.Info()
 		if err != nil {
+			continue
+		}
+		if !info.Mode().IsRegular() {
 			continue
 		}
 		files = append(files, LogFileInfo{
@@ -3649,6 +3838,11 @@ func listLogFiles() map[string]interface{} {
 // log file, transparently decompressing .gz archives.
 //
 // Sensitive files require the caller to pass confirm="1".
+//
+// Symlink rejection: safeOpenRegular refuses symlinks and non-
+// regular files before any byte is read, so a symlink injected
+// into the world-writable LOGS_DIR cannot be used to read an
+// arbitrary file under root privileges.
 func readLogFile(name, confirm string) map[string]interface{} {
 	safeName, ok := sanitizeLogFileName(name)
 	if !ok {
@@ -3667,27 +3861,22 @@ func readLogFile(name, confirm string) map[string]interface{} {
 	}
 
 	path := filepath.Join(LOGS_DIR, safeName)
-	info, err := os.Stat(path)
+	f, info, err := safeOpenRegular(path)
 	if err != nil {
+		// A symlink and a missing file return the same message —
+		// distinguishing them would leak information about the
+		// attacker's setup.
 		return map[string]interface{}{
 			"status":  "error",
-			"message": "File not found",
+			"message": "File not found or not allowed",
 		}
 	}
+	defer f.Close()
 
 	var content string
 	var truncated bool
 
 	if strings.HasSuffix(name, ".gz") {
-		f, err := os.Open(path)
-		if err != nil {
-			return map[string]interface{}{
-				"status":  "error",
-				"message": "Cannot open file",
-			}
-		}
-		defer f.Close()
-
 		gz, err := gzip.NewReader(f)
 		if err != nil {
 			return map[string]interface{}{
@@ -3705,15 +3894,6 @@ func readLogFile(name, confirm string) map[string]interface{} {
 		}
 		content = string(data)
 	} else {
-		f, err := os.Open(path)
-		if err != nil {
-			return map[string]interface{}{
-				"status":  "error",
-				"message": "Cannot open file",
-			}
-		}
-		defer f.Close()
-
 		readSize := info.Size()
 		if readSize > LOG_MAX_READ_BYTES {
 			truncated = true
@@ -3749,6 +3929,12 @@ func readLogFile(name, confirm string) map[string]interface{} {
 
 // clearLogFile truncates a log file. Refuses to touch the
 // active system log or sensitive files.
+//
+// os.Truncate follows symlinks — a symlinked name would
+// truncate the target (e.g. proxy/webui.conf) under root
+// privileges. Opening with O_NOFOLLOW and calling
+// f.Truncate(0) on the already-validated handle is race-free:
+// the inode we truncate is the one we verified.
 func clearLogFile(name string) map[string]interface{} {
 	safeName, ok := sanitizeLogFileName(name)
 	if !ok {
@@ -3773,22 +3959,42 @@ func clearLogFile(name string) map[string]interface{} {
 	}
 
 	path := filepath.Join(LOGS_DIR, safeName)
-	info, err := os.Stat(path)
+
+	// Symlink rejection: Lstat pre-check + O_NOFOLLOW + SameFile
+	// post-check — identical pattern to safeOpenRegular. The open
+	// mode is O_WRONLY so we can truncate on the validated handle.
+	lfi, err := os.Lstat(path)
 	if err != nil {
 		return map[string]interface{}{
 			"status":  "error",
-			"message": "File not found",
+			"message": "File not found or not allowed",
 		}
 	}
-
-	if !info.Mode().IsRegular() {
+	if lfi.Mode()&os.ModeSymlink != 0 || !lfi.Mode().IsRegular() {
 		return map[string]interface{}{
 			"status":  "error",
-			"message": "File is not a regular file",
+			"message": "File not found or not allowed",
 		}
 	}
 
-	if err := os.Truncate(path, 0); err != nil {
+	f, err := os.OpenFile(path, os.O_WRONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "File not found or not allowed",
+		}
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil || !os.SameFile(lfi, fi) {
+		return map[string]interface{}{
+			"status":  "error",
+			"message": "File not found or not allowed",
+		}
+	}
+
+	if err := f.Truncate(0); err != nil {
 		logWithLevel("error", "❌ clearLogFile failed for "+safeName+": "+err.Error())
 		return map[string]interface{}{
 			"status":  "error",
@@ -3805,6 +4011,11 @@ func clearLogFile(name string) map[string]interface{} {
 
 // handleDownloadLog streams a log file to the client as an
 // attachment.
+//
+// Symlink rejection: safeOpenRegular refuses symlinks and non-
+// regular files before any byte is sent. Combined with the
+// max-size check on the validated handle, a symlink injected
+// into LOGS_DIR cannot be used to exfiltrate an arbitrary file.
 func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	if !checkAuth(r) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -3827,11 +4038,15 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := filepath.Join(LOGS_DIR, safeName)
-	info, err := os.Stat(path)
+	f, info, err := safeOpenRegular(path)
 	if err != nil {
+		// Symlink and missing file both return 404 — a distinct
+		// error would leak information about the attacker's
+		// setup.
 		http.NotFound(w, r)
 		return
 	}
+	defer f.Close()
 
 	if info.Size() > LOG_MAX_DOWNLOAD_BYTES {
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
@@ -3843,14 +4058,6 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeName))
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-
-	f, err := os.Open(path)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(w, "Cannot open file")
-		return
-	}
-	defer f.Close()
 
 	io.Copy(w, f)
 }
@@ -3946,11 +4153,12 @@ func buildBackupInfo() map[string]interface{} {
 
 // buildRuntimeInfo returns the /api?action=runtime_info payload.
 //
-// The `app_version` field exposes the companion APK version
-// from proxy/app-apk.version (SSOT). web/index.html uses it to
-// build the direct GitHub APK download URL without hardcoding
-// the version — a version bump in app-apk.version propagates
-// without editing any HTML.
+// profile_key and memory_limit_mb are derived from the SAME
+// source (fileProfile, freshly read from selected_profile.txt).
+// This guarantees consistency even in the edge case where the
+// file was edited externally (without going through
+// updateProfile()) and main.go has not yet re-applied the
+// memory limit.
 func buildRuntimeInfo() map[string]interface{} {
 	fileProfile := readSelectedProfile()
 
@@ -3970,7 +4178,7 @@ func buildRuntimeInfo() map[string]interface{} {
 		"webui_port":     getWebUIPort(),
 		"dashboard_port": getDashboardPort(),
 
-		"memory_limit_mb": memoryLimitForProfile(currentProfile) / (1024 * 1024),
+		"memory_limit_mb": memoryLimitForProfile(fileProfile) / (1024 * 1024),
 		"profile_key":     fileProfile,
 
 		"backups": buildBackupInfo(),
@@ -4053,7 +4261,7 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 	if _, found := isProcessRunning(); !found {
 		checks["dns_engine"] = "not_running"
 		healthy = false
-	} else if !isPortOpenCached(5354, "udp") {
+	} else if !isPortOpenCached(5354) {
 		checks["dns_engine"] = "port_closed"
 		healthy = false
 	} else {
@@ -4199,14 +4407,14 @@ func classifyInstallResult(result map[string]interface{}) int {
 //  7. MaxBytesReader (POST only)
 //
 // The install localhost gate covers all three install-family
-// surfaces: POST install_companion_app, POST uninstall_companion_app,
-// and GET ?action=install_token. The token endpoint is a GET
-// (query-string form) and is not caught by hasEndpoint(), so
-// the check inspects the query parameter directly. Issuing a
-// token to a non-loopback client would expose the install
-// capability to the LAN even though the install endpoint
-// itself remains gated — closing the token issuance path is
-// the correct defence-in-depth.
+// surfaces: POST install_companion_app, POST
+// uninstall_companion_app, and GET ?action=install_token. The
+// token endpoint is a GET (query-string form) and is not
+// caught by hasEndpoint(), so the check inspects the query
+// parameter directly. Issuing a token to a non-loopback client
+// would expose the install capability to the LAN even though
+// the install endpoint itself remains gated — closing the
+// token issuance path is the correct defence-in-depth.
 func handleAPI(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -4320,6 +4528,23 @@ func (h *apiHandler) routeAuthLogout(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
+// rejectNonLocalInstall is retained for documentation symmetry
+// but is no longer invoked — the install-family gate in
+// handleAPI covers all three endpoints inline.
+//
+// (Unused; retained to keep the diff to a minimum in case a
+// future refactor reintroduces the per-endpoint gate.)
+func (h *apiHandler) rejectNonLocalInstall(w http.ResponseWriter, r *http.Request) {
+	action := "install"
+	if hasEndpoint(r.URL.Path, "uninstall_companion_app") {
+		action = "uninstall"
+	}
+	logWithLevel("warn", "❌ "+action+"_companion_app rejected: non-localhost request")
+	writeInstallError(w, http.StatusForbidden, action,
+		"not_localhost", "Forbidden: install is localhost-only")
+}
+
+// ------------------------------------------------------------
 // POST dispatch
 // ------------------------------------------------------------
 func (h *apiHandler) dispatchPost(w http.ResponseWriter, r *http.Request) {
@@ -5496,10 +5721,17 @@ func main() {
 		ErrorLog:          httpLogger,
 	}
 
+	// Shutdown handler: firewall teardown uses the same 90 s
+	// budget as startService/stopService. A short 15 s default
+	// would leave partial firewall rules in place on a slow
+	// device — manage_firewall 0 issues iptables calls that can
+	// contend with netd.
 	go func() {
 		<-sigChan
 		logEvent("🛑 Shutdown signal received")
-		runShell(". " + shellQuote(getFunctionsScript()) + "; manage_firewall 0")
+		runShellWithTimeout(
+			". "+shellQuote(getFunctionsScript())+"; manage_firewall 0",
+			90*time.Second)
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		mainServer.Shutdown(ctx)
@@ -5513,7 +5745,13 @@ func main() {
 		}
 	}()
 
+	// Main-server ListenAndServe. A bind error (port in use, or
+	// permission denied) must terminate the process with a
+	// non-zero exit code — otherwise the root manager interprets
+	// a successful exit as "started OK" and the module appears
+	// functional while the WebUI is unreachable.
 	if err := mainServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		logWithLevel("error", "❌ Main server error: "+err.Error())
+		os.Exit(1)
 	}
 }

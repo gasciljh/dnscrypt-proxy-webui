@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — action.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -616,6 +616,9 @@ fi
 # ============================================================
 # Emits a multi-section status report. Exit code: ALWAYS 0
 # (informational only).
+#
+# Section headers use Unicode box-drawing characters (U+2500)
+# for visual consistency with the rest of the report.
 if [ "$CHECK_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
@@ -657,7 +660,7 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 2: Runtime ---
-    echo "--- Runtime --------------------------------"
+    echo "─── Runtime ────────────────────────────────"
     if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
         printf "  📁 run/     : %s\n" "$RUN_DIR_ACTIVE"
     else
@@ -680,7 +683,7 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 3: Configuration ---
-    echo "--- Configuration --------------------------"
+    echo "─── Configuration ──────────────────────────"
     DASH_PORT=$(read_conf "$CONF_FILE" "DASHBOARD_PORT" "9091")
     printf "  🌐 WebUI port    : %s\n" "$PORT"
     printf "  📈 Dashboard port: %s\n" "$DASH_PORT"
@@ -695,7 +698,7 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 4: Profile + Memory ---
-    echo "--- Profile & Memory -----------------------"
+    echo "─── Profile & Memory ───────────────────────"
     ACTIVE_PROFILE="pro"
     if [ -f "$SELECTED_PROFILE_FILE" ]; then
         _ap=$(cat "$SELECTED_PROFILE_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -713,7 +716,7 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo ""
 
     # --- Section 5: Backup & Recovery ---
-    echo "--- Backup & Recovery ----------------------"
+    echo "─── Backup & Recovery ──────────────────────"
 
     _snap_count=0
     if [ -d "$PERSISTENT_BACKUP" ]; then

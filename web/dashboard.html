@@ -2,7 +2,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
      Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-15
+     Last updated: 2026-10-18
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -551,6 +551,7 @@
     try { showIdleResolvers = localStorage.getItem('dnscrypt-show-idle') === 'true'; } catch(e) {}
     var refreshInterval = null, sessionExpired = false;
     var sseConnected = false, lastRefreshTime = null, failureCount = 0, isRefreshing = false;
+var networkDownActive = false;
     var runtimeInfoLoading = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
     var pendingConfirmCallback = null;
@@ -602,6 +603,12 @@ function updateBackToHomeLinks() {
 // ============================================================
 // [2] Token helpers — cookie-only
 // ============================================================
+// Auth is cookie-only (HttpOnly `dnscrypt_session`). These are
+// intentional no-ops kept for backward compatibility with the
+// XHR helper's `Authorization: Bearer` code path, which is
+// dormant because getStoredToken() always returns null.
+// Do NOT add Bearer token support here — the server never
+// issues one (see SECURITY.md §8.1).
 function getStoredToken() { return null; }
 function storeToken(tk) { void tk; }
 function clearStoredToken() { }
@@ -868,6 +875,7 @@ function renderRuntimeInfo(data) {
 
     if (data.version && data.version !== 'dev') {
         VERSION = data.version;
+        document.title = 'DNSCrypt Dashboard ' + VERSION;
         var footer = $('footerText');
         if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
     }
@@ -1239,15 +1247,27 @@ function resetCardHintTimer(hintEl) {
 function setNetworkDownUI(isDown) {
     var txt = $('diagSse');
     if (!txt) return;
+    networkDownActive = isDown;
     if (isDown) {
         txt.textContent = t('networkDown');
         txt.style.color = 'var(--warning)';
+        $('sseDot').className = 'sse-dot disconnected';
     }
+    // When isDown=false, leave the text for updateDiagnostics()
+    // to restore — it knows the real SSE state.
+
 }
 
 function updateDiagnostics() {
     var sseEl = $('diagSse');
-    if (sseConnected) {
+    if (networkDownActive) {
+        // The fetch path already reported "network down". Do not
+        // overwrite it with the less-specific "SSE: Disconnected"
+        // until the network actually recovers (setNetworkDownUI(false)).
+        sseEl.textContent = t('networkDown');
+        sseEl.style.color = 'var(--warning)';
+        $('sseDot').className = 'sse-dot disconnected';
+    } else if (sseConnected) {
         sseEl.textContent = t('diagSseConnected');
         sseEl.style.color = 'var(--success)';
         $('sseDot').className = 'sse-dot connected';
@@ -1260,6 +1280,7 @@ function updateDiagnostics() {
     if (lastRefreshTime) refreshEl.textContent = t('diagLastRefresh') + formatLocalTime(lastRefreshTime);
     else refreshEl.textContent = t('diagLastRefresh') + t('never');
     $('diagFailures').textContent = t('diagFailures') + failureCount;
+
 }
 
 // ============================================================

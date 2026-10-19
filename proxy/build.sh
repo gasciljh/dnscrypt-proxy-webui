@@ -2,7 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — build.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -49,10 +49,18 @@
 #   • -buildid= removes random build IDs
 #   • Result: same commit → same SHA-256
 #
-# ⚠️ UPX + PIE:
-#   Android 5+ requires PIE. UPX strips the ELF segments Android
-#   uses to verify PIE-ness. A UPX-compressed binary will NOT run
-#   on Android 5+. Do NOT use --enable-upx for release builds.
+# ⚠️ PIE requirements — two independent ways the build can produce
+#    a non-PIE binary that will NOT run on Android 5+:
+#
+#    1. UPX (--enable-upx) strips the ELF segments Android uses to
+#       verify PIE-ness. A UPX-compressed binary will not run on
+#       Android 5+. Do NOT use --enable-upx for release builds.
+#
+#    2. Missing NDK forces CGO_ENABLED=0, which cannot produce a
+#       PIE binary on linux (the linker would need external linking,
+#       which only cgo provides). The build falls back to
+#       -buildmode=default and emits a warning. Always provide
+#       ANDROID_NDK_HOME for release builds.
 # ============================================================
 
 set -euo pipefail
@@ -131,14 +139,9 @@ VERSION_NO_V="${SCRIPT_VERSION#v}"
 #   invalid    = coerced to 0 with a warning below
 #
 # The value is validated HERE — downstream code (LDFLAGS, the
-# checksum block) may assume SOURCE_DATE_EPOCH is a non-negative
-# integer. No other section re-validates it.
-#
-# The case pattern `*[!0-9]*` matches any string that contains a
-# non-digit character. Since `-` is not a digit, negative values
-# like "-1" fall into the first branch and are coerced to 0.
-# No additional `-lt 0` test is required.
-
+# checksum block) may assume it is a non-negative integer.
+# The `*[!0-9]*` pattern catches negative values (`-` is not a
+# digit), so no `-lt 0` test is required.
 SOURCE_DATE_EPOCH_RAW=""
 
 if command -v git >/dev/null 2>&1 && \
@@ -155,8 +158,6 @@ else
     BUILD_COMMIT="unknown"
 fi
 
-# Strict validation — must be a non-negative decimal integer.
-# Any non-digit (including `-`) falls through to the first branch.
 case "$SOURCE_DATE_EPOCH_RAW" in
     ''|*[!0-9]*)
         SOURCE_DATE_EPOCH=0
@@ -324,6 +325,9 @@ Notes:
     It is injected into main.go as BuildVersion via -X.
   • UPX (--enable-upx) strips ELF metadata and breaks PIE.
     Do NOT use it for release builds.
+  • Without NDK, CGO is disabled and the resulting binaries are
+    non-PIE — they will NOT run on Android 5+. Always provide
+    ANDROID_NDK_HOME for release builds.
   • The output directory can be overridden by --output-dir or
     by the BUILD_DIR environment variable.
 EOF
@@ -375,7 +379,8 @@ print_info() {
         fi
     else
         echo -e "  📦 NDK:         ${RED}❌ NOT FOUND${NC}"
-        echo -e "  ${YELLOW}⚠️  Will build with CGO_ENABLED=0${NC}"
+        echo -e "  ${YELLOW}⚠️  Will build with CGO_ENABLED=0 → non-PIE (dev-only)${NC}"
+        echo -e "  ${DIM}   Non-PIE binaries will NOT run on Android 5+.${NC}"
     fi
 
     echo ""
@@ -599,7 +604,9 @@ if NDK_PATH=$(detect_ndk); then
     done
     echo ""
 else
-    echo -e "${YELLOW}⚠️  NDK not found — building with CGO_ENABLED=0${NC}"
+    echo -e "${YELLOW}⚠️  NDK not found — building with CGO_ENABLED=0 (non-PIE)${NC}"
+    echo -e "${DIM}   The resulting binaries will NOT run on Android 5+.${NC}"
+    echo -e "${DIM}   This mode is intended for local dev/testing only.${NC}"
     echo ""
 fi
 
@@ -663,6 +670,17 @@ build_arch() {
     local OS_TARGET="linux"
     [ "$CGO_MODE" = "1" ] && OS_TARGET="android"
 
+    # When CGO is disabled (no NDK), we fall back to a linux build.
+    # `-buildmode=pie` requires external (cgo) linking on linux,
+    # so using it with CGO_ENABLED=0 would fail. Use the default
+    # buildmode in that case — the resulting binary is a fallback
+    # for local testing, not for release. See the header of this
+    # script for the full rationale.
+    local EFFECTIVE_BUILDMODE="$BUILDMODE"
+    if [ "$CGO_MODE" = "0" ]; then
+        EFFECTIVE_BUILDMODE="default"
+    fi
+
     local BUILD_ENV=(
         "GOOS=$OS_TARGET"
         "GOARCH=$GOARCH_VAL"
@@ -678,7 +696,7 @@ build_arch() {
         if timeout 300 env "${BUILD_ENV[@]}" go build \
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
-            -buildmode "$BUILDMODE" \
+            -buildmode "$EFFECTIVE_BUILDMODE" \
             "${GOFLAGS[@]}" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
@@ -688,7 +706,7 @@ build_arch() {
         if env "${BUILD_ENV[@]}" go build \
             -ldflags="$LDFLAGS" \
             -tags "$BUILD_TAGS" \
-            -buildmode "$BUILDMODE" \
+            -buildmode "$EFFECTIVE_BUILDMODE" \
             "${GOFLAGS[@]}" \
             -o "$OUTPUT" \
             main.go > "$LOGFILE" 2>&1; then
@@ -954,7 +972,10 @@ if [ "$SUCCESS_COUNT" -gt 0 ] && command -v file >/dev/null 2>&1; then
         echo -e "  ${GREEN}🎉 All binaries are PIE — Android 5+ compatible${NC}"
     else
         echo -e "  ${YELLOW}⚠️  Some binaries are non-PIE${NC}"
-        echo -e "  ${DIM}Check whether --enable-upx was used.${NC}"
+        echo -e "  ${DIM}Two possible causes:${NC}"
+        echo -e "  ${DIM}  1. --enable-upx was used (strips ELF PIE segments)${NC}"
+        echo -e "  ${DIM}  2. NDK was not found — CGO disabled, buildmode fell back to 'default'${NC}"
+        echo -e "  ${DIM}Provide ANDROID_NDK_HOME and rebuild for a release.${NC}"
     fi
     echo ""
 fi

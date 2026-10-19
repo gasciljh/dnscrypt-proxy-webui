@@ -1,31 +1,30 @@
 #!/usr/bin/env bash
 # ============================================================
-# DNSCrypt Smart Filter – package_module.sh
+# DNSCrypt Smart Filter — package_module.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
-# Author: gasciljh
-# Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# Last updated: 2026-10-18
 # ============================================================
 # Build the final Magisk / KernelSU / APatch ZIP for release.
 #
 # Combines:
-#   • 10 shell scripts (customize, service, post-fs-data,
-#     action, status, uninstall, functions, boot-mini,
-#     watchdog, install_app)
-#   • 2 config files (webui.conf, dnscrypt-proxy.toml)
+#   • 10 shell scripts + 2 config files
 #   • 4 WebUI binaries (arm64, arm, amd64, 386)
-#   • 4 DNS binaries   (arm64, arm, x86_64, x86)
-#   • 13 required web files + 2 optional
-#     (app-debug.apk, app-debug.apk.sha256)
+#   • 4 DNS binaries (arm64, arm, x86_64, x86)
+#   • 13 required web files + 2 optional (app-debug.apk + .sha256)
 #   • module.prop
 #
-# Total: 36 entries (34 required + 2 optional), verified
-# after packaging.
+# Total: 36 entries (34 required + 2 optional), verified after
+# packaging.
+#
+# Usage:
+#   ./scripts/package_module.sh --version vX.Y.Z [options]
 #
 # Options:
 #   --version VERSION      Module version (required)
 #   --build-dir DIR        WebUI binaries directory
 #   --output-dir DIR       Output directory (default: ./dist)
+#                          NOTE: relative paths resolve against the
+#                          repository root, not the caller's cwd.
 #   --dns-cache-dir DIR    DNS binaries cache directory
 #   --skip-dns-fetch       Use cache only (no download)
 #   --keep-staging         Keep staging directory (diagnostics)
@@ -34,7 +33,7 @@
 #
 # Environment:
 #   SOURCE_DATE_EPOCH      Fixed timestamp (auto from git if unset)
-#   DNS_CACHE_DIR          Override the default DNS binaries cache
+#   DNS_CACHE_DIR          Override DNS binaries cache
 #   TMPDIR                 Override temp directory for staging
 #
 # Outputs (in --output-dir):
@@ -42,19 +41,18 @@
 #   • dnscrypt-webui-<version>-module.zip.sha256
 #
 # Reproducibility:
-#   • SOURCE_DATE_EPOCH is applied to every file in staging via
-#     `touch -d @N`. A capability probe runs first; if `touch`
-#     does not support `-d @N`, the script aborts rather than
-#     silently shipping a non-reproducible artifact.
-#   • `zip -X` excludes extra file attributes.
-#   • `find | LC_ALL=C sort` guarantees deterministic order.
+#   • SOURCE_DATE_EPOCH applied to every file via `touch -d @N`
+#     (probe first; abort if unsupported)
+#   • `zip -X` excludes extra file attributes
+#   • TZ=UTC forces DOS timestamps consistent across hosts
+#   • `find | LC_ALL=C sort` guarantees deterministic order
 # ============================================================
 
 set -euo pipefail
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [1] Default settings
-# ============================================================
+# ────────────────────────────────────────────────────────────
 VERSION=""
 BUILD_DIR=""
 OUTPUT_DIR="./dist"
@@ -63,13 +61,12 @@ SKIP_DNS_FETCH=0
 VERBOSE=0
 KEEP_STAGING=0
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [2] Paths
-# ============================================================
-# After the `cd` below, every relative path — including the one
-# passed via --output-dir or --build-dir — resolves against
-# REPO_ROOT, not the caller's original cwd. The resolved
-# absolute path is printed in [7d].
+# ────────────────────────────────────────────────────────────
+# After `cd` below, all relative paths — including --output-dir
+# and --build-dir — resolve against REPO_ROOT, not the caller's
+# original cwd. The resolved absolute path is printed in [7d].
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT"
@@ -77,9 +74,9 @@ cd "$REPO_ROOT"
 DNS_VERSION_FILE="$REPO_ROOT/proxy/dnscrypt-proxy.version"
 FETCH_SCRIPT="$SCRIPT_DIR/fetch_dns_binaries.sh"
 
-# ============================================================
-# [3] Colors
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [3] Colors (conditional on TTY and NO_COLOR)
+# ────────────────────────────────────────────────────────────
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
     RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
     CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
@@ -87,10 +84,9 @@ else
     RED=''; GREEN=''; YELLOW=''; CYAN=''; BOLD=''; DIM=''; NC=''
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [4] Logging
-# ============================================================
-# Stream discipline: info/ok → stdout; warn/error/debug → stderr.
+# ────────────────────────────────────────────────────────────
 log_info()  { echo -e "  ${CYAN}→${NC} $1"; }
 log_ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
 log_warn()  { echo -e "  ${YELLOW}⚠${NC}  $1" >&2; }
@@ -103,12 +99,11 @@ log_debug() {
     return 0
 }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [5] Helpers
-# ============================================================
-# file_size — returns size in bytes, or returns 1 on failure.
-# Callers MUST validate numeric output before using it in an
-# arithmetic context.
+# ────────────────────────────────────────────────────────────
+# file_size — bytes, or return 1 on failure.
+# Callers MUST validate numeric output before arithmetic.
 file_size() {
     local out
     out=$(stat -c%s "$1" 2>/dev/null) && [ -n "$out" ] && { printf '%s' "$out"; return 0; }
@@ -123,12 +118,11 @@ is_numeric() {
     esac
 }
 
-# count_matches — count matching lines in a stream.
-#
-# Note: GNU grep -c prints "0" on no-match but exits 1. The
-# `|| true` silences the exit code without touching stdout.
-# Do NOT rewrite as `grep ... || printf '0'` — that would
-# append an extra "0" after grep's own output ("00").
+# count_matches — count matching lines.
+# GNU grep -c prints "0" on no-match but exits 1; `|| true`
+# silences the exit code without touching stdout. Do NOT
+# rewrite as `grep ... || printf '0'` — that appends an extra
+# "0" after grep's own output ("00").
 count_matches() {
     local pattern="$1"
     local n
@@ -147,17 +141,16 @@ sha256_compat() {
     fi
 }
 
-# calc_version_code — canonical versionCode from a SemVer string.
-#
-#   versionCode = MAJOR × 1,000,000
-#               + MINOR ×    10,000
-#               + PATCH ×       100
-#
-# Prerelease suffixes are ignored. Leading zeros are stripped
-# before arithmetic so "01" does not trigger bash octal errors.
+# calc_version_code — canonical versionCode from SemVer.
+#   MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
+# Prerelease + build suffixes stripped (regex in [6] rejects
+# +build, but defense in depth — a future regex change must
+# not silently corrupt the arithmetic).
+# Leading zeros stripped so "01" does not trigger bash octal.
 calc_version_code() {
     local v="${1#v}"
     local core="${v%%-*}"
+    core="${core%%+*}"
     local major minor patch
 
     major=$(echo "$core" | cut -d. -f1 | sed 's/^0*//')
@@ -171,9 +164,9 @@ calc_version_code() {
     echo $((major * 1000000 + minor * 10000 + patch * 100))
 }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [6] Arguments
-# ============================================================
+# ────────────────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
     case "$1" in
         --version)
@@ -228,9 +221,9 @@ HELP_EOF
     esac
 done
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7] Read + validate VERSION
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ -z "$VERSION" ]; then
     if [ -f VERSION ]; then
         VERSION=$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
@@ -240,19 +233,22 @@ if [ -z "$VERSION" ]; then
     fi
 fi
 
-# Accept optional SemVer build metadata (`+...`) in addition to
-# the prerelease suffix.
-if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$'; then
+# BUG-15: reject +build (SemVer build metadata). Rationale:
+#   • versionCode formula has no room for build metadata
+#   • release.sh rejects it too
+#   • module.prop in practice uses vX.Y.Z only
+if ! echo "$VERSION" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
     log_error "Invalid version: '$VERSION'"
-    log_info "Required format: v<major>.<minor>.<patch>[-prerelease][+build]"
+    log_info "Required format: v<major>.<minor>.<patch>[-prerelease]"
+    log_info "Build metadata (+build) is not accepted."
     exit 2
 fi
 
 VERSION_NO_V="${VERSION#v}"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7b] Verify module.prop matches $VERSION
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ ! -f "$REPO_ROOT/module.prop" ]; then
     log_error "Missing: module.prop"
     exit 2
@@ -288,9 +284,9 @@ elif [ "$MODPROP_VC" != "$EXPECTED_VC" ]; then
     log_warn "This is a warning only — release.sh should keep these in sync."
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7c] Verify update.json matches $VERSION
-# ============================================================
+# ────────────────────────────────────────────────────────────
 UPDATE_JSON="$REPO_ROOT/update.json"
 if [ -f "$UPDATE_JSON" ]; then
     UPDATE_JSON_VERSION=$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$UPDATE_JSON" \
@@ -325,12 +321,12 @@ else
     log_warn "update.json not found — skipping consistency check"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [7d] Verify OUTPUT_DIR is writable early
-# ============================================================
-# Because [2] `cd`'d into REPO_ROOT, a relative --output-dir is
-# resolved against REPO_ROOT. Print the resolved absolute path
-# so the caller sees exactly which directory was created.
+# ────────────────────────────────────────────────────────────
+# [2] `cd`'d into REPO_ROOT, so a relative --output-dir resolves
+# against REPO_ROOT. Print the absolute path so the caller sees
+# exactly which directory was created.
 if ! mkdir -p "$OUTPUT_DIR" 2>/dev/null; then
     log_error "Cannot create OUTPUT_DIR: $OUTPUT_DIR"
     exit 2
@@ -344,9 +340,9 @@ fi
 
 log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [8] Read DNS version
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ ! -f "$DNS_VERSION_FILE" ]; then
     log_error "Missing: $DNS_VERSION_FILE"
     log_info "Create it with: echo '2.1.18' > $DNS_VERSION_FILE"
@@ -360,9 +356,9 @@ if ! echo "$DNS_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
     exit 2
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [9] Auto-detect BUILD_DIR
-# ============================================================
+# ────────────────────────────────────────────────────────────
 if [ -z "$BUILD_DIR" ]; then
     for candidate in "$REPO_ROOT/proxy/build" "$REPO_ROOT/build"; do
         if [ -d "$candidate" ] && \
@@ -374,15 +370,12 @@ if [ -z "$BUILD_DIR" ]; then
     [ -z "$BUILD_DIR" ] && BUILD_DIR="$REPO_ROOT/proxy/build"
 fi
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [10] SOURCE_DATE_EPOCH
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # Resolution: caller env → git commit → 0.
-#
-# Validation is strict: any value that is not a non-negative
-# decimal integer (including negative values like "-1") is
-# coerced to 0 with a warning. is_numeric() rejects the minus
-# sign, so the negative case is covered by the same guard.
+# Any non-negative-integer value (incl. negative like "-1") is
+# coerced to 0 with a warning.
 if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
     if git rev-parse --git-dir >/dev/null 2>&1; then
         SOURCE_DATE_EPOCH=$(git log -1 --format=%ct 2>/dev/null || echo 0)
@@ -396,9 +389,9 @@ if ! is_numeric "$SOURCE_DATE_EPOCH"; then
 fi
 export SOURCE_DATE_EPOCH
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [11] Header
-# ============================================================
+# ────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  📦 package_module.sh                                    ║${NC}"
@@ -415,9 +408,9 @@ echo -e "  ${BOLD}EPOCH:${NC}           ${DIM}${SOURCE_DATE_EPOCH}${NC}"
 [ "$SKIP_DNS_FETCH" = "1" ] && echo -e "  ${BOLD}Mode:${NC}            ${YELLOW}SKIP-DNS-FETCH${NC}"
 echo ""
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [12] Required tools
-# ============================================================
+# ────────────────────────────────────────────────────────────
 MISSING=""
 for tool in zip unzip cp find sort mktemp du; do
     command -v "$tool" >/dev/null 2>&1 || MISSING="$MISSING $tool"
@@ -435,15 +428,15 @@ fi
 
 log_ok "Required tools available"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [13] Project structure
-# ============================================================
+# ────────────────────────────────────────────────────────────
 [ -d "$REPO_ROOT/proxy" ] || { log_error "proxy/ directory missing"; exit 2; }
 [ -d "$REPO_ROOT/web" ]   || { log_error "web/ directory missing"; exit 2; }
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [14] Web files
-# ============================================================
+# ────────────────────────────────────────────────────────────
 WEB_FILES_REQUIRED=(
     "index.html"
     "dashboard.html"
@@ -508,9 +501,9 @@ fi
 
 log_ok "All required web files present (13 required)"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [15] WebUI binaries
-# ============================================================
+# ────────────────────────────────────────────────────────────
 WEBUI_ARCHS="arm64 arm amd64 386"
 
 for arch in $WEBUI_ARCHS; do
@@ -525,9 +518,9 @@ done
 
 log_ok "4 WebUI binaries present in $BUILD_DIR"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [16] DNS binaries
-# ============================================================
+# ────────────────────────────────────────────────────────────
 DNS_BINARIES_REQUIRED=(
     "dnscrypt-proxy-arm64"
     "dnscrypt-proxy-arm"
@@ -535,8 +528,8 @@ DNS_BINARIES_REQUIRED=(
     "dnscrypt-proxy-x86"
 )
 
-# Map module-side name → cache-side name. The only mismatch is
-# x86 → i386 (dnscrypt-proxy convention on GitHub).
+# Module-side → cache-side name mapping. Only x86 → i386 differs
+# (dnscrypt-proxy convention on GitHub).
 map_to_cache_name() {
     case "$1" in
         dnscrypt-proxy-x86)    echo "dnscrypt-proxy-i386" ;;
@@ -549,8 +542,8 @@ map_to_cache_name() {
 
 check_cache_complete() {
     local missing=0
+    local name cache_name
     for name in "${DNS_BINARIES_REQUIRED[@]}"; do
-        local cache_name
         cache_name=$(map_to_cache_name "$name")
         local f="$DNS_CACHE_DIR/$cache_name"
         if [ ! -f "$f" ] || [ ! -s "$f" ]; then
@@ -600,10 +593,9 @@ else
     log_ok "fetch_dns_binaries.sh succeeded"
 fi
 
-# Size check (>= 3 MB). This is the HARD-FAIL call site — a
-# binary whose size cannot be stat'd is corrupt/unreadable and
-# must NOT ship. Compare with the SOFT-FAIL site below for ZIP
-# size (informational only).
+# Size check (≥ 3 MB) — HARD-FAIL: a binary whose size cannot
+# be stat'd is corrupt and MUST NOT ship. Contrast with the
+# SOFT-FAIL ZIP size check in [19].
 for name in "${DNS_BINARIES_REQUIRED[@]}"; do
     cache_name=$(map_to_cache_name "$name")
     f="$DNS_CACHE_DIR/$cache_name"
@@ -627,11 +619,10 @@ done
 
 log_ok "4 DNS binaries ready"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [17] Create staging
-# ============================================================
-# Strip ALL trailing slashes from TMPDIR, not just one, so a
-# value like "/tmp///" normalizes cleanly.
+# ────────────────────────────────────────────────────────────
+# Strip ALL trailing slashes from TMPDIR, so "/tmp///" normalizes.
 _TMPDIR_CLEAN="${TMPDIR:-/tmp}"
 while [ "${_TMPDIR_CLEAN%/}" != "$_TMPDIR_CLEAN" ]; do
     _TMPDIR_CLEAN="${_TMPDIR_CLEAN%/}"
@@ -640,10 +631,9 @@ done
 
 STAGING=$(mktemp -d "${_TMPDIR_CLEAN}/dnscrypt-pkg.XXXXXX")
 
-# Cleanup trap: three handlers with a shared re-entry guard.
-# The staged directory is only removed when KEEP_STAGING=0.
-# The _CLEANED_UP flag prevents double-cleanup when the INT or
-# TERM handler's `exit` triggers the EXIT handler.
+# Cleanup trap: 3 handlers with a shared re-entry guard.
+# Staging removed only when KEEP_STAGING=0. The _CLEANED flag
+# prevents double-cleanup when INT/TERM's `exit` triggers EXIT.
 _STAGING_CLEANED=0
 
 _cleanup_staging() {
@@ -656,7 +646,7 @@ _cleanup_staging() {
     return 0
 }
 
-# shellcheck disable=SC2329  # invoked via traps below
+# shellcheck disable=SC2329
 trap '_cleanup_staging' EXIT
 trap '_cleanup_staging; exit 130' INT
 trap '_cleanup_staging; exit 143' TERM
@@ -666,9 +656,7 @@ mkdir -p "$STAGING/proxy" "$STAGING/web"
 # --- module.prop ---
 cp "$REPO_ROOT/module.prop" "$STAGING/module.prop"
 
-# --- Shell scripts (10) ---
-# boot-mini.sh is at the module root after install, because
-# functions.sh sources it at load time.
+# --- Shell scripts (10) — at module root ---
 for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.sh functions.sh boot-mini.sh watchdog.sh install_app.sh; do
     src="$REPO_ROOT/proxy/$s"
     [ -f "$src" ] || { log_error "Missing: proxy/$s"; exit 1; }
@@ -676,7 +664,7 @@ for s in customize.sh service.sh post-fs-data.sh action.sh status.sh uninstall.s
     chmod 0755 "$STAGING/$s"
 done
 
-# --- Config (2) ---
+# --- Config (2) — under proxy/ ---
 for f in dnscrypt-proxy.toml webui.conf; do
     src="$REPO_ROOT/proxy/$f"
     [ -f "$src" ] || { log_error "Missing: proxy/$f"; exit 1; }
@@ -725,20 +713,13 @@ staging_size=$(du -sh "$STAGING" 2>/dev/null | cut -f1 || true)
 [ -z "$staging_size" ] && staging_size="?"
 log_ok "staging ready (${staging_size})"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [18] Reproducibility (set timestamps)
-# ============================================================
-# Apply SOURCE_DATE_EPOCH to every staged file. Two-step process:
-#
-#   1. Probe `touch -d @N` on a temporary file. If the platform
-#      does not support the `-d @N` form (BSD/macOS with a
-#      non-GNU touch), abort — silently shipping a
-#      non-reproducible artifact is worse than failing.
-#
-#   2. Run `find -exec touch -d @N {} +`. If this fails despite
-#      the probe passing, the cause is a real filesystem issue
-#      (permissions, I/O), not a missing flag. The error message
-#      reflects that distinction.
+# ────────────────────────────────────────────────────────────
+# Two-step: probe `touch -d @N` on a temp file (abort if the
+# platform's touch does not support it — silently shipping a
+# non-reproducible artifact is worse than failing), then run
+# `find -exec touch -d @N {} +` on every staged file.
 _probe=$(mktemp "${_TMPDIR_CLEAN}/touch-probe.XXXXXX" 2>/dev/null || true)
 if [ -n "$_probe" ] && [ -f "$_probe" ]; then
     if ! touch -d "@0" "$_probe" 2>/dev/null; then
@@ -763,13 +744,12 @@ fi
 
 log_ok "timestamps set"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [19] Create ZIP
-# ============================================================
-# The file list comes from `find | LC_ALL=C sort`, so the order
-# is deterministic across machines and locales. `zip -X`
-# excludes extra file attributes (uid/gid metadata) that would
-# otherwise vary between runs.
+# ────────────────────────────────────────────────────────────
+# `find | LC_ALL=C sort` → deterministic order. `zip -X`
+# excludes extra attributes (uid/gid metadata). `TZ=UTC`
+# forces DOS timestamps independent of the host's local TZ.
 OUTPUT_NAME="dnscrypt-webui-${VERSION_NO_V}-module.zip"
 OUTPUT_PATH="$OUTPUT_DIR_ABS/$OUTPUT_NAME"
 
@@ -786,7 +766,7 @@ fi
 FILE_COUNT=$(wc -l < "$FILELIST")
 log_info "File count: $FILE_COUNT"
 
-if ! (cd "$STAGING" && zip -X -q "$OUTPUT_PATH" -@ < "$FILELIST"); then
+if ! (cd "$STAGING" && TZ=UTC zip -X -q "$OUTPUT_PATH" -@ < "$FILELIST"); then
     log_error "Failed to create ZIP"
     exit 1
 fi
@@ -798,10 +778,8 @@ if [ ! -f "$OUTPUT_PATH" ]; then
     exit 1
 fi
 
-# ZIP size is informational. Validate numeric output before
-# using it below; non-numeric is reported as "?" and packaging
-# continues. This is the SOFT-FAIL site — compare with the
-# HARD-FAIL for DNS binaries in [16].
+# ZIP size — SOFT-FAIL (informational only). Contrast with the
+# HARD-FAIL size check on DNS binaries in [16].
 if zip_size=$(file_size "$OUTPUT_PATH"); then
     if ! is_numeric "$zip_size"; then
         log_warn "file_size returned a non-numeric value: '$zip_size'"
@@ -817,9 +795,9 @@ zip_size_human=$(du -h "$OUTPUT_PATH" 2>/dev/null | cut -f1 || true)
 
 log_ok "ZIP: $OUTPUT_NAME ($zip_size_human)"
 
-# ============================================================
-# [20] Verify ZIP structure (36 entries — 34 required + 2 optional)
-# ============================================================
+# ────────────────────────────────────────────────────────────
+# [20] Verify ZIP structure (34 required + 2 optional = 36)
+# ────────────────────────────────────────────────────────────
 REQUIRED_IN_ZIP=(
     "module.prop"
 
@@ -867,15 +845,16 @@ OPTIONAL_IN_ZIP=(
     "web/app-debug.apk.sha256"
 )
 
-ZIP_CONTENTS=$(unzip -l "$OUTPUT_PATH" 2>/dev/null | awk '{print $4}')
+# `unzip -Z1` prints one filename per line, unformatted —
+# robust against spaces in filenames (which would break
+# `unzip -l | awk '{print $4}'`) and against Info-ZIP vs
+# BusyBox layout differences.
+ZIP_CONTENTS=$(unzip -Z1 "$OUTPUT_PATH" 2>/dev/null)
 
 MISSING_IN_ZIP=0
 
-# grep -qFx -- is used with the explicit -- terminator so that
-# a future REQUIRED_IN_ZIP entry starting with '-' cannot be
-# interpreted as an option. All current entries start with a
-# letter (module.prop, proxy/..., web/...), but the defensive
-# -- protects against regressions.
+# `grep -qFx --` uses the explicit `--` terminator so a future
+# entry starting with '-' cannot be interpreted as an option.
 for item in "${REQUIRED_IN_ZIP[@]}"; do
     if ! echo "$ZIP_CONTENTS" | grep -qFx -- "$item"; then
         log_error "ZIP missing: $item"
@@ -903,15 +882,15 @@ SVG_COUNT=$(echo "$ZIP_CONTENTS" | count_matches '^web/.*\.svg$')
 
 log_info "Icons: ${PNG_COUNT} PNG + ${SVG_COUNT} SVG + ${ICO_COUNT} ICO"
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [21] SHA-256 checksum
-# ============================================================
+# ────────────────────────────────────────────────────────────
 CHECKSUM_FILE="$OUTPUT_DIR_ABS/${OUTPUT_NAME}.sha256"
 (cd "$OUTPUT_DIR_ABS" && sha256_compat "$OUTPUT_NAME" > "${OUTPUT_NAME}.sha256")
 
-# `-s` (non-empty) instead of `-f` (exists): the shell creates
-# the file BEFORE sha256_compat runs, so a silent tool failure
-# would leave an empty file on disk.
+# `-s` (non-empty) instead of `-f`: the shell creates the file
+# BEFORE sha256_compat runs, so a silent tool failure would
+# leave an empty file on disk.
 if [ ! -s "$CHECKSUM_FILE" ]; then
     log_error "Failed to create a non-empty checksum file"
     log_info "  Path: $CHECKSUM_FILE"
@@ -930,9 +909,9 @@ fi
 
 log_ok "checksum: ${SHA256_HASH:0:16}..."
 
-# ============================================================
+# ────────────────────────────────────────────────────────────
 # [22] Final summary
-# ============================================================
+# ────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  ${GREEN}✅ Package created successfully${NC}                       ${BOLD}║${NC}"
@@ -948,20 +927,19 @@ echo -e "  ${BOLD}SHA-256:${NC}        ${SHA256_HASH}"
 echo -e "  ${BOLD}Checksum:${NC}       ${CHECKSUM_FILE}"
 echo ""
 echo -e "  ${BOLD}web/ contents:${NC}"
-echo -e "    ${DIM}• HTML:${NC}       2 files (index, dashboard)"
+echo -e "    ${DIM}• HTML:${NC}       3 files (index, dashboard, offline)"
 echo -e "    ${DIM}• Manifest:${NC}   1 file"
 echo -e "    ${DIM}• SW:${NC}         1 file"
 echo -e "    ${DIM}• SVG:${NC}        ${SVG_COUNT} file(s)"
 echo -e "    ${DIM}• PNG:${NC}        ${PNG_COUNT} file(s)"
 echo -e "    ${DIM}• ICO:${NC}        ${ICO_COUNT} file(s)"
-echo -e "    ${DIM}• Offline:${NC}    1 file"
 echo -e "    ${DIM}• APK:${NC}        1 file (optional)"
 echo -e "    ${DIM}• APK SHA256:${NC} 1 file (optional)"
 echo ""
 echo -e "  ${BOLD}References:${NC}"
-echo -e "    ${DIM}• docs/BACKUP.md      — Backup system reference${NC}"
-echo -e "    ${DIM}• docs/EMERGENCY.md   — Emergency recovery guide${NC}"
-echo -e "    ${DIM}• docs/UPGRADE.md     — Version upgrade guide${NC}"
+echo -e "    ${DIM}• docs/REFERENCE.md §4 — Backup system reference${NC}"
+echo -e "    ${DIM}• docs/GUIDE.md §8     — Emergency recovery guide${NC}"
+echo -e "    ${DIM}• docs/GUIDE.md §5     — Version upgrade guide${NC}"
 echo ""
 
 if [ "$VERBOSE" = "1" ]; then

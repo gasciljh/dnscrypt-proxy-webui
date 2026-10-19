@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — customize.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -254,7 +254,7 @@ ROOT_SOLUTION=$(detect_root_solution)
 ui_print "╔══════════════════════════════════════════╗"
 ui_print "║  🛡️  DNSCrypt Smart Filter               ║"
 printf "║      %-32s ║\n" "$MODULE_VERSION"
-ui_print "║      Global edition (EN + AR)            ║"
+ui_print "║      Global edition (bilingual WebUI)    ║"
 ui_print "╚══════════════════════════════════════════╝"
 ui_print ""
 
@@ -285,10 +285,11 @@ echo "Architecture: $ARCH" >> "$INSTALL_LOG"
 # an upgrade from a version with different rules does not leave
 # orphans behind.
 #
-# The rule set removed here MUST match functions.sh:manage_firewall 0
-# and uninstall.sh:_inline_cleanup_firewall. Any change in one
-# MUST be applied consistently to all four files (customize.sh,
-# post-fs-data.sh, functions.sh, uninstall.sh).
+# The rule set removed here MUST be functionally equivalent to
+# functions.sh:manage_firewall 0, uninstall.sh:_inline_cleanup_firewall,
+# and post-fs-data.sh:inline_firewall_cleanup. All four remove the
+# same set of rules; they differ only in the comment tag applied
+# to the loopback rules during best-effort legacy cleanup.
 #
 # The legacy RETURN rules for the pre-v1.2.0 default bootstrap
 # set are best-effort: they are removed so that an upgrade from
@@ -659,12 +660,6 @@ echo "Firewall cleanup attempted (Custom Chain + Legacy)" >> "$INSTALL_LOG"
 # TXN_ID and BACKUP_DIR_NAME share the same timestamp but use
 # DIFFERENT final paths, preventing a collision when both try
 # to `mv` to the same destination.
-#
-# `commit_transaction` verifies that the COMMIT state file was
-# written successfully before clearing TXN_ACTIVE. A failed
-# write leaves TXN_ACTIVE=1, so [23] does not delete the
-# transaction directory — preserving it for the next
-# uninstall.sh run (which renames it to orphan-txn-*).
 BACKUP_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR_NAME="${BACKUP_TIMESTAMP}-${MODULE_VERSION}-$$"
 BACKUP_DIR="$PERSISTENT_BACKUP/$BACKUP_DIR_NAME"
@@ -678,11 +673,6 @@ chmod 0700 "$PERSISTENT_BACKUP" 2>/dev/null || true
 
 # begin_transaction — creates the transaction directory and
 # writes its initial state (START) and PID.
-#
-# Returns:
-#   0 — transaction created; TXN_ACTIVE=1
-#   1 — could not create the directory; TXN_ACTIVE stays 0,
-#       and [8d] proceeds without rollback support.
 begin_transaction() {
     if mkdir -p "$TXN_DIR" 2>/dev/null; then
         echo "START" > "$TXN_DIR/.state" 2>/dev/null
@@ -1102,6 +1092,11 @@ fi
 #
 # The move is idempotent: a file already in web/ from a
 # previous install is simply not found at the root.
+#
+# A failed `mv` is logged explicitly. Without the check, a
+# silent failure would surface later as "Missing critical files:
+# web/index.html" in [10] — harder to diagnose than the actual
+# cause.
 for f in \
     index.html \
     dashboard.html \
@@ -1117,8 +1112,11 @@ for f in \
     favicon.ico \
     offline.html; do
     if [ -f "$MODPATH/$f" ]; then
-        mv -f "$MODPATH/$f" "$MODPATH/web/"
-        echo "  Moved $f to web/" >> "$INSTALL_LOG"
+        if mv -f "$MODPATH/$f" "$MODPATH/web/" 2>/dev/null; then
+            echo "  Moved $f to web/" >> "$INSTALL_LOG"
+        else
+            echo "  ⚠️ Failed to move $f to web/" >> "$INSTALL_LOG"
+        fi
     fi
 done
 
@@ -1592,7 +1590,9 @@ ui_print ""
 # Migration: PID files from the legacy /data/local/tmp location
 # are dropped (they are transient), but `dnscrypt.status` is
 # PRESERVED if it exists — it carries the user's ON/OFF intent
-# across the upgrade.
+# across the upgrade. If the copy fails (e.g. disk full,
+# permission error), the source is kept so the intent is not
+# lost.
 RUN_DIR="$BIN_DIR/run"
 
 ui_print "- 🔧 Creating secure run/ directory..."
@@ -1609,12 +1609,21 @@ chmod 0700 "$RUN_DIR" 2>/dev/null
 chown 0:0 "$RUN_DIR" 2>/dev/null
 
 # --- Migrate status file only from /data/local/tmp ---
+# The source is deleted ONLY when the copy into $RUN_DIR
+# actually succeeded (or when a fresh copy already exists at
+# the destination). A failed copy leaves the source intact.
+_STATUS_PRESERVED=0
 for f in dnscrypt.pid webui.pid watchdog.pid dnscrypt.status; do
     OLD_FILE="/data/local/tmp/$f"
     NEW_FILE="$RUN_DIR/$f"
     if [ -f "$OLD_FILE" ] && [ ! -f "$NEW_FILE" ]; then
         if [ "$f" = "dnscrypt.status" ]; then
-            cp -f "$OLD_FILE" "$NEW_FILE" 2>/dev/null
+            if cp -f "$OLD_FILE" "$NEW_FILE" 2>/dev/null; then
+                echo "  Migrated $f to $RUN_DIR" >> "$INSTALL_LOG"
+            else
+                echo "  ⚠️ Failed to migrate $f — keeping /tmp copy" >> "$INSTALL_LOG"
+                _STATUS_PRESERVED=1
+            fi
         fi
     fi
 done
@@ -1622,7 +1631,9 @@ done
 rm -f /data/local/tmp/dnscrypt.pid 2>/dev/null
 rm -f /data/local/tmp/webui.pid 2>/dev/null
 rm -f /data/local/tmp/watchdog.pid 2>/dev/null
-rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+if [ "$_STATUS_PRESERVED" = "0" ]; then
+    rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+fi
 
 ui_print "  ✅ run/ directory created (0700)"
 ui_print "  ✅ Migrated status files"
@@ -1670,14 +1681,23 @@ ui_print "- ⚙️  Creating configuration files..."
 # Existing values are read from a webui.conf that may have
 # been restored by [9c]. Invalid existing values fall back to
 # the defaults (9090 / 9091) with a warning message.
+#
+# Leading zeros are stripped before the range check: some
+# shells interpret "090" as octal 72 in arithmetic contexts,
+# which would pass a bogus port to the socket layer.
 validate_port() {
     local port="$1"
 
     echo "$port" | grep -qE '^[0-9]+$' || return 1
-    [ "$port" -ge 1 ] || return 1
-    [ "$port" -le 65535 ] || return 1
 
-    if [ "$port" = "$_MONITORING_UI_PORT" ]; then
+    local clean
+    clean=$(printf '%s' "$port" | sed 's/^0*//')
+    [ -z "$clean" ] && clean="0"
+
+    [ "$clean" -ge 1 ] || return 1
+    [ "$clean" -le 65535 ] || return 1
+
+    if [ "$clean" = "$_MONITORING_UI_PORT" ]; then
         return 1
     fi
 
@@ -1827,6 +1847,10 @@ echo "✅ webui.conf created (PORT=$TEMP_PORT, DASHBOARD_PORT=$TEMP_DASHBOARD_PO
 #   1. `ss`       — the modern tool.
 #   2. `netstat`  — the older tool.
 #   3. /proc/net/tcp — the direct kernel view.
+#
+# The trailing space in ":$hex_port " prevents ":1F90" from
+# matching ":1F90A" (a different, longer port whose prefix
+# happens to equal ours).
 port_in_use=0
 if command -v ss >/dev/null 2>&1; then
     ss -tuln 2>/dev/null | grep -q ":$TEMP_PORT " && port_in_use=1
@@ -1834,7 +1858,7 @@ elif command -v netstat >/dev/null 2>&1; then
     netstat -tuln 2>/dev/null | grep -q ":$TEMP_PORT " && port_in_use=1
 elif [ -f /proc/net/tcp ]; then
     hex_port=$(printf "%04X" "$TEMP_PORT")
-    grep -qi ":$hex_port" /proc/net/tcp 2>/dev/null && port_in_use=1
+    grep -qi ":$hex_port " /proc/net/tcp 2>/dev/null && port_in_use=1
 fi
 
 if [ $port_in_use -eq 1 ]; then
@@ -1889,6 +1913,12 @@ ui_print "  ✅ Default config files created"
 #   compared. Any mismatch aborts the install and rolls back
 #   the transaction — a silent credential-replacement failure
 #   would leave the user locked out of their own WebUI.
+#
+# Fallback warning:
+#   When /dev/urandom is unavailable (extremely rare on Android),
+#   the fallback credentials are derived from the epoch time and
+#   are therefore predictable. A warning is shown to the user
+#   and logged so they know to change the password immediately.
 ui_print ""
 ui_print "- 🔐 Generating secure credentials..."
 
@@ -2026,6 +2056,8 @@ if [ -f "$TOML_FILE" ]; then
         fi
         if [ -z "$NEW_USER" ] || [ "$NEW_USER" = "admin_" ] || [ "${#NEW_USER}" -lt 8 ]; then
             NEW_USER="admin_$(date +%s | tail -c 9)"
+            ui_print "  ⚠️ /dev/urandom unavailable — using fallback username"
+            echo "⚠️ Fallback username generated (predictable — change immediately)" >> "$INSTALL_LOG"
         fi
 
         # Password: 24 alphanumeric chars from /dev/urandom, or
@@ -2042,6 +2074,8 @@ if [ -f "$TOML_FILE" ]; then
             else
                 NEW_PASS="Auto_$(date +%s)_$(hostname 2>/dev/null || echo safe)_$RANDOM"
             fi
+            ui_print "  ⚠️ /dev/urandom unavailable — using fallback password"
+            echo "⚠️ Fallback password generated (predictable — change immediately)" >> "$INSTALL_LOG"
         fi
 
         cp -f "$TOML_FILE" "$TOML_FILE.bak" 2>/dev/null
@@ -2384,8 +2418,8 @@ The `current/` directory and `.last_stable` file are essential for
 automatic recovery. If you delete them, the module can still be
 reinstalled, but the emergency recovery path will not work.
 
-See docs/BACKUP.md for the full reference.
-See docs/EMERGENCY.md for recovery procedures.
+See docs/REFERENCE.md §4 for the full reference.
+See docs/GUIDE.md §8 for recovery procedures.
 EOF
     chmod 0644 "$PERSISTENT_BACKUP/README.md" 2>/dev/null
 fi

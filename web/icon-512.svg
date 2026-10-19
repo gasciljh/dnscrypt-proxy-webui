@@ -2,7 +2,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter - PWA Icon (512x512)
      Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-15
+     Last updated: 2026-10-18
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -61,11 +61,10 @@
      Do NOT move the shield without re-checking the safe-
      circle test above.
 
-     Note: in XML comments the sequence of two consecutive
-     hyphens is forbidden by the W3C XML specification. This
-     file therefore writes script flags with a single hyphen
-     (e.g. -f instead of the long form). See the
-     test/check-svg-comments.sh guard.
+     XML note: the W3C XML specification (section 2.5) forbids
+     the sequence of two consecutive hyphens inside a comment.
+     This header therefore writes script flags in short form
+     only (for example, `-f`).
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>

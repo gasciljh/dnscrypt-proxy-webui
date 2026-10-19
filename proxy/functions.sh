@@ -3,7 +3,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — functions.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -144,9 +144,8 @@ SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 #   • customize.sh  — the installer runs BEFORE the module is
 #                     extracted, so functions.sh is not on disk
 #                     yet. It cannot source this file.
-#   • install_app.sh — runs standalone (invoked by main.go, but
-#                      via exec, not source). It also cannot
-#                      source this file.
+#   • uninstall.sh  — runs self-contained (see its header) and
+#                     intentionally does not source this file.
 #
 # The duplication is deliberate. Any change to PERSISTENT_BACKUP
 # or USER_FILES MUST be applied to all three files. A CI check

@@ -4,7 +4,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — status.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -102,9 +102,7 @@ _MONITORING_UI_PORT=""
 # ============================================================
 # [3] Parse command-line arguments
 # ============================================================
-# Primary modes are mutually exclusive. --verbose is a
-# modifier for the default mode only. Any conflicting
-# combination is a hard error.
+# Primary modes are mutually exclusive; --verbose is a modifier only.
 SHORT_MODE=0
 JSON_MODE=0
 CHECK_MODE=0
@@ -155,7 +153,7 @@ EOF
     esac
 done
 
-# --- Enforce mutual exclusivity ---
+# Enforce mutual exclusivity.
 _mode_count=0
 _mode_list=""
 [ "$SHORT_MODE" = "1" ]    && { _mode_count=$((_mode_count + 1)); _mode_list="$_mode_list --short"; }
@@ -180,10 +178,9 @@ fi
 # ============================================================
 # [4] Load functions.sh (sources boot-mini.sh)
 # ============================================================
-# The load is deliberately lenient: a functions.sh that exists
-# but fails to source does NOT abort status.sh. The script
-# falls through to the inline fallbacks in [5] and continues
-# to produce a report.
+# Lenient: a functions.sh that exists but fails to source does
+# NOT abort status.sh. The script falls through to the inline
+# fallbacks in [5] and continues to produce a report.
 FUNCTIONS_LOADED=0
 if [ -f "$MODDIR/functions.sh" ]; then
     # shellcheck disable=SC1090
@@ -205,10 +202,8 @@ _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
 # ============================================================
 # [5] Inline fallbacks
 # ============================================================
-# Provided for every primitive that status.sh needs. Unlike
-# service.sh and action.sh, this file keeps a full fallback
-# set — a broken module is precisely when the user needs
-# status.sh most.
+# status.sh keeps a full fallback set — a broken module is
+# precisely when the user needs this tool most.
 _FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
@@ -234,7 +229,6 @@ if [ "$FUNCTIONS_LOADED" = "0" ]; then
     WATCHDOG_PID_FILE="$_FB_RUN_DIR/watchdog.pid"
 fi
 
-# --- inline: is_port_open ---
 # Three probes: /proc/net → ss → netstat.
 # The trailing space in ":$hex_port " prevents :1F90 from
 # matching :1F90A.
@@ -277,7 +271,6 @@ _inline_is_port_open() {
     return 1
 }
 
-# --- inline: read_conf ---
 _inline_read_conf() {
     local conf="$1"
     local key="$2"
@@ -300,9 +293,8 @@ _inline_read_conf() {
     printf "%s" "$default"
 }
 
-# --- inline: read_port with Port Guard ---
-# Leading zeros are stripped before the range check (the shell
-# interprets 090 as octal 72 in some builds).
+# Leading zeros stripped before range check (some shells
+# interpret 090 as octal 72).
 _inline_read_port() {
     local conf="$1"
     local key="$2"
@@ -324,9 +316,7 @@ _inline_read_port() {
     printf "%s" "$default"
 }
 
-# --- inline: is_ipv6_available ---
-# /proc/net/if_inet6 lists one line per interface that has an
-# IPv6 address assigned.
+# /proc/net/if_inet6 lists one line per interface with an IPv6 address.
 _inline_is_ipv6_available() {
     if [ ! -f /proc/net/if_inet6 ]; then
         return 1
@@ -339,12 +329,8 @@ _inline_is_ipv6_available() {
     return 0
 }
 
-# --- inline: get_profile_memory_hint ---
-# Display-only — main.go is the authority.
-#
-# Table matches:
-#   main.go:memoryLimitForProfile
-#   functions.sh:get_profile_memory_hint
+# Display-only — main.go is the authority. Table matches
+# main.go:memoryLimitForProfile and functions.sh:get_profile_memory_hint.
 _inline_get_profile_memory_hint() {
     local profile="pro"
 
@@ -372,8 +358,6 @@ _inline_get_profile_memory_hint() {
 # ============================================================
 # [6] Unified wrappers
 # ============================================================
-# Every wrapper prefers the functions.sh implementation when
-# available, and falls back to the inline version otherwise.
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_tcp_open()           { is_port_open "$1" tcp; }
     is_udp_open()           { is_port_open "$1" udp; }
@@ -435,15 +419,11 @@ MEMORY_HINT=$(mem_hint 2>/dev/null)
 # ============================================================
 # [7b] Backup resolver
 # ============================================================
-# Snapshot enumeration. Detection rule (SNAP-MANIFEST): a
-# directory is a snapshot iff it contains a `.manifest.json`.
-# Sort: mtime descending.
+# SNAP-MANIFEST: a directory is a snapshot iff it contains
+# .manifest.json. Sort: mtime descending. Excludes current/,
+# txn-*, orphan-txn-*, .restore_snap.*, apk/.
 #
-# Excludes (by name): current/, txn-*, orphan-txn-*,
-# .restore_snap.*, apk/.
-#
-# Uses SUBSHELL ISOLATION (`( ... )`) so the `cd` and the loop
-# variables do not leak into the caller's scope.
+# Subshell isolation prevents cd/loop vars from leaking.
 _list_snapshots() {
     local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
@@ -475,15 +455,9 @@ _list_snapshots() {
     fi
 }
 
-# format_age — converts an integer number of seconds to a
-# human-readable age string.
-#
-# A value of exactly 0 returns "0s ago", not "N/A" — this
-# distinguishes "snapshot created this second" from "age could
-# not be determined".
-#
-# Returns "N/A" for empty input, non-numeric input, or
-# negative input (a snapshot timestamp in the future).
+# Exactly 0 returns "0s ago" (not "N/A") — distinguishes
+# "created this second" from "age unknown". "N/A" for empty /
+# non-numeric / negative input.
 format_age() {
     local sec="$1"
     if [ -z "$sec" ] || ! echo "$sec" | grep -qE '^-?[0-9]+$' || [ "$sec" -lt 0 ]; then
@@ -546,9 +520,9 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
             fi
 
             if [ "$BACKUP_LAST_EPOCH" -gt 0 ]; then
-                # Use the DIRECTORY as the reference file for
-                # `date -r`. `date -d @epoch` works on GNU
-                # coreutils but not on Android's toybox.
+                # Use the directory as the reference file for
+                # `date -r` — `date -d @epoch` works on GNU
+                # coreutils but not Android's toybox.
                 BACKUP_LAST_TIME=$(date -d "@$BACKUP_LAST_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null)
                 if [ -z "$BACKUP_LAST_TIME" ]; then
                     BACKUP_LAST_TIME=$(date -r "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" '+%Y-%m-%d %H:%M' 2>/dev/null)
@@ -586,20 +560,14 @@ fi
 # ============================================================
 # [8] Collect data
 # ============================================================
-# Every variable computed here is consumed by at least one
-# display mode. All read-only.
 
-# ------------------------------------------------------------
 # [8a] Ports
-# ------------------------------------------------------------
 PORT=$(read_webui_port)
 DASHBOARD_PORT=$(read_dashboard_port)
 [ -z "$PORT" ] && PORT="9090"
 [ -z "$DASHBOARD_PORT" ] && DASHBOARD_PORT="9091"
 
-# ------------------------------------------------------------
 # [8b] DNS Engine status
-# ------------------------------------------------------------
 # Prefer functions.sh's is_dnscrypt_running (PID + comm + port
 # cross-check). Fallback: pgrep -x + is_udp_open 5354.
 DNS_RUNNING="NO"
@@ -613,9 +581,7 @@ else
     fi
 fi
 
-# ------------------------------------------------------------
 # [8c] WebUI status
-# ------------------------------------------------------------
 WEBUI_RUNNING="NO"
 if [ "$FUNCTIONS_LOADED" = "1" ] && command -v is_webui_running >/dev/null 2>&1; then
     if is_webui_running "$PORT"; then
@@ -627,17 +593,13 @@ else
     fi
 fi
 
-# ------------------------------------------------------------
 # [8d] User intent (STATUS_FILE)
-# ------------------------------------------------------------
 STATUS_FROM_FILE="UNKNOWN"
 if [ -f "$STATUS_FILE" ]; then
     STATUS_FROM_FILE=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
 fi
 
-# ------------------------------------------------------------
 # [8e] Blocklist stats
-# ------------------------------------------------------------
 BLOCKLIST_COUNT="0"
 BLOCKLIST_SIZE="0"
 if [ -f "$BLOCKLIST_FILE" ]; then
@@ -656,37 +618,27 @@ if [ -f "$RAW_BLOCKLIST_FILE" ]; then
     [ -z "$RAW_BLOCKLIST_SIZE" ] && RAW_BLOCKLIST_SIZE="0"
 fi
 
-# ------------------------------------------------------------
 # [8f] Last blocklist update time
-# ------------------------------------------------------------
 LAST_UPDATE="unknown"
 if [ -f "$BLOCKLIST_FILE" ]; then
     LAST_UPDATE=$(date -r "$BLOCKLIST_FILE" '+%Y-%m-%d %H:%M' 2>/dev/null)
     [ -z "$LAST_UPDATE" ] && LAST_UPDATE="unknown"
 fi
 
-# ------------------------------------------------------------
 # [8g] Module disabled?
-# ------------------------------------------------------------
 IS_DISABLED="NO"
 [ -f "$MODDIR/disable" ] && IS_DISABLED="YES"
 
-# ------------------------------------------------------------
 # [8h] Auto-restart configuration
-# ------------------------------------------------------------
 AUTO_DNS=$(read_conf "$CONF_FILE" "AUTO_RESTART_DNS" "1")
 AUTO_WEBUI=$(read_conf "$CONF_FILE" "AUTO_RESTART_WEBUI" "1")
 case "$AUTO_DNS"   in 0|1) ;; *) AUTO_DNS="1"   ;; esac
 case "$AUTO_WEBUI" in 0|1) ;; *) AUTO_WEBUI="1" ;; esac
 
-# ------------------------------------------------------------
 # [8i] BIND_ADDR
-# ------------------------------------------------------------
 BIND_ADDR=$(read_conf "$CONF_FILE" "BIND_ADDR" "127.0.0.1")
 
-# ------------------------------------------------------------
 # [8j] Watchdog status
-# ------------------------------------------------------------
 WATCHDOG_RUNNING="NO"
 WATCHDOG_PID=""
 if [ -f "$WATCHDOG_PID_FILE" ]; then
@@ -702,26 +654,20 @@ if [ -f "$WATCHDOG_PID_FILE" ]; then
     fi
 fi
 
-# ------------------------------------------------------------
 # [8k] IPv6 availability
-# ------------------------------------------------------------
 IPV6_AVAILABLE="NO"
 if ipv6_available; then
     IPV6_AVAILABLE="YES"
 fi
 
-# ------------------------------------------------------------
 # [8l] Active run directory
-# ------------------------------------------------------------
 if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
     ACTIVE_RUN_DIR="$RUN_DIR_ACTIVE"
 else
     ACTIVE_RUN_DIR=$(dirname "$STATUS_FILE")
 fi
 
-# ------------------------------------------------------------
 # [8m] PIDs
-# ------------------------------------------------------------
 DNS_PID=""
 if [ -f "$PID_FILE" ]; then
     DNS_PID=$(cat "$PID_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -738,9 +684,7 @@ if [ -f "$WEBUI_PID_FILE" ]; then
     fi
 fi
 
-# ------------------------------------------------------------
 # [8n] Root solution
-# ------------------------------------------------------------
 detect_root_solution() {
     if [ -n "${KSU_VER:-}" ] || [ -d "/data/adb/ksu" ]; then
         printf "KernelSU"
@@ -762,13 +706,10 @@ ROOT_SOLUTION=$(detect_root_solution)
 # ============================================================
 # [9] JSON escaping helpers
 # ============================================================
-# Minimal JSON string escaper for the --json mode.
-#
-# In sed, `\b` is a word-boundary anchor (not backspace), so a
-# `s/\b/\\b/g` rule would replace every word boundary with the
-# literal two-character sequence `\b`, corrupting every string
-# field. Backspace (\x08) does not appear in any of the values
-# this function is used on, so no replacement is needed.
+# Minimal JSON string escaper. In sed, `\b` is a word-boundary
+# anchor (not backspace), so a `s/\b/\\b/g` rule would corrupt
+# every string field. Backspace does not appear in any value
+# this function is used on — no replacement needed.
 esc_json() {
     if [ -z "$1" ]; then
         printf ''
@@ -783,13 +724,7 @@ esc_json() {
     ' | tr '\n' ' '
 }
 
-# _json_str <value>
-#   Emits the value as a JSON string. If the value is empty,
-#   emits the literal `null`.
-#
-# The distinction matters for machine consumers:
-#   • `"pid": null` — no PID file exists (legitimate absence)
-#   • `"pid": ""`   — a PID file exists but is empty (error)
+# Empty → literal `null`; non-empty → quoted JSON string.
 _json_str() {
     if [ -z "$1" ]; then
         printf 'null'
@@ -801,21 +736,10 @@ _json_str() {
 # ============================================================
 # [10] Quick check mode (single line)
 # ============================================================
-# Emits a single line with eight pipe-separated fields:
-#
+# Eight pipe-separated fields for shell scripting:
 #   <version> | DNS=<UP|DOWN> | WEBUI=<UP|DOWN> |
 #   PROFILE=<key> | MEM=<hint> | ENTRIES=<count> |
 #   BACKUP=<count>snap/<age> | RUNDIR=<path>[ DISABLED]
-#
-# Designed for shell scripting:
-#   status=$(status.sh --check)
-#   case "$status" in *"DNS=UP"*) ... ;; esac
-#
-# Exit codes:
-#   0 = DNS + WebUI both running
-#   1 = both stopped
-#   2 = partial (exactly one running)
-#   3 = module disabled
 if [ "$CHECK_MODE" = "1" ]; then
     dns_str="DNS=$( [ "$DNS_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
     webui_str="WEBUI=$( [ "$WEBUI_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
@@ -844,12 +768,8 @@ fi
 # ============================================================
 # [11] JSON mode
 # ============================================================
-# Emits a single JSON object on stdout. Hand-formatted (no jq
-# dependency) via a here-document with `esc_json` and
-# `_json_str` calls interpolated.
-#
-# Nullable fields use `_json_str`, which emits the literal
-# `null` for empty values, not `""`.
+# Hand-formatted (no jq dependency). Nullable fields use
+# `_json_str` (emits literal `null` for empty values, not "").
 if [ "$JSON_MODE" = "1" ]; then
     CHECKED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)
 
@@ -929,15 +849,7 @@ fi
 # ============================================================
 # [12] Short mode
 # ============================================================
-# Emits a single word (or the literal "DISABLED") on stdout:
-#
-#   OK          — DNS + WebUI both running
-#   DNS_ONLY    — only the DNS engine is up
-#   WEBUI_ONLY  — only the WebUI is up
-#   STOPPED     — both down
-#   DISABLED    — module disabled
-#
-# Exit codes match --check.
+# One word on stdout: OK / DNS_ONLY / WEBUI_ONLY / STOPPED / DISABLED.
 if [ "$SHORT_MODE" = "1" ]; then
     if [ "$IS_DISABLED" = "YES" ]; then
         echo "DISABLED"
@@ -960,11 +872,8 @@ fi
 # ============================================================
 # [13] Diagnose mode
 # ============================================================
-# Full diagnostic report for troubleshooting. Intended to be
-# pasted verbatim into a GitHub issue.
-#
-# Colors are applied only when stdout is a TTY, so piped /
-# redirected output is plain text (paste-friendly).
+# Full diagnostic report. Intended to be pasted verbatim into a
+# GitHub issue. Colors applied only when stdout is a TTY.
 if [ "$DIAGNOSE_MODE" = "1" ]; then
     if [ -t 1 ]; then
         C_RED=$(printf '\033[0;31m'); C_GREEN=$(printf '\033[0;32m')
@@ -1080,7 +989,6 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
             echo "     Last backup: ${C_DIM}$BACKUP_LAST_NAME${C_NC} ($BACKUP_LAST_AGE)"
             echo ""
 
-            # List up to 10 most recent snapshots.
             echo "  ${C_BOLD}Recent snapshots:${C_NC}"
             _bk_i=0
             while IFS= read -r _snap; do
@@ -1235,7 +1143,7 @@ EOF
     elif [ "$_health_issues" -gt 0 ]; then
         echo "  ${C_RED}❌ $_health_issues critical issue(s) detected${C_NC}"
         echo "     See the 'Health Checks' section above"
-        echo "     Full guide: docs/TROUBLESHOOTING.md"
+        echo "     Full guide: docs/GUIDE.md §7"
     else
         echo "  ${C_YELLOW}⚠  Services not fully running${C_NC}"
         echo "     Try: su -c 'sh $MODDIR/action.sh --restart'"

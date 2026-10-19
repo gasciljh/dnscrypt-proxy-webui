@@ -2,7 +2,7 @@
 # ============================================================
 # DNSCrypt Smart Filter – fetch_app_apk.sh
 # Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-15
+# Last updated: 2026-10-18
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -20,6 +20,11 @@
 # the sidecar directly usable by `sha256sum -c` after
 # release.yml copies it to `web/app-debug.apk.sha256`, and by
 # install_app.sh on device.
+#
+# ⚠️ release.yml REGENERATES this dist sidecar so its embedded
+#    name matches the GitHub Release asset (DNS-Proxy-v*.apk).
+#    The output produced HERE is only correct for the copy
+#    inside the module ZIP (web/app-debug.apk.sha256).
 #
 # Usage:
 #   ./scripts/fetch_app_apk.sh

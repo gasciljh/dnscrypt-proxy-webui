@@ -1,7 +1,7 @@
 // ============================================================
 // DNSCrypt Smart Filter — Go Module Definition
 // Version: v1.5.0 (Global Edition)
-// Last updated: 2026-10-14
+// Last updated: 2026-10-18
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -11,12 +11,12 @@
 // Dependency policy:
 //   Standard library + exactly ONE external dependency —
 //   github.com/cyphar/filepath-securejoin v0.7.0 (see
-//   docs/adr/0007-*.md). All other code remains stdlib-only.
-//   Any future external dependency MUST have its own ADR.
+//   docs/adr/0002-external-dependency.md). All other code
+//   remains stdlib-only. Any future external dependency MUST
+//   have its own ADR.
 //
-//   The filepath-securejoin dependency was introduced in
-//   v1.4.1 to close CodeQL go/path-injection alerts in
-//   proxy/main.go:removeModule.
+//   The dependency closes two CodeQL go/path-injection alerts
+//   in proxy/main.go:removeModule (see SECURITY.md §5.34).
 //
 //   `go.sum` pins filepath-securejoin v0.7.0 together with
 //   its transitive TEST-ONLY dependencies (testify, go-spew,
@@ -37,7 +37,7 @@
 //      • .github/workflows/ci.yml       → GO_VERSION
 //      • .github/workflows/release.yml  → GO_VERSION
 //      • .devcontainer/devcontainer.json
-//      • docs/DEVELOPMENT.md
+//      • docs/CONTRIBUTING.md           → §3 (Build tooling)
 //
 // Build flags (applied by proxy/build.sh):
 //   • -buildvcs=false  no VCS stamping
@@ -46,12 +46,13 @@
 //   • -mod=readonly    fail if go.mod needs changes
 //
 // Cross-references:
-//   • VERSION                 — module version (SSOT)
-//   • proxy/main.go           — consumer of this module
-//   • proxy/build.sh          — build entry point
-//   • proxy/install_app.sh    — companion install (shell)
-//   • docs/adr/0007-*.md      — external dependency policy
-//   • CHANGELOG.md            — version history
+//   • VERSION                              — module version (SSOT)
+//   • CHANGELOG.md                         — version history
+//   • proxy/main.go                        — consumer of this module
+//   • proxy/build.sh                       — build entry point
+//   • proxy/install_app.sh                 — companion install (shell)
+//   • docs/adr/0002-external-dependency.md — external dependency policy
+//   • SECURITY.md §5.34                    — CodeQL fix context
 // ============================================================
 
 module dnscrypt-webui

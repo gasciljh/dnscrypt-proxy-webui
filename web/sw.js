@@ -1,9 +1,7 @@
 /* ============================================================
  * DNSCrypt Smart Filter — Service Worker
  * Version: v1.5.0 (Global Edition)
- * Last updated: 2026-10-15
- * Author: gasciljh
- * Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+ * Last updated: 2026-10-18
  * ============================================================
  * Provides offline support and caching for the WebUI and
  * Dashboard as an installable PWA.
@@ -13,46 +11,67 @@
  *   • Clean up old caches on activate
  *   • Serve HTML with network-first strategy
  *   • Serve other assets with stale-while-revalidate
- *   • Provide an offline fallback when the server is
- *     unreachable
+ *   • Provide an offline fallback when the server is unreachable
  *   • Notify clients when a new version is available
  *   • Handle SKIP_WAITING / CHECK_UPDATE / CLEAR_CACHES /
  *     GET_VERSION / GET_RUNTIME_INFO / PING messages
  *
  * Caching strategy:
- *   • HTML (navigations) → Network-First with 5 s timeout,
- *     fallback to cache, then to /offline.html, then to an
- *     inline offline page.
+ *   • HTML (navigations) → Network-First with 5 s timeout.
+ *     Fallback chain (5 levels):
+ *       1. Fresh fetch (5 s timeout)
+ *       2. Exact request from cache
+ *       3. App shell ('/') from cache
+ *       4. /offline.html from cache
+ *       5. Inline offline page (last resort)
  *   • Static assets (icons, manifest) → Stale-While-Revalidate.
  *   • /sw.js → always bypassed (browser must see byte changes).
- *   • Bypassed paths (9 rules in shouldBypass()):
- *       (1) external origins          — includes GitHub URLs
- *       (2) /api and /api/*           — precise match
- *       (3) /events                   — SSE stream
- *       (4) /auth/*                   — always hit the server
- *       (5) /healthz OR /readyz       — shared rule
- *       (6) /sw.js                    — browser must see bytes
- *       (7) non-GET requests          — mutation methods
- *       (8) Authorization header      — session-scoped
- *       (9) /app-debug.apk            — long-lived HTTP cache
  *
- * PRECACHE_ASSETS (12 files):
- *   • HTML + Manifest: / , /manifest.json , /dashboard.html ,
- *                      /offline.html
+ * Bypass rules (9 in shouldBypass()):
+ *   (1) external origins        — includes GitHub URLs
+ *   (2) /api and /api/*         — precise match
+ *   (3) /events                 — SSE stream
+ *   (4) /auth/*                 — always hit the server
+ *   (5) /healthz OR /readyz     — shared rule
+ *   (6) /sw.js                  — browser must see bytes
+ *   (7) non-GET requests        — mutation methods
+ *   (8) Authorization header    — session-scoped
+ *   (9) /app-debug.apk          — long-lived HTTP cache
+ *
+ * PRECACHE_ASSETS (11 files):
+ *   • HTML + Manifest: / , /manifest.json , /offline.html
  *   • SVG Icons:       /icon-192.svg , /icon-512.svg
  *   • PNG Icons:       /icon-192.png , /icon-512.png ,
  *                      /apple-touch-icon.png
  *   • Favicons:        /favicon-32x32.png ,
  *                      /favicon-16x16.png , /favicon.ico
  *
+ * Note on /dashboard.html (SW-PRECACHE-01):
+ *   /dashboard.html is deliberately NOT in PRECACHE_ASSETS.
+ *   Reason: the WebUI (9090) and Dashboard (9091) are distinct
+ *   origins. On the WebUI origin, /dashboard.html does not
+ *   exist as a distinct file — the catch-all route in main.go
+ *   serves index.html for any unknown path. Precaching it
+ *   there would cache the wrong content under a misleading key.
+ *   On the Dashboard origin, /dashboard.html duplicates `/`.
+ *   Reference: docs/REFERENCE.md §7.7.6.
+ *
  * Design notes:
  *   • The SW is bound to a single origin. WebUI (9090) and
  *     Dashboard (9091) are different origins → each has its
  *     own SW cache. Documented limitation; see
- *     docs/ARCHITECTURE.md §6.6.
+ *     docs/REFERENCE.md §7.7.1–§7.7.5.
  *   • PWA shortcuts in manifest.json use RELATIVE URLs. They
  *     resolve to the manifest's CURRENT origin at install
  *     time. See manifest.json x-note-shortcuts.
+ *
+ * v1.5.0 corrections:
+ *   • SW-PRECACHE-01 — PRECACHE_ASSETS is 11 files (not 12).
+ *   • SW-DEF-01 — clients.claim() is guarded with .catch() so
+ *     a rejected claim no longer skips the client notification
+ *     loop.
+ *   • SW-DEF-02 — client.postMessage() is wrapped in try/catch
+ *     so a single invalid client cannot abort the loop.
  * ============================================================ */
 
 'use strict';
@@ -62,10 +81,9 @@
 // ============================================================
 // CACHE_VERSION — must match the current release tag (VERSION
 // file). Bumping it invalidates every client's cache and
-// forces a full re-download of the 12 precached assets.
+// forces a full re-download of the 11 precached assets.
 //
-// Manual step at each release: bump CACHE_VERSION manually.
-// There is no automation for this.
+// Manual step at each release: bump CACHE_VERSION.
 // ============================================================
 const CACHE_VERSION = 'v1.5.0';
 
@@ -75,7 +93,7 @@ const RUNTIME_CACHE = `dnscrypt-runtime-${CACHE_VERSION}`;
 const DEBUG = false;
 
 // ============================================================
-// [2] PRECACHE_ASSETS — 12 files
+// [2] PRECACHE_ASSETS — 11 files (SW-PRECACHE-01)
 // ============================================================
 // Icon source pipeline (mirrors manifest.json x-note-icon-source):
 //   icon-192.svg  → icon-192.png
@@ -94,23 +112,26 @@ const DEBUG = false;
 //
 // The companion APK (web/app-debug.apk) is deliberately NOT in
 // this list — see shouldBypass() rule 9.
+//
+// /dashboard.html is deliberately NOT in this list — see the
+// SW-PRECACHE-01 note in the header.
 // ============================================================
 const PRECACHE_ASSETS = [
-    // --- HTML + Manifest ---
+    // --- HTML + Manifest (3) ---
     '/',
     '/manifest.json',
     '/offline.html',
 
-    // --- SVG Icons ---
+    // --- SVG Icons (2) ---
     '/icon-192.svg',
     '/icon-512.svg',
 
-    // --- PNG Icons ---
+    // --- PNG Icons (3) ---
     '/icon-192.png',
     '/icon-512.png',
     '/apple-touch-icon.png',
 
-    // --- Favicons ---
+    // --- Favicons (3) ---
     '/favicon-32x32.png',
     '/favicon-16x16.png',
     '/favicon.ico'
@@ -245,11 +266,8 @@ self.addEventListener('install', (event) => {
 // • Takes control of clients via clients.claim().
 // • Notifies each client once per version.
 //
-// clients.claim() is guarded with .catch(). A rejected claim()
-// no longer short-circuits the promise chain.
-//
-// client.postMessage() is wrapped in try/catch so a single
-// invalid client cannot abort the forEach loop.
+// SW-DEF-01: clients.claim() is guarded with .catch().
+// SW-DEF-02: client.postMessage() is wrapped in try/catch.
 self.addEventListener('activate', (event) => {
     debugLog('Activating...');
 
@@ -419,12 +437,12 @@ self.addEventListener('message', (event) => {
 //   4. /auth/*             — must always hit the server.
 //   5. /healthz, /readyz   — liveness probes need fresh responses.
 //   6. /sw.js              — the browser must see byte changes.
-//   7. /app-debug.apk      — served with immutable Cache-Control
+//   7. Non-GET             — mutation methods must not be cached.
+//   8. Authorization hdr   — bearer/token requests are
+//                             session-scoped.
+//   9. /app-debug.apk      — served with immutable Cache-Control
 //                             by main.go; the browser's HTTP cache
 //                             is the correct storage layer.
-//   8. Non-GET             — mutation methods must not be cached.
-//   9. Authorization hdr   — bearer/token requests are
-//                             session-scoped.
 //
 // The /api check matches exactly '/api' or '/api/<anything>'
 // instead of any path starting with '/api'.
@@ -482,15 +500,15 @@ function isNavigationRequest(request) {
 // ============================================================
 // [10] Network-First for HTML
 // ============================================================
-// Flow:
+// Flow (5 levels):
 //   1. Start a fetch with a 5-second AbortController timeout.
 //   2. On success (HTTP 200, type basic):
 //        • Cache the response in RUNTIME_CACHE (for offline).
 //        • Return the fresh response to the client.
 //   3. On timeout (AbortError) or network failure:
-//        • Try the exact request from cache.
-//        • Else try '/' from cache (app shell).
-//        • Else return the offline response (503).
+//        a. Try the exact request from cache.
+//        b. Else try '/' from cache (app shell).
+//        c. Else return the offline response (503).
 function networkFirstHtml(request) {
     return new Promise((resolve) => {
         let settled = false;
