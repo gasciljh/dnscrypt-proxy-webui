@@ -103,6 +103,7 @@
         
         /* Smart Update Button Styles */
         .btn-update-pulse { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; animation: pulse-yellow 2s infinite; }
+        .btn-update-unknown { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; }
         @keyframes pulse-yellow {
             0% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(210, 153, 34, 0); }
@@ -642,7 +643,7 @@
             updateChecking: '⏳ Checking updates...',
             updateAvailable: '🔄 Update Available Now',
             updateUpToDate: '✅ List is Up-to-Date',
-            updateUnknown: '⚠️ Check Failed - Retry',
+            updateUnknown: '⚠️ Check Failed - Tap to Retry',
             updateNotNeededMsg: '✅ You are already using the latest version.',
             updateCurrentListText: '🔄 Update Current Lists',
             serverError: '❌ Connection failed.',
@@ -1768,7 +1769,6 @@
             checkOldModules();
             if (runtimeInfoLoaded) loadRuntimeInfo();
             refreshCompanionState();
-            checkForUpdates();
         }
     }
 
@@ -1823,7 +1823,7 @@
                 loadRuntimeInfo();
                 loadLogFiles();
                 refreshCompanionState();
-                checkForUpdates();
+                checkForUpdates(false);
                 verifyFailures = 0;
                 verifyBackoff = 3000;
             } else if (resp.status === 429) {
@@ -1913,7 +1913,7 @@
                 appInitialized = true;
             }
             refreshCompanionState();
-            checkForUpdates();
+            checkForUpdates(false);
         });
     }
 
@@ -2101,6 +2101,19 @@
                     sseStatusDebounceTimer = null;
                     updateStatusUI(incoming);
                 }, SSE_STATUS_DEBOUNCE_MS);
+            });
+
+            sse.addEventListener('update_status', function(e) {
+                try {
+                    var data = JSON.parse(e.data);
+                    if (data.status === 'up_to_date') {
+                        currentUpdateState = 'up_to_date';
+                        var updBtn = $('updateCurrentListBtn');
+                        var updTxt = $('updateCurrentListText');
+                        if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
+                        if(updTxt) updTxt.textContent = t('updateUpToDate');
+                    }
+                } catch(ex) {}
             });
 
             sse.addEventListener('stats', function(e) {
@@ -2297,7 +2310,7 @@
         });
     }
 
-    function checkForUpdates() {
+    function checkForUpdates(isManual) {
         if (isCheckingUpdates || isProcessing) return;
         isCheckingUpdates = true;
         
@@ -2316,17 +2329,24 @@
             isCheckingUpdates = false;
             if (wrapper) wrapper.style.pointerEvents = 'auto';
             
+            // معالجة الأخطاء
             if (err || !data || data.status === 'unknown') {
                 currentUpdateState = 'unknown';
                 if(btn) {
-                    btn.className = 'btn-apply';
-                    btn.style.background = 'linear-gradient(135deg, #d29922, #e3b341)';
-                    btn.style.color = '#000';
+                    btn.className = 'btn-apply btn-update-unknown';
+                    btn.style.background = '';
+                    btn.style.color = '';
                 }
                 if(txt) txt.textContent = t('updateUnknown');
+                
+                // إظهار الخطأ فقط إذا كان الفحص يدوياً
+                if (isManual) {
+                    showMsg(t('updateUnknown'), 'warning', 3000);
+                }
                 return;
             }
 
+            // معالجة النجاح
             if (data.status === 'available') {
                 currentUpdateState = 'available';
                 if(btn) {
@@ -2335,6 +2355,10 @@
                     btn.style.color = '';
                 }
                 if(txt) txt.textContent = t('updateAvailable');
+
+                // إشعار ذكي: يظهر سواء كان يدوياً أو خلفياً (لأن التحديث مهم)
+                showMsg(t('updateAvailable'), 'info', 4000);
+                
             } else {
                 currentUpdateState = 'up_to_date';
                 if(btn) {
@@ -2343,6 +2367,11 @@
                     btn.style.color = '';
                 }
                 if(txt) txt.textContent = t('updateUpToDate');
+                
+                // إظهار "محدث" فقط إذا كان الفحص يدوياً
+                if (isManual) {
+                    showMsg(t('updateUpToDate'), 'success', 2500);
+                }
             }
         });
     }
@@ -2358,114 +2387,129 @@
         
         var name = select.options[select.selectedIndex].text;
         var warningPrefix = hasUnsavedChanges() ? (t('unsavedWarning') + '\n\n') : '';
+        
         showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
-            isProcessing = true;
-            $('applyBtn').disabled = true;
-            $('updateBtnWrapper').style.pointerEvents = 'none';
-            $('saveAllowBtn').disabled = true;
-            $('saveDenyBtn').disabled = true;
-            $('toggleBtn').disabled = true;
-            $('restartBtn').disabled = true;
             
-            var progContainer = $('progressContainer'), progBar = $('progressBar');
-            progContainer.style.display = 'block';
-            progContainer.style.opacity = '1';
-            progBar.style.width = '5%';
-            progBar.classList.remove('success');
-            $('progressText').textContent = t('progressStart');
-            showMsg(t('updateStatus'), 'info', 2500);
-            if (safetyTimer) clearTimeout(safetyTimer);
-            safetyTimer = setTimeout(function() {
-                if (isProcessing) {
-                    isProcessing = false;
-                    $('applyBtn').disabled = false;
-                    $('updateBtnWrapper').style.pointerEvents = 'auto';
-                    $('saveAllowBtn').disabled = false;
-                    $('saveDenyBtn').disabled = false;
-                    $('toggleBtn').disabled = false;
-                    $('restartBtn').disabled = false;
-                    progContainer.style.display = 'none';
-                    if (window.progressPoller) clearInterval(window.progressPoller);
-                    showMsg(t('safetyTimeout'), 'warning', 5000);
-                }
-                safetyTimer = null;
-            }, 120000);
+            // Auto-save pending changes before starting the update
+            if (editStates.allow === EditState.EDIT && countChanges('allow') > 0) {
+                saveWithOptimistic('allow');
+            }
+            if (editStates.deny === EditState.EDIT && countChanges('deny') > 0) {
+                saveWithOptimistic('deny');
+            }
+            
+            // Wait a brief moment for the save requests to hit the backend
+            setTimeout(function() { executeProfileUpdate(profile); }, 600);
+        });
+    }
 
-            if (window.progressPoller) clearInterval(window.progressPoller);
-            window.progressPoller = setInterval(function() {
-                if (!isProcessing) { clearInterval(window.progressPoller); return; }
-                xhrGet('/api?action=get_progress', function(err, data) {
-                    if (err || !data || !data.progress) return;
-                    var parts = data.progress.split('|');
-                    var percent = parseInt(parts[0]) || 0;
-                    var progressMsg = parts[1] || '';
-                    if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
-                        clearInterval(window.progressPoller);
-                        if (safetyTimer) clearTimeout(safetyTimer);
-                        isProcessing = false;
-                        progContainer.style.display = 'none';
-                        $('applyBtn').disabled = false;
-                        $('updateBtnWrapper').style.pointerEvents = 'auto';
-                        $('saveAllowBtn').disabled = false;
-                        $('saveDenyBtn').disabled = false;
-                        $('toggleBtn').disabled = false;
-                        $('restartBtn').disabled = false;
-                        showMsg(t('corruptFileError'), 'error', 4000);
-                        return;
-                    }
-                    if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
-                        clearInterval(window.progressPoller);
-                        if (safetyTimer) clearTimeout(safetyTimer);
-                        if (isProcessing) {
-                            progBar.style.width = '100%';
-                            progBar.classList.add('success');
-                            showMsg(t('updateStatusDone'), 'success');
-                            setTimeout(function() {
-                                progContainer.style.opacity = '0';
-                                setTimeout(function() {
-                                    progContainer.style.display = 'none';
-                                    progContainer.style.opacity = '1';
-                                    progBar.classList.remove('success');
-                                    progBar.style.width = '0%';
-                                    isProcessing = false;
-                                    $('applyBtn').disabled = false;
-                                    $('updateBtnWrapper').style.pointerEvents = 'auto';
-                                    $('saveAllowBtn').disabled = false;
-                                    $('saveDenyBtn').disabled = false;
-                                    $('toggleBtn').disabled = false;
-                                    $('restartBtn').disabled = false;
-                                    
-                                    currentUpdateState = 'up_to_date';
-                                    var updBtn = $('updateCurrentListBtn');
-                                    var updTxt = $('updateCurrentListText');
-                                    if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
-                                    if(updTxt) updTxt.textContent = t('updateUpToDate');
-                                    
-                                    loadProfile();
-                                    refreshAll(true);
-                                }, 500);
-                            }, 1500);
-                        }
-                    }
-                });
-            }, 1000);
+    function executeProfileUpdate(profile) {
+        isProcessing = true;
+        $('applyBtn').disabled = true;
+        $('updateBtnWrapper').style.pointerEvents = 'none';
+        $('saveAllowBtn').disabled = true;
+        $('saveDenyBtn').disabled = true;
+        $('toggleBtn').disabled = true;
+        $('restartBtn').disabled = true;
+        
+        var progContainer = $('progressContainer'), progBar = $('progressBar');
+        progContainer.style.display = 'block';
+        progContainer.style.opacity = '1';
+        progBar.style.width = '5%';
+        progBar.classList.remove('success');
+        $('progressText').textContent = t('progressStart');
+        showMsg(t('updateStatus'), 'info', 2500);
+        if (safetyTimer) clearTimeout(safetyTimer);
+        safetyTimer = setTimeout(function() {
+            if (isProcessing) {
+                isProcessing = false;
+                $('applyBtn').disabled = false;
+                $('updateBtnWrapper').style.pointerEvents = 'auto';
+                $('saveAllowBtn').disabled = false;
+                $('saveDenyBtn').disabled = false;
+                $('toggleBtn').disabled = false;
+                $('restartBtn').disabled = false;
+                progContainer.style.display = 'none';
+                if (window.progressPoller) clearInterval(window.progressPoller);
+                showMsg(t('safetyTimeout'), 'warning', 5000);
+            }
+            safetyTimer = null;
+        }, 120000);
 
-            xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
-                if (err) {
+        if (window.progressPoller) clearInterval(window.progressPoller);
+        window.progressPoller = setInterval(function() {
+            if (!isProcessing) { clearInterval(window.progressPoller); return; }
+            xhrGet('/api?action=get_progress', function(err, data) {
+                if (err || !data || !data.progress) return;
+                var parts = data.progress.split('|');
+                var percent = parseInt(parts[0]) || 0;
+                var progressMsg = parts[1] || '';
+                if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
+                    clearInterval(window.progressPoller);
                     if (safetyTimer) clearTimeout(safetyTimer);
-                    if (window.progressPoller) clearInterval(window.progressPoller);
                     isProcessing = false;
+                    progContainer.style.display = 'none';
                     $('applyBtn').disabled = false;
                     $('updateBtnWrapper').style.pointerEvents = 'auto';
                     $('saveAllowBtn').disabled = false;
                     $('saveDenyBtn').disabled = false;
                     $('toggleBtn').disabled = false;
                     $('restartBtn').disabled = false;
-                    progContainer.style.display = 'none';
-                    showMsg(t('serverError'), 'error', 4000);
+                    showMsg(t('corruptFileError'), 'error', 4000);
+                    return;
+                }
+                if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
+                    clearInterval(window.progressPoller);
+                    if (safetyTimer) clearTimeout(safetyTimer);
+                    if (isProcessing) {
+                        progBar.style.width = '100%';
+                        progBar.classList.add('success');
+                        showMsg(t('updateStatusDone'), 'success');
+                        setTimeout(function() {
+                            progContainer.style.opacity = '0';
+                            setTimeout(function() {
+                                progContainer.style.display = 'none';
+                                progContainer.style.opacity = '1';
+                                progBar.classList.remove('success');
+                                progBar.style.width = '0%';
+                                isProcessing = false;
+                                $('applyBtn').disabled = false;
+                                $('updateBtnWrapper').style.pointerEvents = 'auto';
+                                $('saveAllowBtn').disabled = false;
+                                $('saveDenyBtn').disabled = false;
+                                $('toggleBtn').disabled = false;
+                                $('restartBtn').disabled = false;
+                                
+                                currentUpdateState = 'up_to_date';
+                                var updBtn = $('updateCurrentListBtn');
+                                var updTxt = $('updateCurrentListText');
+                                if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
+                                if(updTxt) updTxt.textContent = t('updateUpToDate');
+                                
+                                loadProfile();
+                                refreshAll(true);
+                            }, 500);
+                        }, 1500);
+                    }
                 }
             });
+        }, 1000);
+
+        xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
+            if (err) {
+                if (safetyTimer) clearTimeout(safetyTimer);
+                if (window.progressPoller) clearInterval(window.progressPoller);
+                isProcessing = false;
+                $('applyBtn').disabled = false;
+                $('updateBtnWrapper').style.pointerEvents = 'auto';
+                $('saveAllowBtn').disabled = false;
+                $('saveDenyBtn').disabled = false;
+                $('toggleBtn').disabled = false;
+                $('restartBtn').disabled = false;
+                progContainer.style.display = 'none';
+                showMsg(t('serverError'), 'error', 4000);
+            }
         });
     }
 
@@ -2828,7 +2872,7 @@
                 if (currentUpdateState === 'up_to_date') {
                     showMsg(t('updateNotNeededMsg'), 'info', 3000);
                 } else if (currentUpdateState === 'unknown') {
-                    checkForUpdates();
+                    checkForUpdates(true);
                 } else if (currentUpdateState === 'available') {
                     applyProfile(true);
                 }
@@ -2836,7 +2880,17 @@
         }
 
         $('profileSelect').addEventListener('change', function() {
-            checkForUpdates();
+            if (isProcessing || isCheckingUpdates) return;
+            // Reset the button to neutral state because the active profile hasn't changed yet
+            currentUpdateState = 'unknown';
+            var btn = $('updateCurrentListBtn');
+            var txt = $('updateCurrentListText');
+            if(btn) {
+                btn.className = 'btn-apply';
+                btn.style.background = 'linear-gradient(135deg, #6e40c9, #8957e5)';
+                btn.style.color = '#fff';
+            }
+            if(txt) txt.textContent = t('updateCurrentListText'); 
         });
 
         $('saveAllowBtn').addEventListener('click', function() { handleEditBtnClick('allow'); });
@@ -2932,7 +2986,39 @@
             }).catch(function() {});
         }
         
-        setTimeout(checkForUpdates, 1000);
+        // Smart Background Check (Battery Friendly)
+        let updateCheckTimer = null;
+        function startUpdatePolling() {
+            if (updateCheckTimer) clearInterval(updateCheckTimer);
+            updateCheckTimer = setInterval(function() {
+                if (appInitialized && !isProcessing && !isCheckingUpdates) {
+                    checkForUpdates(false);
+                }
+            }, 30 * 60 * 1000); // 30 minutes
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                // When user returns to the tab, check immediately, then restart timer
+                if (appInitialized && !isProcessing && !isCheckingUpdates) {
+                    checkForUpdates(false);
+                }
+                startUpdatePolling();
+            } else {
+                // When tab is hidden, stop timer to save battery
+                if (updateCheckTimer) {
+                    clearInterval(updateCheckTimer);
+                    updateCheckTimer = null;
+                }
+            }
+        });
+
+        // Start the timer initially if tab is visible
+        if (document.visibilityState === 'visible') {
+            startUpdatePolling();
+        }
+        
+        setTimeout(function() { checkForUpdates(false); }, 1000);
         verifyAuth();
     }
 

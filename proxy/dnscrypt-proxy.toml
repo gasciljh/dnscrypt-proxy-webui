@@ -162,6 +162,7 @@ log_files_max_backups = 1
 #
 #    ⚠️ If you change the list here, also update those three
 #       scripts so the legacy cleanup stays in sync.
+# note: see [docs]
 bootstrap_resolvers = ['94.140.14.14:53']
 
 # netprobe_timeout:
