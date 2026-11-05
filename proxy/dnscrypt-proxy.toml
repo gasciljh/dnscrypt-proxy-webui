@@ -162,14 +162,14 @@ log_files_max_backups = 1
 #
 #    ⚠️ If you change the list here, also update those three
 #       scripts so the legacy cleanup stays in sync.
-bootstrap_resolvers = ['9.9.9.9:53', '8.8.8.8:53', '1.1.1.1:53', '1.0.0.1:53']
+bootstrap_resolvers = ['94.140.14.14:53']
 
 # netprobe_timeout:
 #   Seconds. Maximum time to wait for the network before
 #   starting. 120 seconds is enough for phones that boot
 #   slowly (Android on 4G).
 netprobe_timeout = 120
-netprobe_address = '9.9.9.9:53'
+netprobe_address = '94.140.14.14:53'
 
 # ============================================================
 # [6] DNSCrypt-level blocking
