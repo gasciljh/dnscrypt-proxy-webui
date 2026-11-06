@@ -2381,7 +2381,7 @@ func startService() {
 
 	// --- [3] Kill existing ---
 	portOpen := isPortOpen(5354)
-	processRunning, _ := isProcessRunning()
+	_, processRunning := isProcessRunning()
 	if processRunning || portOpen {
 		logEvent(fmt.Sprintf("⚠️ Existing DNS engine detected (process=%v, port=%v), killing...",
 			processRunning, portOpen))
@@ -2486,7 +2486,7 @@ func stopService() {
 	invalidateStatusCache()
 
 	// --- [3] Kill ---
-	processRunning, _ := isProcessRunning()
+	_, processRunning := isProcessRunning()
 	if processRunning {
 		_ = runShell("pkill -9 -x dnscrypt-proxy 2>/dev/null")
 	}
