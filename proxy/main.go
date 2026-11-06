@@ -587,11 +587,11 @@ var (
 	lastUpdateMu    sync.Mutex
 
 	profiles = map[string]Profile{
-		"light":    {"HaGeZi Light", "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/light.txt"},
-		"normal":   {"HaGeZi Normal", "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/multi.txt"},
-		"pro":      {"HaGeZi PRO", "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/pro.txt"},
-		"proplus":  {"HaGeZi PRO++", "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/pro.plus.txt"},
-		"ultimate": {"HaGeZi Ultimate", "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/wildcard/ultimate.txt"},
+		"light":    {"HaGeZi Light", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/light.txt"},
+		"normal":   {"HaGeZi Normal", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/multi.txt"},
+		"pro":      {"HaGeZi PRO", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.txt"},
+		"proplus":  {"HaGeZi PRO++", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/pro.plus.txt"},
+		"ultimate": {"HaGeZi Ultimate", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/ultimate.txt"},
 	}
 
 	oldModulesCache []OldModuleInfo
@@ -4524,35 +4524,25 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 		return map[string]interface{}{"status": "unknown", "reason": "invalid_profile"}
 	}
 
-	// 4. Fetch remote version (Range Request)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	// 4. Fetch remote version (Cascade: Range -> Full GET)
+	remoteVer := fetchRemoteVersion(profile.URL)
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", profile.URL, nil)
-	req.Header.Set("Range", "bytes=0-4096")
-	req.Header.Set("User-Agent", USER_AGENT)
-
-	client := getDownloadClient()
-	resp, err := client.Do(req)
-	if err != nil {
-		return map[string]interface{}{"status": "unknown", "reason": "network_error"}
-	}
-	defer resp.Body.Close()
-
-	// Verify HTTP status (206 Partial Content or 200 OK)
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
-		return map[string]interface{}{"status": "unknown", "reason": "http_error"}
+	// 5. Fail-Safe: If remote version is empty, it's a network/CDN issue.
+	// Return "unknown" (orange button) instead of "available" (yellow button).
+	if remoteVer == "" {
+		return map[string]interface{}{
+			"status": "unknown",
+			"reason": "remote_version_unavailable",
+		}
 	}
 
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	remoteVer := extractVersion(string(bodyBytes))
-
+	// 6. Compare safely
 	status := "up_to_date"
-	if localVer == "" || remoteVer == "" || localVer != remoteVer {
+	if localVer == "" || localVer != remoteVer {
 		status = "available"
 	}
 
-	// 5. Write to cache under lock
+	// 7. Write to cache under lock
 	updateCheckMu.Lock()
 	updateCheckCache[profileKey] = cachedUpdateStatus{
 		Status:    status,
@@ -4567,6 +4557,49 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 		"local_version":  localVer,
 		"remote_version": remoteVer,
 	}
+}
+
+// fetchRemoteVersion tries Range Request first, then falls back to Full GET.
+func fetchRemoteVersion(url string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := getDownloadClient()
+
+	// Attempt 1: Range Request (Fastest)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req.Header.Set("Range", "bytes=0-4096")
+	req.Header.Set("User-Agent", USER_AGENT)
+
+	resp, err := client.Do(req)
+	if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent) {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+		v := extractVersion(string(body))
+		if v != "" {
+			return v
+		}
+	} else if resp != nil {
+		resp.Body.Close()
+	}
+
+	// Attempt 2: Full GET (Fallback)
+	req, _ = http.NewRequestWithContext(ctx, "GET", url, nil)
+	req.Header.Set("User-Agent", USER_AGENT)
+
+	resp, err = client.Do(req)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+		v := extractVersion(string(body))
+		if v != "" {
+			return v
+		}
+	} else if resp != nil {
+		resp.Body.Close()
+	}
+
+	return ""
 }
 
 // ============================================================

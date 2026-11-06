@@ -103,7 +103,7 @@
         
         /* Smart Update Button Styles */
         .btn-update-pulse { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; animation: pulse-yellow 2s infinite; }
-        .btn-update-unknown { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; }
+        .btn-update-unknown { background: linear-gradient(135deg, #e67e22, #d35400) !important; color: #fff !important; }
         @keyframes pulse-yellow {
             0% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(210, 153, 34, 0); }
@@ -1670,9 +1670,6 @@
         $('currentLabel').textContent = t('currentLabel');
         $('applyText').textContent = t('apply');
         
-        var updText = $('updateCurrentListText'); 
-        if (updText) updText.textContent = t('updateCurrentListText');
-        
         $('syncText').textContent = t('sync');
         $('forceRefreshText').textContent = t('forceRefresh');
         $('logsText').textContent = t('logs');
@@ -1747,15 +1744,7 @@
         var dashText = $('dashboardLinkText');
         if (dashText) dashText.textContent = t('dashboardLinkText');
         
-        // Refresh update button text
-        var updText = $('updateCurrentListText');
-        if (updText) {
-            if (currentUpdateState === 'checking') updText.textContent = t('updateChecking');
-            else if (currentUpdateState === 'available') updText.textContent = t('updateAvailable');
-            else if (currentUpdateState === 'up_to_date') updText.textContent = t('updateUpToDate');
-            else if (currentUpdateState === 'unknown') updText.textContent = t('updateUnknown');
-            else updText.textContent = t('updateCurrentListText');
-        }
+        updateSmartUpdateButtonUI();
     }
 
     function toggleLanguage() {
@@ -2071,10 +2060,7 @@
                             
                             // Update Smart Button State after success
                             currentUpdateState = 'up_to_date';
-                            var updBtn = $('updateCurrentListBtn');
-                            var updTxt = $('updateCurrentListText');
-                            if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
-                            if(updTxt) updTxt.textContent = t('updateUpToDate');
+                            updateSmartUpdateButtonUI();
                             
                             loadProfile();
                             refreshAll(true);
@@ -2108,10 +2094,7 @@
                     var data = JSON.parse(e.data);
                     if (data.status === 'up_to_date') {
                         currentUpdateState = 'up_to_date';
-                        var updBtn = $('updateCurrentListBtn');
-                        var updTxt = $('updateCurrentListText');
-                        if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
-                        if(updTxt) updTxt.textContent = t('updateUpToDate');
+                        updateSmartUpdateButtonUI();
                     }
                 } catch(ex) {}
             });
@@ -2266,6 +2249,13 @@
             $('sourceCountText').style.color = 'var(--success)';
         }
         $('editorCard').style.display = 'block';
+        
+        if (currentProfileIsEmpty) {
+            $('updateBtnWrapper').style.display = 'none';
+        } else {
+            $('updateBtnWrapper').style.display = 'block';
+            updateSmartUpdateButtonUI();
+        }
     }
     function loadProfile(callback) {
         if (isProcessing) { if (callback) callback(); return; }
@@ -2310,68 +2300,72 @@
         });
     }
 
+    function updateSmartUpdateButtonUI() {
+        if (currentProfileIsEmpty) {
+            var wrapper = $('updateBtnWrapper');
+            if (wrapper) wrapper.style.display = 'none';
+            return;
+        }
+        
+        var btn = $('updateCurrentListBtn');
+        var txt = $('updateCurrentListText');
+        if (!btn || !txt) return;
+
+        // إعادة تعيين الأنماط المضمنة
+        btn.style.background = '';
+        btn.style.color = '';
+
+        if (currentUpdateState === 'checking') {
+            btn.className = 'btn-apply btn-update-disabled';
+            txt.textContent = t('updateChecking');
+        } else if (currentUpdateState === 'available') {
+            btn.className = 'btn-apply btn-update-pulse';
+            txt.textContent = t('updateAvailable');
+        } else if (currentUpdateState === 'up_to_date') {
+            btn.className = 'btn-apply btn-update-disabled';
+            txt.textContent = t('updateUpToDate');
+        } else {
+            // الحالة الافتراضية (unknown أو خطأ) -> زر برتقالي
+            btn.className = 'btn-apply btn-update-unknown';
+            txt.textContent = t('updateUnknown');
+        }
+    }
+
     function checkForUpdates(isManual) {
+        if (currentProfileIsEmpty) {
+            var wrapper = $('updateBtnWrapper');
+            if (wrapper) wrapper.style.display = 'none';
+            return;
+        }
+        
         if (isCheckingUpdates || isProcessing) return;
         isCheckingUpdates = true;
         
         var wrapper = $('updateBtnWrapper');
-        var btn = $('updateCurrentListBtn');
-        var txt = $('updateCurrentListText');
         
         if (wrapper) wrapper.style.pointerEvents = 'none';
-        if (btn && txt) {
-            currentUpdateState = 'checking';
-            btn.className = 'btn-apply btn-update-disabled';
-            txt.textContent = t('updateChecking');
-        }
+        currentUpdateState = 'checking';
+        updateSmartUpdateButtonUI();
 
         xhrGet('/api?action=check_update', function(err, data) {
             isCheckingUpdates = false;
             if (wrapper) wrapper.style.pointerEvents = 'auto';
             
-            // معالجة الأخطاء
             if (err || !data || data.status === 'unknown') {
                 currentUpdateState = 'unknown';
-                if(btn) {
-                    btn.className = 'btn-apply btn-update-unknown';
-                    btn.style.background = '';
-                    btn.style.color = '';
-                }
-                if(txt) txt.textContent = t('updateUnknown');
-                
-                // إظهار الخطأ فقط إذا كان الفحص يدوياً
-                if (isManual) {
-                    showMsg(t('updateUnknown'), 'warning', 3000);
-                }
+                updateSmartUpdateButtonUI();
+                if (isManual) showMsg(t('updateUnknown'), 'warning', 3000);
                 return;
             }
 
-            // معالجة النجاح
             if (data.status === 'available') {
                 currentUpdateState = 'available';
-                if(btn) {
-                    btn.className = 'btn-apply btn-update-pulse';
-                    btn.style.background = ''; // Let class handle it
-                    btn.style.color = '';
-                }
-                if(txt) txt.textContent = t('updateAvailable');
-
-                // إشعار ذكي: يظهر سواء كان يدوياً أو خلفياً (لأن التحديث مهم)
+                updateSmartUpdateButtonUI();
                 showMsg(t('updateAvailable'), 'info', 4000);
-                
             } else {
                 currentUpdateState = 'up_to_date';
-                if(btn) {
-                    btn.className = 'btn-apply btn-update-disabled';
-                    btn.style.background = '';
-                    btn.style.color = '';
-                }
-                if(txt) txt.textContent = t('updateUpToDate');
-                
-                // إظهار "محدث" فقط إذا كان الفحص يدوياً
-                if (isManual) {
-                    showMsg(t('updateUpToDate'), 'success', 2500);
-                }
+                updateSmartUpdateButtonUI();
+                if (isManual) showMsg(t('updateUpToDate'), 'success', 2500);
             }
         });
     }
@@ -2482,10 +2476,7 @@
                                 $('restartBtn').disabled = false;
                                 
                                 currentUpdateState = 'up_to_date';
-                                var updBtn = $('updateCurrentListBtn');
-                                var updTxt = $('updateCurrentListText');
-                                if(updBtn) updBtn.className = 'btn-apply btn-update-disabled';
-                                if(updTxt) updTxt.textContent = t('updateUpToDate');
+                                updateSmartUpdateButtonUI();
                                 
                                 loadProfile();
                                 refreshAll(true);
@@ -2881,16 +2872,21 @@
 
         $('profileSelect').addEventListener('change', function() {
             if (isProcessing || isCheckingUpdates) return;
-            // Reset the button to neutral state because the active profile hasn't changed yet
-            currentUpdateState = 'unknown';
-            var btn = $('updateCurrentListBtn');
-            var txt = $('updateCurrentListText');
-            if(btn) {
-                btn.className = 'btn-apply';
-                btn.style.background = 'linear-gradient(135deg, #6e40c9, #8957e5)';
-                btn.style.color = '#fff';
+            var selectedProfile = this.value;
+            var wrapper = $('updateBtnWrapper');
+            
+            if (selectedProfile !== currentProfileKey) {
+                // القائمة المختارة تختلف عن النشطة -> أخفِ الزر
+                if (wrapper) wrapper.style.display = 'none';
+            } else {
+                // المستخدم عاد للقائمة النشطة -> أظهر الزر بحالته الصحيحة
+                if (!currentProfileIsEmpty) {
+                    if (wrapper) wrapper.style.display = 'block';
+                    updateSmartUpdateButtonUI();
+                } else {
+                    if (wrapper) wrapper.style.display = 'none';
+                }
             }
-            if(txt) txt.textContent = t('updateCurrentListText'); 
         });
 
         $('saveAllowBtn').addEventListener('click', function() { handleEditBtnClick('allow'); });
