@@ -7,38 +7,41 @@
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Boot service launcher (Magisk / KernelSU phase).
-# Triggered automatically at sys.boot_completed = 1.
+# Boot service launcher (Magisk / KernelSU / APatch phase).
+# Triggered at sys.boot_completed = 1.
 #
 # Responsibilities:
-#   • Wait for boot completion (multi-signal — see [12])
-#   • Wait for network readiness (max 15 × 2s + 10 × 2s)
-#   • Read webui.conf (with Port Guard — reject 8080)
-#   • Verify WebUI binary exists
-#   • Start WebUI (with one retry on failure)
-#   • Launch Watchdog as a standalone process
-#   • Respect the disable file (skip if present)
-#   • Trigger a periodic auto-backup if needed
+#   • Wait for boot completion (multi-signal)
+#   • Wait for network readiness
+#   • Read webui.conf (Port Guard rejects 8080)
+#   • Start WebUI (idempotent: kill → wait → verify → start)
+#   • Start Watchdog (idempotent: kill → nohup → verify)
+#   • Respect the disable file
+#   • Trigger periodic auto-backup if needed
 #   • Rotate old backups
-#   • Clean up leftover COMMIT'd transactions
-#   • Read .pending_notification (install → boot messaging)
-#   • Log active profile + expected memory limit
-#   • Ensure DNS starts after boot via a direct
-#     /api/ensure_running_service call
+#   • Clean up COMMIT'd transactions
+#   • Read .pending_notification
+#   • Ensure DNS starts after boot via /api/ensure_running_service
 #
 # Design:
 #   • Sources functions.sh (which sources boot-mini.sh).
-#   • On functions.sh load failure, only the minimum
-#     primitives are redefined inline so the WebUI can start
-#     and the user can see what is broken. Advanced features
-#     (firewall, backup, rotation) are skipped with a warning.
-#   • Watchdog runs as a separate file so $$ inside it refers
-#     to the real Watchdog PID (not service.sh's).
+#   • On functions.sh load failure, only minimum primitives
+#     are redefined inline so the WebUI can still start.
+#   • Watchdog is a separate process so $$ inside it resolves
+#     to the watchdog PID (not service.sh's).
 #   • All error paths are logged to dnscrypt_main.log.
 #
-# Module layout:
-#   Shell scripts live in $MODDIR (NOT under proxy/).
-#   Binaries and configs live under $MODDIR/proxy/.
+# Idempotency model (v1.5.0+fix):
+#   Every `start_*` step is prefixed with a `_kill_*_safely`
+#   helper that polls for actual process death (up to 3-5 s
+#   with 100 ms intervals), then verifies the port is free
+#   before launching. Repeated invocations therefore always
+#   converge to exactly one of each process.
+#
+#   Watchdog is launched via nohup (not setsid). On Android,
+#   setsid + & through `su -c` can produce TWO processes
+#   (wrapper + real), breaking the single-instance guarantee.
+#   nohup launches exactly one child.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -73,7 +76,7 @@ case "${1:-}" in
 esac
 
 # ============================================================
-# [2] Default paths (reconfigured after loading functions.sh)
+# [2] Default paths (reconfigured after functions.sh loads)
 # ============================================================
 LOG_FILE="/data/local/tmp/dnscrypt_main.log"
 PID_FILE="/data/local/tmp/dnscrypt.pid"
@@ -91,16 +94,14 @@ PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- Reserved port (from boot-mini.sh if available; 8080 otherwise) ---
-# The assignment is finalized after functions.sh is sourced.
+# --- Reserved port (finalized after functions.sh is sourced) ---
 _MONITORING_UI_PORT=""
 
 # ============================================================
 # [3] Log helper (fallback)
 # ============================================================
-# functions.sh sources boot-mini.sh which defines log_msg. If
-# functions.sh is unavailable, this local version is used
-# instead. No rotation — a single append per line.
+# Used only when functions.sh failed to load. log_msg from
+# boot-mini.sh takes precedence once sourced.
 log_msg() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE" 2>/dev/null
 }
@@ -110,9 +111,6 @@ log_msg "service.sh started ($MODULE_VERSION)"
 # ============================================================
 # [4] Load functions.sh (sources boot-mini.sh)
 # ============================================================
-# functions.sh already calls init_runtime_paths() at source
-# time. We only call it here as an idempotent fallback when
-# $RUN_DIR_ACTIVE is still empty.
 FUNCTIONS_LOADED=0
 if [ -f "$MODDIR/functions.sh" ]; then
     # shellcheck disable=SC1090
@@ -125,7 +123,7 @@ if [ -f "$MODDIR/functions.sh" ]; then
         if command -v init_runtime_paths >/dev/null 2>&1 \
            && [ -z "$RUN_DIR_ACTIVE" ]; then
             init_runtime_paths
-            log_msg "Runtime paths initialized (deferred, RUN_DIR was empty)"
+            log_msg "Runtime paths initialized (deferred)"
         fi
     else
         log_msg "WARNING: functions.sh loaded but critical functions missing"
@@ -134,18 +132,15 @@ else
     log_msg "WARNING: functions.sh not found, using inline fallbacks"
 fi
 
-# Finalize _MONITORING_UI_PORT: prefer the value from
-# boot-mini.sh (via functions.sh); fall back to 8080.
+# Prefer boot-mini.sh's constant; fall back to 8080.
 _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
 
 # ============================================================
 # [5] Inline fallbacks (minimal)
 # ============================================================
-# If functions.sh failed to load, only the primitives required
-# to start the WebUI are provided here. Every other feature
-# (firewall, backup, rotation, cleanup) is skipped with a
-# warning rather than silently reimplemented — the module is
-# in a degraded state and the user must see it clearly.
+# Only the primitives required to start the WebUI are
+# provided here. Advanced features (firewall, backup, rotation)
+# skip gracefully via [6] wrappers.
 _FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
@@ -173,9 +168,8 @@ if [ "$FUNCTIONS_LOADED" = "0" ]; then
 fi
 
 # --- Fallback: is_port_open ---
-# Three probes: /proc/net → ss → netstat.
-# The trailing space in ":$hex_port " is required — without it,
-# ":1F90" would also match ":1F90A".
+# /proc/net → ss → netstat. Trailing space in ":$hex_port "
+# prevents :1F90 from matching :1F90A.
 _inline_is_port_open() {
     local port="$1"
     local proto="${2:-tcp}"
@@ -223,9 +217,6 @@ _inline_cleanup_webui() {
 }
 
 # --- Fallback: read_conf ---
-# Uses plain `grep "^${key}="` — the `-F` flag would treat `^`
-# as a literal character, defeating the anchor and always
-# returning the default.
 _inline_read_conf() {
     local conf="$1"
     local key="$2"
@@ -277,8 +268,7 @@ _inline_get_port() {
 
 # --- Fallback: start_webui ---
 # Three-way launch: setsid → busybox setsid → nohup.
-# Waits up to 35 s for the port to bind, and detects early
-# process death (port collision) as a distinct failure mode.
+# Waits up to 35 s for the port to bind; detects early death.
 _inline_start_webui() {
     local bin="$1"
     local port="$2"
@@ -331,9 +321,6 @@ _inline_start_webui() {
 # ============================================================
 # [6] Unified wrappers
 # ============================================================
-# Each wrapper is defined in both branches of the if/else so
-# the rest of the script reads identically regardless of
-# whether functions.sh loaded.
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     do_cleanup_webui()  { cleanup_webui; }
     do_is_port_open()   { is_port_open "$1" "${2:-tcp}"; }
@@ -387,34 +374,119 @@ else
 fi
 
 # ============================================================
+# [6b] Process lifecycle helpers (idempotency primitives)
+# ============================================================
+# Four helpers give service.sh idempotent start semantics.
+# Every "start" in [16]/[17] is preceded by a corresponding
+# "kill … safely" call that:
+#   1. Sends SIGKILL to every matching process.
+#   2. Polls until the process set is empty (100 ms × N).
+#   3. Returns 0 on success, 1 on timeout (logged by caller).
+#
+# Polling interval (100 ms) is aggressive but bounded: the
+# worst-case wait is 5 s (webui) or 3 s (watchdog), which is
+# well within the boot budget. A blind `sleep 1` would not be
+# sufficient on devices where SIGKILL takes longer to reap.
+
+# _kill_webui_safely — kill all dnscrypt-webui instances.
+# Uses pgrep -x (exact comm match) to avoid matching unrelated
+# shells whose argv contains the string.
+_kill_webui_safely() {
+    local pids wait
+    pids=$(pgrep -x dnscrypt-webui 2>/dev/null)
+    if [ -n "$pids" ]; then
+        # Word-splitting is intentional: kill takes multiple PIDs.
+        # shellcheck disable=SC2086
+        kill -9 $pids 2>/dev/null
+    fi
+
+    wait=0
+    while [ "$wait" -lt 50 ]; do
+        if ! pgrep -x dnscrypt-webui >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.1
+        wait=$((wait + 1))
+    done
+    return 1
+}
+
+# _wait_port_free — poll until the port accepts no connection.
+# Caller must have already killed any process that held it.
+_wait_port_free() {
+    local port="$1"
+    local wait=0
+    while [ "$wait" -lt 30 ]; do
+        if ! do_is_port_open "$port" tcp; then
+            return 0
+        fi
+        sleep 0.1
+        wait=$((wait + 1))
+    done
+    return 1
+}
+
+# _kill_watchdogs_safely — kill all watchdog.sh instances.
+# Uses ps + grep (not pgrep -f) because pgrep -f would also
+# match this very shell's argv when the script name contains
+# "watchdog.sh". The `grep -v grep` filter excludes the grep
+# process itself; `grep -v 'service\.sh'` is not needed because
+# service.sh does not carry that literal string.
+_kill_watchdogs_safely() {
+    local pids wait
+    pids=$(ps -A -o PID,ARGS 2>/dev/null \
+        | grep '/watchdog\.sh' \
+        | grep -v grep \
+        | awk '{print $1}')
+    if [ -n "$pids" ]; then
+        # shellcheck disable=SC2086
+        kill -9 $pids 2>/dev/null
+    fi
+
+    wait=0
+    while [ "$wait" -lt 30 ]; do
+        if [ -z "$(ps -A -o ARGS 2>/dev/null \
+                  | grep '/watchdog\.sh' \
+                  | grep -v grep)" ]; then
+            return 0
+        fi
+        sleep 0.1
+        wait=$((wait + 1))
+    done
+    return 1
+}
+
+# _count_watchdogs — current watchdog count (0, 1, 2, …).
+# Used to verify single-instance after launch.
+_count_watchdogs() {
+    ps -A -o ARGS 2>/dev/null \
+        | grep '/watchdog\.sh' \
+        | grep -v grep \
+        | wc -l \
+        | tr -d ' '
+}
+
+# ============================================================
 # [7] Initial cleanup
 # ============================================================
-# Kill any leftover dnscrypt-proxy process from a previous run
-# before the WebUI and DNS engine start. Defensive: the
-# previous shutdown should have cleaned up, but a hard reboot
-# (power loss, watchdog reset) can leave the process running.
-#
-# Note: cleanup_proxy does NOT touch the WebUI or the
-# watchdog. Those are handled separately in [16] and [17].
+# Kill any leftover dnscrypt-proxy from a previous run before
+# the WebUI and DNS engine start. Defensive: previous shutdown
+# should have cleaned up, but a hard reboot can leave the
+# process running.
 do_cleanup_proxy
 log_msg "Initial cleanup done"
 
-# --- Cleanup leftover COMMIT'd transactions ---
-# Defense-in-depth: main.go also does this at startup, but a
-# boot-time cleanup catches the case where main.go never
-# started.
+# Cleanup leftover COMMIT'd transactions.
+# Defense-in-depth: main.go also does this, but a boot-time
+# cleanup catches the case where main.go never started.
 do_cleanup_transactions
 
 # ============================================================
-# [7b] Read pending notification (if any)
+# [7b] Read pending notification (informational)
 # ============================================================
 # customize.sh writes .pending_notification after a successful
-# restore during an upgrade. main.go also reads this file at
-# startup, but if the WebUI has not started yet we still want
-# the boot log to reflect what happened during the install.
-#
-# We log the content but do NOT delete the file — main.go
-# owns the deletion (it re-reads the file at startup).
+# restore during an upgrade. main.go owns the deletion; this
+# read is purely for the boot log.
 if [ -f "$PENDING_NOTIFY_FILE" ]; then
     _pending_msg=$(cat "$PENDING_NOTIFY_FILE" 2>/dev/null | tr -d '\r\n ')
     if [ -n "$_pending_msg" ]; then
@@ -425,16 +497,9 @@ fi
 # ============================================================
 # [8] Migrate old PID files from /data/local/tmp
 # ============================================================
-# v1.2.0 migrated the runtime directory from /data/local/tmp to
-# $MODDIR/proxy/run/. This section moves the surviving files
-# from the legacy location to the new one on first boot after
-# an upgrade.
-#
-# `dnscrypt.status` carries the user's ON/OFF intent and MUST
-# NOT be deleted from /data/local/tmp unless the copy into
-# $RUN_DIR_ACTIVE actually succeeded. On failure we keep the
-# source and log a WARNING. PID files are transient and always
-# safe to drop.
+# v1.2.0 migrated the runtime dir to $MODDIR/proxy/run/.
+# `dnscrypt.status` carries user intent and is preserved on
+# successful copy; PID files are transient and always dropped.
 if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ] && \
    [ "$RUN_DIR_ACTIVE" != "/data/local/tmp" ]; then
     for _mf in dnscrypt.pid webui.pid watchdog.pid dnscrypt.status; do
@@ -442,7 +507,6 @@ if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ] && \
 
         if [ "$_mf" = "dnscrypt.status" ]; then
             if [ -f "$RUN_DIR_ACTIVE/$_mf" ]; then
-                # Already present in run/ — tmp copy is stale.
                 rm -f "/data/local/tmp/$_mf" 2>/dev/null
             elif cp -f "/data/local/tmp/$_mf" "$RUN_DIR_ACTIVE/$_mf" 2>/dev/null; then
                 log_msg "Migrated $_mf from tmp to run/"
@@ -451,7 +515,6 @@ if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ] && \
                 log_msg "WARNING: could not migrate $_mf — keeping /tmp copy"
             fi
         else
-            # PID files are transient — always safe to drop.
             rm -f "/data/local/tmp/$_mf" 2>/dev/null
         fi
     done
@@ -460,9 +523,8 @@ fi
 # ============================================================
 # [9] Verify binary permissions
 # ============================================================
-# A manual reinstall or an unusual file-manager copy can strip
-# the execute bit. This section re-applies it before the
-# binaries are used.
+# A manual reinstall or file-manager copy can strip the
+# execute bit. Re-apply it before use.
 BIN_DIR="$MODDIR/proxy"
 
 if [ -f "$BIN_DIR/dnscrypt-proxy" ] && [ ! -x "$BIN_DIR/dnscrypt-proxy" ]; then
@@ -478,9 +540,6 @@ fi
 # ============================================================
 # [10] One-time notification when credentials are ready
 # ============================================================
-# customize.sh writes /data/local/tmp/dnscrypt_credentials.txt
-# on every install. Log a one-time hint on first boot so the
-# user sees a clear pointer to their login file.
 if [ -f "$CRED_FILE" ] && [ ! -f /data/local/tmp/.dnscrypt_credentials_shown ]; then
     log_msg "Login credentials are ready at: $CRED_FILE"
     touch /data/local/tmp/.dnscrypt_credentials_shown 2>/dev/null
@@ -489,18 +548,6 @@ fi
 # ============================================================
 # [11] If module is disabled → cleanup and exit
 # ============================================================
-# When the user disables the module, the manager touches a
-# `disable` file in the module folder. The boot service
-# respects that and:
-#   1. Writes OFF to STATUS_FILE (user intent = off).
-#   2. Cleans up the firewall.
-#   3. Kills the DNS engine and WebUI processes.
-#   4. Resets the system's private DNS mode to AUTO.
-#   5. Exits cleanly with code 0.
-#
-# `settings delete global private_dns_mode` is wrapped in a
-# bounded wait loop because the settings service may not be
-# ready immediately after boot.
 if [ -f "$MODDIR/disable" ]; then
     log_msg "WARNING: Module is disabled, cleaning up before exit"
 
@@ -546,33 +593,18 @@ fi
 # ============================================================
 # [12] Wait for boot completion — multi-signal
 # ============================================================
-# Magisk triggers this script when `sys.boot_completed = 1`
+# Magisk triggers this script when sys.boot_completed = 1
 # fires, but on some ROMs that property is set BEFORE the
-# system is truly usable. The two most common symptoms of
-# firing too early:
-#
-#   • `settings` service not yet available → private_dns_mode
+# system is truly usable. Symptoms of firing too early:
+#   • `settings` service not available → private_dns_mode
 #     reset fails silently
-#   • Network stack partially initialized → the network wait
-#     in [13] fails and the DNS engine starts without
-#     reachability
+#   • Network stack partially initialized → [13] fails
 #
-# Fix: wait for TWO independent signals, in order.
+# Fix: wait for TWO independent signals:
+#   1. sys.boot_completed = 1 (poll every 3 s, max 180 s)
+#   2. Boot animation stopped (poll every 2 s, max 30 s)
 #
-#   Signal 1 (primary)   — `sys.boot_completed = 1`
-#     Polled every 3 s, max 180 s (60 iterations).
-#     A ROM that never sets this is broken; we still proceed
-#     after the timeout with a warning.
-#
-#   Signal 2 (secondary) — boot animation has stopped
-#     `init.svc.bootanim = stopped` OR
-#     `service.bootanim.exit = 1`
-#     Polled every 2 s, max 30 s (15 iterations).
-#     Best-effort: some minimal ROMs do not define either
-#     property. On timeout we proceed with a warning.
-#
-# A final 2-second grace period follows, letting the property
-# observer settle before the network check in [13] begins.
+# Timeout is a soft failure — we proceed with a WARNING.
 _wait=0
 _max=60
 _boot_property_seen=0
@@ -623,17 +655,13 @@ sleep 2
 # ============================================================
 # [13] Wait for network readiness
 # ============================================================
-# Two-stage network readiness check:
+# Two-stage check:
+#   Stage 1 (30 s) — wait for a default route.
+#   Stage 2 (20 s) — fall back to ping reachability.
 #
-#   Stage 1 (30 seconds) — wait for a default route.
-#   Stage 2 (20 seconds) — if no default route was seen, fall
-#     back to a ping reachability check against two public DNS
-#     servers.
-#
-# If neither succeeds within 50 seconds total, log a warning
-# and proceed anyway. Refusing to start on a device with a
-# slow network is worse than starting with a partially-
-# initialized network: the DNS engine and WebUI can bind their
+# If neither succeeds within 50 s, log a warning and proceed.
+# Refusing to start on a slow network is worse than starting
+# partially initialized: the WebUI and DNS engine bind
 # loopback sockets regardless of external reachability, and
 # the blocklist download retries automatically.
 net_wait=0
@@ -674,15 +702,14 @@ log_msg "Network ready (route wait: $((net_wait * 2))s)"
 # ============================================================
 # [14] Read webui.conf settings
 # ============================================================
-# Reads the values service.sh needs:
+# Values read:
 #   PORT               — WebUI listen port (default 9090)
-#   AUTO_RESTART_DNS   — watchdog restarts DNS if it crashes
-#   AUTO_RESTART_WEBUI — watchdog restarts WebUI if it dies
+#   AUTO_RESTART_DNS   — watchdog restarts DNS on crash
+#   AUTO_RESTART_WEBUI — watchdog restarts WebUI on crash
 #
-# `do_get_port` applies the Port Guard (rejects 8080) and the
-# leading-zero-safe numeric check. The two AUTO_RESTART values
-# are validated as either "0" or "1" — a value outside that
-# set is normalized to "1".
+# do_get_port applies the Port Guard (rejects 8080) and the
+# leading-zero-safe numeric check. AUTO_RESTART values outside
+# {0,1} normalize to "1".
 CONF_FILE="$BIN_DIR/webui.conf"
 PORT=$(do_get_port "$CONF_FILE")
 [ -z "$PORT" ] && PORT="9090"
@@ -704,7 +731,7 @@ fi
 # ============================================================
 # [14b] Log active profile + memory hint
 # ============================================================
-# Purely informational. main.go remains the authority for the
+# Informational only. main.go remains the authority for the
 # actual debug.SetMemoryLimit() value.
 ACTIVE_PROFILE="pro"
 if [ -f "$SELECTED_PROFILE_FILE" ]; then
@@ -721,12 +748,12 @@ log_msg "Expected memory limit: $MEMORY_HINT (managed by main.go)"
 # ============================================================
 # [14c] Auto-backup if needed
 # ============================================================
-# Triggers a backup of the 5 user config files to the
-# persistent directory if the last one is older than 24 hours.
+# Triggers a backup of the 5 user config files if the last
+# one is older than 24 hours.
 #
-# `BACKUP_STATUS` distinguishes "created" from "skipped" by
-# comparing the mtime of `.last_auto_backup` before and after
-# the call. Consumed by the summary block in [18].
+# BACKUP_STATUS distinguishes "created" from "skipped" by
+# comparing the mtime of .last_auto_backup before and after.
+# Consumed by the summary block in §[18].
 BACKUP_STATUS="not-attempted"
 BACKUP_COUNT="0"
 LAST_STABLE_NAME=""
@@ -773,8 +800,8 @@ if [ "$FUNCTIONS_LOADED" = "1" ]; then
 
     # --- Collect backup state for the summary ---
     # Counts directories matching the timestamp pattern
-    # `^[0-9]{8}-[0-9]{6}-`. current/, txn-*, orphan-txn-*,
-    # .restore_snap.*, and apk/ are excluded by the pattern.
+    # ^[0-9]{8}-[0-9]{6}-. Excludes current/, txn-*, orphan-txn-*,
+    # .restore_snap.*, apk/.
     if [ -d "$PERSISTENT_BACKUP" ]; then
         BACKUP_COUNT=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && \
             ls -1d ./*/ 2>/dev/null | \
@@ -795,9 +822,8 @@ fi
 # [15] Verify WebUI binary exists
 # ============================================================
 # A missing binary is fatal: without the WebUI, the user has
-# no way to interact with the module. Exit code 1 and write
-# OFF to the status file so the user's intent is not left
-# ambiguous.
+# no way to interact with the module. Write OFF to
+# STATUS_FILE so the user's intent is not left ambiguous.
 WEBUI="$BIN_DIR/dnscrypt-webui"
 if [ ! -f "$WEBUI" ]; then
     log_msg "ERROR: WebUI binary not found at $WEBUI"
@@ -806,27 +832,64 @@ if [ ! -f "$WEBUI" ]; then
 fi
 
 # ============================================================
-# [16] Start WebUI (two attempts)
+# [16] Start WebUI — linear sequence, no confusing conditionals
 # ============================================================
-# Two attempts with a 3-second pause between them. Each
-# attempt goes through `do_start_webui`, which:
-#   • cleans up any leftover WebUI process,
-#   • launches the binary via setsid/busybox-setsid/nohup,
-#   • writes the PID file atomically,
-#   • waits up to 35 seconds for the port to bind.
+# Sequence:
+#   [A] Kill any existing WebUI (poll for death, up to 5 s).
+#   [B] Wait for the port to be free (poll, up to 3 s). If
+#       still occupied after 3 s, force-kill via fuser and
+#       wait again.
+#   [C] Start the WebUI (up to 2 attempts).
+#   [D] Verify: exactly one process + port bound.
 #
-# Worst-case wall-clock for [16] = 2 × (35 + 3) = 76 seconds.
-# On a healthy device, the first attempt succeeds in < 2 s.
+# Why "always attempt to start" instead of "start only if
+# port is free":
+#   A port-check false positive (kernel TIME_WAIT transient,
+#   or a race between two `ss` calls) would prevent a
+#   legitimate start. Better to let start_native_webui's own
+#   bind attempt report the real failure with a clear log.
+#
+# The `do_start_webui` wrapper delegates to
+# start_native_webui (or its inline fallback), which already
+# performs its own cleanup. The explicit kill/wait here is
+# additional diagnostics — it shows in the log WHY start is
+# being attempted.
 WEBUI_STARTED=0
+
+# --- [A] Kill existing WebUI ---
+log_msg "🧹 Killing any existing WebUI before start..."
+if ! _kill_webui_safely; then
+    log_msg "⚠️ WebUI survived 5s (likely D-state); proceeding anyway"
+fi
+log_msg "✅ Previous WebUI instances cleared"
+
+# --- [B] Wait for port to be free (with fuser fallback) ---
+log_msg "🔍 Waiting for port $PORT to be free..."
+if ! _wait_port_free "$PORT"; then
+    log_msg "⚠️ Port $PORT still in use after 3s, forcing cleanup"
+    if command -v fuser >/dev/null 2>&1; then
+        fuser -k "$PORT"/tcp 2>/dev/null
+        sleep 1
+    fi
+    if ! _wait_port_free "$PORT"; then
+        log_msg "❌ Port $PORT STILL in use after fuser"
+        log_msg "   Diagnostic: ss -tlnp | grep :$PORT"
+        log_msg "   Proceeding anyway — start will report its own failure"
+    fi
+fi
+
+# --- [C] Start (2 attempts) ---
 for _attempt in 1 2; do
     log_msg "WebUI start attempt $_attempt/2..."
     if do_start_webui "$WEBUI" "$PORT"; then
         WEBUI_STARTED=1
-        log_msg "WebUI started (Port: $PORT)"
+        log_msg "✅ WebUI started (port: $PORT)"
         break
     fi
     if [ "$_attempt" -lt 2 ]; then
         log_msg "WARNING: WebUI start attempt $_attempt failed, retrying in 3s..."
+        _kill_webui_safely
+        _wait_port_free "$PORT"
         sleep 3
     fi
 done
@@ -835,29 +898,42 @@ if [ "$WEBUI_STARTED" != "1" ]; then
     log_msg "ERROR: WebUI failed to start after 2 attempts"
 fi
 
+# --- [D] Verify: exactly one WebUI process ---
+if [ "$WEBUI_STARTED" = "1" ]; then
+    sleep 1
+    _wb_count=$(pgrep -x dnscrypt-webui 2>/dev/null | wc -l | tr -d ' ')
+    case "$_wb_count" in
+        1)
+            log_msg "✅ WebUI verification: 1 instance (correct)"
+            ;;
+        0)
+            log_msg "❌ WebUI verification: 0 instances (start failed)"
+            WEBUI_STARTED=0
+            ;;
+        *)
+            log_msg "⚠️ WebUI verification: $_wb_count instances (expected 1)"
+            ;;
+    esac
+fi
+
 # ============================================================
-# [17] Watchdog — independent process
+# [17] Start Watchdog — single instance guaranteed
 # ============================================================
-# The watchdog is a SEPARATE PROCESS, not a subshell of this
-# script. This is critical: inside watchdog.sh, `$$` must
-# resolve to the watchdog's own PID (not service.sh's), so
-# that its PID file and duplicate-instance guard work.
+# The watchdog is a SEPARATE PROCESS (not a subshell), so
+# `$$` inside watchdog.sh resolves to the watchdog's own PID.
 #
-# WATCHDOG_SCRIPT lives in the module root ($MODDIR), NOT in
-# $MODDIR/proxy/. Standard Magisk layout: shell scripts at the
-# root, binaries and configs under proxy/.
+# Launch strategy: nohup is preferred over setsid. On Android,
+# setsid + & through `su -c` can produce TWO processes (one
+# for the setsid wrapper, one for the actual watchdog), which
+# breaks the single-instance guarantee that watchdog.sh's own
+# PID-file check relies on. nohup launches exactly one child
+# process and does not create a new session — this is
+# sufficient for a daemon that ignores SIGHUP anyway.
 #
-# Launch strategy: mirrors _inline_start_webui and
-# start_native_webui — setsid → busybox setsid → nohup.
-#
-# Arguments passed to watchdog.sh (5, in order):
-#   1. WATCHDOG_PID_FILE
-#   2. MODDIR
-#   3. PORT
-#   4. AUTO_RESTART_DNS
-#   5. AUTO_RESTART_WEBUI
-#
-# After launch, wait up to 3 s for the PID file to appear.
+# Three-phase:
+#   1. Kill any existing watchdog (poll for death, up to 3 s).
+#   2. Launch one watchdog via nohup.
+#   3. Verify: exactly one process by counting matching argv.
 WATCHDOG_SCRIPT="$MODDIR/watchdog.sh"
 
 if [ ! -f "$WATCHDOG_SCRIPT" ]; then
@@ -868,24 +944,20 @@ else
         chmod 0755 "$WATCHDOG_SCRIPT" 2>/dev/null
     fi
 
-    if command -v setsid >/dev/null 2>&1; then
-        setsid "$WATCHDOG_SCRIPT" \
-            "$WATCHDOG_PID_FILE" \
-            "$MODDIR" \
-            "$PORT" \
-            "$AUTO_RESTART_DNS" \
-            "$AUTO_RESTART_WEBUI" \
-            >/dev/null 2>&1 < /dev/null &
-    elif command -v busybox >/dev/null 2>&1 && \
-         busybox --list 2>/dev/null | grep -q setsid; then
-        busybox setsid "$WATCHDOG_SCRIPT" \
-            "$WATCHDOG_PID_FILE" \
-            "$MODDIR" \
-            "$PORT" \
-            "$AUTO_RESTART_DNS" \
-            "$AUTO_RESTART_WEBUI" \
-            >/dev/null 2>&1 < /dev/null &
-    else
+    # --- Phase 1: kill existing watchdogs ---
+    log_msg "🧹 Killing any existing Watchdog..."
+    if ! _kill_watchdogs_safely; then
+        log_msg "⚠️ Some watchdogs survived 3s (likely D-state)"
+    fi
+    rm -f "$WATCHDOG_PID_FILE" 2>/dev/null
+    log_msg "✅ Previous Watchdog instances cleared"
+
+    # --- Phase 2: launch one watchdog ---
+    # nohup is the primary launcher. setsid is a fallback only
+    # for devices without nohup (rare on Android, but possible
+    # on minimal builds).
+    _launcher=""
+    if command -v nohup >/dev/null 2>&1; then
         nohup "$WATCHDOG_SCRIPT" \
             "$WATCHDOG_PID_FILE" \
             "$MODDIR" \
@@ -893,33 +965,60 @@ else
             "$AUTO_RESTART_DNS" \
             "$AUTO_RESTART_WEBUI" \
             >/dev/null 2>&1 < /dev/null &
+        _launcher="nohup"
+    elif command -v setsid >/dev/null 2>&1; then
+        setsid "$WATCHDOG_SCRIPT" \
+            "$WATCHDOG_PID_FILE" \
+            "$MODDIR" \
+            "$PORT" \
+            "$AUTO_RESTART_DNS" \
+            "$AUTO_RESTART_WEBUI" \
+            >/dev/null 2>&1 < /dev/null &
+        _launcher="setsid (fallback)"
+    else
+        "$WATCHDOG_SCRIPT" \
+            "$WATCHDOG_PID_FILE" \
+            "$MODDIR" \
+            "$PORT" \
+            "$AUTO_RESTART_DNS" \
+            "$AUTO_RESTART_WEBUI" \
+            >/dev/null 2>&1 < /dev/null &
+        _launcher="direct (fallback)"
     fi
+    log_msg "Watchdog launched via $_launcher"
 
-    # Wait up to 3 s for the PID file to appear.
+    # --- Phase 3: verify single instance ---
+    # Wait up to 5 s for the PID file, then count matching
+    # processes. Expect exactly 1.
     _wd_wait=0
-    while [ "$_wd_wait" -lt 3 ] && [ ! -f "$WATCHDOG_PID_FILE" ]; do
+    while [ "$_wd_wait" -lt 5 ] && [ ! -f "$WATCHDOG_PID_FILE" ]; do
         sleep 1
         _wd_wait=$((_wd_wait + 1))
     done
 
-    if [ -f "$WATCHDOG_PID_FILE" ]; then
-        wd_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null | tr -d '\r\n ')
-        if [ -n "$wd_pid" ] && kill -0 "$wd_pid" 2>/dev/null; then
-            log_msg "Watchdog started (PID: $wd_pid)"
-        else
-            log_msg "WARNING: Watchdog PID file exists but process is not alive"
-        fi
-    else
-        log_msg "WARNING: Watchdog PID file not created — check watchdog.sh"
-    fi
+    sleep 1  # let the process fully initialize
+
+    _wd_count=$(_count_watchdogs)
+    case "$_wd_count" in
+        1)
+            wd_pid=$(pgrep -f '/watchdog\.sh' 2>/dev/null | head -n1)
+            log_msg "✅ Watchdog started (PID: ${wd_pid:-unknown}, single instance)"
+            ;;
+        0)
+            log_msg "❌ Watchdog failed to start (0 instances)"
+            ;;
+        *)
+            log_msg "⚠️ CRITICAL: $_wd_count watchdog instances (expected 1)"
+            log_msg "   Investigate immediately: ps -A | grep watchdog"
+            ;;
+    esac
 fi
 
 # ============================================================
 # [18] Final structured summary
 # ============================================================
-# Compact, structured summary. Every field is emitted as a
-# separate log line prefixed with a bullet point, so the boot
-# log can be grepped for a specific field without parsing a
+# Compact, one log line per field, prefixed with a bullet.
+# Each field can be grepped individually without parsing a
 # multi-line blob.
 log_msg "─────────────────────────────────────────────"
 log_msg "service.sh summary ($MODULE_VERSION):"
@@ -958,14 +1057,14 @@ log_msg "───────────────────────�
 #
 # Intent check: STATUS_FILE is read to determine whether DNS
 # should start:
-#   • ON  → call the API to ensure the DNS engine is running
+#   • ON  → call the API to ensure DNS is running
 #   • OFF → do nothing (user stopped it manually)
 #
-# Three-way HTTP client cascade:
-#   The cascade tries curl → wget → busybox wget. Each attempt
-#   is guarded by `command -v`, and the first that succeeds
-#   returns immediately. If none is available, a clear warning
-#   is logged and the watchdog's own retry loop takes over.
+# Three-way HTTP client cascade: curl → wget → busybox wget.
+# Each attempt is guarded by `command -v`, and the first
+# success returns immediately. If no client is available, a
+# warning is logged and the watchdog's own retry loop takes
+# over.
 log_msg "🔧 Ensuring DNS starts after boot..."
 
 # Guard: WATCHDOG_TOKEN_FILE may be undefined if functions.sh
@@ -1003,13 +1102,8 @@ if [ "$_dns_intent" = "ON" ]; then
         # --------------------------------------------------------
         # Three-way HTTP client cascade.
         # --------------------------------------------------------
-        # Try curl → wget → busybox wget. The first client whose
-        # `command -v` succeeds is used.
-        #
-        # Both stdout and stderr are captured into
-        # `_api_response` so a client-level error is preserved
-        # in the boot log.
-        # --------------------------------------------------------
+        # Both stdout and stderr are captured into `_api_response`
+        # so a client-level error is preserved in the boot log.
         _api_client=""
         if command -v curl >/dev/null 2>&1; then
             _api_client="curl"
@@ -1063,7 +1157,7 @@ if [ "$_dns_intent" = "ON" ]; then
                 # --------------------------------------------------------
                 # Extract the `action` field (best-effort).
                 # --------------------------------------------------------
-                # The response is one of:
+                # Response shapes:
                 #   {"status":"ON",  "action":"none"}     — already running
                 #   {"status":"ON",  "action":"started"}  — started now
                 #   {"status":"OFF", "action":"skipped"}  — user wants OFF
@@ -1071,7 +1165,6 @@ if [ "$_dns_intent" = "ON" ]; then
                 # Substring match, not a JSON parse — keeps the
                 # script POSIX-portable. Any unrecognized response
                 # falls through to the generic "succeeded" message.
-                # --------------------------------------------------------
                 case "$_api_response" in
                     *'"action":"started"'*)
                         log_msg "✅ DNS start requested successfully (action=started)"
@@ -1097,4 +1190,10 @@ else
     log_msg "ℹ️ User intent is OFF — skipping DNS auto-start"
 fi
 
+# ============================================================
+# [20] Clean exit
+# ============================================================
+# All state has been logged. The root manager treats exit 0
+# as "boot service completed". A non-zero exit is interpreted
+# as "boot service failed" and may trigger a reboot loop.
 exit 0

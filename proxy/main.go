@@ -5,6 +5,29 @@
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
+// HTTP backend for the DNSCrypt Smart Filter module.
+//
+// Responsibilities:
+//   • Serve WebUI (9090) + Dashboard (9091)
+//   • Authentication (Basic / Bearer / Cookie / Watchdog token)
+//   • Rate limiting (login, Basic Auth, install)
+//   • Blocklist download + rebuild (streaming I/O)
+//   • SSE live updates (status, stats, resources, progress)
+//   • Metrics proxy (Prometheus → JSON)
+//   • Runtime info endpoint
+//   • Health checks (/healthz + /readyz)
+//   • Firewall lifecycle (via shell scripts)
+//   • Watchdog integration
+//   • Auto-backup + rotation
+//   • Companion app install (4 endpoints)
+//
+// Service lifecycle (v1.5.0+fix):
+//   startService() and stopService() are idempotent. Every
+//   start acquires an atomic mkdir lock, kills any existing
+//   process, polls for actual death (100 ms × N), verifies
+//   the port is free, then starts and re-verifies. Repeated
+//   invocations always converge to exactly one running engine.
+// ============================================================
 
 package main
 
@@ -175,6 +198,24 @@ const (
 	AUTO_BACKUP_TIMEOUT    = 15 * time.Second
 	WATCHDOG_TOKEN_HEADER  = "X-Watchdog-Token"
 	METRICS_MAX_BODY       = 2 * 1024 * 1024
+
+	// Service lifecycle (v1.5.0+fix)
+	//
+	// SERVICE_LOCK_TIMEOUT: how long to wait to acquire the
+	// start lock. A lock held for longer than this indicates a
+	// crashed start that never released it — we clean it up.
+	SERVICE_LOCK_TIMEOUT = 5 * time.Second
+
+	// PROCESS_DEATH_TIMEOUT: how long to poll for actual
+	// process death after SIGKILL (100 ms × N). SIGKILL is
+	// synchronous on Linux but the parent may need a few
+	// hundred ms to reap the process.
+	PROCESS_DEATH_TIMEOUT = 5 * time.Second
+
+	// PORT_FREE_TIMEOUT: how long to poll for port 5354 to
+	// become free after the process is dead. The kernel may
+	// keep a UDP socket in TIME_WAIT briefly.
+	PORT_FREE_TIMEOUT = 5 * time.Second
 )
 
 // ============================================================
@@ -349,6 +390,11 @@ func initRulesState() {
 // ============================================================
 // [6] HTTP client
 // ============================================================
+// Bootstrap DNS is hardcoded to 8.8.8.8 (primary) with 9.9.9.9
+// as fallback. The dnscrypt-proxy.toml bootstrap_resolvers is
+// deliberately NOT read — that config is used by the DNS
+// engine itself, but our blocklist downloads need an
+// independent resolver that is stable in restricted networks.
 var (
 	downloadClientMu sync.Mutex
 	downloadClient   *http.Client
@@ -2173,26 +2219,208 @@ func ensureExecutable(path string) bool {
 }
 
 // ============================================================
-// [20] Service lifecycle
+// [20] Service lifecycle helpers — idempotent primitives
 // ============================================================
+// Three helpers give startService/stopService their idempotent
+// semantics. They mirror the pattern proven in service.sh and
+// watchdog.sh (which are already in production):
+//
+//   acquireServiceLock() — atomic mkdir lock. Two concurrent
+//     startService() calls cannot both proceed; the loser
+//     waits up to SERVICE_LOCK_TIMEOUT, then gives up with a
+//     clear log line. A stale lock (crashed previous start)
+//     is removed automatically once its age exceeds the
+//     timeout.
+//
+//   waitForProcessDeath() — polls for actual process death
+//     (100 ms × N, up to PROCESS_DEATH_TIMEOUT). A blind
+//     `time.Sleep(500*time.Millisecond)` after SIGKILL is
+//     insufficient: on a loaded device the kernel may take
+//     several hundred ms to reap the process, during which
+//     the port 5354 remains bound.
+//
+//   waitForPortFree() — polls for port 5354 to become free.
+//     The kernel keeps a UDP socket in a transient state for
+//     a short window after the owning process dies; without
+//     this poll, the new engine's bind can fail with
+//     "address already in use".
+func getServiceLockPath() string {
+	return filepath.Join(getActiveRunDir(), ".service.start.lock")
+}
+
+// acquireServiceLock blocks until the mkdir lock is acquired,
+// or returns an error after SERVICE_LOCK_TIMEOUT.
+//
+// The returned release function MUST be called exactly once
+// (typically via defer) to avoid leaving a stale lock. It is
+// idempotent: calling it twice is safe.
+func acquireServiceLock() (func(), error) {
+	lockPath := getServiceLockPath()
+	deadline := time.Now().Add(SERVICE_LOCK_TIMEOUT)
+	var staleCheckCount int
+
+	for {
+		if err := os.Mkdir(lockPath, 0700); err == nil {
+			// Success. Return an idempotent release closure.
+			released := false
+			return func() {
+				if !released {
+					released = true
+					os.Remove(lockPath)
+				}
+			}, nil
+		}
+
+		// Lock exists. Check for staleness (crashed start).
+		if fi, err := os.Stat(lockPath); err == nil {
+			age := time.Since(fi.ModTime())
+			if age > SERVICE_LOCK_TIMEOUT {
+				staleCheckCount++
+				if staleCheckCount <= 3 {
+					logWithLevel("warn", fmt.Sprintf(
+						"🧹 Removing stale service lock (age=%v, attempt=%d)",
+						age, staleCheckCount))
+				}
+				os.Remove(lockPath)
+				continue
+			}
+		}
+
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("service lock timeout after %v (another start in progress?)", SERVICE_LOCK_TIMEOUT)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// waitForProcessDeath polls for the DNS engine process to
+// disappear. Returns true if it died within `timeout`, false
+// otherwise.
+func waitForProcessDeath(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, found := isProcessRunning(); !found {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return false
+}
+
+// waitForPortFree polls for the given port to accept no
+// connections. Returns true if it became free within `timeout`,
+// false otherwise.
+//
+// isPortOpen is NOT cached — this is deliberately accurate.
+// A stale port-cache entry (5 s TTL) would defeat the entire
+// purpose of this poll.
+func waitForPortFree(port int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if !isPortOpen(port) {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return false
+}
+
+// ============================================================
+// [20a] Service lifecycle — idempotent
+// ============================================================
+// startService and stopService are the single entry points
+// for DNS engine lifecycle. Both are idempotent: calling them
+// repeatedly converges to the same state regardless of the
+// initial state.
+//
+// startService sequence:
+//   1. Acquire lock (fail → another start in progress → return).
+//   2. Invalidate port cache (stale entries from previous run).
+//   3. Kill any existing dnscrypt-proxy (pkill -9 -x).
+//   4. Wait for actual process death (poll 100 ms × 5 s).
+//   5. Wait for port 5354 to be free (poll 100 ms × 5 s).
+//   6. Clean up shell artifacts (functions.sh:cleanup_proxy).
+//   7. Ensure executable.
+//   8. Start cmd.
+//   9. Write PID atomically.
+//  10. Wait for process + port readiness (up to 45 s).
+//  11. Firewall setup.
+//  12. Write STATUS_FILE = ON.
+//  13. Broadcast SSE events.
+//
+// stopService sequence:
+//   1. Write STATUS_FILE = OFF first (user intent).
+//   2. Invalidate port cache.
+//   3. Kill dnscrypt-proxy (pkill -9 -x).
+//   4. Wait for actual process death (poll 100 ms × 5 s).
+//   5. Clean up shell artifacts.
+//   6. Remove PID file.
+//   7. Firewall cleanup.
+//   8. Write STATUS_FILE = OFF again (belt-and-suspenders).
+//   9. Broadcast SSE events.
+
+// startService launches the DNS engine with full idempotency.
 func startService() {
 	defer func() { recover() }()
 	logEvent("▶️ Starting service...")
 
+	// --- [1] Acquire lock ---
+	release, err := acquireServiceLock()
+	if err != nil {
+		logWithLevel("warn", "⚠️ startService: "+err.Error())
+		return
+	}
+	defer release()
+
+	// --- [2] Invalidate port cache ---
 	portCacheMu.Lock()
 	portCacheMap = make(map[int]portCacheEntry)
 	portCacheMu.Unlock()
-
 	invalidateStatusCache()
-	if getStatus() == "ON" {
-		return
-	}
-	if !ensureExecutable(BIN) {
-		return
-	}
-	runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
-	time.Sleep(500 * time.Millisecond)
 
+	// --- [3] Kill existing ---
+	portOpen := isPortOpen(5354)
+	processRunning, _ := isProcessRunning()
+	if processRunning || portOpen {
+		logEvent(fmt.Sprintf("⚠️ Existing DNS engine detected (process=%v, port=%v), killing...",
+			processRunning, portOpen))
+		_ = runShell("pkill -9 -x dnscrypt-proxy 2>/dev/null")
+	}
+
+	// --- [4] Wait for death ---
+	if processRunning {
+		if !waitForProcessDeath(PROCESS_DEATH_TIMEOUT) {
+			logWithLevel("warn", fmt.Sprintf(
+				"⚠️ dnscrypt-proxy still alive after %v (D-state?), continuing anyway",
+				PROCESS_DEATH_TIMEOUT))
+		} else {
+			logEvent("✅ Previous DNS engine stopped cleanly")
+		}
+	}
+
+	// --- [5] Wait for port free ---
+	if portOpen {
+		if !waitForPortFree(5354, PORT_FREE_TIMEOUT) {
+			logWithLevel("warn", fmt.Sprintf(
+				"⚠️ Port 5354 still in use after %v (kernel TIME_WAIT?), continuing anyway",
+				PORT_FREE_TIMEOUT))
+		} else {
+			logEvent("✅ Port 5354 is free")
+		}
+	}
+
+	// --- [6] Shell-level cleanup ---
+	_ = runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
+	time.Sleep(200 * time.Millisecond)
+
+	// --- [7] Ensure executable ---
+	if !ensureExecutable(BIN) {
+		logWithLevel("error", "❌ startService: binary not executable: "+BIN)
+		return
+	}
+
+	// --- [8] Start cmd ---
 	cmd := exec.Command(BIN, "-config", CONF)
 	cmd.Dir = PROXYDIR
 	if err := cmd.Start(); err != nil {
@@ -2206,67 +2434,113 @@ func startService() {
 		}
 	}()
 
+	// --- [9] Write PID ---
 	atomicWriteFile(PID_FILE, []byte(strconv.Itoa(pid)), 0666)
 
+	// --- [10] Wait for readiness ---
 	if !waitForProcessAndPort(SERVICE_START_TIMEOUT) {
 		if cmd.Process != nil {
 			cmd.Process.Kill()
 		}
-		runShell("pkill -9 dnscrypt-proxy")
-		runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
+		_ = runShell("pkill -9 -x dnscrypt-proxy")
+		_ = runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
 		os.Remove(PID_FILE)
 		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
 		invalidateStatusCache()
+		logWithLevel("error", "❌ startService: engine failed to bind 5354 within timeout")
 		return
 	}
-	runShell("settings delete global private_dns_mode")
-	runShellWithTimeout(
+
+	// --- [11] Firewall ---
+	_ = runShell("settings delete global private_dns_mode")
+	_ = runShellWithTimeout(
 		". "+shellQuote(getFunctionsScript())+"; manage_firewall 1",
 		90*time.Second)
+
+	// --- [12] Write STATUS_FILE ---
 	atomicWriteFile(STATUS_FILE, []byte("ON"), 0666)
 	invalidateStatusCache()
+
+	// --- [13] Broadcast ---
 	logEvent("✅ Service started (PID: " + strconv.Itoa(pid) + ")")
-	runShell("ndc resolver flushdefaultif 2>/dev/null || true")
+	_ = runShell("ndc resolver flushdefaultif 2>/dev/null || true")
 	broadcastEvent("status", "ON")
 	broadcastEvent("resources", fmt.Sprintf("{\"ram\":\"%s\"}", getResourceUsage()))
 }
 
+// stopService kills the DNS engine and tears down the firewall.
+//
+// Writes STATUS_FILE = OFF FIRST so the watchdog reads the
+// user's intent even if the rest of this function hangs.
 func stopService() {
 	defer func() { recover() }()
 	logEvent("⏹️ Stopping service...")
+
+	// --- [1] User intent first ---
+	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
+
+	// --- [2] Invalidate caches ---
 	portCacheMu.Lock()
 	portCacheMap = make(map[int]portCacheEntry)
 	portCacheMu.Unlock()
-	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
 	invalidateStatusCache()
 
-	runShell("pkill -9 dnscrypt-proxy")
-	runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
+	// --- [3] Kill ---
+	processRunning, _ := isProcessRunning()
+	if processRunning {
+		_ = runShell("pkill -9 -x dnscrypt-proxy 2>/dev/null")
+	}
+
+	// --- [4] Wait for death ---
+	if processRunning {
+		if !waitForProcessDeath(PROCESS_DEATH_TIMEOUT) {
+			logWithLevel("warn", fmt.Sprintf(
+				"⚠️ dnscrypt-proxy still alive after %v (D-state?)",
+				PROCESS_DEATH_TIMEOUT))
+		}
+	}
+
+	// --- [5] Shell cleanup ---
+	_ = runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
+
+	// --- [6] Remove PID ---
 	if err := os.Remove(PID_FILE); err != nil && !os.IsNotExist(err) {
 		logWithLevel("warn", "stopService: could not remove PID file: "+err.Error())
 	}
-	runShellWithTimeout(
+
+	// --- [7] Firewall ---
+	_ = runShellWithTimeout(
 		". "+shellQuote(getFunctionsScript())+"; manage_firewall 0",
 		90*time.Second)
+
+	// --- [8] Write STATUS_FILE again (belt-and-suspenders) ---
 	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
 	invalidateStatusCache()
+
+	// --- [9] Broadcast ---
 	logEvent("✅ Service stopped")
 	broadcastEvent("status", "OFF")
 	broadcastEvent("resources", "{\"ram\":\"N/A\"}")
 }
 
+// reloadService sends SIGHUP when the engine is running, else
+// it starts the service.
 func reloadService() {
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
 	defer func() { recover() }()
 	if getStatus() == "ON" {
-		runShell("pkill -HUP dnscrypt-proxy")
+		_ = runShell("pkill -HUP dnscrypt-proxy")
 		logEvent("✅ Service reloaded (HUP)")
 	} else {
 		startService()
 	}
 }
 
+// restartService is stop + start. Both are now idempotent,
+// so the whole sequence is safe even if the engine is
+// already dead or if two restarts race (the mkdir lock in
+// startService serializes them).
 func restartService() {
 	defer func() { recover() }()
 	logEvent("🔄 Restarting service...")
@@ -2280,6 +2554,11 @@ func restartService() {
 // ============================================================
 // [21] getEntriesCount + validate + internet + progress
 // ============================================================
+// getEntriesCount counts newlines in blocklist.txt.
+//
+// Cache key: (size, mtime, inode). The inode field guards
+// against same-second same-size writes on filesystems with
+// coarse mtime resolution.
 func getEntriesCount() int {
 	defer func() { recover() }()
 
@@ -2334,6 +2613,8 @@ func inodeOf(fi os.FileInfo) uint64 {
 	return 0
 }
 
+// validateBlocklist rejects files that are too small or that
+// have no valid domain/IP entries in the first 500 lines.
 func validateBlocklist(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -2367,6 +2648,9 @@ func validateBlocklist(path string) error {
 	return fmt.Errorf("no valid domain/IP entries in first 500 lines")
 }
 
+// isInternetAvailable prefers a quick radio-state check via
+// `getprop`; falls back to HEAD probes against three public
+// resolvers.
 func isInternetAvailable() bool {
 	defer func() { recover() }()
 	out, err := exec.Command("getprop", "gsm.network.type").Output()
@@ -2400,6 +2684,13 @@ func isInternetAvailable() bool {
 	return false
 }
 
+// writeProgress atomically updates PROGRESS_FILE and broadcasts
+// the value over SSE.
+//
+// The message is sanitized: `|` is the field separator between
+// percent and message in the file format (parsed by
+// /api?action=get_progress), so any `|` in the message would
+// shift the parse.
 func writeProgress(percent int, msg string) {
 	msg = strings.ReplaceAll(msg, "|", "/")
 	atomicWriteFile(PROGRESS_FILE, []byte(fmt.Sprintf("%d|%s", percent, msg)), 0666)
@@ -2409,6 +2700,9 @@ func writeProgress(percent int, msg string) {
 // ============================================================
 // [22] Download with progress
 // ============================================================
+// downloadWithProgress streams a URL into dest via
+// atomicWriteStream, reporting progress through the SSE
+// channel every 5 percent.
 func downloadWithProgress(urlStr, dest string) error {
 	defer func() { recover() }()
 	if !isInternetAvailable() {
@@ -2516,6 +2810,9 @@ func isAllowedBySuffixes(norm string, allowSet map[string]struct{}) bool {
 // ============================================================
 // [24] Rebuild blocklist.txt
 // ============================================================
+// rebuildBlocklist streams blocklist.raw through the allowlist
+// filter, appends the deny section, and writes blocklist.txt
+// atomically. Serialized by rebuildMu.
 func rebuildBlocklist() error {
 	rebuildMu.Lock()
 	defer rebuildMu.Unlock()
@@ -2954,6 +3251,15 @@ func buildProfileResponse() map[string]interface{} {
 // ============================================================
 // [28] Update profile
 // ============================================================
+// updateProfile downloads the selected profile, validates it,
+// rebuilds the blocklist, restarts the engine if it was
+// running, and applies the new memory limit.
+//
+// startService and stopService are now idempotent (v1.5.0+fix),
+// so this function does not need to check getStatus() before
+// calling them — the lock + kill + wait + verify sequence
+// inside each one guarantees correct behavior regardless of
+// the initial state.
 func updateProfile(key string) map[string]interface{} {
 	defer func() {
 		if r := recover(); r != nil {
@@ -4425,7 +4731,7 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	buf := make([]byte, 4096)
 	n, _ := f.Read(buf)
 	f.Close()
-	
+
 	if n > 0 {
 		localVer = extractVersion(string(buf[:n]))
 	}

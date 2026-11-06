@@ -20,8 +20,7 @@
 #   • Service state checks (DNS engine + WebUI)
 #   • IPv6 availability detection
 #   • Firewall management (nftables / iptables / ip6tables)
-#   • Process cleanup (proxy, webui, orphans)
-#   • WebUI launcher (setsid → busybox setsid → nohup)
+#   • Process lifecycle (idempotent kill + start with verification)
 #   • Persistent backup helpers (backup, restore, rotate)
 #   • Watchdog token reader
 #
@@ -29,10 +28,13 @@
 #   log_msg, get_run_dir, read_conf, is_port_open, get_webui_port,
 #   and the _MONITORING_UI_PORT constant.
 #
-# File layout:
-#   Part 1 of 3 — [1]–[11]:  Foundation
-#   Part 2 of 3 — [12]–[17]: Firewall
-#   Part 3 of 3 — [18]–[32]: Runtime + Backup
+# Process lifecycle model (v1.5.0+fix):
+#   Every cleanup function polls for actual process death (100ms
+#   intervals, up to 3-5s) instead of relying on a blind `sleep`.
+#   Every start function prefixes its launch with a synchronous
+#   kill + wait + verify-port-free sequence, making repeated
+#   invocations converge to exactly one process. This matches
+#   the pattern proven in uninstall.sh:_inline_kill_all.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -40,13 +42,6 @@ export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/ad
 # ============================================================
 # [1] Module root resolution
 # ============================================================
-# Resolution order:
-#   1. Caller-supplied MODDIR (the normal path).
-#   2. $0-derived path (source tree or post-install layout).
-#   3. Canonical install path.
-#
-# Mirrors boot-mini.sh's logic so functions.sh can locate
-# boot-mini.sh even when MODDIR was not pre-set.
 if [ -z "${MODDIR:-}" ]; then
     _fn_dir="${0%/*}"
     case "$_fn_dir" in
@@ -62,11 +57,6 @@ fi
 # ============================================================
 # [1b] Load boot-mini.sh (Layer 0)
 # ============================================================
-# Search order: module root first (post-install layout), then
-# proxy/ (source tree). A missing boot-mini.sh is fatal — every
-# function below depends on the primitives it defines. The
-# error is emitted on stderr so the caller can see it in the
-# log or logcat.
 _BM_PATH=""
 for _cand in "$MODDIR/boot-mini.sh" "$MODDIR/proxy/boot-mini.sh"; do
     if [ -f "$_cand" ]; then
@@ -77,7 +67,7 @@ done
 
 if [ -z "$_BM_PATH" ]; then
     echo "functions.sh: boot-mini.sh not found (searched \$MODDIR and \$MODDIR/proxy)" >&2
-    # shellcheck disable=SC2317  # return-or-exit idiom
+    # shellcheck disable=SC2317
     return 1 2>/dev/null || exit 1
 fi
 
@@ -87,9 +77,6 @@ unset _BM_PATH _cand
 # ============================================================
 # [2] Run directory management
 # ============================================================
-# ensure_run_dir adds chown 0:0 that the Layer-0 primitive does
-# not enforce on an already-existing directory.
-# Returns 0 on success, 1 when only /data/local/tmp is available.
 ensure_run_dir() {
     local rd
     rd=$(get_run_dir)
@@ -98,16 +85,12 @@ ensure_run_dir() {
     return 0
 }
 
-# run_file <name> — absolute path of a runtime file.
 run_file() {
     local run_dir
     run_dir=$(get_run_dir)
     printf "%s/%s" "$run_dir" "$1"
 }
 
-# init_runtime_paths — populates the runtime file paths and
-# exports them. Prefers $RUN_DIR when writable; falls back to
-# /data/local/tmp otherwise.
 init_runtime_paths() {
     local rd
     rd=$(get_run_dir)
@@ -139,43 +122,12 @@ WEBUI_CONF="$MODDIR/proxy/webui.conf"
 SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 # --- Data preservation paths ---
-#
-# PERSISTENT_BACKUP and USER_FILES are the canonical Layer-1
-# definitions. Two other files define the same values:
-#
-#   • customize.sh  — the installer runs BEFORE the module is
-#                     extracted, so functions.sh is not on disk
-#                     yet. It cannot source this file.
-#   • uninstall.sh  — runs self-contained (see its header) and
-#                     intentionally does not source this file.
-#
-# The duplication is deliberate. Any change to PERSISTENT_BACKUP
-# or USER_FILES MUST be applied to all three files. A CI check
-# (`ci.yml` Step 3 — PERSISTENT_BACKUP path consistency)
-# enforces that every file references the same path.
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
 # ============================================================
 # [3] JSON escape helper
 # ============================================================
-# Escapes a string for safe inclusion inside a JSON string
-# literal. Handles:
-#   • backslash    → \\   (MUST be first)
-#   • double-quote → \"
-#   • tab          → \t
-#   • CR           → \r
-#   • LF           → \n   (multi-line input)
-#
-# After the explicit escapes, any remaining C0 control
-# characters (0x00–0x08, 0x0B, 0x0C, 0x0E–0x1F) are dropped.
-# Tab (0x09), CR (0x0D) and LF (0x0A) are excluded from the
-# `tr` range because they have already been escaped above.
-#
-# NOTE: `tr` alone cannot perform this transformation — it
-# operates per-byte and cannot insert multi-byte escape
-# sequences. The `awk` pass handles the escape; `tr` cleans up
-# whatever remains.
 json_escape() {
     printf '%s' "$1" | awk '
         BEGIN { ORS = "" }
@@ -193,13 +145,6 @@ json_escape() {
 # ============================================================
 # [4] Bootstrap resolver cache
 # ============================================================
-# get_dynamic_bootstrap — extract bootstrap_resolvers from the
-# TOML. Bounds the count at 32 so a malformed TOML cannot
-# produce an unbounded firewall rule set.
-#
-# Anchor pattern requires bootstrap_resolvers to be the first
-# non-whitespace token, so a commented-out line (`# bootstrap_...`)
-# does not trigger collection.
 get_dynamic_bootstrap() {
     [ ! -f "$TOML_FILE" ] && return 0
 
@@ -218,9 +163,6 @@ get_dynamic_bootstrap() {
 _BOOTSTRAP_CACHE_FILE="$(get_run_dir)/.bootstrap_cache"
 _BOOTSTRAP_CACHE_TTL=300
 
-# _load_bootstrap_from_cache — rejects missing paths, symlinks,
-# non-regular files, stale entries, and content that does not
-# look like a space-separated IP list.
 _load_bootstrap_from_cache() {
     [ ! -f "$_BOOTSTRAP_CACHE_FILE" ] && return 1
     [ -L "$_BOOTSTRAP_CACHE_FILE" ] && return 1
@@ -230,8 +172,6 @@ _load_bootstrap_from_cache() {
         || cache_mtime=$(stat -f %m "$_BOOTSTRAP_CACHE_FILE" 2>/dev/null) \
         || return 1
 
-    # Guard: a failed `date` produces an empty `now`, which would
-    # turn the arithmetic below into a syntax error.
     now=$(date +%s 2>/dev/null)
     case "$now" in
         ''|*[!0-9]*) return 1 ;;
@@ -255,7 +195,6 @@ _load_bootstrap_from_cache() {
     return 0
 }
 
-# _save_bootstrap_to_cache — atomic write via tmp + mv.
 _save_bootstrap_to_cache() {
     local value="$1"
     local _rd
@@ -297,10 +236,6 @@ LOOPBACK_IPS="127.0.0.1"
 # ============================================================
 # [5] Progress file writer (atomic)
 # ============================================================
-# The message is truncated at 200 chars and sanitized of the
-# pipe character (`|`), which is the field separator between
-# percent and message in the file format. Without sanitization,
-# a message containing `|` would shift the parse in main.go.
 write_progress() {
     local percent="$1"
     local msg="$2"
@@ -315,7 +250,6 @@ write_progress() {
         msg=$(printf "%s" "$msg" | cut -c1-200)
     fi
 
-    # Replace the field separator to preserve the parse contract.
     msg=$(printf '%s' "$msg" | tr '|' '/')
 
     printf "%d|%s" "$percent" "$msg" > "${PROGRESS_FILE}.tmp" 2>/dev/null
@@ -323,7 +257,7 @@ write_progress() {
 }
 
 # ============================================================
-# [6] Dashboard port — Port Guard
+# [6] Dashboard port (Port Guard)
 # ============================================================
 get_dashboard_port() {
     local conf_file="${1:-$WEBUI_CONF}"
@@ -346,8 +280,6 @@ get_dashboard_port() {
 # ============================================================
 # [7] Profile memory hint (display-only)
 # ============================================================
-# HINT only. main.go is the authority for the actual
-# debug.SetMemoryLimit() value.
 get_profile_memory_hint() {
     local profile="pro"
 
@@ -396,19 +328,13 @@ get_auto_restart_webui() {
 }
 
 # ============================================================
-# [9] TOML credentials — section-restricted
+# [9] TOML credentials (section-restricted)
 # ============================================================
-# Reads ONLY from [monitoring_ui]. Section tracking ignores any
-# username/password in other sections.
+# Reads ONLY from [monitoring_ui]. Section tracking ignores
+# any username/password in other sections.
 #
 # Supports section headers with trailing comments:
-#     [monitoring_ui] # monitoring section
-#
-# NOTE: this parser is intentionally duplicated in three files
-# (functions.sh, customize.sh, install_app.sh). Each file must
-# be independently sourceable at different stages of the module
-# lifecycle, so the duplication is deliberate. Any behavioral
-# change MUST be applied to all three.
+#   [monitoring_ui] # monitoring section
 parse_toml_value() {
     local s="$1"
     [ -z "$s" ] && return 0
@@ -496,9 +422,8 @@ read_toml_credentials() {
 # ============================================================
 # is_dnscrypt_running — two-tier check:
 #   1. PID file → /proc/<pid>/comm == "dnscrypt-proxy" → port
-#      5354/udp listening. The comm check catches PID reuse
-#      after a reboot; the port check catches a process that is
-#      alive but not yet bound.
+#      5354/udp listening. The comm check catches PID reuse;
+#      the port check catches a process alive but not bound.
 #   2. Fallback: pgrep -x dnscrypt-proxy + port check.
 is_dnscrypt_running() {
     local pid_file
@@ -525,9 +450,8 @@ is_dnscrypt_running() {
     return 1
 }
 
-# is_webui_running [port] — defaults to get_webui_port.
-# Port check only; the WebUI is a single process with a single
-# listening socket.
+# is_webui_running [port] — port check only; the WebUI is a
+# single process with a single listening socket.
 is_webui_running() {
     local port="${1:-$(get_webui_port)}"
     is_port_open "$port" tcp
@@ -538,16 +462,14 @@ is_webui_running() {
 # ============================================================
 # /proc/net/if_inet6 lists one line per interface that has an
 # IPv6 address. Its absence (or empty content) means IPv6 is
-# not available on this device — all IPv6 firewall work can be
-# skipped without error.
+# not available on this device — all IPv6 firewall work can
+# be skipped without error.
 is_ipv6_available() {
     [ ! -f /proc/net/if_inet6 ] && return 1
 
     local count
     count=$(wc -l < /proc/net/if_inet6 2>/dev/null | tr -d ' ')
 
-    # wc -l returns 0 for an empty file; treat "0 lines" as
-    # "no interfaces with IPv6".
     [ -z "$count" ] && return 1
     [ "$count" -eq 0 ] && return 1
 
@@ -630,7 +552,6 @@ detect_firewall() {
 # Both helpers are guarded by a once-per-shell flag. Without
 # the guard, mode-0 (blind cleanup) followed by mode-1
 # (install) would run the same delete cascade twice.
-
 _LEGACY_CLEANUP_IPTABLES_DONE=0
 
 _legacy_cleanup_iptables() {
@@ -715,13 +636,11 @@ _legacy_cleanup_ip6tables() {
 #       1. Try Custom Chain (clean, no orphans).
 #       2. If it fails → fallback to Direct DNAT.
 #
-# Some OEM chains (OnePlus, some Samsung) prevent Custom Chain
-# creation; Direct DNAT works reliably on those.
-#
-# In the fallback path, the same RETURN rules used inside the
-# Custom Chain are installed in OUTPUT before the DNAT rules.
-# Without them, dnscrypt-proxy's own bootstrap queries would be
-# DNAT'd back into itself, forming a resolver loop.
+# Some OEM chains prevent Custom Chain creation; Direct DNAT
+# works reliably on those. In the fallback path, RETURN rules
+# are installed in OUTPUT before the DNAT rules, otherwise
+# dnscrypt-proxy's own bootstrap queries would be DNAT'd back
+# into itself, forming a resolver loop.
 manage_iptables() {
     local mode="$1"
     local chain="DNSCRYPT_OUT"
@@ -842,11 +761,8 @@ manage_iptables() {
 # ============================================================
 # [15] Hybrid ip6tables (IPv6)
 # ============================================================
-# Same strategy as [14], adapted for IPv6:
-#   1. Early-return if IPv6 is unavailable.
-#   2. Early-return if the nat table is not supported by the
-#      kernel build.
-#   3. Full cleanup → Custom Chain → Direct DNAT fallback.
+# Same strategy as [14], adapted for IPv6. Early-returns when
+# IPv6 is unavailable or the nat table is not supported.
 manage_ip6tables() {
     local mode="$1"
     local chain="DNSCRYPT_OUT6"
@@ -1104,14 +1020,16 @@ manage_firewall() {
 }
 
 # ============================================================
-# [18] Process cleanup
+# [18] Process cleanup — polling wait (v1.5.0+fix)
 # ============================================================
 # cleanup_proxy terminates dnscrypt-proxy and removes its
 # runtime artifacts.
 #
 # Order:
 #   1. pkill -9 -x dnscrypt-proxy (exact-name match).
-#   2. 1-second grace period (kernel reap before fuser).
+#   2. Poll for death (up to 3 s, 100 ms intervals). A blind
+#      `sleep 1` is insufficient on devices where SIGKILL
+#      takes longer to reap (slow I/O, D-state transient).
 #   3. fuser -k on the DNS ports (catches a process bound to
 #      5354/udp but named differently).
 #   4. Remove the PID file from both locations.
@@ -1122,7 +1040,20 @@ cleanup_proxy() {
 
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-proxy 2>/dev/null
-        sleep 1
+
+        # Poll for actual death (up to 3 s, 100 ms intervals).
+        local _cp_wait=0
+        while [ "$_cp_wait" -lt 30 ]; do
+            if ! pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.1
+            _cp_wait=$((_cp_wait + 1))
+        done
+
+        if [ "$_cp_wait" -ge 30 ]; then
+            log_msg "⚠️ dnscrypt-proxy still alive after 3s (D-state?)"
+        fi
     fi
 
     if command -v fuser >/dev/null 2>&1; then
@@ -1141,14 +1072,28 @@ cleanup_proxy() {
 # cleanup_webui terminates dnscrypt-webui and removes its PID
 # files.
 #
-# Does NOT call `fuser` on the WebUI port — the port is
-# user-configurable, and a stale fuser call could kill an
+# Uses the same polling pattern as cleanup_proxy. Does NOT
+# call `fuser` on the WebUI port — the port is user-
+# configurable, and a stale fuser call could kill an
 # unrelated process that happened to listen on the same port.
 cleanup_webui() {
     log_msg "🧹 Cleaning up dnscrypt-webui"
 
     if pgrep -x dnscrypt-webui >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-webui 2>/dev/null
+
+        local _cw_wait=0
+        while [ "$_cw_wait" -lt 50 ]; do
+            if ! pgrep -x dnscrypt-webui >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.1
+            _cw_wait=$((_cw_wait + 1))
+        done
+
+        if [ "$_cw_wait" -ge 50 ]; then
+            log_msg "⚠️ dnscrypt-webui still alive after 5s (D-state?)"
+        fi
     fi
 
     rm -f "$(run_file webui.pid)" 2>/dev/null
@@ -1179,6 +1124,16 @@ cleanup_orphans() {
     if pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
         log_msg "Found orphan dnscrypt-proxy processes, killing..."
         pkill -9 -x dnscrypt-proxy 2>/dev/null
+
+        # Poll for death.
+        local _co_wait=0
+        while [ "$_co_wait" -lt 30 ]; do
+            if ! pgrep -x dnscrypt-proxy >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.1
+            _co_wait=$((_co_wait + 1))
+        done
     fi
 
     local current_webui_pid=""
@@ -1189,10 +1144,8 @@ cleanup_orphans() {
     local port
     port=$(get_webui_port)
     if command -v fuser >/dev/null 2>&1; then
-        # fuser writes "PID" or "PID1 PID2" (space-separated) to
-        # stdout; the "user" column goes to stderr. Extract only
-        # decimal PIDs to avoid picking up the numeric suffix of
-        # a filename on ROMs that emit the target path.
+        # fuser writes "PID" or "PID1 PID2" to stdout; the "user"
+        # column goes to stderr. Extract only decimal PIDs.
         local pid_on_port
         pid_on_port=$(fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+$' | head -n1)
 
@@ -1241,7 +1194,7 @@ aggressive_cleanup() {
 }
 
 # ============================================================
-# [21] Start WebUI
+# [21] Start WebUI — atomic, idempotent, verified
 # ============================================================
 # Launch strategy (three-way fallback):
 #   1. `setsid`         — preferred; new session so the child
@@ -1250,10 +1203,17 @@ aggressive_cleanup() {
 #   3. `nohup`          — last resort; ignores SIGHUP but does
 #                         not create a new session.
 #
-# After launch, waits up to 35 seconds for the WebUI to bind.
-# During this wait, also checks `kill -0` against the WebUI
-# PID, so a port collision (which causes the WebUI to exit
-# immediately) is detected as a distinct failure mode.
+# Before launch:
+#   1. Kill existing WebUI (poll for death, up to 5 s).
+#   2. Wait for port to be free (poll, up to 3 s). If the port
+#      remains busy after 3 s, force-kill any process holding
+#      it via fuser.
+#
+# After launch:
+#   Wait up to 35 seconds for the WebUI to bind. During this
+#   wait, also check `kill -0` against the WebUI PID, so a
+#   port collision (which causes the WebUI to exit immediately)
+#   is detected as a distinct failure mode.
 #
 # Return: 0 = bound within timeout; 1 = died early or timeout.
 start_native_webui() {
@@ -1262,8 +1222,21 @@ start_native_webui() {
 
     log_msg "🚀 Starting WebUI (port: $port)"
 
-    cleanup_webui
+    # --- Phase 1: kill existing + wait for port to free ---
+    _kill_webui_safely || true
+    if ! _wait_port_free "$port"; then
+        log_msg "⚠️ Port $port still in use after 3s, forcing cleanup"
+        if command -v fuser >/dev/null 2>&1; then
+            fuser -k "$port"/tcp 2>/dev/null
+            sleep 1
+        fi
+        if ! _wait_port_free "$port"; then
+            log_msg "❌ Port $port STILL in use, aborting start"
+            return 1
+        fi
+    fi
 
+    # --- Phase 2: launch ---
     export HOME=/data/local/tmp
 
     if command -v setsid >/dev/null 2>&1; then
@@ -1285,6 +1258,7 @@ start_native_webui() {
         mv -f "${wpid_file}.tmp" "$wpid_file" 2>/dev/null
     fi
 
+    # --- Phase 3: wait for bind ---
     local i=0
     while [ "$i" -lt 35 ]; do
         if [ -n "$web_pid" ] && ! kill -0 "$web_pid" 2>/dev/null; then
@@ -1302,6 +1276,53 @@ start_native_webui() {
     done
 
     log_msg "❌ WebUI failed to bind within 35s"
+    return 1
+}
+
+# ============================================================
+# [21b] Process lifecycle helpers (idempotency primitives)
+# ============================================================
+# These two helpers give callers idempotent start semantics.
+# They match the pattern proven in uninstall.sh:_inline_kill_all
+# and are used by:
+#   • start_native_webui (§[21])
+#   • service.sh (via its own copy — see service.sh §[6b])
+
+# _kill_webui_safely — kill all dnscrypt-webui instances.
+# Uses pgrep -x (exact comm match) to avoid matching unrelated
+# shells whose argv contains the string.
+_kill_webui_safely() {
+    local pids wait
+    pids=$(pgrep -x dnscrypt-webui 2>/dev/null)
+    if [ -n "$pids" ]; then
+        # Word-splitting is intentional: kill takes multiple PIDs.
+        # shellcheck disable=SC2086
+        kill -9 $pids 2>/dev/null
+    fi
+
+    wait=0
+    while [ "$wait" -lt 50 ]; do
+        if ! pgrep -x dnscrypt-webui >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.1
+        wait=$((wait + 1))
+    done
+    return 1
+}
+
+# _wait_port_free — poll until the port accepts no connection.
+# Caller must have already killed any process that held it.
+_wait_port_free() {
+    local port="$1"
+    local wait=0
+    while [ "$wait" -lt 30 ]; do
+        if ! is_port_open "$port" tcp; then
+            return 0
+        fi
+        sleep 0.1
+        wait=$((wait + 1))
+    done
     return 1
 }
 
@@ -1337,8 +1358,8 @@ copy_with_context() {
 # ============================================================
 # [23] Watchdog token reader
 # ============================================================
-# Reads the token written by customize.sh §[19b] or by main.go
-# (loadOrCreateWatchdogToken). Used by watchdog.sh to
+# Reads the token written by customize.sh §[19b] or by
+# main.go (loadOrCreateWatchdogToken). Used by watchdog.sh to
 # authenticate its POST /api/ensure_running_service call.
 #
 # Token is 64 hex chars (256 bits). Both writers persist it
@@ -1378,11 +1399,10 @@ get_backup_dir() {
 }
 
 # ensure_backup_dir creates the backup root if missing and
-# applies chmod 0700 in ALL cases.
-#
-# On Android, /sdcard is a FUSE mount that typically ignores
-# chmod. The call is best-effort — the effective protection is
-# the per-file chmod 0600 applied by copy_with_context.
+# applies chmod 0700 in ALL cases. On Android, /sdcard is a
+# FUSE mount that typically ignores chmod; the call is
+# best-effort — the effective protection is the per-file
+# chmod 0600 applied by copy_with_context.
 ensure_backup_dir() {
     if [ ! -d "$PERSISTENT_BACKUP" ]; then
         mkdir -p "$PERSISTENT_BACKUP" 2>/dev/null || return 1
@@ -1602,13 +1622,13 @@ verify_backup_integrity() {
 # Snapshots the 5 user files from <src_dir>.
 #
 # If <dst_dir> is provided, files are written directly there
-# (used by the transaction system and by main.go). Otherwise a
-# timestamped directory is created under $PERSISTENT_BACKUP:
+# (used by the transaction system and by main.go). Otherwise
+# a timestamped directory is created under $PERSISTENT_BACKUP:
 #     <YYYYMMDD>-<HHMMSS>-manual-<pid>
 #
-# Returns 0 on success (>= 1 file copied), 1 on any failure.
+# Returns 0 on success (≥ 1 file copied), 1 on any failure.
 #
-# Iterates over $USER_FILES only. The `apk/` mirror subfolder
+# Iterates over $USER_FILES only. The apk/ mirror subfolder
 # (created by customize.sh §[10c]) is not in that list and is
 # therefore never touched.
 backup_user_files() {
@@ -1668,25 +1688,15 @@ backup_user_files() {
 # Returns 0 if at least one file was restored, 1 otherwise.
 #
 # Three-part safety model:
-#
-#   (a) PRE-FLIGHT — verify that BOTH critical source files
+#   (a) PRE-FLIGHT — verify BOTH critical source files
 #       (webui.conf, dnscrypt-proxy.toml) exist and are
 #       non-empty. If either is missing, return 1 immediately
 #       without touching dst_dir.
-#
-#   (b) SNAPSHOT — before the restore loop, save the pre-restore
-#       content of the two critical files into a temp dir. For
-#       critical files that did not exist pre-restore, record
-#       an `.absent` marker so rollback can DELETE them.
-#
-#   (c) ROLLBACK — on critical failure, restore the two critical
-#       files from the snapshot (or delete them if absent).
-#       The loop BREAKS on the first critical failure instead
-#       of continuing to overwrite non-critical files with data
-#       from an unverified source.
-#
-# Iterates over $USER_FILES only. The `apk/` mirror subfolder
-# is never touched.
+#   (b) SNAPSHOT — save pre-restore content of the two critical
+#       files. For critical files that did not exist,
+#       record an `.absent` marker so rollback can DELETE them.
+#   (c) ROLLBACK — on critical failure, restore from snapshot
+#       (or delete if absent). BREAK on first critical failure.
 restore_user_files() {
     local src_dir="$1"
     local dst_dir="${2:-$MODDIR/proxy}"
@@ -1836,13 +1846,10 @@ restore_user_files() {
 #   • README.md
 #
 # Three rotation semantics:
-#
 #   • ROT-MANIFEST — snapshots are detected by the presence of
 #     `.manifest.json` (not by name pattern).
-#
 #   • ROT-MTIME — candidates are sorted by mtime (numeric,
 #     descending), not by directory name.
-#
 #   • ROT-PROTECT — two additional targets are preserved on
 #     top of the 21-newest window:
 #       - the `.last_stable` target (recovery pointer)

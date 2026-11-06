@@ -50,8 +50,6 @@ get_version() {
 
 VERSION="$(get_version)"
 
-# --version is handled before any other parsing so it works even
-# if the rest of the file cannot be loaded.
 case "${1:-}" in
     --version)
         echo "$0: $VERSION"
@@ -70,25 +68,20 @@ CRED_FILE="/data/local/tmp/dnscrypt_credentials.txt"
 
 SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
-# --- Data preservation paths ---
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 LAST_AUTO_BACKUP_MARKER="$PERSISTENT_BACKUP/.last_auto_backup"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- Recovery mode trigger files ---
 RECOVERY_TRIGGER_1="$MODDIR/recovery"
 RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
 
-# --- Reserved port (finalized after loading functions.sh) ---
 _MONITORING_UI_PORT=""
 
 # ============================================================
 # [3] Log prefix + fallback log_msg
 # ============================================================
-# Set LOG_PREFIX before sourcing functions.sh so boot-mini.sh's
-# log_msg picks up the [action] tag.
 LOG_PREFIX="[action]"
 
 log_msg_fallback() {
@@ -98,9 +91,6 @@ log_msg_fallback() {
 # ============================================================
 # [4] Load functions.sh (which sources boot-mini.sh)
 # ============================================================
-# A functions.sh that exists but fails to source does NOT
-# abort action.sh — the script falls through to the inline
-# fallbacks in [5].
 FUNCTIONS_LOADED=0
 if [ -f "$MODDIR/functions.sh" ]; then
     # shellcheck disable=SC1090
@@ -116,19 +106,13 @@ if [ -f "$MODDIR/functions.sh" ]; then
     fi
 fi
 
-# Restore our preferred log prefix after sourcing.
 LOG_PREFIX="[action]"
 
-# Finalize _MONITORING_UI_PORT: prefer the value from
-# boot-mini.sh (via functions.sh); fall back to 8080.
 _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
 
 # ============================================================
 # [5] Minimal inline fallbacks
 # ============================================================
-# Only the primitives required by --status and the default mode
-# are provided here. Advanced modes (--backup, --check,
-# --diagnose) fail cleanly when functions.sh is not loaded.
 _FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
@@ -239,17 +223,49 @@ _inline_get_port() {
     printf "9090"
 }
 
-# --- Fallback: start_webui ---
+# --- Fallback: start_webui (v1.5.0+fix) ---
 # Three-way launch: setsid → busybox setsid → nohup.
-# Waits up to 20 s for the port to bind.
+#
+# v1.5.0+fix: polling wait after pkill (100 ms × 30 = 3 s),
+# matching the pattern in service.sh and watchdog.sh. Without
+# it, the port 9090 can still be bound when the new binary
+# tries to bind, causing "address already in use".
+#
+# This fallback only runs when functions.sh failed to load —
+# a degraded mode. In the normal path, start_native_webui
+# (already idempotent) is used instead.
 _inline_start_webui() {
     local bin="$1"
     local port="$2"
 
     log_msg_fallback "Starting WebUI (inline, port: $port)"
-    pkill -9 -x dnscrypt-webui 2>/dev/null
+
+    # --- Kill existing + polling wait ---
+    if pgrep -x dnscrypt-webui >/dev/null 2>&1; then
+        pkill -9 -x dnscrypt-webui 2>/dev/null
+
+        local _kill_wait=0
+        while [ "$_kill_wait" -lt 30 ]; do
+            if ! pgrep -x dnscrypt-webui >/dev/null 2>&1; then
+                break
+            fi
+            sleep 0.1
+            _kill_wait=$((_kill_wait + 1))
+        done
+    fi
     rm -f "$WEBUI_PID_FILE" 2>/dev/null
 
+    # --- Wait for port to be free ---
+    local _port_wait=0
+    while [ "$_port_wait" -lt 30 ]; do
+        if ! _inline_is_port_open "$port" tcp; then
+            break
+        fi
+        sleep 0.1
+        _port_wait=$((_port_wait + 1))
+    done
+
+    # --- Launch ---
     export HOME=/data/local/tmp
 
     if command -v setsid >/dev/null 2>&1; then
@@ -280,8 +296,6 @@ _inline_start_webui() {
 }
 
 # --- Fallback: list_snapshots + backup_summary ---
-# Diagnostic-only. Detection rule (SNAP-MANIFEST): a directory
-# is a snapshot iff it contains a `.manifest.json` file.
 _inline_list_snapshots() {
     local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
@@ -369,9 +383,6 @@ _inline_backup_summary() {
 # ============================================================
 # [6] Unified wrappers
 # ============================================================
-# Every mode calls the wrappers below, never the underlying
-# functions directly. This lets the mode-dispatch code read
-# identically regardless of whether functions.sh loaded.
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     is_port_listening()  { is_port_open "$1" "${2:-tcp}"; }
     get_port()           { get_webui_port "$1"; }
@@ -436,10 +447,6 @@ fi
 # ============================================================
 # [7] show_help
 # ============================================================
-# Defined BEFORE the argument parser (section [8]) so that
-# `action.sh --help` works in mksh / busybox ash. The previous
-# revision defined show_help AFTER the parser, so the
-# `--help|-h` branch called an undefined function.
 show_help() {
     cat << EOF
 DNSCrypt Smart Filter – action.sh ${VERSION}
@@ -466,13 +473,6 @@ EOF
 # ============================================================
 # [8] Parse command-line arguments
 # ============================================================
-# --restart is a MODIFIER on the default mode, not a mode in
-# itself. It has no effect when combined with any of the four
-# explicit modes.
-#
-# Unknown options are a hard error (exit 1) with a clear
-# message. A typo like `--restat` must not silently fall
-# through to the default "start WebUI" path.
 FORCE_RESTART=0
 STATUS_ONLY=0
 CHECK_MODE=0
@@ -498,8 +498,6 @@ done
 # ============================================================
 # [9] Configure paths
 # ============================================================
-# BIN_DIR is the module's proxy/ subdirectory.
-# PORT is resolved via the Port Guard (rejects 8080).
 BIN_DIR="$MODDIR/proxy"
 WEBUI="$BIN_DIR/dnscrypt-webui"
 CONF_FILE="$BIN_DIR/webui.conf"
@@ -511,9 +509,6 @@ PORT=$(get_port "$CONF_FILE" 2>/dev/null)
 # ============================================================
 # [10] Path 1: status only (--status)
 # ============================================================
-# Exit codes:
-#   0 — WebUI is listening
-#   1 — WebUI is not listening
 if [ "$STATUS_ONLY" = "1" ]; then
     if is_port_listening "$PORT" tcp; then
         printf "✅ WebUI is RUNNING on port %s\n" "$PORT"
@@ -527,12 +522,6 @@ fi
 # ============================================================
 # [11] Path 2: diagnose mode (--diagnose)
 # ============================================================
-# Delegates to status.sh --diagnose. Three-tier resolution:
-#   1. Executable → exec directly (kernel resolves shebang).
-#   2. Exists but not executable → chmod 0755 then exec.
-#   3. Both fail (read-only FS) → exec sh "$STATUS_SCRIPT".
-#
-# A missing status.sh degrades gracefully to --check.
 if [ "$DIAGNOSE_MODE" = "1" ]; then
     STATUS_SCRIPT="$MODDIR/status.sh"
 
@@ -557,13 +546,6 @@ fi
 # ============================================================
 # [12] Path 3: backup mode (--backup)
 # ============================================================
-# Triggers an immediate manual backup. Requires functions.sh.
-# When it is not loaded, the mode fails cleanly (exit 3)
-# rather than running a duplicate of backup_user_files.
-#
-# Exit codes:
-#   0 — backup succeeded
-#   3 — backup failed (source missing, disk full, 0 files copied)
 if [ "$BACKUP_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
@@ -613,11 +595,6 @@ fi
 # ============================================================
 # [13] Path 4: comprehensive check (--check)
 # ============================================================
-# Emits a multi-section status report. Exit code: ALWAYS 0
-# (informational only).
-#
-# Section headers use Unicode box-drawing characters (U+2500)
-# for visual consistency with the rest of the report.
 if [ "$CHECK_MODE" = "1" ]; then
     echo ""
     echo "╔══════════════════════════════════════════════╗"
@@ -625,7 +602,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     echo "╚══════════════════════════════════════════════╝"
     echo ""
 
-    # --- Section 1: Services ---
     echo "─── Service Status ────────────────────────"
     if is_port_listening "$PORT" tcp; then
         printf "  🟢 WebUI    : Running on port %s\n" "$PORT"
@@ -639,7 +615,6 @@ if [ "$CHECK_MODE" = "1" ]; then
         printf "  🔴 DNS      : Stopped\n"
     fi
 
-    # --- Watchdog ---
     if [ -f "$WATCHDOG_PID_FILE" ]; then
         wd_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null | tr -d '\r\n ')
         if [ -n "$wd_pid" ] && kill -0 "$wd_pid" 2>/dev/null; then
@@ -658,7 +633,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     fi
     echo ""
 
-    # --- Section 2: Runtime ---
     echo "─── Runtime ────────────────────────────────"
     if [ "$FUNCTIONS_LOADED" = "1" ] && [ -n "$RUN_DIR_ACTIVE" ]; then
         printf "  📁 run/     : %s\n" "$RUN_DIR_ACTIVE"
@@ -681,7 +655,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     fi
     echo ""
 
-    # --- Section 3: Configuration ---
     echo "─── Configuration ──────────────────────────"
     DASH_PORT=$(read_conf "$CONF_FILE" "DASHBOARD_PORT" "9091")
     printf "  🌐 WebUI port    : %s\n" "$PORT"
@@ -696,7 +669,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  🔌 BIND_ADDR     : %s\n" "$BIND_ADDR"
     echo ""
 
-    # --- Section 4: Profile + Memory ---
     echo "─── Profile & Memory ───────────────────────"
     ACTIVE_PROFILE="pro"
     if [ -f "$SELECTED_PROFILE_FILE" ]; then
@@ -714,7 +686,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  ℹ️  Managed by    : main.go (Go runtime soft limit)\n"
     echo ""
 
-    # --- Section 5: Backup & Recovery ---
     echo "─── Backup & Recovery ──────────────────────"
 
     _snap_count=0
@@ -797,7 +768,6 @@ if [ "$CHECK_MODE" = "1" ]; then
     printf "  ℹ️  Recovery      : touch %s/recovery && reboot\n" "$MODDIR"
     echo ""
 
-    # --- Section 6: Final ---
     if [ -f "$MODDIR/disable" ]; then
         printf "  ⚠️  Module        : DISABLED (remove 'disable' file to enable)\n"
         echo ""
@@ -819,9 +789,6 @@ fi
 # ============================================================
 # [14] Refuse to start if module is disabled
 # ============================================================
-# Exit code 2 distinguishes this from the generic startup
-# failure (exit 1) — a caller can tell "module disabled" from
-# "WebUI failed to start".
 if [ -f "$MODDIR/disable" ]; then
     act_log "Module is disabled, cannot start WebUI"
     printf "⚠️  Module is disabled.\n"
@@ -844,13 +811,11 @@ fi
 # ============================================================
 # Two entry conditions decide whether a start is needed:
 #   1. --restart was passed       → always start.
-#   2. The WebUI port is closed   → start (first boot, or the
-#                                    process died).
+#   2. The WebUI port is closed   → start.
 #
 # In every other case (WebUI running, no --restart), the
 # function prints "already running" and proceeds to [17] —
-# the browser-open still runs, because the user's intent was
-# "open the WebUI" not just "start the WebUI".
+# the browser-open still runs.
 STARTED_NOW=0
 
 if [ "$FORCE_RESTART" = "1" ]; then
@@ -900,17 +865,11 @@ fi
 # [17] Open browser (5 fallback methods + timeout)
 # ============================================================
 # Launches the default browser at http://127.0.0.1:$PORT.
-# Five fallback methods are attempted in order; the first one
-# that succeeds exits the script with status 0.
 #
 # Try 5 race condition fix:
 #   On POSIX shells, a background job started with `&` inherits
 #   the parent's process group. When the parent calls `exit 0`,
 #   the kernel delivers SIGHUP to every process in that group.
-#   On some Android ROMs, this kills the `am` command before it
-#   can hand the intent to `system_server`, and the browser
-#   silently fails to open.
-#
 #   Two protections:
 #     (a) SUBSHELL ISOLATION — `( ... ) &` runs the child in a
 #         NEW process group, decoupled from the parent's group.
@@ -975,8 +934,6 @@ if timeout 5 am start \
 fi
 
 # --- Try 5: fire-and-forget ---
-# No `if` check — `if cmd &` always succeeds in POSIX sh.
-# The subshell + sleep protects against SIGHUP.
 (
     timeout 5 am start \
         -a android.intent.action.VIEW \
@@ -984,7 +941,6 @@ fi
         >/dev/null 2>&1
 ) &
 
-# Grace period for the subshell to fork and reach exec().
 sleep 0.3
 
 act_log "Browser opened via am start (async, no -W)"

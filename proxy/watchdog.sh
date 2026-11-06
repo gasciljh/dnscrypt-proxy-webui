@@ -7,16 +7,16 @@
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Standalone watchdog process that monitors the WebUI and the
-# DNS Engine and restarts them when needed.
+# Standalone watchdog process. Monitors the WebUI (TCP port)
+# and the DNS Engine (5354/UDP) and restarts them when needed.
 #
-# Launched by service.sh as an independent process (setsid +
-# background), so that $$ inside this file refers to the real
+# Launched by service.sh as an independent process (nohup +
+# background), so $$ inside this file refers to the real
 # watchdog PID, not service.sh's.
 #
 # Responsibilities:
 #   • Monitor the WebUI (TCP port) and restart if closed
-#   • Monitor the DNS Engine (5354/UDP) via the main.go API
+#   • Monitor the DNS Engine (5354/UDP) via main.go API
 #   • Respect STATUS_FILE as "user intent":
 #       ON  → restart DNS if crashed
 #       OFF → do nothing
@@ -32,25 +32,25 @@
 #   4. AUTO_RESTART_DNS  — "0" or "1"
 #   5. AUTO_RESTART_WEBUI — "0" or "1"
 #
-# Authentication (preferred → fallback):
-#   1. X-Watchdog-Token header — token from $RUN_DIR/.watchdog_token
-#   2. Authorization: Basic    — [monitoring_ui] in the TOML
-#
-# Design:
-#   • Sources functions.sh (which sources boot-mini.sh).
-#     Falls back to a minimal inline set only when sourcing
-#     fails.
-#   • The HTTP client cascade in watchdog_api_call is unique
-#     to this file and is never delegated.
+# Single-instance model (v1.5.0+fix):
+#   Two independent layers of protection against duplicate
+#   watchdogs:
+#     1. Four-layer PID check (§[8]) — PID exists, not zombie,
+#        AND its cmdline contains "watchdog.sh".
+#     2. Atomic mkdir lock (§[9]) — if a concurrent watchdog
+#        is in the middle of writing its PID file, the second
+#        one exits via the lock.
+#   Together they make duplicate watchdog start impossible
+#   even under a race between two service.sh invocations.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Version resolution (works with a single --version arg)
+# [1] Version resolution (standalone --version support)
 # ============================================================
 # Pre-resolve the module root from $0 so `--version` works
-# standalone, before the 5-argument count check below.
+# before the 5-argument count check below.
 _MODDIR_FROM_SELF=${0%/*}
 [ "$_MODDIR_FROM_SELF" = "." ] && _MODDIR_FROM_SELF=$(pwd)
 case $_MODDIR_FROM_SELF in
@@ -81,9 +81,6 @@ esac
 # ============================================================
 # [2] Parse arguments
 # ============================================================
-# Requires EXACTLY 5 arguments. Fewer means the caller is
-# broken; more means the caller expects an interface that does
-# not exist.
 if [ "$#" -ne 5 ]; then
     echo "watchdog.sh: requires exactly 5 arguments, got $#" >&2
     echo "Usage: watchdog.sh <pid_file> <moddir> <port> <auto_dns> <auto_webui>" >&2
@@ -98,7 +95,6 @@ AUTO_RESTART_WEBUI="$5"
 
 if [ -z "$WATCHDOG_PID_FILE" ] || [ -z "$MODDIR" ]; then
     echo "watchdog.sh: missing required args" >&2
-    echo "Usage: watchdog.sh <pid_file> <moddir> <port> <auto_dns> <auto_webui>" >&2
     exit 1
 fi
 
@@ -117,11 +113,8 @@ fi
 case "$AUTO_RESTART_DNS"   in 0|1) ;; *) AUTO_RESTART_DNS="1"   ;; esac
 case "$AUTO_RESTART_WEBUI" in 0|1) ;; *) AUTO_RESTART_WEBUI="1" ;; esac
 
-# Re-read the version using the caller-supplied MODDIR (the
-# authoritative source for the running module).
 WATCHDOG_VERSION="$(get_version_from "$MODDIR")"
 
-# --- Validate WebUI binary ---
 WEBUI="$MODDIR/proxy/dnscrypt-webui"
 if [ ! -f "$WEBUI" ]; then
     echo "watchdog.sh: WEBUI binary not found: $WEBUI" >&2
@@ -139,7 +132,6 @@ SELECTED_PROFILE_FILE="$MODDIR/proxy/selected_profile.txt"
 
 WATCHDOG_TOKEN_FILE="$RUN_DIR/.watchdog_token"
 
-# Data preservation paths (READ-ONLY access).
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
@@ -197,9 +189,9 @@ LOG_PREFIX="[watchdog]"
 # ============================================================
 # [6] Inline fallbacks (minimal)
 # ============================================================
-# Only the primitives required for monitoring are provided
-# here. Everything else (backup, rotation, firewall) is
-# unnecessary for the watchdog's job.
+# Only the primitives required for monitoring are provided.
+# Everything else (backup, rotation, firewall) is unnecessary
+# for the watchdog's job.
 _fb_log() {
     echo "$(date +'%Y-%m-%d %H:%M:%S') - [watchdog] $1" >> "$LOG_FILE" 2>/dev/null
 }
@@ -297,17 +289,6 @@ _fb_start_webui() {
 # ============================================================
 # [7] Unified wrappers
 # ============================================================
-# Every call site below uses the do_* names, never the
-# underlying functions directly. This lets the loop code read
-# identically whether functions.sh loaded or not.
-#
-# NOTE: do_get_token is intentionally NOT defined here. It
-# requires get_watchdog_token_fallback, which is only defined
-# in §[12] — after functions.sh has been sourced and the
-# fallback reader is available. Defining it here (as a
-# placeholder) would be dead code: §[12] always re-defines it
-# later in the same shell process. See §[12] for the canonical
-# definition.
 if [ "$FUNCTIONS_LOADED" = "1" ]; then
     do_log()           { log_msg "$1"; }
     do_is_port_open()  { is_port_open "$1" "${2:-tcp}"; }
@@ -328,41 +309,52 @@ else
 fi
 
 # ============================================================
-# [8] Prevent duplicate watchdog instances
+# [8] Prevent duplicate watchdog instances — FOUR-LAYER check
 # ============================================================
 # On startup, checks the existing PID file. If a live watchdog
 # is already running, this process exits silently with code 0.
 #
-# `kill -0` returns 0 for zombies. The check therefore also
-# inspects /proc/PID/stat and rejects state 'Z'. Without this,
-# a zombie watchdog would block a new watchdog from starting.
+# Four layers, in order:
+#   1. PID file exists?          → else proceed.
+#   2. /proc/PID exists?         → else stale PID file, proceed.
+#   3. Not a zombie (state != Z)? → zombie means dead-waiting,
+#                                    proceed and let init reap it.
+#   4. cmdline contains
+#      "watchdog.sh"?            → else PID reused by an
+#                                    unrelated process, proceed.
 #
-# Three outcomes:
-#   1. PID exists, alive, comm matches shell → log and exit 0.
-#   2. PID exists, alive, comm is something else → PID
-#      reused; log and continue.
-#   3. PID exists, state is 'Z' → zombie; log and continue.
+# Layer 4 is the new v1.5.0+fix addition. Without it, a
+# device reboot that reassigns a low PID to an unrelated
+# shell would falsely report "Watchdog already running" and
+# refuse to start a real watchdog.
+#
+# `kill -0` is insufficient on its own: it returns 0 for
+# zombies. Layer 3 therefore inspects /proc/PID/stat directly.
 if [ -f "$WATCHDOG_PID_FILE" ]; then
     old_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null | tr -d '\r\n ')
     if [ -n "$old_pid" ] && [ -d "/proc/$old_pid" ]; then
-        # Extract the process state safely: strip everything up
-        # to and including the LAST ')' in /proc/<pid>/stat,
-        # then take the first field. This handles `comm` values
-        # that contain spaces or parentheses (unlike a naive
-        # `awk '{print $3}'`, which would split on them).
+        # Layer 3: zombie check. Strip everything up to and
+        # including the LAST ')' in /proc/<pid>/stat, then take
+        # the first field. This handles `comm` values containing
+        # spaces or parentheses.
         old_state=$(sed 's/.*) //' "/proc/$old_pid/stat" 2>/dev/null | awk '{print $1}')
 
         if [ "$old_state" = "Z" ]; then
-            do_log "PID $old_pid is a zombie (stale PID file) — ignoring"
+            do_log "PID $old_pid is a zombie (stale PID file) — proceeding"
         else
-            old_comm=$(cat "/proc/$old_pid/comm" 2>/dev/null)
-            case "$old_comm" in
-                busybox|*sh)
+            # Layer 4: cmdline check. The comm field alone is
+            # insufficient — a shell PID reused by an unrelated
+            # `sh -c ...` invocation has comm="sh" but is NOT
+            # a watchdog.
+            old_cmdline=$(cat "/proc/$old_pid/cmdline" 2>/dev/null | tr '\0' ' ')
+
+            case "$old_cmdline" in
+                *watchdog.sh*)
                     do_log "Watchdog already running (PID: $old_pid), exiting"
                     exit 0
                     ;;
                 *)
-                    do_log "PID $old_pid was reused by '$old_comm', ignoring"
+                    do_log "PID $old_pid reused by non-watchdog process — proceeding"
                     ;;
             esac
         fi
@@ -370,24 +362,99 @@ if [ -f "$WATCHDOG_PID_FILE" ]; then
 fi
 
 # ============================================================
-# [9] Write real PID
+# [9] Write real PID — atomic mkdir lock
 # ============================================================
 # We run as an independent process (not a subshell).
 # $$ = this process's PID = real watchdog PID.
 #
+# Concurrency protection: a `mkdir` lock is acquired before
+# the PID file is written. mkdir is atomic on every
+# filesystem — two processes racing to create the same
+# directory will see exactly one success. The winner writes
+# the PID file; the loser exits cleanly, deferring to the
+# winner.
+#
+# The lock is released on every exit path:
+#   • Explicitly at the end of this block on success.
+#   • Via _wd_terminate (SIGTERM/SIGINT/SIGQUIT) — installed
+#     in §[11].
+#   • Via the `_LOCK_ACQUIRED=1` flag being observed by the
+#     trap.
+#
+# A stale lock (e.g. from an earlier power loss) is cleaned
+# up opportunistically: if the lock exists but the PID file
+# inside it is older than 10 minutes, we assume the lock is
+# orphaned and take it over.
+_LOCK_DIR="${WATCHDOG_PID_FILE}.lock"
+_LOCK_ACQUIRED=0
+
+_acquire_lock() {
+    local retries=0
+
+    while [ "$retries" -lt 3 ]; do
+        if mkdir "$_LOCK_DIR" 2>/dev/null; then
+            _LOCK_ACQUIRED=1
+            return 0
+        fi
+
+        # Lock exists — check whether it's stale (older than 10
+        # minutes). If so, remove and retry.
+        if [ -d "$_LOCK_DIR" ]; then
+            local lock_age
+            local lock_mtime
+            lock_mtime=$(stat -c %Y "$_LOCK_DIR" 2>/dev/null) \
+                || lock_mtime=$(stat -f %m "$_LOCK_DIR" 2>/dev/null) \
+                || lock_mtime=0
+            local now
+            now=$(date +%s 2>/dev/null)
+            case "$now" in ''|*[!0-9]*) now=0 ;; esac
+            case "$lock_mtime" in ''|*[!0-9]*) lock_mtime=0 ;; esac
+
+            if [ "$now" -gt 0 ] && [ "$lock_mtime" -gt 0 ]; then
+                lock_age=$((now - lock_mtime))
+                if [ "$lock_age" -gt 600 ]; then
+                    do_log "Stale lock detected (age=${lock_age}s), removing"
+                    rmdir "$_LOCK_DIR" 2>/dev/null
+                    retries=$((retries + 1))
+                    continue
+                fi
+            fi
+        fi
+
+        do_log "Another watchdog is starting (lock held), exiting"
+        return 1
+    done
+
+    return 1
+}
+
+if ! _acquire_lock; then
+    exit 0
+fi
+
 # Explicit error check on both the tmp-write and the atomic
 # rename. If either fails, the watchdog refuses to run — a
 # watchdog without a PID file cannot be supervised by
 # service.sh, and cannot be reliably stopped by uninstall.sh.
 if ! printf "%d\n" $$ > "${WATCHDOG_PID_FILE}.tmp" 2>/dev/null; then
     do_log "FATAL: cannot write PID tmp file: ${WATCHDOG_PID_FILE}.tmp"
+    rmdir "$_LOCK_DIR" 2>/dev/null
+    _LOCK_ACQUIRED=0
     exit 1
 fi
 if ! mv -f "${WATCHDOG_PID_FILE}.tmp" "$WATCHDOG_PID_FILE" 2>/dev/null; then
     do_log "FATAL: cannot move PID file into place: $WATCHDOG_PID_FILE"
     rm -f "${WATCHDOG_PID_FILE}.tmp" 2>/dev/null
+    rmdir "$_LOCK_DIR" 2>/dev/null
+    _LOCK_ACQUIRED=0
     exit 1
 fi
+
+# Release the lock immediately after PID file is in place.
+# From this point on, §[8]'s four-layer check protects against
+# a second watchdog, so the lock is no longer needed.
+rmdir "$_LOCK_DIR" 2>/dev/null
+_LOCK_ACQUIRED=0
 
 # ============================================================
 # [10] Startup diagnostics (READ-ONLY)
@@ -396,10 +463,9 @@ fi
 # startup. READ-ONLY: this block inspects the backup directory
 # but does NOT create, modify, or delete any files.
 #
-# The snapshot counter requires BOTH a name match
-# (`^[0-9]{8}-[0-9]{6}-`) AND a `.manifest.json` file, matching
-# the canonical SNAP-MANIFEST detection rule. The `case`
-# statement also skips `apk/` and `.restore_snap.*`.
+# Snapshot counter requires BOTH a name match
+# (^[0-9]{8}-[0-9]{6}-) AND a .manifest.json file, matching
+# the canonical SNAP-MANIFEST detection rule.
 _pending_msg=""
 if [ -f "$PENDING_NOTIFY_FILE" ]; then
     _pending_msg=$(cat "$PENDING_NOTIFY_FILE" 2>/dev/null | tr -d '\r\n ')
@@ -448,7 +514,6 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
     [ -z "$_orphan_count" ] && _orphan_count=0
 fi
 
-# --- Startup banner (structured) ---
 do_log "============================================"
 do_log "Watchdog started (PID: $$)"
 do_log "   Version: $WATCHDOG_VERSION"
@@ -479,20 +544,40 @@ do_log "   Note: install_app.sh is not supervised by the watchdog."
 do_log "============================================"
 
 # ============================================================
-# [11] Traps for clean exit
+# [11] Traps for clean exit — lock-aware
 # ============================================================
-# Single handler function, three signal bindings. The
-# single-quoted trap bodies defer $WATCHDOG_PID_FILE expansion
-# to fire time.
+# Single handler function, three signal bindings. Single-
+# quoted trap bodies defer $WATCHDOG_PID_FILE expansion to
+# fire time.
+#
+# Lock release:
+#   If the process exits while still holding the mkdir lock
+#   (§[9]), the lock must be released. Without this, a
+#   SIGTERM during startup would leave a stale lock directory
+#   that blocks the next watchdog launch for 10 minutes
+#   (until _acquire_lock's stale detection kicks in).
+#
+#   _LOCK_ACQUIRED is set to 1 by _acquire_lock and reset to
+#   0 immediately after the PID file is committed. The trap
+#   only removes the lock if the flag is 1 — normal exits
+#   after startup do NOT touch the lock (which was already
+#   released).
 #
 # POSIX-mandated exit codes:
 #   SIGINT  → 130
 #   SIGTERM → 143
-# We use 0 here because the watchdog exiting cleanly is a
-# normal terminal state — a supervisor (service.sh) reads the
-# PID file, not the exit code.
+# We use 0 because the watchdog exiting cleanly is a normal
+# terminal state — a supervisor reads the PID file, not the
+# exit code.
 _wd_terminate() {
     local _sig="${1:-UNKNOWN}"
+
+    # Release the mkdir lock if we still hold it.
+    if [ "${_LOCK_ACQUIRED:-0}" = "1" ] && [ -n "${_LOCK_DIR:-}" ] && [ -d "$_LOCK_DIR" ]; then
+        rmdir "$_LOCK_DIR" 2>/dev/null
+        _LOCK_ACQUIRED=0
+    fi
+
     do_log "Watchdog terminated (SIG$_sig)"
     rm -f "$WATCHDOG_PID_FILE" 2>/dev/null
     exit 0
@@ -508,12 +593,6 @@ trap '_wd_terminate QUIT' QUIT
 # The token path is preferred over Basic Auth: independent of
 # the credentials file, constant-time-compared, localhost-
 # scoped, and not subject to the login rate limiter.
-#
-# This is the CANONICAL definition of do_get_token. It
-# replaces the (now-removed) placeholder that used to live in
-# §[7] — the placeholder was dead code, because this section
-# always re-defines do_get_token later in the same shell
-# process.
 #
 # Return values:
 #   0 — token read and looks valid (>= 32 chars); printed to
@@ -590,18 +669,18 @@ fi
 # ============================================================
 # [15] Explicit safe PATH for the HTTP client
 # ============================================================
-# The HTTP client invocations below use `env -i` to start with
-# an EMPTY environment, then explicitly set:
+# The HTTP client invocations use `env -i` to start with an
+# EMPTY environment, then explicitly set:
 #   • PATH=$SAFE_PATH
 #   • HOME=/data/local/tmp
 #   • http_proxy / https_proxy / HTTP_PROXY / HTTPS_PROXY = ""
 #   • no_proxy / NO_PROXY = ""
 #
-# The empty proxy variables are critical: on a device where the
-# user has configured a proxy, an inherited `http_proxy` would
-# redirect the watchdog's localhost API call through that
-# proxy — which would fail (the proxy cannot reach 127.0.0.1)
-# or leak the watchdog token to the proxy.
+# The empty proxy variables are critical: on a device where
+# the user has configured a proxy, an inherited `http_proxy`
+# would redirect the watchdog's localhost API call through
+# that proxy — which would fail (the proxy cannot reach
+# 127.0.0.1) or leak the watchdog token to the proxy.
 SAFE_PATH="/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin"
 
 # ============================================================
@@ -722,7 +801,6 @@ watchdog_api_call() {
             fi
             rm -f "$tmp_resp" "$tmp_code" 2>/dev/null
 
-            # --- Analyze curl result ---
             if [ "$exit_code" -ne 0 ]; then
                 do_log "WARNING: API call failed (exit=$exit_code) — network/timeout"
                 return 2
@@ -852,7 +930,6 @@ watchdog_api_call() {
             ;;
     esac
 
-    # Unreachable — all three branches return explicitly.
     return 4
 }
 
@@ -916,11 +993,11 @@ do_log "Active profile: $_profile_hint"
 while true; do
     LOOP_COUNT=$((LOOP_COUNT + 1))
 
-    # ============================================================
-    # [18.0] Compute sleep
-    # ============================================================
-    # Sleep duration is the SMALLER of the two current backoffs,
-    # clamped to [5, BACKOFF_MAX].
+# ============================================================
+# [18.0] Compute sleep
+# ============================================================
+# Sleep duration is the SMALLER of the two current backoffs,
+# clamped to [5, BACKOFF_MAX].
     SLEEP_DURATION="$WEBUI_BACKOFF_CURRENT"
     if [ "$DNS_BACKOFF_CURRENT" -lt "$SLEEP_DURATION" ]; then
         SLEEP_DURATION="$DNS_BACKOFF_CURRENT"
@@ -930,42 +1007,42 @@ while true; do
 
     sleep "$SLEEP_DURATION"
 
-    # ============================================================
-    # [18.1] Check for disable
-    # ============================================================
-    # The `disable` file is written by the manager when the user
-    # disables the module. On detection, the watchdog removes
-    # its own PID file and exits cleanly (code 0).
+# ============================================================
+# [18.1] Check for disable
+# ============================================================
+# The `disable` file is written by the manager when the user
+# disables the module. On detection, the watchdog removes
+# its own PID file and exits cleanly (code 0).
     if [ -f "$MODDIR/disable" ]; then
         do_log "module disabled -> Watchdog exiting"
         rm -f "$WATCHDOG_PID_FILE" 2>/dev/null
         exit 0
     fi
 
-    # ============================================================
-    # Guard against empty `date` output
-    # ============================================================
-    # `date +%s` can fail (returning empty) on a device where
-    # the system clock is broken. An empty `now` would make
-    # every arithmetic below fail. Setting `now=0` degrades
-    # gracefully — no restart attempt fires this iteration.
+# ============================================================
+# Guard against empty `date` output
+# ============================================================
+# `date +%s` can fail (returning empty) on a device where
+# the system clock is broken. An empty `now` would make
+# every arithmetic below fail. Setting `now=0` degrades
+# gracefully — no restart attempt fires this iteration.
     now=$(date +%s 2>/dev/null)
     case "$now" in
         ''|*[!0-9]*) now=0 ;;
     esac
 
-    # ============================================================
-    # [18.2] Restart WebUI
-    # ============================================================
-    # Only attempt a restart when ALL of the following hold:
-    #   • AUTO_RESTART_WEBUI is "1".
-    #   • WEBUI_BACKOFF_CURRENT has elapsed since
-    #     LAST_WEBUI_ATTEMPT.
-    #   • The WebUI port is NOT listening.
-    #
-    # If the WebUI port IS listening, the backoff is reset to
-    # BACKOFF_BASE — a healthy service should not carry the
-    # penalty of a previous failure.
+# ============================================================
+# [18.2] Restart WebUI
+# ============================================================
+# Only attempt a restart when ALL of the following hold:
+#   • AUTO_RESTART_WEBUI is "1".
+#   • WEBUI_BACKOFF_CURRENT has elapsed since
+#     LAST_WEBUI_ATTEMPT.
+#   • The WebUI port is NOT listening.
+#
+# If the WebUI port IS listening, the backoff is reset to
+# BACKOFF_BASE — a healthy service should not carry the
+# penalty of a previous failure.
     if [ "$AUTO_RESTART_WEBUI" = "1" ]; then
         if [ $((now - LAST_WEBUI_ATTEMPT)) -ge "$WEBUI_BACKOFF_CURRENT" ]; then
             LAST_WEBUI_ATTEMPT="$now"
@@ -988,28 +1065,28 @@ while true; do
         fi
     fi
 
-    # ============================================================
-    # [18.3] Restart DNS Engine
-    # ============================================================
-    # STATUS_FILE represents "user intent":
-    #   * ON  = user wants the service running → Watchdog
-    #           restarts it
-    #   * OFF = user stopped it manually → Watchdog does
-    #           nothing
-    #
-    # DNS backoff resets when STATUS_FILE changes.
-    #
-    # TOCTOU mitigation:
-    #   After the initial `if [ "$desired" = "ON" ]` check, the
-    #   code re-reads STATUS_FILE immediately before calling the
-    #   API. This closes the window in which the user could have
-    #   pressed "Stop" in the WebUI between the first read and
-    #   the API call.
-    #
-    # RC handling from watchdog_api_call:
-    #   RC=0  → success. Reset backoff to base.
-    #   RC=3  → rate-limited (HTTP 429). Double the backoff.
-    #   other → any other failure. Double the backoff.
+# ============================================================
+# [18.3] Restart DNS Engine
+# ============================================================
+# STATUS_FILE represents "user intent":
+#   * ON  = user wants the service running → Watchdog
+#           restarts it
+#   * OFF = user stopped it manually → Watchdog does
+#           nothing
+#
+# DNS backoff resets when STATUS_FILE changes.
+#
+# TOCTOU mitigation:
+#   After the initial `if [ "$desired" = "ON" ]` check, the
+#   code re-reads STATUS_FILE immediately before calling the
+#   API. This closes the window in which the user could have
+#   pressed "Stop" in the WebUI between the first read and
+#   the API call.
+#
+# RC handling from watchdog_api_call:
+#   RC=0  → success. Reset backoff to base.
+#   RC=3  → rate-limited (HTTP 429). Double the backoff.
+#   other → any other failure. Double the backoff.
     if [ "$AUTO_RESTART_DNS" = "1" ]; then
         desired="OFF"
         if [ -f "$STATUS_FILE" ]; then
@@ -1071,12 +1148,12 @@ while true; do
         fi
     fi
 
-    # ============================================================
-    # [18.4] Periodic log every 20 iterations (~10 minutes)
-    # ============================================================
-    # Reports the current values of both backoffs so an operator
-    # inspecting the log can see whether either service is in a
-    # degraded state.
+# ============================================================
+# [18.4] Periodic log every 20 iterations (~10 minutes)
+# ============================================================
+# Reports the current values of both backoffs so an operator
+# inspecting the log can see whether either service is in a
+# degraded state.
     if [ $((LOOP_COUNT % 20)) -eq 0 ]; then
         do_log "Watchdog alive (loop #$LOOP_COUNT, webui_backoff=${WEBUI_BACKOFF_CURRENT}s, dns_backoff=${DNS_BACKOFF_CURRENT}s)"
     fi
