@@ -40,7 +40,7 @@ import (
 )
 
 // ============================================================
-// [0] Build version variables (injected via LDFLAGS)
+// [0] Build version variables
 // ============================================================
 var (
 	BuildVersion = "dev"
@@ -353,17 +353,13 @@ var (
 	downloadClientMu sync.Mutex
 	downloadClient   *http.Client
 
-	// Smart Bootstrap Resolver State
 	bootstrapIPOnce   sync.Once
 	cachedBootstrapIP string
 )
 
-// getBootstrapIP extracts the first IP from dnscrypt-proxy.toml safely.
-// Handles: multi-line TOML arrays, comments, exact key matching,
-// quoted keys (single & double), IPv4/IPv6.
 func getBootstrapIP() string {
 	bootstrapIPOnce.Do(func() {
-		cachedBootstrapIP = "94.140.14.14" // Default fallback
+		cachedBootstrapIP = "94.140.14.14"
 		data, err := os.ReadFile(CONF)
 		if err != nil {
 			return
@@ -372,7 +368,6 @@ func getBootstrapIP() string {
 		content := string(data)
 		lines := strings.Split(content, "\n")
 
-		// 1. Find the REAL "bootstrap_resolvers" line with EXACT key matching.
 		startIdx := -1
 		currentPos := 0
 		for _, line := range lines {
@@ -398,24 +393,20 @@ func getBootstrapIP() string {
 			return
 		}
 
-		// 2. Find the opening bracket '['
 		blockStart := strings.IndexByte(content[startIdx:], '[')
 		if blockStart == -1 {
 			return
 		}
 		blockStart += startIdx
 
-		// 3. Find the closing bracket ']'
 		blockEnd := strings.IndexByte(content[blockStart:], ']')
 		if blockEnd == -1 {
 			return
 		}
 		blockEnd += blockStart
 
-		// 4. Extract the content between [ and ]
 		block := content[blockStart+1 : blockEnd]
 
-		// 5. Find the first quoted string
 		quoteStart := strings.IndexAny(block, "'\"")
 		if quoteStart == -1 {
 			return
@@ -426,10 +417,8 @@ func getBootstrapIP() string {
 			return
 		}
 
-		// 6. Extract the IP:port string
 		ipWithPort := strings.TrimSpace(block[quoteStart+1 : quoteStart+1+quoteEnd])
 
-		// 7. Strip the port (handles IPv4, bracketed IPv6, pure IPv6)
 		if strings.HasPrefix(ipWithPort, "[") {
 			if endIdx := strings.Index(ipWithPort, "]"); endIdx != -1 {
 				ipWithPort = ipWithPort[1:endIdx]
@@ -438,7 +427,6 @@ func getBootstrapIP() string {
 			ipWithPort = ipWithPort[:strings.LastIndex(ipWithPort, ":")]
 		}
 
-		// 8. Validate and cache
 		if net.ParseIP(ipWithPort) != nil {
 			cachedBootstrapIP = ipWithPort
 		}
@@ -456,7 +444,6 @@ func createDownloadClient() *http.Client {
 	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			// Attempt 1: Primary (from TOML)
 			conn, err := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", primaryIP+":53")
 			if err == nil {
 				return conn, nil
@@ -466,7 +453,6 @@ func createDownloadClient() *http.Client {
 				return conn, nil
 			}
 
-			// Attempt 2: Tertiary Fallback (Quad9 - 9.9.9.9)
 			conn, err = (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", "9.9.9.9:53")
 			if err == nil {
 				return conn, nil
@@ -3139,12 +3125,10 @@ func updateProfile(key string) map[string]interface{} {
 	atomicWriteFile(SELECTED_FILE, []byte(key), 0666)
 	applyMemoryLimit(key)
 
-	// Invalidate Smart Update cache for this specific profile
 	updateCheckMu.Lock()
 	delete(updateCheckCache, key)
 	updateCheckMu.Unlock()
 
-	// Broadcast event to sync the UI button state across all tabs
 	broadcastEvent("update_status", `{"status":"up_to_date"}`)
 
 	writeProgress(95, "Restarting DNSCrypt engine...")
@@ -4307,16 +4291,16 @@ func (h *apiHandler) dispatchGet(w http.ResponseWriter, r *http.Request) {
 
 	switch action {
 	case "status":
-		json.NewEncoder(w).Encode(h.getStatusAction(r))
+			json.NewEncoder(w).Encode(h.getStatusAction(r))
 
 	case "get_profile":
-		json.NewEncoder(w).Encode(h.getProfileAction(r))
+			json.NewEncoder(w).Encode(h.getProfileAction(r))
 
 	case "get_custom_rules":
-		json.NewEncoder(w).Encode(h.getCustomRulesAction(r))
+			json.NewEncoder(w).Encode(h.getCustomRulesAction(r))
 
 	case "get_rules_state":
-		json.NewEncoder(w).Encode(h.getRulesStateAction(r))
+			json.NewEncoder(w).Encode(h.getRulesStateAction(r))
 
 	case "check_update":
 		profileKey := readSelectedProfile()
@@ -4485,7 +4469,6 @@ func extractVersion(text string) string {
 }
 
 func checkUpdateStatus(profileKey string) map[string]interface{} {
-	// 1. Prevent race conditions: check if an update is already running
 	updatingMu.Lock()
 	if isUpdating {
 		updatingMu.Unlock()
@@ -4493,7 +4476,6 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 	updatingMu.Unlock()
 
-	// 2. Check cache under lock (Fast Path)
 	updateCheckMu.Lock()
 	if cached, ok := updateCheckCache[profileKey]; ok && time.Since(cached.Timestamp) < 5*time.Minute {
 		updateCheckMu.Unlock()
@@ -4505,7 +4487,6 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 	updateCheckMu.Unlock()
 
-	// 3. Read local version safely (Only read first 4KB)
 	localVer := ""
 	f, err := os.Open(RAW_BLOCKLIST_FILE)
 	if err != nil {
@@ -4524,11 +4505,8 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 		return map[string]interface{}{"status": "unknown", "reason": "invalid_profile"}
 	}
 
-	// 4. Fetch remote version (Cascade: Range -> Full GET)
 	remoteVer := fetchRemoteVersion(profile.URL)
 
-	// 5. Fail-Safe: If remote version is empty, it's a network/CDN issue.
-	// Return "unknown" (orange button) instead of "available" (yellow button).
 	if remoteVer == "" {
 		return map[string]interface{}{
 			"status": "unknown",
@@ -4536,13 +4514,11 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 		}
 	}
 
-	// 6. Compare safely
 	status := "up_to_date"
 	if localVer == "" || localVer != remoteVer {
 		status = "available"
 	}
 
-	// 7. Write to cache under lock
 	updateCheckMu.Lock()
 	updateCheckCache[profileKey] = cachedUpdateStatus{
 		Status:    status,
@@ -4559,14 +4535,12 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 }
 
-// fetchRemoteVersion tries Range Request first, then falls back to Full GET.
 func fetchRemoteVersion(url string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	client := getDownloadClient()
 
-	// Attempt 1: Range Request (Fastest)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("Range", "bytes=0-4096")
 	req.Header.Set("User-Agent", USER_AGENT)
@@ -4583,7 +4557,6 @@ func fetchRemoteVersion(url string) string {
 		resp.Body.Close()
 	}
 
-	// Attempt 2: Full GET (Fallback)
 	req, _ = http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("User-Agent", USER_AGENT)
 

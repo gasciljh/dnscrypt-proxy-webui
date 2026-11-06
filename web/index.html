@@ -100,8 +100,7 @@
         .profile-selector select option { background:var(--bg); color:var(--text); }
         .btn-apply { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; }
         .btn-apply:disabled { opacity:0.5; cursor:not-allowed; }
-        
-        /* Smart Update Button Styles */
+
         .btn-update-pulse { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; animation: pulse-yellow 2s infinite; }
         .btn-update-unknown { background: linear-gradient(135deg, #e67e22, #d35400) !important; color: #fff !important; }
         @keyframes pulse-yellow {
@@ -449,14 +448,13 @@
                 </select>
                 <button class="btn-apply" id="applyBtn"><span id="applyText">Apply</span></button>
             </div>
-            
-            <!-- Smart Update Button with Wrapper -->
+
             <div id="updateBtnWrapper">
                 <button class="btn-apply" id="updateCurrentListBtn" style="width: 100%;">
                     <span id="updateCurrentListText">🔄 Update Current Lists</span>
                 </button>
             </div>
-            
+
             <div id="updateStatus" style="font-size:13px; color:var(--text-muted); text-align:center; margin-top:8px; min-height:20px;"></div>
         </div>
 
@@ -642,6 +640,7 @@
             apply: 'Apply', alreadyActive: '⚠️ This profile is already active', applyConfirm: 'Are you sure you want to apply rules and "',
             updateChecking: '⏳ Checking updates...',
             updateAvailable: '🔄 Update Available Now',
+            updateAvailableMsg: '🔄 Blocklist Update Available Now',
             updateUpToDate: '✅ List is Up-to-Date',
             updateUnknown: '⚠️ Check Failed - Tap to Retry',
             updateNotNeededMsg: '✅ You are already using the latest version.',
@@ -757,6 +756,7 @@
             apply: 'تطبيق', alreadyActive: '⚠️ هذه القائمة مفعلة بالفعل', applyConfirm: 'هل أنت متأكد من تطبيق القواعد وقائمة ',
             updateChecking: '⏳ جاري فحص التحديثات...',
             updateAvailable: '🔄 تحديث متاح الآن',
+            updateAvailableMsg: '🔄 تحديث قوائم الحجب متاح الآن',
             updateUpToDate: '✅ القائمة محدثة',
             updateUnknown: '⚠️ تعذر الفحص - إعادة المحاولة',
             updateNotNeededMsg: '✅ أنت تستخدم أحدث إصدار بالفعل.',
@@ -881,8 +881,7 @@
     var companionInstallInFlight = false;
     var installModalActive = false;
 
-    // Smart Update State
-    var currentUpdateState = 'unknown';
+    var currentUpdateState = 'checking';
     var isCheckingUpdates = false;
 
     var $ = function(id) { return document.getElementById(id); };
@@ -1669,7 +1668,7 @@
         else $('sourceCountText').textContent = t('sourceCount');
         $('currentLabel').textContent = t('currentLabel');
         $('applyText').textContent = t('apply');
-        
+
         $('syncText').textContent = t('sync');
         $('forceRefreshText').textContent = t('forceRefresh');
         $('logsText').textContent = t('logs');
@@ -1743,7 +1742,7 @@
         if (logFilesData) renderLogFiles();
         var dashText = $('dashboardLinkText');
         if (dashText) dashText.textContent = t('dashboardLinkText');
-        
+
         updateSmartUpdateButtonUI();
     }
 
@@ -1812,7 +1811,7 @@
                 loadRuntimeInfo();
                 loadLogFiles();
                 refreshCompanionState();
-                checkForUpdates(false);
+                setTimeout(function() { checkForUpdates(false); }, 4500);
                 verifyFailures = 0;
                 verifyBackoff = 3000;
             } else if (resp.status === 429) {
@@ -1892,7 +1891,8 @@
             setNetworkDownUI(false);
             showMainScreen();
             showAuthBadge();
-            if (!appInitialized) {
+            var wasFirstInit = !appInitialized;
+            if (wasFirstInit) {
                 showMsg(t('welcomeMsg'), 'info', 4000);
                 initSSE();
                 startPolling();
@@ -1902,7 +1902,7 @@
                 appInitialized = true;
             }
             refreshCompanionState();
-            checkForUpdates(false);
+            setTimeout(function() { checkForUpdates(false); }, wasFirstInit ? 4500 : 0);
         });
     }
 
@@ -2057,11 +2057,10 @@
                             $('saveDenyBtn').disabled = false;
                             $('toggleBtn').disabled = false;
                             $('restartBtn').disabled = false;
-                            
-                            // Update Smart Button State after success
+
                             currentUpdateState = 'up_to_date';
                             updateSmartUpdateButtonUI();
-                            
+
                             loadProfile();
                             refreshAll(true);
                         }, 500);
@@ -2249,7 +2248,7 @@
             $('sourceCountText').style.color = 'var(--success)';
         }
         $('editorCard').style.display = 'block';
-        
+
         if (currentProfileIsEmpty) {
             $('updateBtnWrapper').style.display = 'none';
         } else {
@@ -2306,12 +2305,11 @@
             if (wrapper) wrapper.style.display = 'none';
             return;
         }
-        
+
         var btn = $('updateCurrentListBtn');
         var txt = $('updateCurrentListText');
         if (!btn || !txt) return;
 
-        // إعادة تعيين الأنماط المضمنة
         btn.style.background = '';
         btn.style.color = '';
 
@@ -2325,7 +2323,6 @@
             btn.className = 'btn-apply btn-update-disabled';
             txt.textContent = t('updateUpToDate');
         } else {
-            // الحالة الافتراضية (unknown أو خطأ) -> زر برتقالي
             btn.className = 'btn-apply btn-update-unknown';
             txt.textContent = t('updateUnknown');
         }
@@ -2337,12 +2334,12 @@
             if (wrapper) wrapper.style.display = 'none';
             return;
         }
-        
+
         if (isCheckingUpdates || isProcessing) return;
         isCheckingUpdates = true;
-        
+
         var wrapper = $('updateBtnWrapper');
-        
+
         if (wrapper) wrapper.style.pointerEvents = 'none';
         currentUpdateState = 'checking';
         updateSmartUpdateButtonUI();
@@ -2350,7 +2347,7 @@
         xhrGet('/api?action=check_update', function(err, data) {
             isCheckingUpdates = false;
             if (wrapper) wrapper.style.pointerEvents = 'auto';
-            
+
             if (err || !data || data.status === 'unknown') {
                 currentUpdateState = 'unknown';
                 updateSmartUpdateButtonUI();
@@ -2361,7 +2358,7 @@
             if (data.status === 'available') {
                 currentUpdateState = 'available';
                 updateSmartUpdateButtonUI();
-                showMsg(t('updateAvailable'), 'info', 4000);
+                showMsg(t('updateAvailableMsg'), 'info', 5000);
             } else {
                 currentUpdateState = 'up_to_date';
                 updateSmartUpdateButtonUI();
@@ -2373,27 +2370,25 @@
     function applyProfile(forceUpdate) {
         if (isProcessing) return;
         var select = $('profileSelect'), profile = select.value;
-        
+
         if (!forceUpdate && profile === currentProfileKey && !currentProfileIsEmpty) {
             showMsg(t('alreadyActive'), 'warning');
             return;
         }
-        
+
         var name = select.options[select.selectedIndex].text;
         var warningPrefix = hasUnsavedChanges() ? (t('unsavedWarning') + '\n\n') : '';
-        
+
         showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
-            
-            // Auto-save pending changes before starting the update
+
             if (editStates.allow === EditState.EDIT && countChanges('allow') > 0) {
                 saveWithOptimistic('allow');
             }
             if (editStates.deny === EditState.EDIT && countChanges('deny') > 0) {
                 saveWithOptimistic('deny');
             }
-            
-            // Wait a brief moment for the save requests to hit the backend
+
             setTimeout(function() { executeProfileUpdate(profile); }, 600);
         });
     }
@@ -2406,7 +2401,7 @@
         $('saveDenyBtn').disabled = true;
         $('toggleBtn').disabled = true;
         $('restartBtn').disabled = true;
-        
+
         var progContainer = $('progressContainer'), progBar = $('progressBar');
         progContainer.style.display = 'block';
         progContainer.style.opacity = '1';
@@ -2474,10 +2469,10 @@
                                 $('saveDenyBtn').disabled = false;
                                 $('toggleBtn').disabled = false;
                                 $('restartBtn').disabled = false;
-                                
+
                                 currentUpdateState = 'up_to_date';
                                 updateSmartUpdateButtonUI();
-                                
+
                                 loadProfile();
                                 refreshAll(true);
                             }, 500);
@@ -2853,13 +2848,12 @@
         $('restartBtn').addEventListener('click', handleRestart);
 
         $('applyBtn').addEventListener('click', function() { applyProfile(false); });
-        
-        // Smart Update Wrapper Listener
+
         var updateWrapper = $('updateBtnWrapper');
         if (updateWrapper) {
             updateWrapper.addEventListener('click', function(e) {
                 if (isProcessing || isCheckingUpdates) return;
-                
+
                 if (currentUpdateState === 'up_to_date') {
                     showMsg(t('updateNotNeededMsg'), 'info', 3000);
                 } else if (currentUpdateState === 'unknown') {
@@ -2874,12 +2868,10 @@
             if (isProcessing || isCheckingUpdates) return;
             var selectedProfile = this.value;
             var wrapper = $('updateBtnWrapper');
-            
+
             if (selectedProfile !== currentProfileKey) {
-                // القائمة المختارة تختلف عن النشطة -> أخفِ الزر
                 if (wrapper) wrapper.style.display = 'none';
             } else {
-                // المستخدم عاد للقائمة النشطة -> أظهر الزر بحالته الصحيحة
                 if (!currentProfileIsEmpty) {
                     if (wrapper) wrapper.style.display = 'block';
                     updateSmartUpdateButtonUI();
@@ -2981,8 +2973,7 @@
                 setupSWUpdateHandler();
             }).catch(function() {});
         }
-        
-        // Smart Background Check (Battery Friendly)
+
         let updateCheckTimer = null;
         function startUpdatePolling() {
             if (updateCheckTimer) clearInterval(updateCheckTimer);
@@ -2990,18 +2981,16 @@
                 if (appInitialized && !isProcessing && !isCheckingUpdates) {
                     checkForUpdates(false);
                 }
-            }, 30 * 60 * 1000); // 30 minutes
+            }, 30 * 60 * 1000);
         }
 
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible') {
-                // When user returns to the tab, check immediately, then restart timer
                 if (appInitialized && !isProcessing && !isCheckingUpdates) {
                     checkForUpdates(false);
                 }
                 startUpdatePolling();
             } else {
-                // When tab is hidden, stop timer to save battery
                 if (updateCheckTimer) {
                     clearInterval(updateCheckTimer);
                     updateCheckTimer = null;
@@ -3009,12 +2998,10 @@
             }
         });
 
-        // Start the timer initially if tab is visible
         if (document.visibilityState === 'visible') {
             startUpdatePolling();
         }
-        
-        setTimeout(function() { checkForUpdates(false); }, 1000);
+
         verifyAuth();
     }
 
