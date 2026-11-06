@@ -92,11 +92,12 @@
         @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
         .card-editor { margin-top:24px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:right; }
         [dir="ltr"] .card-editor { text-align:left; }
-        .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap; }
-        .editor-header h3 { font-size:16px; color:var(--primary); margin:0; }
+        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 4px; flex-wrap: nowrap; }
+        .editor-header h3 { font-size: 14px; color: var(--primary); margin: 0; white-space: nowrap; }
+        .source-count { font-size: 11px !important; white-space: nowrap; text-align: right; }
         .profile-selector { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
-        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; }
-        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; }
+        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:3px solid #88c0ff; box-shadow: 0 0 10px rgba(136,192,255,0.2); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; transition: 0.3s; }
+        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; border-color: var(--border); box-shadow: none; }
         .profile-selector select option { background:var(--bg); color:var(--text); }
         .btn-apply { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; }
         .btn-apply:disabled { opacity:0.5; cursor:not-allowed; }
@@ -217,18 +218,38 @@
             text-decoration: underline;
         }
 
-        .stats-area { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; color:var(--text-muted); flex-wrap:wrap; gap:8px; }
-        .stats-area > span { background:rgba(255,255,255,0.03); padding:4px 12px; border-radius:8px; border:1px solid var(--border); }
-        #blockedToday { display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:center; }
-        #blockedToday .stat-sub { flex-basis:100%; width:100%; }
-        .stat-paused { opacity:0.9; }
-        .stat-sub { display:block; font-size:9px; opacity:0.9; margin-top:4px; font-style:italic; line-height:1.4; font-weight:400; white-space:nowrap; letter-spacing:-0.2px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-width:100%; box-sizing:border-box; scrollbar-width:thin; padding-bottom:2px; }
-        .stat-sub::-webkit-scrollbar { height:3px; }
-        .stat-sub::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); border-radius:2px; }
-        .stat-sub::-webkit-scrollbar-thumb { background:rgba(88,166,255,0.4); border-radius:2px; }
-        .stats-area { align-items:flex-start; }
-        .stats-area > span { flex:1 1 0; min-width:0; }
-        #blockedToday { transition:opacity .3s ease; }
+        .stats-area { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-top: 12px; 
+            font-size: 13px; 
+            color: var(--text-muted); 
+            gap: 8px; 
+            align-items: stretch; }
+        .stats-area > span { 
+            background: rgba(255,255,255,0.03); 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            border: 1px solid var(--border); 
+            flex: 1 1 0px;
+            width: 0; 
+            min-width: 0; 
+            display: flex; 
+            align-items: center;
+            justify-content: center; }
+        #blockedToday { 
+            display: inline-flex; 
+            align-items: center; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            transition: opacity .3s ease; }
+        #blockedToday .stat-sub { flex-basis: 100%; width: 100%; }
+        .stat-paused { opacity: 0.9; }
+        .stat-sub { display: block; font-size: 9px; opacity: 0.9; margin-top: 4px; font-style: italic; line-height: 1.4; font-weight: 400; white-space: nowrap; letter-spacing: -0.2px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; max-width: 100%; box-sizing: border-box; scrollbar-width: thin; padding-bottom: 2px; }
+        .stat-sub::-webkit-scrollbar { height: 3px; }
+        .stat-sub::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
+        .stat-sub::-webkit-scrollbar-thumb { background: rgba(88,166,255,0.4); border-radius: 2px; }
+
         #blockedToday .led {
             display: inline-block !important;
             width: 12px !important;
@@ -469,7 +490,7 @@
                             <span class="draft-badge" id="allowDraftBadge">💾 Draft</span>
                         </span>
                     </span>
-                    <textarea id="allowlistInput" readonly placeholder="googleadservices.com&#10;s.youtube.com"></textarea>
+                    <textarea id="allowlistInput" readonly placeholder="example.com&#10;example.org"></textarea>
                     <div class="rule-status" id="allowStatus"></div>
                     <button class="btn-edit" id="saveAllowBtn">
                         <span id="saveAllowText">✏️ Edit Allowlist</span>
@@ -484,7 +505,7 @@
                             <span class="draft-badge" id="denyDraftBadge">💾 Draft</span>
                         </span>
                     </span>
-                    <textarea id="denylistInput" readonly placeholder="facebook.com&#10;tiktok.com"></textarea>
+                    <textarea id="denylistInput" readonly placeholder="example.com&#10;example.org"></textarea>
                     <div class="rule-status" id="denyStatus"></div>
                     <button class="btn-edit" id="saveDenyBtn">
                         <span id="saveDenyText">✏️ Edit Denylist</span>
