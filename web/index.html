@@ -92,27 +92,14 @@
         @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
         .card-editor { margin-top:24px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:right; }
         [dir="ltr"] .card-editor { text-align:left; }
-        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 4px; flex-wrap: nowrap; }
-        .editor-header h3 { font-size: 14px; color: var(--primary); margin: 0; white-space: nowrap; }
-        .source-count { font-size: 11px !important; white-space: nowrap; text-align: right; }
-        .profile-selector { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
-        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:3px solid #88c0ff; box-shadow: 0 0 10px rgba(136,192,255,0.2); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; transition: 0.3s; }
-        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; border-color: var(--border); box-shadow: none; }
+        .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:8px; flex-wrap:wrap; }
+        .editor-header h3 { font-size:16px; color:var(--primary); margin:0; }
+        .profile-selector { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; }
+        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; }
         .profile-selector select option { background:var(--bg); color:var(--text); }
         .btn-apply { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; }
         .btn-apply:disabled { opacity:0.5; cursor:not-allowed; }
-
-        .btn-update-pulse { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; animation: pulse-yellow 2s infinite; }
-        .btn-update-unknown { background: linear-gradient(135deg, #e67e22, #d35400) !important; color: #fff !important; }
-        @keyframes pulse-yellow {
-            0% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(210, 153, 34, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0); }
-        }
-        .btn-update-disabled { background: rgba(139, 148, 158, 0.2) !important; color: var(--text-muted) !important; pointer-events: none; opacity: 0.7; box-shadow: none !important; }
-        #updateBtnWrapper { width: 100%; margin-top: 2px; cursor: pointer; transition: transform 0.1s; }
-        #updateBtnWrapper:active { transform: scale(0.98); }
-
         .btn-edit { background:linear-gradient(135deg,#8957e5,#6e40c9); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; }
         .btn-edit:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(137,87,229,0.4); }
         .btn-cancel-edit { background:rgba(139,148,158,0.15); border:1px solid rgba(139,148,158,0.3); color:var(--text-muted); padding:10px 16px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer; width:100%; margin-top:6px; font-family:inherit; transition:0.2s; display:none; }
@@ -218,38 +205,18 @@
             text-decoration: underline;
         }
 
-        .stats-area { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-top: 12px; 
-            font-size: 13px; 
-            color: var(--text-muted); 
-            gap: 8px; 
-            align-items: stretch; }
-        .stats-area > span { 
-            background: rgba(255,255,255,0.03); 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            border: 1px solid var(--border); 
-            flex: 1 1 0px;
-            width: 0; 
-            min-width: 0; 
-            display: flex; 
-            align-items: center;
-            justify-content: center; }
-        #blockedToday { 
-            display: inline-flex; 
-            align-items: center; 
-            flex-wrap: wrap; 
-            justify-content: center; 
-            transition: opacity .3s ease; }
-        #blockedToday .stat-sub { flex-basis: 100%; width: 100%; }
-        .stat-paused { opacity: 0.9; }
-        .stat-sub { display: block; font-size: 9px; opacity: 0.9; margin-top: 4px; font-style: italic; line-height: 1.4; font-weight: 400; white-space: nowrap; letter-spacing: -0.2px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; max-width: 100%; box-sizing: border-box; scrollbar-width: thin; padding-bottom: 2px; }
-        .stat-sub::-webkit-scrollbar { height: 3px; }
-        .stat-sub::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
-        .stat-sub::-webkit-scrollbar-thumb { background: rgba(88,166,255,0.4); border-radius: 2px; }
-
+        .stats-area { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; color:var(--text-muted); flex-wrap:wrap; gap:8px; }
+        .stats-area > span { background:rgba(255,255,255,0.03); padding:4px 12px; border-radius:8px; border:1px solid var(--border); }
+        #blockedToday { display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:center; }
+        #blockedToday .stat-sub { flex-basis:100%; width:100%; }
+        .stat-paused { opacity:0.9; }
+        .stat-sub { display:block; font-size:9px; opacity:0.9; margin-top:4px; font-style:italic; line-height:1.4; font-weight:400; white-space:nowrap; letter-spacing:-0.2px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-width:100%; box-sizing:border-box; scrollbar-width:thin; padding-bottom:2px; }
+        .stat-sub::-webkit-scrollbar { height:3px; }
+        .stat-sub::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); border-radius:2px; }
+        .stat-sub::-webkit-scrollbar-thumb { background:rgba(88,166,255,0.4); border-radius:2px; }
+        .stats-area { align-items:flex-start; }
+        .stats-area > span { flex:1 1 0; min-width:0; }
+        #blockedToday { transition:opacity .3s ease; }
         #blockedToday .led {
             display: inline-block !important;
             width: 12px !important;
@@ -469,13 +436,6 @@
                 </select>
                 <button class="btn-apply" id="applyBtn"><span id="applyText">Apply</span></button>
             </div>
-
-            <div id="updateBtnWrapper">
-                <button class="btn-apply" id="updateCurrentListBtn" style="width: 100%;">
-                    <span id="updateCurrentListText">🔄 Update Current Lists</span>
-                </button>
-            </div>
-
             <div id="updateStatus" style="font-size:13px; color:var(--text-muted); text-align:center; margin-top:8px; min-height:20px;"></div>
         </div>
 
@@ -490,7 +450,7 @@
                             <span class="draft-badge" id="allowDraftBadge">💾 Draft</span>
                         </span>
                     </span>
-                    <textarea id="allowlistInput" readonly placeholder="example.com&#10;example.org"></textarea>
+                    <textarea id="allowlistInput" readonly placeholder="googleadservices.com&#10;s.youtube.com"></textarea>
                     <div class="rule-status" id="allowStatus"></div>
                     <button class="btn-edit" id="saveAllowBtn">
                         <span id="saveAllowText">✏️ Edit Allowlist</span>
@@ -505,7 +465,7 @@
                             <span class="draft-badge" id="denyDraftBadge">💾 Draft</span>
                         </span>
                     </span>
-                    <textarea id="denylistInput" readonly placeholder="example.com&#10;example.org"></textarea>
+                    <textarea id="denylistInput" readonly placeholder="facebook.com&#10;tiktok.com"></textarea>
                     <div class="rule-status" id="denyStatus"></div>
                     <button class="btn-edit" id="saveDenyBtn">
                         <span id="saveDenyText">✏️ Edit Denylist</span>
@@ -597,6 +557,9 @@
 (function() {
     'use strict';
 
+// ============================================================
+// [1] Initial settings
+// ============================================================
     var VERSION = 'v1.5.0';
 
     var APP_GITHUB_PAGE_URL = 'https://github.com/gasciljh/dnscrypt-proxy-app';
@@ -659,13 +622,6 @@
             editorTitle: '📝 Select Blocklist', sourceCount: 'Choose protection level',
             entriesLabel: 'Protection entries', currentLabel: 'Current Profile:', lastUpdateLabel: '🕒 Last update: ',
             apply: 'Apply', alreadyActive: '⚠️ This profile is already active', applyConfirm: 'Are you sure you want to apply rules and "',
-            updateChecking: '⏳ Checking updates...',
-            updateAvailable: '🔄 Update Available Now',
-            updateAvailableMsg: '🔄 Blocklist Update Available Now',
-            updateUpToDate: '✅ List is Up-to-Date',
-            updateUnknown: '⚠️ Check Failed - Tap to Retry',
-            updateNotNeededMsg: '✅ You are already using the latest version.',
-            updateCurrentListText: '🔄 Update Current Lists',
             serverError: '❌ Connection failed.',
             safetyTimeout: '⚠️ Server timeout.', corruptFileError: '❌ Corrupted file.',
             updateStatus: '⏳ Downloading blocklist...', updateStatusDone: '✅ Blocklist updated',
@@ -775,13 +731,6 @@
             editorTitle: '📝 اختيار القائمة', sourceCount: 'اختر مستوى الحماية',
             entriesLabel: 'مدخلة حماية', currentLabel: 'القائمة الحالية:', lastUpdateLabel: '🕒 آخر تحديث: ',
             apply: 'تطبيق', alreadyActive: '⚠️ هذه القائمة مفعلة بالفعل', applyConfirm: 'هل أنت متأكد من تطبيق القواعد وقائمة ',
-            updateChecking: '⏳ جاري فحص التحديثات...',
-            updateAvailable: '🔄 تحديث متاح الآن',
-            updateAvailableMsg: '🔄 تحديث قوائم الحجب متاح الآن',
-            updateUpToDate: '✅ القائمة محدثة',
-            updateUnknown: '⚠️ تعذر الفحص - إعادة المحاولة',
-            updateNotNeededMsg: '✅ أنت تستخدم أحدث إصدار بالفعل.',
-            updateCurrentListText: '🔄 تحديث القوائم الحالية',
             serverError: '❌ فشل الاتصال.',
             safetyTimeout: '⚠️ طال انتظار الخادم.', corruptFileError: '❌ الملف المحمل تالف.',
             updateStatus: '⏳ جاري تحميل القائمة...', updateStatusDone: '✅ تم تحديث القائمة',
@@ -893,6 +842,10 @@
     var dashboardLinkFallbackTimer = null;
     var networkDownActive = false;
 
+    // Companion app state — single source of truth.
+    // companionInstallInFlight guards against a race: the explicit
+    // renderCompanionButton() calls in doCompanionInstall() act as a
+    // safety net if refreshCompanionState() fails (network / 401).
     var COMPANION_CACHE_KEY = 'companion-state';
     var companionState = {
         installed: false,
@@ -900,32 +853,50 @@
         expected_version: ''
     };
     var companionInstallInFlight = false;
-    var installModalActive = false;
 
-    var currentUpdateState = 'checking';
-    var isCheckingUpdates = false;
+    // installModalActive — set true by showInstallModal().
+    //
+    // While true, the shared backdrop-click handler in §[28]
+    // MUST NOT close the modal. Its only valid exits are its own
+    // buttons (each resets companionInstallInFlight). A backdrop
+    // close would strand the install button in a disabled state.
+    //
+    // INVARIANT: installModalActive === true ⇒ the install modal is
+    // the one currently visible. Enforced by resetting the flag in
+    // both closeConfirmModal() and showConfirmModal().
+    var installModalActive = false;
 
     var $ = function(id) { return document.getElementById(id); };
     function t(k) { return translations[currentLang][k] || k; }
 
+// ============================================================
+// [1b] Dashboard URL builder (respects custom ports)
+// ============================================================
     function getDashboardUrl() {
         var hostname = window.location.hostname || '127.0.0.1';
+
         if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
             hostname = '[' + hostname + ']';
         }
+
         var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+
         return protocol + '//' + hostname + ':' + PORTS.dashboard + '/';
     }
 
     function updateDashboardLink() {
         var link = $('dashboardLink');
         if (!link) return;
+
         var url = getDashboardUrl();
         link.href = url;
         link.setAttribute('data-port', PORTS.dashboard);
         link.classList.remove('loading');
     }
 
+// ============================================================
+// [2] escapeHtml
+// ============================================================
     function escapeHtml(s) {
         if (s === null || s === undefined) return '';
         return String(s)
@@ -938,10 +909,22 @@
             .replace(/\u2029/g, '&#8233;');
     }
 
+// ============================================================
+// [3] Token helpers — cookie-only
+// ============================================================
+    // Auth is cookie-only (HttpOnly `dnscrypt_session`). These are
+    // intentional no-ops kept for backward compatibility with the
+    // XHR helper's `Authorization: Bearer` code path, which is
+    // dormant because getStoredToken() always returns null.
+    // Do NOT add Bearer token support here — the server never
+    // issues one (see SECURITY.md §8.1).
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
     function clearStoredToken() { }
 
+// ============================================================
+// [4] Draft helpers
+// ============================================================
     function getDraftKey(listType) { return 'dnscrypt-' + listType + '-draft'; }
     function saveDraft(listType, value) {
         try {
@@ -971,6 +954,9 @@
         return draft.value !== orig;
     }
 
+// ============================================================
+// [5] countChanges
+// ============================================================
     function countChanges(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var original = originalValues[listType] || '';
@@ -988,6 +974,9 @@
         return total > 0 ? total : 1;
     }
 
+// ============================================================
+// [6] Draft auto-save
+// ============================================================
     function startDraftAutoSave(listType) {
         if (draftTimers[listType]) clearInterval(draftTimers[listType]);
         draftTimers[listType] = setInterval(function() {
@@ -1016,6 +1005,9 @@
         }
     }
 
+// ============================================================
+// [7] FSM transition
+// ============================================================
     function transitionTo(listType, newState) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
         var btn = listType === 'allow' ? $('saveAllowBtn') : $('saveDenyBtn');
@@ -1036,6 +1028,7 @@
                 if (badge) badge.classList.remove('visible');
                 stopDraftAutoSave(listType);
                 break;
+
             case EditState.EDIT:
                 ta.readOnly = false;
                 ta.classList.add('editing');
@@ -1047,6 +1040,7 @@
                 if (badge) badge.classList.add('visible');
                 startDraftAutoSave(listType);
                 break;
+
             case EditState.ROLLBACK:
                 ta.readOnly = false;
                 ta.classList.remove('editing');
@@ -1060,6 +1054,9 @@
         }
     }
 
+// ============================================================
+// [8] Edit mode
+// ============================================================
     function handleEditBtnClick(listType) {
         if (editStates[listType] === EditState.VIEW) {
             enterEditMode(listType);
@@ -1070,16 +1067,23 @@
 
     function enterEditMode(listType) {
         var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
-        var serverHash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+
+        var serverHash = listType === 'allow'
+            ? rulesState.serverAllowHash
+            : rulesState.serverDenyHash;
         if (originalValues[listType] === '' && ta.value === '' && serverHash === '') {
             showMsg(t('waitForContent'), 'warning', 2500);
             return;
         }
+
         originalValues[listType] = ta.value;
+
         var draft = getDraft(listType);
         if (draft && draft.value !== ta.value) {
             showConfirmModal(t('draftRestored') + '\n\n' +
-                (currentLang === 'ar' ? 'هل تريد استرجاع المسودة المحفوظة من آخر جلسة؟' : 'Do you want to restore the draft from your last session?'),
+                (currentLang === 'ar'
+                    ? 'هل تريد استرجاع المسودة المحفوظة من آخر جلسة؟'
+                    : 'Do you want to restore the draft from your last session?'),
                 function(restore) {
                     if (restore) {
                         ta.value = draft.value;
@@ -1120,865 +1124,1018 @@
         setRuleStatus(statusId, '', '');
     }
 
+// ============================================================
+// [9] setRuleStatus
+// ============================================================
     function setRuleStatus(id, text, type) {
         var el = $(id); if (!el) return;
         el.textContent = text;
         el.className = 'rule-status' + (type ? ' ' + type : '');
     }
 
-    function saveWithOptimistic(listType) {
-        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
-        var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
-        var content = ta.value;
-        var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
-        var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
-        var originalValue = originalValues[listType];
+// ============================================================
+// [10] Save with optimistic UI
+// ============================================================
+// The new hash comes from the server response, not from a
+// client-side SHA-256 computation — crypto.subtle is unavailable
+// on non-secure contexts (LAN via BIND_ADDR=0.0.0.0 over HTTP).
+// The optimistic-concurrency protocol is unchanged: send the
+// previously-known hash as expected_hash; the server returns the
+// new hash.
+function saveWithOptimistic(listType) {
+    var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
+    var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
+    var content = ta.value;
+    var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+    var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
+    var originalValue = originalValues[listType];
 
-        if (countChanges(listType) === 0) {
-            showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+    if (countChanges(listType) === 0) {
+        showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+        return;
+    }
+
+    rulesState[savingFlag] = true;
+    transitionTo(listType, EditState.VIEW);
+    setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
+
+    var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
+    var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
+                 encodeURIComponent(content) +
+                 '&expected_hash=' + hash;
+
+    xhrPost(url, params, function(err, data) {
+        rulesState[savingFlag] = false;
+
+        if (err || !data || data.status !== 'ok') {
+            ta.value = originalValue;
+            transitionTo(listType, EditState.ROLLBACK);
+            setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
+            showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
+            saveDraft(listType, content);
             return;
         }
 
-        rulesState[savingFlag] = true;
-        transitionTo(listType, EditState.VIEW);
-        setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
-
-        var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
-        var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
-                     encodeURIComponent(content) +
-                     '&expected_hash=' + hash;
-
-        xhrPost(url, params, function(err, data) {
-            rulesState[savingFlag] = false;
-
-            if (err || !data || data.status !== 'ok') {
-                ta.value = originalValue;
-                transitionTo(listType, EditState.ROLLBACK);
-                setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
-                showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
-                saveDraft(listType, content);
-                return;
-            }
-
-            var newHash = data.hash || '';
-            if (listType === 'allow') {
-                rulesState.serverAllowHash = newHash;
-            } else {
-                rulesState.serverDenyHash = newHash;
-            }
-            clearDraft(listType);
-            originalValues[listType] = content;
-            var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
-            if (badge) badge.classList.remove('visible');
-            setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
-            showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
-            setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
-            setTimeout(loadProfile, 500);
-        });
-    }
-
-    function hasUnsavedChanges() {
-        return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
-               ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
-    }
-
-    document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                saveWithOptimistic('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                saveWithOptimistic('deny');
-            }
+        var newHash = data.hash || '';
+        if (listType === 'allow') {
+            rulesState.serverAllowHash = newHash;
+        } else {
+            rulesState.serverDenyHash = newHash;
         }
-        if (e.key === 'Escape') {
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                cancelEdit('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                cancelEdit('deny');
+        clearDraft(listType);
+        originalValues[listType] = content;
+        var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
+        if (badge) badge.classList.remove('visible');
+        setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
+        showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
+        setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
+        setTimeout(loadProfile, 500);
+    });
+}
+
+function hasUnsavedChanges() {
+    return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
+           ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
+}
+
+// ============================================================
+// [11] Keyboard shortcuts
+// ============================================================
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+            saveWithOptimistic('allow');
+        } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+            saveWithOptimistic('deny');
+        }
+    }
+    if (e.key === 'Escape') {
+        if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+            cancelEdit('allow');
+        } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+            cancelEdit('deny');
+        }
+    }
+});
+
+// ============================================================
+// [12] Modal
+// ============================================================
+// Two flags must be reset whenever a generic confirm modal is
+// opened or closed:
+//
+//   installModalActive
+//     Prevents the shared backdrop-click handler in §[28] from
+//     closing the install-method modal. Its only valid exits are
+//     its own buttons — each resets companionInstallInFlight.
+//     A backdrop close would strand the install button in a
+//     disabled state.
+//
+//   companionInstallInFlight
+//     Guards the one-shot CSRF-token fetch in
+//     handleCompanionInstall(). If a generic confirm modal
+//     replaces the install modal (e.g. session-expired while
+//     installing), the flag must be cleared — otherwise the
+//     install button stays disabled after re-login.
+//
+// Resetting both in BOTH showConfirmModal() and
+// closeConfirmModal() enforces the invariant structurally:
+//   installModalActive === true ⇒ the install modal is the one
+//   currently visible.
+function showConfirmModal(message, callback, options) {
+    options = options || {};
+    _resetModalLayout();
+    installModalActive = false;
+    companionInstallInFlight = false;
+    $('modalMessage').textContent = message;
+    $('modalTitle').textContent = options.title || t('confirmTitle');
+    $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
+    $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+
+    var box = $('customModal').querySelector('.custom-modal-actions');
+    var existing = box.querySelector('.modal-primary');
+    if (existing) existing.remove();
+
+    if (options.primaryText && options.primaryCallback) {
+        var btn = document.createElement('button');
+        btn.className = 'modal-primary';
+        btn.textContent = options.primaryText;
+        btn.addEventListener('click', function() {
+            closeConfirmModal();
+            options.primaryCallback();
+        });
+        box.insertBefore(btn, box.firstChild);
+    }
+
+    $('customModal').style.display = 'flex';
+    pendingConfirmCallback = callback || function() { /* no-op */ };
+}
+function closeConfirmModal() {
+    $('customModal').style.display = 'none';
+    pendingConfirmCallback = null;
+    installModalActive = false;
+}
+
+// ============================================================
+// [13] Auth helpers
+// ============================================================
+function showAuthBadge() {
+    var b = $('authBadge');
+    if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
+}
+function hideAuthBadge() {
+    var b = $('authBadge');
+    if (b) b.style.display = 'none';
+}
+
+function setNetworkDownUI(isDown) {
+    var area = $('statusArea'), txt = $('statusText');
+    if (!area || !txt) return;
+    if (isDown) {
+        area.style.borderColor = 'rgba(210,153,34,0.4)';
+        txt.textContent = t('networkDown');
+        networkDownActive = true;
+    } else {
+        area.style.borderColor = '';
+        if (networkDownActive) {
+            if (currentStatus === 'ON') {
+                txt.textContent = t('statusOn');
+            } else if (currentStatus === 'OFF') {
+                txt.textContent = t('statusOff');
+            } else {
+                txt.textContent = t('statusChecking');
+            }
+            networkDownActive = false;
+        }
+    }
+}
+function updateStatsDisplay() {
+    var btEl = $('blockedToday');
+    if (btEl) {
+        var isPaused = (currentStatus !== 'ON');
+        var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
+        var rawLabel = t('blockedTodayLabel');
+        var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
+
+        var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
+        var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
+        var ledCls = isPaused ? 'led led-off' : 'led led-on';
+
+        btEl.innerHTML =
+            escapeHtml(icon) + ' ' +
+            escapeHtml(labelText) + ' ' +
+            escapeHtml(currentBlockedCount) +
+            '<span class="' + ledCls + '" aria-hidden="true"></span>' +
+            '<span class="stat-sub">' +
+            escapeHtml(before) + ' ' + escapeHtml(after) +
+            '</span>';
+
+        if (isPaused) btEl.classList.add('stat-paused');
+        else btEl.classList.remove('stat-paused');
+    }
+    $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
+}
+
+// ============================================================
+// [13b] SW Update handlers
+// ============================================================
+function showSWUpdateBanner() {
+    var banner = $('swUpdateBanner');
+    var txt = $('swUpdateText');
+    if (txt) txt.textContent = t('swUpdateAvailable');
+    if (banner) banner.style.display = 'flex';
+}
+
+function hideSWUpdateBanner() {
+    var banner = $('swUpdateBanner');
+    if (banner) banner.style.display = 'none';
+}
+
+function installControllerChangeHandler() {
+    if (controllerChangeHandlerInstalled) return;
+    if (!('serviceWorker' in navigator)) return;
+    controllerChangeHandlerInstalled = true;
+
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!pendingReload) return;
+        pendingReload = false;
+        if (swUpdateCheckInterval) {
+            clearInterval(swUpdateCheckInterval);
+            swUpdateCheckInterval = null;
+        }
+        window.location.reload();
+    });
+}
+
+function setupSWUpdateHandler() {
+    if (!('serviceWorker' in navigator)) return;
+
+    installControllerChangeHandler();
+
+    navigator.serviceWorker.addEventListener('message', function(event) {
+        if (!event.data) return;
+        if (event.data.type === 'UPDATE_AVAILABLE') {
+            if (event.data.waiting) {
+                showSWUpdateBanner();
             }
         }
     });
 
-    function showConfirmModal(message, callback, options) {
-        options = options || {};
-        _resetModalLayout();
-        installModalActive = false;
-        companionInstallInFlight = false;
-        $('modalMessage').textContent = message;
-        $('modalTitle').textContent = options.title || t('confirmTitle');
-        $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
-        $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
-
-        var box = $('customModal').querySelector('.custom-modal-actions');
-        var existing = box.querySelector('.modal-primary');
-        if (existing) existing.remove();
-
-        if (options.primaryText && options.primaryCallback) {
-            var btn = document.createElement('button');
-            btn.className = 'modal-primary';
-            btn.textContent = options.primaryText;
-            btn.addEventListener('click', function() {
-                closeConfirmModal();
-                options.primaryCallback();
-            });
-            box.insertBefore(btn, box.firstChild);
+    if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+    swUpdateCheckInterval = setInterval(function() {
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
         }
+    }, 3600000);
 
-        $('customModal').style.display = 'flex';
-        pendingConfirmCallback = callback || function() { /* no-op */ };
-    }
-    function closeConfirmModal() {
-        $('customModal').style.display = 'none';
-        pendingConfirmCallback = null;
-        installModalActive = false;
-    }
-
-    function showAuthBadge() {
-        var b = $('authBadge');
-        if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
-    }
-    function hideAuthBadge() {
-        var b = $('authBadge');
-        if (b) b.style.display = 'none';
-    }
-
-    function setNetworkDownUI(isDown) {
-        var area = $('statusArea'), txt = $('statusText');
-        if (!area || !txt) return;
-        if (isDown) {
-            area.style.borderColor = 'rgba(210,153,34,0.4)';
-            txt.textContent = t('networkDown');
-            networkDownActive = true;
-        } else {
-            area.style.borderColor = '';
-            if (networkDownActive) {
-                if (currentStatus === 'ON') {
-                    txt.textContent = t('statusOn');
-                } else if (currentStatus === 'OFF') {
-                    txt.textContent = t('statusOff');
-                } else {
-                    txt.textContent = t('statusChecking');
-                }
-                networkDownActive = false;
-            }
+    setTimeout(function() {
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
         }
-    }
-    function updateStatsDisplay() {
-        var btEl = $('blockedToday');
-        if (btEl) {
-            var isPaused = (currentStatus !== 'ON');
-            var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
-            var rawLabel = t('blockedTodayLabel');
-            var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
-            var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
-            var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
-            var ledCls = isPaused ? 'led led-off' : 'led led-on';
+    }, 5000);
+}
 
-            btEl.innerHTML =
-                escapeHtml(icon) + ' ' +
-                escapeHtml(labelText) + ' ' +
-                escapeHtml(currentBlockedCount) +
-                '<span class="' + ledCls + '" aria-hidden="true"></span>' +
-                '<span class="stat-sub">' +
-                escapeHtml(before) + ' ' + escapeHtml(after) +
-                '</span>';
+function bindSWUpdateButtons() {
+    var reloadBtn = $('swUpdateReloadBtn');
+    var closeBtn = $('swUpdateCloseBtn');
 
-            if (isPaused) btEl.classList.add('stat-paused');
-            else btEl.classList.remove('stat-paused');
-        }
-        $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
-    }
+    if (reloadBtn) {
+        reloadBtn.addEventListener('click', function() {
+            if (pendingReload) return;
 
-    function showSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        var txt = $('swUpdateText');
-        if (txt) txt.textContent = t('swUpdateAvailable');
-        if (banner) banner.style.display = 'flex';
-    }
-    function hideSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        if (banner) banner.style.display = 'none';
-    }
-    function installControllerChangeHandler() {
-        if (controllerChangeHandlerInstalled) return;
-        if (!('serviceWorker' in navigator)) return;
-        controllerChangeHandlerInstalled = true;
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            if (!pendingReload) return;
-            pendingReload = false;
-            if (swUpdateCheckInterval) {
-                clearInterval(swUpdateCheckInterval);
-                swUpdateCheckInterval = null;
+            if (!swRegistration) {
+                window.location.reload();
+                return;
             }
-            window.location.reload();
-        });
-    }
-    function setupSWUpdateHandler() {
-        if (!('serviceWorker' in navigator)) return;
-        installControllerChangeHandler();
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (!event.data) return;
-            if (event.data.type === 'UPDATE_AVAILABLE') {
-                if (event.data.waiting) showSWUpdateBanner();
+
+            var waiting = swRegistration.waiting;
+            if (!waiting) {
+                window.location.reload();
+                return;
             }
-        });
-        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-        swUpdateCheckInterval = setInterval(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+
+            pendingReload = true;
+            reloadBtn.disabled = true;
+
+            try {
+                waiting.postMessage({ type: 'SKIP_WAITING' });
+            } catch (e) {
+                pendingReload = false;
+                reloadBtn.disabled = false;
+                window.location.reload();
+                return;
             }
-        }, 3600000);
-        setTimeout(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-            }
-        }, 5000);
-    }
-    function bindSWUpdateButtons() {
-        var reloadBtn = $('swUpdateReloadBtn');
-        var closeBtn = $('swUpdateCloseBtn');
-        if (reloadBtn) {
-            reloadBtn.addEventListener('click', function() {
-                if (pendingReload) return;
-                if (!swRegistration) { window.location.reload(); return; }
-                var waiting = swRegistration.waiting;
-                if (!waiting) { window.location.reload(); return; }
-                pendingReload = true;
-                reloadBtn.disabled = true;
-                try {
-                    waiting.postMessage({ type: 'SKIP_WAITING' });
-                } catch (e) {
+
+            setTimeout(function() {
+                if (pendingReload) {
                     pendingReload = false;
-                    reloadBtn.disabled = false;
-                    window.location.reload();
-                    return;
-                }
-                setTimeout(function() {
-                    if (pendingReload) {
-                        pendingReload = false;
-                        if (swUpdateCheckInterval) {
-                            clearInterval(swUpdateCheckInterval);
-                            swUpdateCheckInterval = null;
-                        }
-                        window.location.reload();
+                    if (swUpdateCheckInterval) {
+                        clearInterval(swUpdateCheckInterval);
+                        swUpdateCheckInterval = null;
                     }
-                }, 3000);
-            });
-        }
-        if (closeBtn) closeBtn.addEventListener('click', hideSWUpdateBanner);
-    }
-
-    function loadRuntimeInfo() {
-        var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
-        if (!content) return;
-        if (card) card.style.display = 'block';
-        if (refreshBtn) refreshBtn.disabled = true;
-        content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
-        xhrGet('/api?action=runtime_info', function(err, data) {
-            if (refreshBtn) refreshBtn.disabled = false;
-            if (err || !data) {
-                content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
-                return;
-            }
-            runtimeInfoData = data;
-            runtimeInfoLoaded = true;
-            if (data.webui_port) PORTS.webui = String(data.webui_port);
-            if (data.dashboard_port) {
-                PORTS.dashboard = String(data.dashboard_port);
-                updateDashboardLink();
-            }
-            if (data.version && data.version !== 'dev') {
-                VERSION = data.version;
-                document.title = 'DNSCrypt Proxy ' + VERSION;
-                var badge = $('versionBadge');
-                if (badge) badge.textContent = VERSION;
-                var footer = $('footerVersion');
-                if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
-            }
-            if (data.project_url && data.project_url !== '') {
-                var link = $('footerProjectLink');
-                var linkText = $('footerProjectText');
-                if (link) {
-                    link.href = data.project_url;
-                    link.style.display = 'inline-flex';
+                    window.location.reload();
                 }
-                if (linkText) linkText.textContent = t('projectLink');
-            }
-            var memDisplay = 'unknown';
-            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-                memDisplay = String(data.memory_limit_mb) + ' MB';
-            }
-            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
-            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
-            var bkLatest    = bk.last_backup_name || t('riBackupNone');
-            var bkDate      = bk.last_backup      || t('riBackupNone');
-            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
-            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
-            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
-            var bkPath      = bk.path || t('riBackupDirMissing');
-
-            var html = '';
-            var items = [
-                { label: t('riVersion'), value: data.version || 'unknown' },
-                { label: t('riCommit'), value: data.commit || 'unknown' },
-                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
-                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
-                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
-                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
-                { label: t('riProfile'), value: data.profile_key || 'unknown' },
-                { label: t('riMemoryLimit'), value: memDisplay },
-                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
-                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
-                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
-                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
-                { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                { label: t('riBackupCount'), value: bkAvailable, warn: bkAvailable === '0' },
-                { label: t('riBackupLatest'), value: bkLatest, warn: !bk.last_backup_name },
-                { label: t('riBackupDate'), value: bkDate, warn: !bk.last_backup },
-                { label: t('riBackupLastStable'), value: bkLastStbl, warn: !bk.last_stable },
-                { label: t('riBackupInFlight'), value: bkInFlight, warn: parseInt(bkInFlight, 10) > 0 },
-                { label: t('riBackupOrphan'), value: bkOrphan, warn: parseInt(bkOrphan, 10) > 0 },
-                { label: t('riBackupPath'), value: bkPath }
-            ];
-            for (var i = 0; i < items.length; i++) {
-                var valHtml;
-                if (items[i].isLink && items[i].value !== 'unknown') {
-                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
-                } else {
-                    valHtml = escapeHtml(items[i].value);
-                }
-                var labelClass = 'ri-label';
-                if (items[i].warn) labelClass += ' ri-warn';
-                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
-            }
-            html += '<div class="ri-actions">'
-                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
-                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
-                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
-                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
-            content.innerHTML = html;
-
-            var copyBtn = $('riCopyBtn');
-            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
-            var rawBtn = $('riRawJsonBtn');
-            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+            }, 3000);
         });
     }
 
-    function copyRuntimeInfo() {
-        if (!runtimeInfoData) return;
-        var text = JSON.stringify(runtimeInfoData, null, 2);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
-                showMsg(t('riCopySuccess'), 'success', 1500);
-            }).catch(function() { _fallbackCopy(text); });
-        } else {
-            _fallbackCopy(text);
-        }
+    if (closeBtn) {
+        closeBtn.addEventListener('click', hideSWUpdateBanner);
     }
-    function _fallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            document.execCommand('copy');
-            showMsg(t('riCopySuccess'), 'success', 1500);
-        } catch(e) {
-            showMsg(t('riCopyError'), 'error', 2000);
-        }
-        document.body.removeChild(ta);
-    }
-    function toggleRawJson() {
-        var el = $('riRawJson'), btn = $('riRawJsonBtn');
-        if (!el) return;
-        rawJsonVisible = !rawJsonVisible;
-        el.style.display = rawJsonVisible ? 'block' : 'none';
-        if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-    }
+}
 
-    function formatBytes(bytes) {
-        if (!bytes || bytes < 0) return '0 B';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    }
-    function formatMtime(mtime) {
-        var d = new Date(mtime * 1000);
-        var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
-        var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
-        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
-    }
-    function fileIcon(name) {
-        if (name.indexOf('query') !== -1) return '📊';
-        if (name.indexOf('blocked-ips') !== -1) return '🚫';
-        if (name.indexOf('blocked') !== -1) return '🔴';
-        if (name.indexOf('allowed') !== -1) return '🟢';
-        if (name.indexOf('proxy.log') !== -1) return '⚙️';
-        if (name.indexOf('install') !== -1) return '📦';
-        if (name.indexOf('credential') !== -1) return '🔐';
-        if (name.endsWith('.gz')) return '🗜️';
-        if (name.indexOf('.emergency.') !== -1) return '⚠️';
-        return '📄';
-    }
-    function loadLogFiles() {
-        var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
-        if (!card || !content) return;
-        card.style.display = 'block';
-        if (btn) btn.disabled = true;
-        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
-        xhrGet('/api?action=list_logs', function(err, data) {
-            if (btn) btn.disabled = false;
-            if (err || !data || !data.files) {
-                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
-                return;
-            }
-            logFilesData = data;
-            renderLogFiles();
-        });
-    }
-    function renderLogFiles() {
-        var content = $('diagFilesContent');
-        if (!content || !logFilesData || !logFilesData.files) return;
-        var active = [], archive = [], emergency = [], sensitive = [];
-        for (var i = 0; i < logFilesData.files.length; i++) {
-            var f = logFilesData.files[i];
-            switch (f.type) {
-                case 'active': active.push(f); break;
-                case 'archive': archive.push(f); break;
-                case 'emergency': emergency.push(f); break;
-                case 'sensitive': sensitive.push(f); break;
-            }
-        }
-        var html = '';
-        html += renderSection('🟢', t('dfActiveFiles'), active);
-        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
-        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
-        if (sensitive.length > 0) {
-            html += '<div class="df-section">';
-            html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
-            if (!sensitiveRevealed) {
-                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
-            } else {
-                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
-                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
-            }
-            html += '</div>';
-        }
-        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
-        content.querySelectorAll('[data-action]').forEach(function(el) {
-            var action = el.getAttribute('data-action');
-            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
-            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
-            else if (action === 'view-log') {
-                el.addEventListener('click', function() {
-                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-            else if (action === 'download-log') {
-                el.addEventListener('click', function() {
-                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-        });
-    }
-    function renderSection(icon, label, files) {
-        if (!files || files.length === 0) return '';
-        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
-        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
-        html += '</div>';
-        return html;
-    }
-    function renderFileRow(file, isSensitive) {
-        var sens = isSensitive ? '1' : '0';
-        return '<div class="df-file">'
-             + '<div class="df-file-info">'
-             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
-             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
-             + '</div>'
-             + '<div class="df-file-actions">'
-             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
-             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
-             + '</div></div>';
-    }
-    function revealSensitive() {
-        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
-            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
-        }, { title: '⚠️ ' + t('confirmTitle') });
-    }
-    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+// ============================================================
+// [13c] Companion Install Button
+// ============================================================
+// The install button opens the install-method modal (IDX-24).
+// See §[27b]/§[27c] for state and install flow.
 
-    function viewLogFile(name, isSensitive) {
-        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
-        title.textContent = name;
-        body.textContent = t('dfLoading');
-        warning.style.display = isSensitive ? 'block' : 'none';
-        warning.textContent = t('dfSensitiveWarning');
-        modal.style.display = 'flex';
-        currentViewerFile = { name: name, sensitive: isSensitive };
-        xhrGet(url, function(err, data) {
-            if (err || !data || data.status !== 'ok') {
-                body.textContent = t('dfFailedToLoad');
-                return;
-            }
-            var content = data.content || '';
-            if (data.truncated) content = t('dfTruncatedPrefix') + content;
-            body.textContent = content || t('dfEmpty');
-            body.scrollTop = body.scrollHeight;
-        });
-    }
-    function downloadLogFile(name, isSensitive) {
-        var url = '/api/download_log?file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        showMsg(t('dfDownloading'), 'info', 1500);
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.withCredentials = true;
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                var blob = new Blob([xhr.response]);
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-            }
-        };
-        xhr.send();
-    }
-    function downloadCurrentFile() {
-        if (!currentViewerFile) return;
-        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
-    }
-    function clearCurrentFile() {
-        if (!currentViewerFile) return;
-        var name = currentViewerFile.name;
-        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
-            if (!confirmed) return;
-            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
-                if (err || !data || data.status !== 'ok') {
-                    showMsg(t('fvClearError'), 'error', 3000);
-                    return;
-                }
-                showMsg(t('fvClearSuccess'), 'success', 2500);
-                closeFileViewer();
-                setTimeout(function() { loadLogFiles(); }, 500);
-            });
-        });
-    }
-    function closeFileViewer() {
-        $('fileViewerModal').style.display = 'none';
-        currentViewerFile = null;
-    }
+// ============================================================
+// [14] Runtime Info
+// ============================================================
+function loadRuntimeInfo() {
+    var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
+    if (!content) return;
+    if (card) card.style.display = 'block';
+    if (refreshBtn) refreshBtn.disabled = true;
+    content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
 
-    function updateUIStrings() {
-        $('title').textContent = t('title');
-        $('subtitle').textContent = t('subtitle');
-        $('editorTitle').textContent = t('editorTitle');
-        var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
-        if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
-        else $('sourceCountText').textContent = t('sourceCount');
-        $('currentLabel').textContent = t('currentLabel');
-        $('applyText').textContent = t('apply');
-
-        $('syncText').textContent = t('sync');
-        $('forceRefreshText').textContent = t('forceRefresh');
-        $('logsText').textContent = t('logs');
-        $('clearLogsText').textContent = t('clearLogs');
-        $('closeLogsText').textContent = t('closeLogs');
-        $('logsModalTitle').textContent = t('logsModalTitle');
-        $('oldModulesTitle').textContent = t('oldModulesTitle');
-        $('customRulesTitle').textContent = t('customRulesTitle');
-
-        var allowBadge = $('allowEditBadge');
-        if (allowBadge) allowBadge.textContent = t('editBadge');
-        var denyBadge = $('denyEditBadge');
-        if (denyBadge) denyBadge.textContent = t('editBadge');
-
-        var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
-        var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
-        $('saveAllowText').textContent = allowBtnText;
-        $('saveDenyText').textContent = denyBtnText;
-        $('cancelAllowBtn').textContent = t('cancelEdit');
-        $('cancelDenyBtn').textContent = t('cancelEdit');
-
-        var allowLabel = $('allowlistLabel');
-        if (allowLabel) {
-            var firstSpan = allowLabel.querySelector('span:first-child');
-            if (firstSpan) firstSpan.textContent = t('allowlistLabel');
-        }
-        var denyLabel = $('denylistLabel');
-        if (denyLabel) {
-            var firstSpan2 = denyLabel.querySelector('span:first-child');
-            if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
-        }
-
-        var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
-        var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-        var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
-        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
-        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
-        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
-        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
-        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
-        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
-
-        var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
-        var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
-
-        $('loginTitle').textContent = t('loginTitle');
-        $('usernameInput').placeholder = t('username');
-        $('passwordInput').placeholder = t('password');
-        $('loginBtn').textContent = t('loginBtn');
-        $('logoutBtn').textContent = t('logoutBtn');
-
-        $('restartBtn').title = t('restartBtn');
-        $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
-
-        renderAllDynamic();
-
-        var ab = $('authBadge');
-        if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
-    }
-
-    function renderAllDynamic() {
-        renderCompanionButton();
-        if (networkDownActive) {
-            setNetworkDownUI(true);
-            updateStatsDisplay();
-        } else if (currentStatus === 'ON' || currentStatus === 'OFF') {
-            updateStatusUI(currentStatus);
-        } else {
-            updateStatsDisplay();
-        }
-        if (logFilesData) renderLogFiles();
-        var dashText = $('dashboardLinkText');
-        if (dashText) dashText.textContent = t('dashboardLinkText');
-
-        updateSmartUpdateButtonUI();
-    }
-
-    function toggleLanguage() {
-        currentLang = currentLang === 'ar' ? 'en' : 'ar';
-        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
-        document.documentElement.lang = currentLang;
-        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-        updateUIStrings();
-        if (appInitialized) {
-            loadProfile();
-            checkOldModules();
-            if (runtimeInfoLoaded) loadRuntimeInfo();
-            refreshCompanionState();
-        }
-    }
-
-    function showMsg(text, type, duration) {
-        duration = duration || 2000;
-        var m = $('msg');
-        m.textContent = text;
-        m.className = 'msg-float ' + (type || 'info');
-        m.style.display = 'block';
-        m.style.opacity = '1';
-        m.style.visibility = 'visible';
-        clearTimeout(m._timeout);
-        m._timeout = setTimeout(function() {
-            m.style.opacity = '0';
-            m.style.visibility = 'hidden';
-            setTimeout(function() { m.style.display = 'none'; }, 400);
-        }, duration);
-    }
-
-    function performLogin() {
-        var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
-        if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
-        isLoginAttempt = true;
-        var btn = $('loginBtn');
-        btn.disabled = true;
-        btn.textContent = t('loggingIn');
-        fetch('/api/auth/login', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        }).then(function(r) {
-            return r.json().then(function(d) { return { status: r.status, data: d }; });
-        }).then(function(resp) {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            if (resp.status === 200 && resp.data.status === 'ok') {
-                $('passwordInput').value = '';
-                sessionExpiredShown = false;
-                if (resp.data.profile) renderProfileData(resp.data.profile);
-                if (resp.data.token) storeToken(resp.data.token);
-                closeConfirmModal();
-                showAuthBadge();
-                showMainScreen();
-                if (!appInitialized) {
-                    showMsg(t('welcomeMsg'), 'info', 4000);
-                    appInitialized = true;
-                }
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
-                refreshCompanionState();
-                setTimeout(function() { checkForUpdates(false); }, 4500);
-                verifyFailures = 0;
-                verifyBackoff = 3000;
-            } else if (resp.status === 429) {
-                showMsg(t('tooManyAttempts'), 'error', 5000);
-                isLoginAttempt = false;
-            } else {
-                showMsg(t('loginError'), 'error');
-                isLoginAttempt = false;
-            }
-        }).catch(function() {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            showMsg(t('networkError'), 'error');
-            isLoginAttempt = false;
-        });
-    }
-
-    function logout() {
-        if (hasUnsavedChanges()) {
-            showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
-                function(confirmed) {
-                    if (!confirmed) return;
-                    doLogout();
-                },
-                { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
-            );
+    xhrGet('/api?action=runtime_info', function(err, data) {
+        if (refreshBtn) refreshBtn.disabled = false;
+        if (err || !data) {
+            content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
             return;
         }
-        doLogout();
-    }
+        runtimeInfoData = data;
+        runtimeInfoLoaded = true;
 
-    function doLogout() {
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-            .catch(function() {})
-            .then(function() {
-                clearStoredToken();
-                clearDraft('allow');
-                clearDraft('deny');
-                try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
-                if (sse) { sse.close(); sse = null; }
-                if (statusPollInterval) clearInterval(statusPollInterval);
-                if (statsInterval) clearInterval(statsInterval);
-                if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-                if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-                if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
-                location.reload();
+        if (data.webui_port) {
+            PORTS.webui = String(data.webui_port);
+        }
+        if (data.dashboard_port) {
+            PORTS.dashboard = String(data.dashboard_port);
+            updateDashboardLink();
+        }
+
+        if (data.version && data.version !== 'dev') {
+            VERSION = data.version;
+            document.title = 'DNSCrypt Proxy ' + VERSION;
+            var badge = $('versionBadge');
+            if (badge) badge.textContent = VERSION;
+            var footer = $('footerVersion');
+            if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
+        }
+
+        if (data.project_url && data.project_url !== '') {
+            var link = $('footerProjectLink');
+            var linkText = $('footerProjectText');
+            if (link) {
+                link.href = data.project_url;
+                link.style.display = 'inline-flex';
+            }
+            if (linkText) linkText.textContent = t('projectLink');
+        }
+
+        var memDisplay = 'unknown';
+        if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+            memDisplay = String(data.memory_limit_mb) + ' MB';
+        }
+
+        var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
+        var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
+        var bkLatest    = bk.last_backup_name || t('riBackupNone');
+        var bkDate      = bk.last_backup      || t('riBackupNone');
+        var bkLastStbl  = bk.last_stable      || t('riBackupNone');
+        var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
+        var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
+        var bkPath      = bk.path || t('riBackupDirMissing');
+
+        var html = '';
+        var items = [
+            { label: t('riVersion'), value: data.version || 'unknown' },
+            { label: t('riCommit'), value: data.commit || 'unknown' },
+            { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
+            { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
+            { label: t('riWebuiPort'), value: data.webui_port || '9090' },
+            { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+            { label: t('riProfile'), value: data.profile_key || 'unknown' },
+            { label: t('riMemoryLimit'), value: memDisplay },
+            { label: t('riRunDir'), value: data.run_dir || 'unknown' },
+            { label: t('riStatusFile'), value: data.status_file || 'unknown' },
+            { label: t('riPidFile'), value: data.pid_file || 'unknown' },
+            { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
+            { label: t('riLogFile'), value: data.log_file || 'unknown' },
+            { label: t('riBackupCount'), value: bkAvailable,
+              warn: bkAvailable === '0' },
+            { label: t('riBackupLatest'), value: bkLatest,
+              warn: !bk.last_backup_name },
+            { label: t('riBackupDate'), value: bkDate,
+              warn: !bk.last_backup },
+            { label: t('riBackupLastStable'), value: bkLastStbl,
+              warn: !bk.last_stable },
+            { label: t('riBackupInFlight'), value: bkInFlight,
+              warn: parseInt(bkInFlight, 10) > 0 },
+            { label: t('riBackupOrphan'), value: bkOrphan,
+              warn: parseInt(bkOrphan, 10) > 0 },
+            { label: t('riBackupPath'), value: bkPath }
+        ];
+        for (var i = 0; i < items.length; i++) {
+            var valHtml;
+            if (items[i].isLink && items[i].value !== 'unknown') {
+                valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+            } else {
+                valHtml = escapeHtml(items[i].value);
+            }
+            var labelClass = 'ri-label';
+            if (items[i].warn) labelClass += ' ri-warn';
+            html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+        }
+        html += '<div class="ri-actions">'
+             + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
+             + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
+             + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
+             + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+        content.innerHTML = html;
+
+        var copyBtn = $('riCopyBtn');
+        if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
+        var rawBtn = $('riRawJsonBtn');
+        if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+    });
+}
+
+function copyRuntimeInfo() {
+    if (!runtimeInfoData) return;
+    var text = JSON.stringify(runtimeInfoData, null, 2);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showMsg(t('riCopySuccess'), 'success', 1500);
+        }).catch(function() { _fallbackCopy(text); });
+    } else {
+        _fallbackCopy(text);
+    }
+}
+function _fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        showMsg(t('riCopySuccess'), 'success', 1500);
+    } catch(e) {
+        showMsg(t('riCopyError'), 'error', 2000);
+    }
+    document.body.removeChild(ta);
+}
+function toggleRawJson() {
+    var el = $('riRawJson'), btn = $('riRawJsonBtn');
+    if (!el) return;
+    rawJsonVisible = !rawJsonVisible;
+    el.style.display = rawJsonVisible ? 'block' : 'none';
+    if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+}
+
+// ============================================================
+// [15] Log files
+// ============================================================
+function formatBytes(bytes) {
+    if (!bytes || bytes < 0) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+function formatMtime(mtime) {
+    var d = new Date(mtime * 1000);
+    var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+    return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+}
+function fileIcon(name) {
+    if (name.indexOf('query') !== -1) return '📊';
+    if (name.indexOf('blocked-ips') !== -1) return '🚫';
+    if (name.indexOf('blocked') !== -1) return '🔴';
+    if (name.indexOf('allowed') !== -1) return '🟢';
+    if (name.indexOf('proxy.log') !== -1) return '⚙️';
+    if (name.indexOf('install') !== -1) return '📦';
+    if (name.indexOf('credential') !== -1) return '🔐';
+    if (name.endsWith('.gz')) return '🗜️';
+    if (name.indexOf('.emergency.') !== -1) return '⚠️';
+    return '📄';
+}
+function loadLogFiles() {
+    var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
+    if (!card || !content) return;
+    card.style.display = 'block';
+    if (btn) btn.disabled = true;
+    if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+    xhrGet('/api?action=list_logs', function(err, data) {
+        if (btn) btn.disabled = false;
+        if (err || !data || !data.files) {
+            content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+            return;
+        }
+        logFilesData = data;
+        renderLogFiles();
+    });
+}
+function renderLogFiles() {
+    var content = $('diagFilesContent');
+    if (!content || !logFilesData || !logFilesData.files) return;
+    var active = [], archive = [], emergency = [], sensitive = [];
+    for (var i = 0; i < logFilesData.files.length; i++) {
+        var f = logFilesData.files[i];
+        switch (f.type) {
+            case 'active': active.push(f); break;
+            case 'archive': archive.push(f); break;
+            case 'emergency': emergency.push(f); break;
+            case 'sensitive': sensitive.push(f); break;
+        }
+    }
+    var html = '';
+    html += renderSection('🟢', t('dfActiveFiles'), active);
+    html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+    html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+    if (sensitive.length > 0) {
+        html += '<div class="df-section">';
+        html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+        if (!sensitiveRevealed) {
+            html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+        } else {
+            for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+            html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+        }
+        html += '</div>';
+    }
+    content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+
+    content.querySelectorAll('[data-action]').forEach(function(el) {
+        var action = el.getAttribute('data-action');
+        if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+        else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+        else if (action === 'view-log') {
+            el.addEventListener('click', function() {
+                viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
             });
-    }
+        }
+        else if (action === 'download-log') {
+            el.addEventListener('click', function() {
+                downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+            });
+        }
+    });
+}
+function renderSection(icon, label, files) {
+    if (!files || files.length === 0) return '';
+    var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+    for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+    html += '</div>';
+    return html;
+}
+function renderFileRow(file, isSensitive) {
+    var sens = isSensitive ? '1' : '0';
+    return '<div class="df-file">'
+         + '<div class="df-file-info">'
+         + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+         + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+         + '</div>'
+         + '<div class="df-file-actions">'
+         + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+         + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+         + '</div></div>';
+}
+function revealSensitive() {
+    showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+        if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+    }, { title: '⚠️ ' + t('confirmTitle') });
+}
+function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
 
-    function verifyAuth() {
-        xhrGet('/api?action=status', function(err, data) {
-            if (err) {
-                if (err.code === 401) {
-                    clearStoredToken();
-                    showLoginScreen();
-                    hideAuthBadge();
-                    if (isLoginAttempt) {
-                        showMsg(t('loginError'), 'error');
-                        isLoginAttempt = false;
-                    }
-                    verifyFailures = 0;
-                    verifyBackoff = 3000;
-                } else {
-                    verifyFailures++;
-                    setNetworkDownUI(true);
-                    if (verifyFailures === 1) {
-                        showMsg(t('networkError'), 'warning', 3000);
-                    }
-                    setTimeout(verifyAuth, verifyBackoff);
-                    verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
-                }
+function viewLogFile(name, isSensitive) {
+    var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+    if (isSensitive) url += '&confirm=1';
+    var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
+    title.textContent = name;
+    body.textContent = t('dfLoading');
+    warning.style.display = isSensitive ? 'block' : 'none';
+    warning.textContent = t('dfSensitiveWarning');
+    modal.style.display = 'flex';
+    currentViewerFile = { name: name, sensitive: isSensitive };
+    xhrGet(url, function(err, data) {
+        if (err || !data || data.status !== 'ok') {
+            body.textContent = t('dfFailedToLoad');
+            return;
+        }
+        var content = data.content || '';
+        if (data.truncated) content = t('dfTruncatedPrefix') + content;
+        body.textContent = content || t('dfEmpty');
+        body.scrollTop = body.scrollHeight;
+    });
+}
+function downloadLogFile(name, isSensitive) {
+    var url = '/api/download_log?file=' + encodeURIComponent(name);
+    if (isSensitive) url += '&confirm=1';
+    showMsg(t('dfDownloading'), 'info', 1500);
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.withCredentials = true;
+    xhr.responseType = 'blob';
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            var blob = new Blob([xhr.response]);
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+        }
+    };
+    xhr.send();
+}
+function downloadCurrentFile() {
+    if (!currentViewerFile) return;
+    downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+}
+function clearCurrentFile() {
+    if (!currentViewerFile) return;
+    var name = currentViewerFile.name;
+    showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+        if (!confirmed) return;
+        xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+            if (err || !data || data.status !== 'ok') {
+                showMsg(t('fvClearError'), 'error', 3000);
                 return;
             }
-            verifyFailures = 0;
-            verifyBackoff = 3000;
+            showMsg(t('fvClearSuccess'), 'success', 2500);
+            closeFileViewer();
+            setTimeout(function() { loadLogFiles(); }, 500);
+        });
+    });
+}
+function closeFileViewer() {
+    $('fileViewerModal').style.display = 'none';
+    currentViewerFile = null;
+}
+
+// ============================================================
+// [16] updateUIStrings
+// ============================================================
+function updateUIStrings() {
+    $('title').textContent = t('title');
+    $('subtitle').textContent = t('subtitle');
+    $('editorTitle').textContent = t('editorTitle');
+    var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
+    if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
+    else $('sourceCountText').textContent = t('sourceCount');
+    $('currentLabel').textContent = t('currentLabel');
+    $('applyText').textContent = t('apply');
+    $('syncText').textContent = t('sync');
+    $('forceRefreshText').textContent = t('forceRefresh');
+    $('logsText').textContent = t('logs');
+    $('clearLogsText').textContent = t('clearLogs');
+    $('closeLogsText').textContent = t('closeLogs');
+    $('logsModalTitle').textContent = t('logsModalTitle');
+    $('oldModulesTitle').textContent = t('oldModulesTitle');
+    $('customRulesTitle').textContent = t('customRulesTitle');
+
+    var allowBadge = $('allowEditBadge');
+    if (allowBadge) allowBadge.textContent = t('editBadge');
+    var denyBadge = $('denyEditBadge');
+    if (denyBadge) denyBadge.textContent = t('editBadge');
+
+    var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
+    var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
+    $('saveAllowText').textContent = allowBtnText;
+    $('saveDenyText').textContent = denyBtnText;
+    $('cancelAllowBtn').textContent = t('cancelEdit');
+    $('cancelDenyBtn').textContent = t('cancelEdit');
+
+    var allowLabel = $('allowlistLabel');
+    if (allowLabel) {
+        var firstSpan = allowLabel.querySelector('span:first-child');
+        if (firstSpan) firstSpan.textContent = t('allowlistLabel');
+    }
+    var denyLabel = $('denylistLabel');
+    if (denyLabel) {
+        var firstSpan2 = denyLabel.querySelector('span:first-child');
+        if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
+    }
+
+    var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
+    var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+    var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
+    var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+    var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+    var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+    var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+    var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+    var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+    var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+    var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
+
+    $('loginTitle').textContent = t('loginTitle');
+    $('usernameInput').placeholder = t('username');
+    $('passwordInput').placeholder = t('password');
+    $('loginBtn').textContent = t('loginBtn');
+    $('logoutBtn').textContent = t('logoutBtn');
+
+    $('restartBtn').title = t('restartBtn');
+    $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+
+    // Every element whose text depends on BOTH the current
+    // language AND runtime state is re-rendered via a single
+    // entry point (renderAllDynamic). This removes the ~3 s
+    // delay on the status card and the revert-to-default bug
+    // on the companion button.
+    renderAllDynamic();
+
+    var ab = $('authBadge');
+    if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
+}
+
+// ============================================================
+// [16b] renderAllDynamic — single re-render entry point
+// ============================================================
+// Called from updateUIStrings() on every language toggle.
+// Re-renders every element whose visible text depends on BOTH
+// the current language AND runtime state, from cached state —
+// WITHOUT waiting for SSE / poll cycles.
+function renderAllDynamic() {
+    renderCompanionButton();
+
+    if (networkDownActive) {
+        setNetworkDownUI(true);
+        updateStatsDisplay();
+    } else if (currentStatus === 'ON' || currentStatus === 'OFF') {
+        updateStatusUI(currentStatus);
+    } else {
+        updateStatsDisplay();
+    }
+
+    if (logFilesData) renderLogFiles();
+
+    var dashText = $('dashboardLinkText');
+    if (dashText) dashText.textContent = t('dashboardLinkText');
+}
+
+function toggleLanguage() {
+    currentLang = currentLang === 'ar' ? 'en' : 'ar';
+    try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+    updateUIStrings();
+    if (appInitialized) {
+        loadProfile();
+        checkOldModules();
+        if (runtimeInfoLoaded) loadRuntimeInfo();
+        refreshCompanionState();
+    }
+}
+
+function showMsg(text, type, duration) {
+    duration = duration || 2000;
+    var m = $('msg');
+    m.textContent = text;
+    m.className = 'msg-float ' + (type || 'info');
+    m.style.display = 'block';
+    m.style.opacity = '1';
+    m.style.visibility = 'visible';
+    clearTimeout(m._timeout);
+    m._timeout = setTimeout(function() {
+        m.style.opacity = '0';
+        m.style.visibility = 'hidden';
+        setTimeout(function() { m.style.display = 'none'; }, 400);
+    }, duration);
+}
+
+// ============================================================
+// [17] Login / Logout
+// ============================================================
+function performLogin() {
+    var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
+    if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
+    isLoginAttempt = true;
+    var btn = $('loginBtn');
+    btn.disabled = true;
+    btn.textContent = t('loggingIn');
+    fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: u, password: p })
+    }).then(function(r) {
+        return r.json().then(function(d) { return { status: r.status, data: d }; });
+    }).then(function(resp) {
+        btn.disabled = false;
+        btn.textContent = t('loginBtn');
+        if (resp.status === 200 && resp.data.status === 'ok') {
+            $('passwordInput').value = '';
             sessionExpiredShown = false;
-            setNetworkDownUI(false);
-            showMainScreen();
+            if (resp.data.profile) renderProfileData(resp.data.profile);
+            if (resp.data.token) storeToken(resp.data.token);
+            closeConfirmModal();
             showAuthBadge();
-            var wasFirstInit = !appInitialized;
-            if (wasFirstInit) {
+            showMainScreen();
+            if (!appInitialized) {
                 showMsg(t('welcomeMsg'), 'info', 4000);
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
                 appInitialized = true;
             }
+            initSSE();
+            startPolling();
+            loadCustomRules();
+            loadRuntimeInfo();
+            loadLogFiles();
             refreshCompanionState();
-            setTimeout(function() { checkForUpdates(false); }, wasFirstInit ? 4500 : 0);
-        });
-    }
+            verifyFailures = 0;
+            verifyBackoff = 3000;
+        } else if (resp.status === 429) {
+            showMsg(t('tooManyAttempts'), 'error', 5000);
+            isLoginAttempt = false;
+        } else {
+            showMsg(t('loginError'), 'error');
+            isLoginAttempt = false;
+        }
+    }).catch(function() {
+        btn.disabled = false;
+        btn.textContent = t('loginBtn');
+        showMsg(t('networkError'), 'error');
+        isLoginAttempt = false;
+    });
+}
 
-    function showLoginScreen() {
-        $('loginScreen').style.display = 'flex';
-        $('appContent').style.display = 'none';
-        $('logoutBtn').style.display = 'none';
-        hideAuthBadge();
+function logout() {
+    if (hasUnsavedChanges()) {
+        showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
+            function(confirmed) {
+                if (!confirmed) return;
+                doLogout();
+            },
+            { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
+        );
+        return;
     }
-    function showMainScreen() {
-        $('loginScreen').style.display = 'none';
-        $('appContent').style.display = 'block';
-        $('logoutBtn').style.display = 'block';
-        showAuthBadge();
-        closeConfirmModal();
-        sessionExpiredShown = false;
-    }
-    function handleSessionExpired() {
-        if (sessionExpiredShown) return;
-        sessionExpiredShown = true;
-        var wasInitialized = appInitialized;
-        appInitialized = false;
-        clearStoredToken();
+    doLogout();
+}
+
+function doLogout() {
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(function() {})
+        .then(function() {
+            clearStoredToken();
+            clearDraft('allow');
+            clearDraft('deny');
+            try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
+            if (sse) { sse.close(); sse = null; }
+            if (statusPollInterval) clearInterval(statusPollInterval);
+            if (statsInterval) clearInterval(statsInterval);
+            if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+            if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+            if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
+            location.reload();
+        });
+}
+
+// ============================================================
+// [18] verifyAuth with backoff
+// ============================================================
+function verifyAuth() {
+    xhrGet('/api?action=status', function(err, data) {
+        if (err) {
+            if (err.code === 401) {
+                clearStoredToken();
+                showLoginScreen();
+                hideAuthBadge();
+                if (isLoginAttempt) {
+                    showMsg(t('loginError'), 'error');
+                    isLoginAttempt = false;
+                }
+                verifyFailures = 0;
+                verifyBackoff = 3000;
+            } else {
+                verifyFailures++;
+                setNetworkDownUI(true);
+                if (verifyFailures === 1) {
+                    showMsg(t('networkError'), 'warning', 3000);
+                }
+                setTimeout(verifyAuth, verifyBackoff);
+                verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
+            }
+            return;
+        }
         verifyFailures = 0;
         verifyBackoff = 3000;
-        sseBackoff = 5000;
-        if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
-        if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
-        if (sse) { sse.close(); sse = null; }
-        if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
-        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
-        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        showLoginScreen();
-        if (!wasInitialized) return;
-        showConfirmModal(t('sessionExpiredMsg'), function(ok) {
-            if (ok) $('usernameInput').focus();
-        }, {
-            title: t('sessionExpiredTitle'),
-            primaryText: t('sessionRelogin'),
-            primaryCallback: function() {
-                $('usernameInput').value = '';
-                $('passwordInput').value = '';
-                $('usernameInput').focus();
-            }
-        });
-    }
+        sessionExpiredShown = false;
+        setNetworkDownUI(false);
+        showMainScreen();
+        showAuthBadge();
+        if (!appInitialized) {
+            showMsg(t('welcomeMsg'), 'info', 4000);
+            initSSE();
+            startPolling();
+            loadCustomRules();
+            loadRuntimeInfo();
+            loadLogFiles();
+            appInitialized = true;
+        }
+        refreshCompanionState();
+    });
+}
 
+function showLoginScreen() {
+    $('loginScreen').style.display = 'flex';
+    $('appContent').style.display = 'none';
+    $('logoutBtn').style.display = 'none';
+    hideAuthBadge();
+}
+function showMainScreen() {
+    $('loginScreen').style.display = 'none';
+    $('appContent').style.display = 'block';
+    $('logoutBtn').style.display = 'block';
+    showAuthBadge();
+    closeConfirmModal();
+    sessionExpiredShown = false;
+}
+function handleSessionExpired() {
+    if (sessionExpiredShown) return;
+    sessionExpiredShown = true;
+    var wasInitialized = appInitialized;
+    appInitialized = false;
+    clearStoredToken();
+
+    verifyFailures = 0;
+    verifyBackoff = 3000;
+    sseBackoff = 5000;
+
+    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
+    if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
+    if (sse) { sse.close(); sse = null; }
+    if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+    if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+    if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+    showLoginScreen();
+    if (!wasInitialized) return;
+    showConfirmModal(t('sessionExpiredMsg'), function(ok) {
+        if (ok) $('usernameInput').focus();
+    }, {
+        title: t('sessionExpiredTitle'),
+        primaryText: t('sessionRelogin'),
+        primaryCallback: function() {
+            $('usernameInput').value = '';
+            $('passwordInput').value = '';
+            $('usernameInput').focus();
+        }
+    });
+}
+
+// ============================================================
+// [19] xhrRequest
+// ============================================================
     function getTimeoutForUrl(method, url) {
-        if (method === 'POST' && url.indexOf('update_profile') !== -1) return 310000;
-        if (url.indexOf('install_companion_app') !== -1) return 120000;
-        if (url.indexOf('toggle_service') !== -1 || url.indexOf('restart_service') !== -1) return 60000;
+        if (method === 'POST' && url.indexOf('update_profile') !== -1) {
+            return 310000;
+        }
+        // Companion install can take 60+ s on slow ROMs
+        // (5-level cascade + Play Protect + scanning).
+        if (url.indexOf('install_companion_app') !== -1) {
+            return 120000;
+        }
+        if (url.indexOf('toggle_service') !== -1 ||
+            url.indexOf('restart_service') !== -1) {
+            return 60000;
+        }
         return 15000;
     }
 
+    // isInstallFamilyUrl gates the session-expired modal in
+    // xhrRequest(). It MUST list only **token-consuming**
+    // endpoints:
+    //
+    //   • uninstall_companion_app — consumes a session; a 401
+    //     means the install-flow token expired.
+    //   • install_companion_app   — same.
+    //
+    // It MUST NOT list `install_token`:
+    //
+    //   • install_token **issues** tokens; it never consumes one.
+    //   • A 401 from install_token therefore means the **session**
+    //     expired (cookie/bearer), NOT the one-shot install token.
+    //   • Such a 401 MUST go through the standard session-expired
+    //     path (handleSessionExpired), exactly like every other
+    //     non-install endpoint. Suppressing it would leave the
+    //     user with an unresponsive install button and no
+    //     re-login prompt.
+    //
+    // O2: `uninstall_companion_app` contains `install_companion_app`
+    // as a substring, so the install_companion_app check would also
+    // match uninstall_companion_app URLs. Listed first for clarity.
     function isInstallFamilyUrl(url) {
         return url.indexOf('uninstall_companion_app') !== -1 ||
                url.indexOf('install_companion_app') !== -1;
@@ -2004,9 +2161,15 @@
                 } else if (xhr.status === 401) {
                     var e401 = new Error('HTTP 401'); e401.code = 401;
                     cb(e401, null);
-                    if (!isInstallFamilyUrl(url)) handleSessionExpired();
+                    // Suppress session-expired modal for
+                    // install-family URLs: 401 is a token-expiry
+                    // signal, not a session-expiry signal.
+                    if (!isInstallFamilyUrl(url)) {
+                        handleSessionExpired();
+                    }
                 } else if (xhr.status === 405) {
-                    var e405 = new Error('HTTP 405'); e405.code = 405;
+                    var e405 = new Error('HTTP 405');
+                    e405.code = 405;
                     cb(e405, null);
                     showMsg('⚠️ endpoint requires POST', 'warning', 3000);
                 } else if (xhr.status === 409) {
@@ -2040,10 +2203,17 @@
     }
     function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
     function xhrPost(url, data, cb) {
+        // install_companion_app must NOT retry. The first request
+        // consumes the one-shot CSRF token; retrying produces
+        // "Invalid or expired install token" even when the first
+        // install is still in progress.
         var retries = (url.indexOf('install_companion_app') !== -1) ? 0 : 3;
         xhrRequest('POST', url, data, cb, retries);
     }
 
+// ============================================================
+// [20] SSE with backoff
+// ============================================================
     function initSSE() {
         if (sse) { sse.close(); sse = null; }
         try {
@@ -2073,15 +2243,10 @@
                             $('progressText').textContent = '0%';
                             isProcessing = false;
                             $('applyBtn').disabled = false;
-                            $('updateBtnWrapper').style.pointerEvents = 'auto';
                             $('saveAllowBtn').disabled = false;
                             $('saveDenyBtn').disabled = false;
                             $('toggleBtn').disabled = false;
                             $('restartBtn').disabled = false;
-
-                            currentUpdateState = 'up_to_date';
-                            updateSmartUpdateButtonUI();
-
                             loadProfile();
                             refreshAll(true);
                         }, 500);
@@ -2092,7 +2257,6 @@
                     progBar.classList.remove('success');
                     isProcessing = true;
                     $('applyBtn').disabled = true;
-                    $('updateBtnWrapper').style.pointerEvents = 'none';
                     $('saveAllowBtn').disabled = true;
                     $('saveDenyBtn').disabled = true;
                     $('toggleBtn').disabled = true;
@@ -2102,21 +2266,13 @@
 
             sse.addEventListener('status', function(e) {
                 var incoming = e.data;
-                if (sseStatusDebounceTimer) clearTimeout(sseStatusDebounceTimer);
+                if (sseStatusDebounceTimer) {
+                    clearTimeout(sseStatusDebounceTimer);
+                }
                 sseStatusDebounceTimer = setTimeout(function() {
                     sseStatusDebounceTimer = null;
                     updateStatusUI(incoming);
                 }, SSE_STATUS_DEBOUNCE_MS);
-            });
-
-            sse.addEventListener('update_status', function(e) {
-                try {
-                    var data = JSON.parse(e.data);
-                    if (data.status === 'up_to_date') {
-                        currentUpdateState = 'up_to_date';
-                        updateSmartUpdateButtonUI();
-                    }
-                } catch(ex) {}
             });
 
             sse.addEventListener('stats', function(e) {
@@ -2154,7 +2310,11 @@
 
     function updateStatusUI(status) {
         var dot = $('statusDot'), txt = $('statusText'), btn = $('toggleBtn');
-        if (status === 'ON' || status === 'OFF') currentStatus = status;
+
+        if (status === 'ON' || status === 'OFF') {
+            currentStatus = status;
+        }
+
         if (status === 'ON') {
             dot.className = 'status-dot dot-on';
             txt.textContent = t('statusOn');
@@ -2170,6 +2330,7 @@
             btn.disabled = false;
             $('restartBtn').disabled = false;
         }
+
         updateStatsDisplay();
     }
 
@@ -2182,6 +2343,9 @@
         });
     }
 
+// ============================================================
+// [21] handleToggle
+// ============================================================
     function handleToggle() {
         if (isProcessing || isToggling) return;
         isToggling = true;
@@ -2189,6 +2353,7 @@
         btn.disabled = true;
         $('restartBtn').disabled = true;
         $('loaderContainer').style.display = 'flex';
+
         xhrPost('/api/toggle_service', '', function(err, data) {
             isToggling = false;
             $('loaderContainer').style.display = 'none';
@@ -2200,6 +2365,9 @@
         });
     }
 
+// ============================================================
+// [22] handleRestart
+// ============================================================
     function handleRestart() {
         if (isProcessing || isToggling) return;
         showConfirmModal(t('restartConfirm'), function(confirmed) {
@@ -2209,6 +2377,7 @@
             btn.disabled = true;
             $('restartBtn').disabled = true;
             $('loaderContainer').style.display = 'flex';
+
             xhrPost('/api/restart_service', '', function(err, data) {
                 isToggling = false;
                 $('loaderContainer').style.display = 'none';
@@ -2252,6 +2421,9 @@
         setTimeout(function() { loadLogFiles(); checkComplete(); }, 700);
     }
 
+// ============================================================
+// [23] Profile management
+// ============================================================
     function renderProfileData(data) {
         if (!data || !data.key) return;
         currentProfileKey = data.key;
@@ -2269,13 +2441,6 @@
             $('sourceCountText').style.color = 'var(--success)';
         }
         $('editorCard').style.display = 'block';
-
-        if (currentProfileIsEmpty) {
-            $('updateBtnWrapper').style.display = 'none';
-        } else {
-            $('updateBtnWrapper').style.display = 'block';
-            updateSmartUpdateButtonUI();
-        }
     }
     function loadProfile(callback) {
         if (isProcessing) { if (callback) callback(); return; }
@@ -2286,13 +2451,19 @@
         });
     }
 
+    // loadCustomRules — fetches rule content and hashes in
+    // parallel. The hashes come from /api?action=get_rules_state,
+    // not from client-side crypto.subtle (unavailable on
+    // non-secure contexts — LAN via BIND_ADDR=0.0.0.0 over HTTP).
     function loadCustomRules() {
         var pending = 2;
         var content = { allow: '', deny: '' };
         var hashes = { allow: '', deny: '' };
+
         function finish() {
             pending--;
             if (pending > 0) return;
+
             if (editStates.allow === EditState.VIEW) {
                 $('allowlistInput').value = content.allow;
                 originalValues.allow = content.allow;
@@ -2304,6 +2475,7 @@
             rulesState.serverAllowHash = hashes.allow;
             rulesState.serverDenyHash = hashes.deny;
         }
+
         xhrGet('/api?action=get_custom_rules', function(err, data) {
             if (!err && data) {
                 content.allow = data.allowlist || '';
@@ -2311,6 +2483,7 @@
             }
             finish();
         });
+
         xhrGet('/api?action=get_rules_state', function(err, data) {
             if (!err && data) {
                 hashes.allow = data.allowlist_hash || '';
@@ -2320,206 +2493,131 @@
         });
     }
 
-    function updateSmartUpdateButtonUI() {
-        if (currentProfileIsEmpty) {
-            var wrapper = $('updateBtnWrapper');
-            if (wrapper) wrapper.style.display = 'none';
-            return;
-        }
-
-        var btn = $('updateCurrentListBtn');
-        var txt = $('updateCurrentListText');
-        if (!btn || !txt) return;
-
-        btn.style.background = '';
-        btn.style.color = '';
-
-        if (currentUpdateState === 'checking') {
-            btn.className = 'btn-apply btn-update-disabled';
-            txt.textContent = t('updateChecking');
-        } else if (currentUpdateState === 'available') {
-            btn.className = 'btn-apply btn-update-pulse';
-            txt.textContent = t('updateAvailable');
-        } else if (currentUpdateState === 'up_to_date') {
-            btn.className = 'btn-apply btn-update-disabled';
-            txt.textContent = t('updateUpToDate');
-        } else {
-            btn.className = 'btn-apply btn-update-unknown';
-            txt.textContent = t('updateUnknown');
-        }
-    }
-
-    function checkForUpdates(isManual) {
-        if (currentProfileIsEmpty) {
-            var wrapper = $('updateBtnWrapper');
-            if (wrapper) wrapper.style.display = 'none';
-            return;
-        }
-
-        if (isCheckingUpdates || isProcessing) return;
-        isCheckingUpdates = true;
-
-        var wrapper = $('updateBtnWrapper');
-
-        if (wrapper) wrapper.style.pointerEvents = 'none';
-        currentUpdateState = 'checking';
-        updateSmartUpdateButtonUI();
-
-        xhrGet('/api?action=check_update', function(err, data) {
-            isCheckingUpdates = false;
-            if (wrapper) wrapper.style.pointerEvents = 'auto';
-
-            if (err || !data || data.status === 'unknown') {
-                currentUpdateState = 'unknown';
-                updateSmartUpdateButtonUI();
-                if (isManual) showMsg(t('updateUnknown'), 'warning', 3000);
-                return;
-            }
-
-            if (data.status === 'available') {
-                currentUpdateState = 'available';
-                updateSmartUpdateButtonUI();
-                showMsg(t('updateAvailableMsg'), 'info', 5000);
-            } else {
-                currentUpdateState = 'up_to_date';
-                updateSmartUpdateButtonUI();
-                if (isManual) showMsg(t('updateUpToDate'), 'success', 2500);
-            }
-        });
-    }
-
-    function applyProfile(forceUpdate) {
+    function applyProfile() {
         if (isProcessing) return;
         var select = $('profileSelect'), profile = select.value;
-
-        if (!forceUpdate && profile === currentProfileKey && !currentProfileIsEmpty) {
+        if (profile === currentProfileKey && !currentProfileIsEmpty) {
             showMsg(t('alreadyActive'), 'warning');
             return;
         }
-
         var name = select.options[select.selectedIndex].text;
-        var warningPrefix = hasUnsavedChanges() ? (t('unsavedWarning') + '\n\n') : '';
-
+        // L-5: warn about unsaved rule edits before the profile
+        // switch replaces the current blocklist.
+        //
+        // The warning is prepended to the SAME confirm dialog as
+        // the apply prompt, rather than opening a second modal.
+        // Rationale: showConfirmModal() now resets
+        // installModalActive and companionInstallInFlight on every
+        // call (BUG-1/BUG-3 invariant). Opening a second modal
+        // from inside the first would break that invariant mid-
+        // flow. Combining the two messages into one dialog keeps
+        // the state machine linear.
+        var warningPrefix = hasUnsavedChanges()
+            ? (t('unsavedWarning') + '\n\n')
+            : '';
         showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
+            isProcessing = true;
+            $('applyBtn').disabled = true;
+            $('saveAllowBtn').disabled = true;
+            $('saveDenyBtn').disabled = true;
+            $('toggleBtn').disabled = true;
+            $('restartBtn').disabled = true;
+            var progContainer = $('progressContainer'), progBar = $('progressBar');
+            progContainer.style.display = 'block';
+            progContainer.style.opacity = '1';
+            progBar.style.width = '5%';
+            progBar.classList.remove('success');
+            $('progressText').textContent = t('progressStart');
+            showMsg(t('updateStatus'), 'info', 2500);
 
-            if (editStates.allow === EditState.EDIT && countChanges('allow') > 0) {
-                saveWithOptimistic('allow');
-            }
-            if (editStates.deny === EditState.EDIT && countChanges('deny') > 0) {
-                saveWithOptimistic('deny');
-            }
-
-            setTimeout(function() { executeProfileUpdate(profile); }, 600);
-        });
-    }
-
-    function executeProfileUpdate(profile) {
-        isProcessing = true;
-        $('applyBtn').disabled = true;
-        $('updateBtnWrapper').style.pointerEvents = 'none';
-        $('saveAllowBtn').disabled = true;
-        $('saveDenyBtn').disabled = true;
-        $('toggleBtn').disabled = true;
-        $('restartBtn').disabled = true;
-
-        var progContainer = $('progressContainer'), progBar = $('progressBar');
-        progContainer.style.display = 'block';
-        progContainer.style.opacity = '1';
-        progBar.style.width = '5%';
-        progBar.classList.remove('success');
-        $('progressText').textContent = t('progressStart');
-        showMsg(t('updateStatus'), 'info', 2500);
-        if (safetyTimer) clearTimeout(safetyTimer);
-        safetyTimer = setTimeout(function() {
-            if (isProcessing) {
-                isProcessing = false;
-                $('applyBtn').disabled = false;
-                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                $('saveAllowBtn').disabled = false;
-                $('saveDenyBtn').disabled = false;
-                $('toggleBtn').disabled = false;
-                $('restartBtn').disabled = false;
-                progContainer.style.display = 'none';
-                if (window.progressPoller) clearInterval(window.progressPoller);
-                showMsg(t('safetyTimeout'), 'warning', 5000);
-            }
-            safetyTimer = null;
-        }, 120000);
-
-        if (window.progressPoller) clearInterval(window.progressPoller);
-        window.progressPoller = setInterval(function() {
-            if (!isProcessing) { clearInterval(window.progressPoller); return; }
-            xhrGet('/api?action=get_progress', function(err, data) {
-                if (err || !data || !data.progress) return;
-                var parts = data.progress.split('|');
-                var percent = parseInt(parts[0]) || 0;
-                var progressMsg = parts[1] || '';
-                if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
-                    clearInterval(window.progressPoller);
-                    if (safetyTimer) clearTimeout(safetyTimer);
+            if (safetyTimer) clearTimeout(safetyTimer);
+            safetyTimer = setTimeout(function() {
+                if (isProcessing) {
                     isProcessing = false;
-                    progContainer.style.display = 'none';
                     $('applyBtn').disabled = false;
-                    $('updateBtnWrapper').style.pointerEvents = 'auto';
                     $('saveAllowBtn').disabled = false;
                     $('saveDenyBtn').disabled = false;
                     $('toggleBtn').disabled = false;
                     $('restartBtn').disabled = false;
-                    showMsg(t('corruptFileError'), 'error', 4000);
-                    return;
+                    progContainer.style.display = 'none';
+                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    showMsg(t('safetyTimeout'), 'warning', 5000);
                 }
-                if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
-                    clearInterval(window.progressPoller);
-                    if (safetyTimer) clearTimeout(safetyTimer);
-                    if (isProcessing) {
-                        progBar.style.width = '100%';
-                        progBar.classList.add('success');
-                        showMsg(t('updateStatusDone'), 'success');
-                        setTimeout(function() {
-                            progContainer.style.opacity = '0';
-                            setTimeout(function() {
-                                progContainer.style.display = 'none';
-                                progContainer.style.opacity = '1';
-                                progBar.classList.remove('success');
-                                progBar.style.width = '0%';
-                                isProcessing = false;
-                                $('applyBtn').disabled = false;
-                                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                                $('saveAllowBtn').disabled = false;
-                                $('saveDenyBtn').disabled = false;
-                                $('toggleBtn').disabled = false;
-                                $('restartBtn').disabled = false;
+                safetyTimer = null;
+            }, 120000);
 
-                                currentUpdateState = 'up_to_date';
-                                updateSmartUpdateButtonUI();
-
-                                loadProfile();
-                                refreshAll(true);
-                            }, 500);
-                        }, 1500);
+            if (window.progressPoller) clearInterval(window.progressPoller);
+            window.progressPoller = setInterval(function() {
+                if (!isProcessing) { clearInterval(window.progressPoller); return; }
+                xhrGet('/api?action=get_progress', function(err, data) {
+                    if (err || !data || !data.progress) return;
+                    var parts = data.progress.split('|');
+                    var percent = parseInt(parts[0]) || 0;
+                    var progressMsg = parts[1] || '';
+                    if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
+                        clearInterval(window.progressPoller);
+                        if (safetyTimer) clearTimeout(safetyTimer);
+                        isProcessing = false;
+                        progContainer.style.display = 'none';
+                        $('applyBtn').disabled = false;
+                        $('saveAllowBtn').disabled = false;
+                        $('saveDenyBtn').disabled = false;
+                        $('toggleBtn').disabled = false;
+                        $('restartBtn').disabled = false;
+                        showMsg(t('corruptFileError'), 'error', 4000);
+                        return;
                     }
+                    if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
+                        clearInterval(window.progressPoller);
+                        if (safetyTimer) clearTimeout(safetyTimer);
+                        if (isProcessing) {
+                            progBar.style.width = '100%';
+                            progBar.classList.add('success');
+                            showMsg(t('updateStatusDone'), 'success');
+                            setTimeout(function() {
+                                progContainer.style.opacity = '0';
+                                setTimeout(function() {
+                                    progContainer.style.display = 'none';
+                                    progContainer.style.opacity = '1';
+                                    progBar.classList.remove('success');
+                                    progBar.style.width = '0%';
+                                    isProcessing = false;
+                                    $('applyBtn').disabled = false;
+                                    $('saveAllowBtn').disabled = false;
+                                    $('saveDenyBtn').disabled = false;
+                                    $('toggleBtn').disabled = false;
+                                    $('restartBtn').disabled = false;
+                                    loadProfile();
+                                    refreshAll(true);
+                                }, 500);
+                            }, 1500);
+                        }
+                    }
+                });
+            }, 1000);
+
+            xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
+                if (err) {
+                    if (safetyTimer) clearTimeout(safetyTimer);
+                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    isProcessing = false;
+                    $('applyBtn').disabled = false;
+                    $('saveAllowBtn').disabled = false;
+                    $('saveDenyBtn').disabled = false;
+                    $('toggleBtn').disabled = false;
+                    $('restartBtn').disabled = false;
+                    progContainer.style.display = 'none';
+                    showMsg(t('serverError'), 'error', 4000);
                 }
             });
-        }, 1000);
-
-        xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
-            if (err) {
-                if (safetyTimer) clearTimeout(safetyTimer);
-                if (window.progressPoller) clearInterval(window.progressPoller);
-                isProcessing = false;
-                $('applyBtn').disabled = false;
-                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                $('saveAllowBtn').disabled = false;
-                $('saveDenyBtn').disabled = false;
-                $('toggleBtn').disabled = false;
-                $('restartBtn').disabled = false;
-                progContainer.style.display = 'none';
-                showMsg(t('serverError'), 'error', 4000);
-            }
         });
     }
 
+
+// ============================================================
+// [24] Logs
+// ============================================================
     function showLogs() {
         if (isProcessing) return;
         var modal = $('logModal'), content = $('logContent');
@@ -2549,6 +2647,9 @@
         });
     }
 
+// ============================================================
+// [25] Old modules
+// ============================================================
     function checkOldModules() {
         var card = $('oldModulesCard'), list = $('oldModulesList');
         card.style.display = 'none';
@@ -2614,6 +2715,9 @@
         });
     }
 
+// ============================================================
+// [26] Stats / Resources
+// ============================================================
     function fetchStatsAndResources() {
         xhrGet('/api?action=stats', function(err, data) {
             if (!err && data && data.blocked_today !== undefined) {
@@ -2639,6 +2743,9 @@
         fetchStatsAndResources();
     }
 
+// ============================================================
+// [27] beforeunload
+// ============================================================
     window.addEventListener('beforeunload', function(e) {
         if (hasUnsavedChanges()) {
             e.preventDefault();
@@ -2656,9 +2763,24 @@
         if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
     });
 
+// ============================================================
+// [27b] Companion app state + render
+// ============================================================
+// Two responsibilities, strictly separated:
+//   refreshCompanionState()  — writes companionState, calls
+//                              renderCompanionButton()
+//   renderCompanionButton()  — reads companionState + t(),
+//                              writes the DOM only
+//
+// This split is what fixes the language-toggle bug: a
+// language switch can call renderCompanionButton() without
+// clobbering the cached "Installed" / "Update App" state.
     function _companionCacheWrite() {
-        try { sessionStorage.setItem(COMPANION_CACHE_KEY, JSON.stringify(companionState)); } catch(e) {}
+        try {
+            sessionStorage.setItem(COMPANION_CACHE_KEY, JSON.stringify(companionState));
+        } catch(e) {}
     }
+
     function _companionCacheRead() {
         try {
             var raw = sessionStorage.getItem(COMPANION_CACHE_KEY);
@@ -2673,6 +2795,7 @@
             }
         } catch(e) {}
     }
+
     function refreshCompanionState() {
         xhrGet('/api?action=companion_app_state', function(err, data) {
             if (err || !data) return;
@@ -2685,60 +2808,103 @@
             renderCompanionButton();
         });
     }
+
+    // Pure renderer — reads companionState + current language.
+    // The ONLY function that mutates #pwaInstallText / #pwaInstallBtn
+    // (aside from doCompanionInstall()'s transient "Installing..."
+    // label, which is intentional).
     function renderCompanionButton() {
         var btn = $('pwaInstallBtn');
         var txt = $('pwaInstallText');
         if (!btn || !txt) return;
+
         var icon = btn.querySelector('.pwa-install-icon');
         var installed = companionState.installed;
         var vname = companionState.version_name;
         var expected = companionState.expected_version;
 
         if (!installed) {
-            if (icon) icon.textContent = '\uD83D\uDCF2';
+            if (icon) icon.textContent = '\uD83D\uDCF2';           // 📲
             txt.textContent = t('pwaInstallBtn');
             btn.setAttribute('aria-label', t('pwaInstallAriaLabel'));
             btn.dataset.mode = 'install';
             btn.disabled = companionInstallInFlight;
         } else if (vname && expected && vname === expected) {
-            if (icon) icon.textContent = '\u2705';
+            if (icon) icon.textContent = '\u2705';                  // ✅
             txt.textContent = t('pwaInstalled');
             btn.setAttribute('aria-label', t('pwaInstalled'));
             btn.dataset.mode = 'none';
             btn.disabled = true;
         } else {
-            if (icon) icon.textContent = '\uD83D\uDD04';
+            if (icon) icon.textContent = '\uD83D\uDD04';           // 🔄
             txt.textContent = t('pwaUpdate');
             btn.setAttribute('aria-label', t('pwaUpdate'));
             btn.dataset.mode = 'install';
             btn.disabled = companionInstallInFlight;
         }
     }
+
+// ============================================================
+// [27c] Companion install flow
+// ============================================================
+// The install button is disabled while the one-shot CSRF
+// token is being fetched. companionInstallInFlight tracks
+// this state across every code path that could re-enable the
+// button (language toggle, verifyAuth re-entry, SSE-driven
+// renders). Every exit path resets the flag AND calls
+// renderCompanionButton() so the button reflects the current
+// state — not the transient "install in flight" state.
     function handleCompanionInstall() {
         var btn = $('pwaInstallBtn');
         if (!btn || btn.dataset.mode === 'none') return;
         if (btn.disabled || companionInstallInFlight) return;
+
         companionInstallInFlight = true;
         btn.disabled = true;
+
         xhrGet('/api?action=install_token', function(err, data) {
             if (err || !data || !data.token) {
                 companionInstallInFlight = false;
                 renderCompanionButton();
+                // A 401 from install_token means the SESSION
+                // expired — not the one-shot install token.
+                // install_token issues tokens; it never consumes
+                // one, so it is deliberately excluded from
+                // isInstallFamilyUrl(). xhrRequest() already
+                // called handleSessionExpired(), so showing
+                // installTokenError here would stack two modals.
                 if (err && err.code === 401) return;
                 showMsg(t('installTokenError'), 'error', 3000);
                 return;
             }
             var token = data.token;
+            // companionInstallInFlight stays true through the
+            // modal: the button remains disabled until either
+            // doCompanionInstall() resets it, or the user closes
+            // the modal via Cancel.
             showInstallModal(token);
         });
     }
+
+    // Dedicated install-method modal with block layout.
+    //
+    // installModalActive is set true for the duration of the
+    // modal's lifetime. The shared backdrop-click handler in
+    // §[28] checks this flag before closing — a stray tap
+    // outside the modal MUST NOT dismiss it, because every
+    // valid exit path is responsible for resetting
+    // companionInstallInFlight. A backdrop close would strand
+    // the install button in a permanently disabled state.
     function showInstallModal(token) {
         var modal = $('customModal');
         var box = modal.querySelector('.custom-modal-box');
         box.classList.add('install-modal-box');
+
         var html = ''
             + '<div class="install-modal-header">\uD83D\uDCF2 ' + t('pwaInstallBtn') + '</div>'
             + '<div class="install-modal-subtitle">' + t('installChooseMethod') + '</div>'
+
+            // Local install block
             + '<div class="install-option">'
             +   '<div class="install-option-title">' + t('installLocalTitle') + '</div>'
             +   '<div class="install-option-desc">' + t('installLocalDesc').replace(/\n/g, '<br>') + '</div>'
@@ -2746,6 +2912,8 @@
             +     '<button class="install-btn-local" id="installLocalBtn" type="button">' + t('installLocalBtn') + '</button>'
             +   '</div>'
             + '</div>'
+
+            // GitHub block
             + '<div class="install-option">'
             +   '<div class="install-option-title">' + t('installGithubTitle') + '</div>'
             +   '<div class="install-option-desc">' + t('installGithubDesc').replace(/\n/g, '<br>') + '</div>'
@@ -2754,26 +2922,39 @@
             +     '<button class="install-btn-github-direct" id="installGithubBtnDirect" type="button">' + t('installGithubBtnDirect') + '</button>'
             +   '</div>'
             + '</div>'
+
             + '<button class="install-modal-cancel" id="installCancelBtn" type="button">' + t('confirmCancel') + '</button>';
+
         $('modalTitle').style.display = 'none';
         $('modalMessage').style.display = 'none';
         $('modalCancelBtn').style.display = 'none';
         $('modalConfirmBtn').style.display = 'none';
+
         var actionsBox = modal.querySelector('.custom-modal-actions');
         actionsBox.style.display = 'none';
+
         var msgEl = $('modalMessage');
+        // Reuse #modalMessage as host for the custom HTML.
         msgEl.innerHTML = html;
         msgEl.style.display = 'block';
         msgEl.style.whiteSpace = 'normal';
+
         modal.style.display = 'flex';
         installModalActive = true;
+        // The install-modal owns its own action buttons. Every
+        // action path calls closeConfirmModal() explicitly and
+        // resets companionInstallInFlight.
         pendingConfirmCallback = null;
+
+        // Wire up buttons. Every exit path resets both
+        // installModalActive and companionInstallInFlight.
         var localBtn = $('installLocalBtn');
         if (localBtn) localBtn.addEventListener('click', function() {
             installModalActive = false;
             closeConfirmModal();
             doCompanionInstall(token);
         });
+
         var pageBtn = $('installGithubPageBtn');
         if (pageBtn) pageBtn.addEventListener('click', function() {
             window.open(APP_GITHUB_PAGE_URL, '_blank', 'noopener,noreferrer');
@@ -2782,14 +2963,18 @@
             closeConfirmModal();
             renderCompanionButton();
         });
+
         var directBtn = $('installGithubBtnDirect');
         if (directBtn) directBtn.addEventListener('click', function() {
+            // Built dynamically from companionState.expected_version
+            // (SSOT from proxy/app-apk.version) — never hardcoded.
             window.open(getCompanionApkUrl(), '_blank', 'noopener,noreferrer');
             installModalActive = false;
             companionInstallInFlight = false;
             closeConfirmModal();
             renderCompanionButton();
         });
+
         var cancelBtn = $('installCancelBtn');
         if (cancelBtn) cancelBtn.addEventListener('click', function() {
             installModalActive = false;
@@ -2798,6 +2983,11 @@
             renderCompanionButton();
         });
     }
+
+    // Restore the standard modal layout after the install modal.
+    // Called from showConfirmModal() at the start of every
+    // confirm dialog. Idempotent: safe to call even when the
+    // standard layout is already in place.
     function _resetModalLayout() {
         var modal = $('customModal');
         var box = modal.querySelector('.custom-modal-box');
@@ -2810,15 +3000,31 @@
         var actionsBox = modal.querySelector('.custom-modal-actions');
         actionsBox.style.display = '';
     }
+
+    // doCompanionInstall() distinguishes three failure shapes:
+    //
+    //   429 → rate limit (per-IP, 5 / 15 min)
+    //   401 → token expired (one-shot CSRF, 60 s TTL)
+    //   other → generic install failure
+    //
+    // The 401 branch renders t('installTokenError') — NOT
+    // t('installError') — matching docs/REFERENCE.md §2.4.6 and
+    // CHANGELOG.md's IDX-401-DISTINCT entry. A 401 from this
+    // endpoint is a token-expiry signal, not a session-expiry
+    // signal; the session-expired modal is already suppressed
+    // upstream in xhrRequest() via isInstallFamilyUrl().
     function doCompanionInstall(token) {
         var txt = $('pwaInstallText');
         var btn = $('pwaInstallBtn');
         if (btn) btn.disabled = true;
         if (txt) txt.textContent = t('installing');
+
         xhrPost('/api/install_companion_app',
             'token=' + encodeURIComponent(token),
             function(err, data) {
+                // Reset the in-flight flag on every exit path.
                 companionInstallInFlight = false;
+
                 if (err || !data) {
                     if (err && err.code === 429) {
                         showMsg(t('installRateLimited'), 'error', 4000);
@@ -2831,16 +3037,29 @@
                     refreshCompanionState();
                     return;
                 }
+
                 if (data.status === 'ok') {
                     showMsg(t('installSuccess'), 'success', 3000);
                     renderCompanionButton();
                     refreshCompanionState();
                     return;
                 }
-                var msg = data.message_ar && currentLang === 'ar' ? data.message_ar : (data.message_en || data.message || t('installError'));
-                var hint = data.hint_ar && currentLang === 'ar' ? data.hint_ar : (data.hint_en || '');
+
+                // Failure — offer manual download as fallback.
+                var msg = data.message_ar && currentLang === 'ar'
+                    ? data.message_ar
+                    : (data.message_en || data.message || t('installError'));
+                var hint = data.hint_ar && currentLang === 'ar'
+                    ? data.hint_ar
+                    : (data.hint_en || '');
+
                 var fullMsg = '\u274C ' + msg;
                 if (hint) fullMsg += '\n\n\uD83D\uDCA1 ' + hint;
+
+                // Passing null as the callback is safe.
+                // showConfirmModal() installs a no-op fallback so
+                // the Cancel / Confirm / backdrop listeners always
+                // call closeConfirmModal().
                 showConfirmModal(fullMsg, null, {
                     title: t('installError'),
                     primaryText: t('installManualDownload'),
@@ -2854,53 +3073,39 @@
         );
     }
 
+// ============================================================
+// [28] bindEvents
+// ============================================================
+// The three modal listeners always call closeConfirmModal(),
+// even when pendingConfirmCallback is null. Combined with
+// the no-op fallback installed by showConfirmModal(), this
+// guarantees that Cancel, Confirm, and backdrop clicks
+// always dismiss the dialog.
+//
+// The backdrop-click handler is guarded by installModalActive:
+// when the install-method modal is open, a stray click outside
+// the modal MUST NOT close it. Its own buttons are the only
+// paths that reset companionInstallInFlight. A backdrop close
+// would strand the install button in a permanently disabled
+// state until page reload.
     function bindEvents() {
         $('langToggle').addEventListener('click', toggleLanguage);
         $('logoutBtn').addEventListener('click', logout);
+
         $('loginBtn').addEventListener('click', performLogin);
         $('passwordInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') performLogin();
         });
 
         var _pwaBtn = $('pwaInstallBtn');
-        if (_pwaBtn) _pwaBtn.addEventListener('click', handleCompanionInstall);
+        if (_pwaBtn) {
+            _pwaBtn.addEventListener('click', handleCompanionInstall);
+        }
 
         $('toggleBtn').addEventListener('click', handleToggle);
         $('restartBtn').addEventListener('click', handleRestart);
 
-        $('applyBtn').addEventListener('click', function() { applyProfile(false); });
-
-        var updateWrapper = $('updateBtnWrapper');
-        if (updateWrapper) {
-            updateWrapper.addEventListener('click', function(e) {
-                if (isProcessing || isCheckingUpdates) return;
-
-                if (currentUpdateState === 'up_to_date') {
-                    showMsg(t('updateNotNeededMsg'), 'info', 3000);
-                } else if (currentUpdateState === 'unknown') {
-                    checkForUpdates(true);
-                } else if (currentUpdateState === 'available') {
-                    applyProfile(true);
-                }
-            });
-        }
-
-        $('profileSelect').addEventListener('change', function() {
-            if (isProcessing || isCheckingUpdates) return;
-            var selectedProfile = this.value;
-            var wrapper = $('updateBtnWrapper');
-
-            if (selectedProfile !== currentProfileKey) {
-                if (wrapper) wrapper.style.display = 'none';
-            } else {
-                if (!currentProfileIsEmpty) {
-                    if (wrapper) wrapper.style.display = 'block';
-                    updateSmartUpdateButtonUI();
-                } else {
-                    if (wrapper) wrapper.style.display = 'none';
-                }
-            }
-        });
+        $('applyBtn').addEventListener('click', applyProfile);
 
         $('saveAllowBtn').addEventListener('click', function() { handleEditBtnClick('allow'); });
         $('saveDenyBtn').addEventListener('click', function() { handleEditBtnClick('deny'); });
@@ -2944,6 +3149,7 @@
         var diagHeader = $('diagFilesHeader');
         diagHeader.addEventListener('click', function() { diagCard.classList.toggle('open'); });
 
+        // Always close, regardless of callback.
         $('modalConfirmBtn').addEventListener('click', function() {
             if (pendingConfirmCallback) pendingConfirmCallback(true);
             closeConfirmModal();
@@ -2954,18 +3160,34 @@
         });
         $('customModal').addEventListener('click', function(e) {
             if (e.target !== this) return;
+            // The install-method modal holds an in-flight one-shot
+            // CSRF token. Its own buttons are the only valid exits.
+            // A backdrop close would leave companionInstallInFlight
+            // true and permanently disable the install button.
             if (installModalActive) return;
             if (pendingConfirmCallback) pendingConfirmCallback(false);
             closeConfirmModal();
         });
     }
 
+// ============================================================
+// [29] Boot
+// ============================================================
+// installControllerChangeHandler() is invoked from
+// setupSWUpdateHandler() below — no direct call here.
     function boot() {
         document.documentElement.lang = currentLang;
         document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+
         updateDashboardLink();
+
+        // Paint the correct companion label from sessionStorage
+        // BEFORE the first async XHR so a hard reload (F5) does
+        // not flash "Install App" over the cached "Installed"
+        // state.
         _companionCacheRead();
         renderCompanionButton();
+
         updateUIStrings();
         bindEvents();
         bindSWUpdateButtons();
@@ -2981,7 +3203,11 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
                 swRegistration = reg;
-                if (reg.waiting && navigator.serviceWorker.controller) showSWUpdateBanner();
+
+                if (reg.waiting && navigator.serviceWorker.controller) {
+                    showSWUpdateBanner();
+                }
+
                 reg.addEventListener('updatefound', function() {
                     var newWorker = reg.installing;
                     if (!newWorker) return;
@@ -2991,36 +3217,11 @@
                         }
                     });
                 });
+
                 setupSWUpdateHandler();
-            }).catch(function() {});
-        }
-
-        let updateCheckTimer = null;
-        function startUpdatePolling() {
-            if (updateCheckTimer) clearInterval(updateCheckTimer);
-            updateCheckTimer = setInterval(function() {
-                if (appInitialized && !isProcessing && !isCheckingUpdates) {
-                    checkForUpdates(false);
-                }
-            }, 30 * 60 * 1000);
-        }
-
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-                if (appInitialized && !isProcessing && !isCheckingUpdates) {
-                    checkForUpdates(false);
-                }
-                startUpdatePolling();
-            } else {
-                if (updateCheckTimer) {
-                    clearInterval(updateCheckTimer);
-                    updateCheckTimer = null;
-                }
-            }
-        });
-
-        if (document.visibilityState === 'visible') {
-            startUpdatePolling();
+            }).catch(function() {
+                // Silent — registration is non-critical
+            });
         }
 
         verifyAuth();
