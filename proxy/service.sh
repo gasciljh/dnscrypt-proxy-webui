@@ -930,10 +930,18 @@ fi
 # process and does not create a new session — this is
 # sufficient for a daemon that ignores SIGHUP anyway.
 #
-# Three-phase:
-#   1. Kill any existing watchdog (poll for death, up to 3 s).
-#   2. Launch one watchdog via nohup.
-#   3. Verify: exactly one process by counting matching argv.
+# Four-phase:
+#   1. Kill any existing watchdog (poll for death, up to 3 s,
+#      then force-kill if survivors remain).
+#   2. Gate: if any watchdog survived, SKIP the launch entirely
+#      (do not risk duplication).
+#   3. If the kill was clean, launch one watchdog via nohup.
+#   4. Verify single instance with a settle-retry loop. During
+#      its startup phase, watchdog.sh forks subshells via
+#      `$(...)` expansions. Until each child exec()s, parent
+#      and child share the same argv, and `ps -o ARGS | grep
+#      /watchdog\.sh` counts both → transient false positive.
+#      We retry the count for up to 5 s before declaring CRITICAL.
 WATCHDOG_SCRIPT="$MODDIR/watchdog.sh"
 
 if [ ! -f "$WATCHDOG_SCRIPT" ]; then
@@ -947,71 +955,111 @@ else
     # --- Phase 1: kill existing watchdogs ---
     log_msg "🧹 Killing any existing Watchdog..."
     if ! _kill_watchdogs_safely; then
-        log_msg "⚠️ Some watchdogs survived 3s (likely D-state)"
+        log_msg "⚠️ Some watchdogs survived 3s — retrying with force-kill..."
+        _stub_pids=$(ps -A -o PID,ARGS 2>/dev/null \
+            | grep '/watchdog\.sh' | grep -v grep | awk '{print $1}')
+        if [ -n "$_stub_pids" ]; then
+            # shellcheck disable=SC2086
+            kill -9 $_stub_pids 2>/dev/null
+        fi
+        sleep 2
     fi
+
+    # --- Phase 2: gate — decide once, act once ---
+    # Normalize the count so a malformed value (empty/non-numeric)
+    # cannot make `[ -gt ]` fail and silently fall through.
+    _remaining_wd=$(_count_watchdogs)
+    case "$_remaining_wd" in ''|*[!0-9]*) _remaining_wd=0 ;; esac
+
+    # Drop the stale PID file in both branches: if we launch a
+    # new watchdog it will write its own PID; if we skip, the
+    # surviving watchdog still owns its PID file (or will
+    # rewrite it on next loop).
     rm -f "$WATCHDOG_PID_FILE" 2>/dev/null
-    log_msg "✅ Previous Watchdog instances cleared"
 
-    # --- Phase 2: launch one watchdog ---
-    # nohup is the primary launcher. setsid is a fallback only
-    # for devices without nohup (rare on Android, but possible
-    # on minimal builds).
-    _launcher=""
-    if command -v nohup >/dev/null 2>&1; then
-        nohup "$WATCHDOG_SCRIPT" \
-            "$WATCHDOG_PID_FILE" \
-            "$MODDIR" \
-            "$PORT" \
-            "$AUTO_RESTART_DNS" \
-            "$AUTO_RESTART_WEBUI" \
-            >/dev/null 2>&1 < /dev/null &
-        _launcher="nohup"
-    elif command -v setsid >/dev/null 2>&1; then
-        setsid "$WATCHDOG_SCRIPT" \
-            "$WATCHDOG_PID_FILE" \
-            "$MODDIR" \
-            "$PORT" \
-            "$AUTO_RESTART_DNS" \
-            "$AUTO_RESTART_WEBUI" \
-            >/dev/null 2>&1 < /dev/null &
-        _launcher="setsid (fallback)"
+    if [ "$_remaining_wd" -gt 0 ]; then
+        # A watchdog survived even after SIGKILL + force-kill.
+        # Most likely a transient D-state. Launching a new one
+        # here is exactly the bug we are fixing — skip and let
+        # the survivor resume.
+        log_msg "⚠️ $_remaining_wd watchdog(s) still alive after force-kill"
+        log_msg "   Skipping launch to avoid duplication (existing WD will resume)"
     else
-        "$WATCHDOG_SCRIPT" \
-            "$WATCHDOG_PID_FILE" \
-            "$MODDIR" \
-            "$PORT" \
-            "$AUTO_RESTART_DNS" \
-            "$AUTO_RESTART_WEBUI" \
-            >/dev/null 2>&1 < /dev/null &
-        _launcher="direct (fallback)"
+        log_msg "✅ Previous Watchdog instances cleared"
+
+        # --- Phase 3: launch one watchdog ---
+        # nohup is the primary launcher. setsid is a fallback only
+        # for devices without nohup (rare on Android, but possible
+        # on minimal builds).
+        _launcher=""
+        if command -v nohup >/dev/null 2>&1; then
+            nohup "$WATCHDOG_SCRIPT" \
+                "$WATCHDOG_PID_FILE" \
+                "$MODDIR" \
+                "$PORT" \
+                "$AUTO_RESTART_DNS" \
+                "$AUTO_RESTART_WEBUI" \
+                >/dev/null 2>&1 < /dev/null &
+            _launcher="nohup"
+        elif command -v setsid >/dev/null 2>&1; then
+            setsid "$WATCHDOG_SCRIPT" \
+                "$WATCHDOG_PID_FILE" \
+                "$MODDIR" \
+                "$PORT" \
+                "$AUTO_RESTART_DNS" \
+                "$AUTO_RESTART_WEBUI" \
+                >/dev/null 2>&1 < /dev/null &
+            _launcher="setsid (fallback)"
+        else
+            "$WATCHDOG_SCRIPT" \
+                "$WATCHDOG_PID_FILE" \
+                "$MODDIR" \
+                "$PORT" \
+                "$AUTO_RESTART_DNS" \
+                "$AUTO_RESTART_WEBUI" \
+                >/dev/null 2>&1 < /dev/null &
+            _launcher="direct (fallback)"
+        fi
+        log_msg "Watchdog launched via $_launcher"
+
+        # --- Phase 4: verify single instance (settle-retry) ---
+        # Wait for the PID file (up to 5 s), then retry the count
+        # up to 5 times with 1 s gaps. A transient count of 2
+        # during fork (before the child exec()s) is normal; a
+        # count that stays > 1 across all retries (≈5 s of
+        # continuous duplication) is a real CRITICAL.
+        _wd_wait=0
+        while [ "$_wd_wait" -lt 5 ] && [ ! -f "$WATCHDOG_PID_FILE" ]; do
+            sleep 1
+            _wd_wait=$((_wd_wait + 1))
+        done
+
+        _wd_count=0
+        _retry=0
+        while [ "$_retry" -lt 5 ]; do
+            _wd_count=$(_count_watchdogs)
+            case "$_wd_count" in ''|*[!0-9]*) _wd_count=0 ;; esac
+            if [ "$_wd_count" -le 1 ]; then
+                break
+            fi
+            sleep 1
+            _retry=$((_retry + 1))
+        done
+
+        case "$_wd_count" in
+            1)
+                wd_pid=$(pgrep -f '/watchdog\.sh' 2>/dev/null | head -n1)
+                log_msg "✅ Watchdog started (PID: ${wd_pid:-unknown}, single instance)"
+                ;;
+            0)
+                log_msg "❌ Watchdog failed to start (0 instances)"
+                ;;
+            *)
+                log_msg "⚠️ CRITICAL: $_wd_count watchdog instances (expected 1, verified after ${_retry}s settle)"
+                log_msg "   Investigate immediately: ps -A -o PID,PPID,ARGS | grep watchdog"
+                ;;
+        esac
     fi
-    log_msg "Watchdog launched via $_launcher"
-
-    # --- Phase 3: verify single instance ---
-    # Wait up to 5 s for the PID file, then count matching
-    # processes. Expect exactly 1.
-    _wd_wait=0
-    while [ "$_wd_wait" -lt 5 ] && [ ! -f "$WATCHDOG_PID_FILE" ]; do
-        sleep 1
-        _wd_wait=$((_wd_wait + 1))
-    done
-
-    sleep 1  # let the process fully initialize
-
-    _wd_count=$(_count_watchdogs)
-    case "$_wd_count" in
-        1)
-            wd_pid=$(pgrep -f '/watchdog\.sh' 2>/dev/null | head -n1)
-            log_msg "✅ Watchdog started (PID: ${wd_pid:-unknown}, single instance)"
-            ;;
-        0)
-            log_msg "❌ Watchdog failed to start (0 instances)"
-            ;;
-        *)
-            log_msg "⚠️ CRITICAL: $_wd_count watchdog instances (expected 1)"
-            log_msg "   Investigate immediately: ps -A | grep watchdog"
-            ;;
-    esac
 fi
 
 # ============================================================
