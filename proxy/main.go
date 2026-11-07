@@ -577,6 +577,11 @@ var (
 	updateCheckCache = make(map[string]cachedUpdateStatus)
 )
 
+// [8d] Premium Backup Queue System
+var (
+	backupQueue = make(chan string, 20)
+)
+
 // [9] Read webui.conf settings
 func readConfValue(key, defaultValue string) (result string) {
 	result = defaultValue
@@ -1925,10 +1930,20 @@ func startSessionGC() {
 			}
 			installAttemptsMu.Unlock()
 
-			if sessRemoved > 0 || attemptsRemoved > 0 || installRemoved > 0 {
+			installTokensMu.Lock()
+			tokensRemoved := 0
+			for k, v := range installTokens {
+				if v.ExpiresAt.Before(now) {
+					delete(installTokens, k)
+					tokensRemoved++
+				}
+			}
+			installTokensMu.Unlock()
+
+			if sessRemoved > 0 || attemptsRemoved > 0 || installRemoved > 0 || tokensRemoved > 0 {
 				logWithLevel("debug", fmt.Sprintf(
-					"🧹 GC removed: %d session(s), %d login attempt(s), %d install attempt(s)",
-					sessRemoved, attemptsRemoved, installRemoved))
+					"🧹 GC removed: %d session(s), %d login attempt(s), %d install attempt(s), %d token(s)",
+					sessRemoved, attemptsRemoved, installRemoved, tokensRemoved))
 			}
 		}
 	}()
@@ -2310,7 +2325,6 @@ func stopService() {
 	broadcastEvent("resources", "{\"ram\":\"N/A\"}")
 }
 
-// reloadService respects user intent. It only reloads if the service is currently running.
 func reloadService() {
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
@@ -2524,19 +2538,6 @@ func normalizeDomain(line string) string {
 	return line
 }
 
-func isDomainMatch(blocked, allowed string) bool {
-	if blocked == "" || allowed == "" {
-		return false
-	}
-	if blocked == allowed {
-		return true
-	}
-	if len(blocked) > len(allowed) && strings.HasSuffix(blocked, "."+allowed) {
-		return true
-	}
-	return false
-}
-
 func stripDenySections(content string) string {
 	if idx := strings.Index(content, DENY_MARKER_START); idx >= 0 {
 		content = content[:idx]
@@ -2736,7 +2737,6 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 	rulesStateMu.Lock()
 	defer rulesStateMu.Unlock()
 
-	// Strict conflict check based ONLY on the lists being updated
 	if (req.UpdateAllow && currentRules.AllowlistHash != prev.AllowlistHash) ||
 	   (req.UpdateDeny && currentRules.DenylistHash != prev.DenylistHash) {
 		logWithLevel("warn", "⚠️ save: state changed during save, aborting")
@@ -2795,6 +2795,16 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 		AllowlistHash: newAllowHash,
 		DenylistHash:  newDenyHash,
 	}
+
+	backupReason := "post-save"
+	if req.UpdateAllow && req.UpdateDeny {
+		backupReason = "post-custom-save"
+	} else if req.UpdateAllow {
+		backupReason = "post-allow-save"
+	} else if req.UpdateDeny {
+		backupReason = "post-deny-save"
+	}
+	enqueueBackup(backupReason)
 
 	aH, dH := newAllowHash, newDenyHash
 	if len(aH) > 12 {
@@ -2863,7 +2873,6 @@ func saveAllowlist(content, expectedHash string) map[string]interface{} {
 			"entries":    getEntriesCount(),
 		}
 	}
-	createAutoBackup("pre-allowlist-save")
 	return runAtomicSave(saveRulesRequest{
 		AllowContent:      content,
 		ExpectedAllowHash: expectedHash,
@@ -2890,7 +2899,6 @@ func saveDenylist(content, expectedHash string) map[string]interface{} {
 			"entries":    getEntriesCount(),
 		}
 	}
-	createAutoBackup("pre-denylist-save")
 	return runAtomicSave(saveRulesRequest{
 		DenyContent:      content,
 		ExpectedDenyHash: expectedHash,
@@ -2912,7 +2920,6 @@ func saveCustomRulesCombined(allow, deny string) map[string]interface{} {
 			"entries":    getEntriesCount(),
 		}
 	}
-	createAutoBackup("pre-custom-rules-save")
 	return runAtomicSave(saveRulesRequest{
 		AllowContent: allow,
 		DenyContent:  deny,
@@ -2994,29 +3001,30 @@ func buildProfileResponse() map[string]interface{} {
 	}
 }
 
-// [28] Update profile
-func updateProfile(key string) map[string]interface{} {
-	defer func() {
-		if r := recover(); r != nil {
-			logWithLevel("error", fmt.Sprintf("PANIC in updateProfile: %v", r))
-		}
-	}()
-	updatingMu.Lock()
-	if isUpdating {
-		updatingMu.Unlock()
-		return map[string]interface{}{"status": "error", "message": "⚠️ Another update in progress"}
-	}
-	isUpdating = true
-	updatingMu.Unlock()
+// [28] Update profile — premium (defensive + server-authoritative)
+//
+// updateProfileBody runs on its own goroutine, protected by the
+// caller which atomically sets isUpdating = true before launching.
+// All resources are released via defer to prevent stale locks on panic.
+func updateProfileBody(key string) {
 	defer func() {
 		updatingMu.Lock()
 		isUpdating = false
 		updatingMu.Unlock()
 	}()
 
+	defer func() {
+		if r := recover(); r != nil {
+			logWithLevel("error", fmt.Sprintf("PANIC in updateProfileBody: %v", r))
+			// Best-effort progress reset so clients don't get stuck on 5%
+			writeProgress(0, "❌ Internal error")
+		}
+	}()
+
 	profile, ok := profiles[key]
 	if !ok {
-		return map[string]interface{}{"status": "error", "message": "Invalid profile"}
+		writeProgress(0, "❌ Invalid profile")
+		return
 	}
 
 	createAutoBackup("pre-profile-change")
@@ -3044,14 +3052,14 @@ func updateProfile(key string) map[string]interface{} {
 	}
 	if err != nil {
 		writeProgress(0, "❌ Download failed: "+err.Error())
-		return map[string]interface{}{"status": "error", "message": "Download failed", "details": err.Error()}
+		return
 	}
 
 	writeProgress(85, "Verifying downloaded data...")
 	time.Sleep(1000 * time.Millisecond)
 	if err := validateBlocklist(tempFile); err != nil {
 		writeProgress(0, "❌ Downloaded file is corrupt or invalid")
-		return map[string]interface{}{"status": "error", "message": "File corrupt", "details": err.Error()}
+		return
 	}
 
 	writeProgress(88, "Preparing base file...")
@@ -3059,7 +3067,7 @@ func updateProfile(key string) map[string]interface{} {
 		src, oerr := os.Open(tempFile)
 		if oerr != nil {
 			writeProgress(0, "❌ Failed to open temp file")
-			return map[string]interface{}{"status": "error", "message": "Failed to move file"}
+			return
 		}
 		streamErr := atomicWriteStream(RAW_BLOCKLIST_FILE, 0644, func(w io.Writer) error {
 			_, e := io.Copy(w, src)
@@ -3068,13 +3076,44 @@ func updateProfile(key string) map[string]interface{} {
 		src.Close()
 		if streamErr != nil {
 			writeProgress(0, "❌ Failed to save base file")
-			return map[string]interface{}{"status": "error", "message": "Failed to save base file"}
+			return
 		}
 	}
 
 	writeProgress(90, "Applying custom rules...")
 	time.Sleep(500 * time.Millisecond)
 
+	// [PREMIUM] All service operations wrapped in applyUpdatePhase,
+	// which uses defer to guarantee mutex release on panic.
+	if err := applyUpdatePhase(key); err != nil {
+		writeProgress(0, "❌ "+err.Error())
+		return
+	}
+
+	time.Sleep(1500 * time.Millisecond)
+
+	entries := getEntriesCount()
+
+	lastUpdateMu.Lock()
+	lastUpdateCache = time.Now().Format("2006-01-02 15:04:05")
+	lastUpdateTime = time.Now()
+	lastUpdateMu.Unlock()
+
+	writeProgress(100, fmt.Sprintf("✅ Protection applied successfully (%d entries)", entries))
+	time.Sleep(1000 * time.Millisecond)
+	writeProgress(0, "")
+
+	broadcastEvent("stats", fmt.Sprintf("{\"blocked_today\":\"%s\"}", getBlockedStats()))
+	broadcastEvent("resources", fmt.Sprintf("{\"ram\":\"%s\"}", getResourceUsage()))
+
+	runShell("ndc resolver flushdefaultif 2>/dev/null || true")
+	debug.FreeOSMemory()
+}
+
+// applyUpdatePhase performs the locked service-application phase with
+// defensive defer-based mutex release. Any panic inside is caught by
+// the caller's recover, and the mutex is guaranteed to be released.
+func applyUpdatePhase(key string) error {
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
 
@@ -3085,12 +3124,11 @@ func updateProfile(key string) map[string]interface{} {
 	}
 
 	if err := rebuildBlocklist(); err != nil {
-		logWithLevel("error", "❌ updateProfile: rebuild failed: "+err.Error())
+		logWithLevel("error", "❌ applyUpdatePhase: rebuild failed: "+err.Error())
 		if wasRunning {
 			startService()
 		}
-		writeProgress(0, "❌ Failed to rebuild blocklist")
-		return map[string]interface{}{"status": "error", "message": "Rebuild failed", "details": err.Error()}
+		return fmt.Errorf("Failed to rebuild blocklist")
 	}
 
 	atomicWriteFile(SELECTED_FILE, []byte(key), 0666)
@@ -3108,33 +3146,8 @@ func updateProfile(key string) map[string]interface{} {
 	if wasRunning {
 		startService()
 	}
-	time.Sleep(1500 * time.Millisecond)
 
-	entries := getEntriesCount()
-
-	lastUpdateMu.Lock()
-	lastUpdateCache = time.Now().Format("2006-01-02 15:04:05")
-	lastUpdateTime = time.Now()
-	lastUpdateCopy := lastUpdateCache
-	lastUpdateMu.Unlock()
-
-	writeProgress(100, fmt.Sprintf("✅ Protection applied successfully (%d entries)", entries))
-	time.Sleep(1000 * time.Millisecond)
-	writeProgress(0, "")
-
-	broadcastEvent("stats", fmt.Sprintf("{\"blocked_today\":\"%s\"}", getBlockedStats()))
-	broadcastEvent("resources", fmt.Sprintf("{\"ram\":\"%s\"}", getResourceUsage()))
-
-	runShell("ndc resolver flushdefaultif 2>/dev/null || true")
-	debug.FreeOSMemory()
-
-	return map[string]interface{}{
-		"status":          "ok",
-		"message":         fmt.Sprintf("Blocklist updated to %s", profile.Name),
-		"entries":         entries,
-		"last_update":     lastUpdateCopy,
-		"memory_limit_mb": memoryLimitForProfile(key) / (1024 * 1024),
-	}
+	return nil
 }
 
 // [29] Old modules
@@ -3659,7 +3672,9 @@ func buildBackupInfo() map[string]interface{} {
 
 		manifestPath := filepath.Join(PERSISTENT_BACKUP, name, ".manifest.json")
 		if _, err := os.Stat(manifestPath); err != nil {
-			continue
+			if !strings.Contains(name, "-manual-") && !strings.Contains(name, "-auto-") {
+				continue
+			}
 		}
 
 		snapshots = append(snapshots, e)
@@ -3992,16 +4007,6 @@ func (h *apiHandler) routeAuthLogout(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-func (h *apiHandler) rejectNonLocalInstall(w http.ResponseWriter, r *http.Request) {
-	action := "install"
-	if hasEndpoint(r.URL.Path, "uninstall_companion_app") {
-		action = "uninstall"
-	}
-	logWithLevel("warn", "❌ "+action+"_companion_app rejected: non-localhost request")
-	writeInstallError(w, http.StatusForbidden, action,
-		"not_localhost", "Forbidden: install is localhost-only")
-}
-
 func (h *apiHandler) dispatchPost(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case hasEndpoint(r.URL.Path, "update_profile"):
@@ -4035,6 +4040,7 @@ func (h *apiHandler) dispatchPost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// PREMIUM: atomic reservation, returns "already_running" for concurrent requests
 func (h *apiHandler) postUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if !requireFormContentType(w, r) {
 		return
@@ -4043,11 +4049,74 @@ func (h *apiHandler) postUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if profile == "" {
 		profile = "pro"
 	}
-	go updateProfile(profile)
+
+	updatingMu.Lock()
+	if isUpdating {
+		progressData, _ := os.ReadFile(PROGRESS_FILE)
+		progressStr := strings.TrimSpace(string(progressData))
+		updatingMu.Unlock()
+
+		percent := 0
+		text := ""
+		if progressStr != "" {
+			parts := strings.SplitN(progressStr, "|", 2)
+			if len(parts) >= 1 {
+				if p, err := strconv.Atoi(parts[0]); err == nil {
+					percent = p
+				}
+			}
+			if len(parts) >= 2 {
+				text = parts[1]
+			}
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":   "already_running",
+			"progress": percent,
+			"text":     text,
+		})
+		return
+	}
+
+	isUpdating = true
+	updatingMu.Unlock()
+
+	go updateProfileBody(profile)
+
 	json.NewEncoder(w).Encode(map[string]string{
-		"status":  "processing",
+		"status":  "started",
 		"message": "Update in progress...",
 	})
+}
+
+// PREMIUM: Server-authoritative update state
+func (h *apiHandler) getUpdateStateAction(r *http.Request) map[string]interface{} {
+	updatingMu.Lock()
+	running := isUpdating
+	updatingMu.Unlock()
+
+	progressData, _ := os.ReadFile(PROGRESS_FILE)
+	progressStr := strings.TrimSpace(string(progressData))
+
+	percent := 0
+	text := ""
+	if progressStr != "" {
+		parts := strings.SplitN(progressStr, "|", 2)
+		if len(parts) >= 1 {
+			if p, err := strconv.Atoi(parts[0]); err == nil {
+				percent = p
+			}
+		}
+		if len(parts) >= 2 {
+			text = parts[1]
+		}
+	}
+
+	return map[string]interface{}{
+		"running":  running,
+		"progress": percent,
+		"message":  text,
+	}
 }
 
 func (h *apiHandler) postSaveAllowlist(w http.ResponseWriter, r *http.Request) {
@@ -4266,6 +4335,9 @@ func (h *apiHandler) dispatchGet(w http.ResponseWriter, r *http.Request) {
 	case "check_update":
 		profileKey := readSelectedProfile()
 		json.NewEncoder(w).Encode(checkUpdateStatus(profileKey))
+
+	case "update_state":
+		json.NewEncoder(w).Encode(h.getUpdateStateAction(r))
 
 	case "stats":
 		json.NewEncoder(w).Encode(h.getStatsAction(r))
@@ -4658,54 +4730,18 @@ func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType strin
 		path        string
 		contentType string
 	}{
-		"/sw.js": {
-			path:        SW_FILE,
-			contentType: "application/javascript; charset=utf-8",
-		},
-		"/manifest.json": {
-			path:        MANIFEST_FILE,
-			contentType: "application/json; charset=utf-8",
-		},
-		"/icon-192.svg": {
-			path:        ICON_192_SVG_FILE,
-			contentType: "image/svg+xml",
-		},
-		"/icon-512.svg": {
-			path:        ICON_512_SVG_FILE,
-			contentType: "image/svg+xml",
-		},
-		"/icon-192.png": {
-			path:        ICON_192_PNG_FILE,
-			contentType: "image/png",
-		},
-		"/icon-512.png": {
-			path:        ICON_512_PNG_FILE,
-			contentType: "image/png",
-		},
-		"/apple-touch-icon.png": {
-			path:        APPLE_TOUCH_FILE,
-			contentType: "image/png",
-		},
-		"/favicon-32x32.png": {
-			path:        FAVICON_32_FILE,
-			contentType: "image/png",
-		},
-		"/favicon-16x16.png": {
-			path:        FAVICON_16_FILE,
-			contentType: "image/png",
-		},
-		"/favicon.ico": {
-			path:        FAVICON_ICO_FILE,
-			contentType: "image/x-icon",
-		},
-		"/offline.html": {
-			path:        OFFLINE_FILE,
-			contentType: "text/html; charset=utf-8",
-		},
-		"/app-debug.apk": {
-			path:        APK_FILE,
-			contentType: "application/vnd.android.package-archive",
-		},
+		"/sw.js":                       {SW_FILE, "application/javascript; charset=utf-8"},
+		"/manifest.json":               {MANIFEST_FILE, "application/json; charset=utf-8"},
+		"/icon-192.svg":                {ICON_192_SVG_FILE, "image/svg+xml"},
+		"/icon-512.svg":                {ICON_512_SVG_FILE, "image/svg+xml"},
+		"/icon-192.png":                {ICON_192_PNG_FILE, "image/png"},
+		"/icon-512.png":                {ICON_512_PNG_FILE, "image/png"},
+		"/apple-touch-icon.png":        {APPLE_TOUCH_FILE, "image/png"},
+		"/favicon-32x32.png":           {FAVICON_32_FILE, "image/png"},
+		"/favicon-16x16.png":           {FAVICON_16_FILE, "image/png"},
+		"/favicon.ico":                 {FAVICON_ICO_FILE, "image/x-icon"},
+		"/offline.html":                {OFFLINE_FILE, "text/html; charset=utf-8"},
+		"/app-debug.apk":               {APK_FILE, "application/vnd.android.package-archive"},
 	}
 
 	for urlPath, asset := range staticAssets {
@@ -4756,26 +4792,10 @@ func findMetric(prom map[string]float64, names ...string) float64 {
 }
 
 func buildDashboardJSON(prom map[string]float64) map[string]interface{} {
-	totalQ := findMetric(prom,
-		"dnscrypt_proxy_query_total",
-		"dnscrypt_query_total",
-		"dnscrypt_proxy_queries_total",
-	)
-	blockedQ := findMetric(prom,
-		"dnscrypt_proxy_blocked_query_total",
-		"dnscrypt_blocked_query_total",
-		"dnscrypt_proxy_blocked_queries_total",
-	)
-	cacheHits := findMetric(prom,
-		"dnscrypt_proxy_cache_hits_total",
-		"dnscrypt_proxy_cache_hit_total",
-		"dnscrypt_cache_hits_total",
-	)
-	cacheMisses := findMetric(prom,
-		"dnscrypt_proxy_cache_misses_total",
-		"dnscrypt_proxy_cache_miss_total",
-		"dnscrypt_cache_misses_total",
-	)
+	totalQ := findMetric(prom, "dnscrypt_proxy_query_total", "dnscrypt_query_total", "dnscrypt_proxy_queries_total")
+	blockedQ := findMetric(prom, "dnscrypt_proxy_blocked_query_total", "dnscrypt_blocked_query_total", "dnscrypt_proxy_blocked_queries_total")
+	cacheHits := findMetric(prom, "dnscrypt_proxy_cache_hits_total", "dnscrypt_proxy_cache_hit_total", "dnscrypt_cache_hits_total")
+	cacheMisses := findMetric(prom, "dnscrypt_proxy_cache_misses_total", "dnscrypt_proxy_cache_miss_total", "dnscrypt_cache_misses_total")
 
 	hitRatio := 0.0
 	if total := cacheHits + cacheMisses; total > 0 {
@@ -4876,14 +4896,16 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(dashboardJSON)
 }
 
-// [36b] Auto-backup + notifications
-func createAutoBackup(reason string) {
-	if _, err := os.Stat(PERSISTENT_BACKUP); err != nil {
-		logWithLevel("debug", fmt.Sprintf(
-			"auto-backup skipped (%s): %s not initialized", reason, PERSISTENT_BACKUP))
-		return
+// [36b] Premium Backup System
+func enqueueBackup(reason string) {
+	select {
+	case backupQueue <- reason:
+	default:
+		logWithLevel("warn", "⚠️ Backup queue full, skipping backup request: "+reason)
 	}
+}
 
+func createAutoBackup(reason string) {
 	backupMu.Lock()
 	defer backupMu.Unlock()
 
@@ -4945,6 +4967,15 @@ func createAutoBackup(reason string) {
 	logWithLevel("info", fmt.Sprintf(
 		"💾 auto-backup complete (reason=%s, took=%v, target=%s)",
 		safeReason, elapsed, filepath.Base(targetDir)))
+}
+
+func startBackupWorker() {
+	go func() {
+		for reason := range backupQueue {
+			createAutoBackup(reason)
+			time.Sleep(1 * time.Second)
+		}
+	}()
 }
 
 func checkPendingNotifications() {
@@ -5016,27 +5047,33 @@ func cleanupOldTransactions() {
 			continue
 		}
 		name := e.Name()
-		if !strings.HasPrefix(name, "txn-") {
+
+		if strings.HasPrefix(name, "txn-") {
+			statePath := filepath.Join(PERSISTENT_BACKUP, name, ".state")
+			data, err := os.ReadFile(statePath)
+			if err == nil && strings.TrimSpace(string(data)) == "COMMIT" {
+				fullPath := filepath.Join(PERSISTENT_BACKUP, name)
+				if err := os.RemoveAll(fullPath); err == nil {
+					removed++
+				}
+			}
 			continue
 		}
 
-		statePath := filepath.Join(PERSISTENT_BACKUP, name, ".state")
-		data, err := os.ReadFile(statePath)
-		if err != nil {
-			continue
-		}
-
-		state := strings.TrimSpace(string(data))
-		if state == "COMMIT" {
-			fullPath := filepath.Join(PERSISTENT_BACKUP, name)
-			if err := os.RemoveAll(fullPath); err == nil {
-				removed++
+		if strings.HasPrefix(name, "orphan-txn-") {
+			if fi, err := e.Info(); err == nil {
+				if time.Since(fi.ModTime()) > 24*time.Hour {
+					fullPath := filepath.Join(PERSISTENT_BACKUP, name)
+					if err := os.RemoveAll(fullPath); err == nil {
+						removed++
+					}
+				}
 			}
 		}
 	}
 
 	if removed > 0 {
-		logEvent(fmt.Sprintf("🧹 cleanupOldTransactions: removed %d COMMIT'd txn dir(s)", removed))
+		logEvent(fmt.Sprintf("🧹 cleanupOldTransactions: removed %d stale/orphaned txn dir(s)", removed))
 	}
 }
 
@@ -5065,6 +5102,7 @@ func main() {
 
 	checkPendingNotifications()
 	cleanupOldTransactions()
+	startBackupWorker()
 
 	signal.Ignore(syscall.SIGPIPE)
 
@@ -5189,7 +5227,6 @@ func main() {
 
 	dashboardMux.HandleFunc("/healthz", handleHealthz)
 	dashboardMux.HandleFunc("/readyz", handleReadyz)
-
 	dashboardMux.HandleFunc("/api/runtime_info", handleRuntimeInfo)
 	dashboardMux.HandleFunc("/api/runtime_info/", handleRuntimeInfo)
 	dashboardMux.HandleFunc("/api/download_log", handleDownloadLog)

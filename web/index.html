@@ -867,8 +867,7 @@
     var appInitialized = false, isLoginAttempt = false, sessionExpiredShown = false;
     var runtimeInfoLoaded = false, runtimeInfoData = null, rawJsonVisible = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
-    
-    // Core state for rules management with Atomic UI Lock
+
     var rulesState = { 
         savingAllow: false, 
         savingDeny: false, 
@@ -913,6 +912,11 @@
 
     var currentUpdateState = 'checking';
     var isCheckingUpdates = false;
+
+    // Completion guard prevents double handling from SSE + poller.
+    // It stays true after completion until a new update starts
+    // (executeProfileUpdate or attachToRunningUpdate resets it).
+    var updateCompletionHandled = false;
 
     var $ = function(id) { return document.getElementById(id); };
     function t(k) { return translations[currentLang][k] || k; }
@@ -1149,7 +1153,6 @@
 
         rulesState.isSaving = true;
         
-        // Activate Atomic UI Lock for all inputs
         $('saveAllowBtn').disabled = true;
         $('saveDenyBtn').disabled = true;
         $('cancelAllowBtn').disabled = true;
@@ -1170,7 +1173,6 @@
         xhrPost(url, params, function(err, data) {
             rulesState.isSaving = false;
             
-            // Release Atomic UI Lock
             $('saveAllowBtn').disabled = false;
             $('saveDenyBtn').disabled = false;
             $('cancelAllowBtn').disabled = false;
@@ -1879,6 +1881,7 @@
                 loadLogFiles();
                 refreshCompanionState();
                 setTimeout(function() { checkForUpdates(false); }, 4500);
+                setTimeout(checkServerUpdateState, 1000);
                 verifyFailures = 0;
                 verifyBackoff = 3000;
             } else if (resp.status === 429) {
@@ -1922,6 +1925,8 @@
                 if (statusPollInterval) clearInterval(statusPollInterval);
                 if (statsInterval) clearInterval(statsInterval);
                 if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+                if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
+                if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
                 if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
                 if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
                 location.reload();
@@ -1967,6 +1972,7 @@
                 loadRuntimeInfo();
                 loadLogFiles();
                 appInitialized = true;
+                setTimeout(checkServerUpdateState, 1000);
             }
             refreshCompanionState();
             setTimeout(function() { checkForUpdates(false); }, wasFirstInit ? 4500 : 0);
@@ -2000,6 +2006,7 @@
         if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
         if (sse) { sse.close(); sse = null; }
         if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+        if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
         if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
         if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
@@ -2102,11 +2109,12 @@
                 var progBar = $('progressBar'), progContainer = $('progressContainer');
                 progBar.style.width = Math.min(percent, 100) + '%';
                 $('progressText').textContent = msg || percent + '%';
-                if (percent >= 100) {
+                if (percent >= 100 && !updateCompletionHandled) {
+                    updateCompletionHandled = true;
                     progBar.classList.add('success');
                     showMsg(t('updateStatusDone'), 'success');
                     if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-                    if (window.progressPoller) clearInterval(window.progressPoller);
+                    if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
                     setTimeout(function() {
                         progContainer.style.opacity = '0';
                         setTimeout(function() {
@@ -2115,22 +2123,14 @@
                             progBar.classList.remove('success');
                             progBar.style.width = '0%';
                             $('progressText').textContent = '0%';
-                            isProcessing = false;
-                            $('applyBtn').disabled = false;
-                            $('updateBtnWrapper').style.pointerEvents = 'auto';
-                            $('saveAllowBtn').disabled = false;
-                            $('saveDenyBtn').disabled = false;
-                            $('toggleBtn').disabled = false;
-                            $('restartBtn').disabled = false;
-
+                            finishUpdateUI();
                             currentUpdateState = 'up_to_date';
                             updateSmartUpdateButtonUI();
-
                             loadProfile();
                             refreshAll(true);
                         }, 500);
                     }, 1500);
-                } else if (percent > 0 && percent < 100) {
+                } else if (percent > 0 && percent < 100 && !updateCompletionHandled) {
                     progContainer.style.display = 'block';
                     progContainer.style.opacity = '1';
                     progBar.classList.remove('success');
@@ -2432,6 +2432,153 @@
         });
     }
 
+    function checkServerUpdateState() {
+        if (isProcessing || rulesState.isSaving || !appInitialized) return;
+        xhrGet('/api?action=update_state', function(err, data) {
+            if (err || !data || !data.running) return;
+            attachToRunningUpdate(data.progress || 0, data.message || '');
+        });
+    }
+
+    function attachToRunningUpdate(progress, message) {
+        if (!isProcessing) {
+            isProcessing = true;
+            updateCompletionHandled = false;
+            $('applyBtn').disabled = true;
+            $('updateBtnWrapper').style.pointerEvents = 'none';
+            $('saveAllowBtn').disabled = true;
+            $('saveDenyBtn').disabled = true;
+            $('toggleBtn').disabled = true;
+            $('restartBtn').disabled = true;
+
+            currentUpdateState = 'checking';
+            updateSmartUpdateButtonUI();
+
+            if (safetyTimer) clearTimeout(safetyTimer);
+            safetyTimer = setTimeout(function() {
+                if (isProcessing) {
+                    var pc = $('progressContainer');
+                    if (pc) pc.style.display = 'none';
+                    finishUpdateUI();
+                    if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+                    showMsg(t('safetyTimeout'), 'warning', 5000);
+                }
+                safetyTimer = null;
+            }, 120000);
+        }
+
+        var progContainer = $('progressContainer'), progBar = $('progressBar'), progText = $('progressText');
+        if (progContainer) {
+            progContainer.style.display = 'block';
+            progContainer.style.opacity = '1';
+        }
+        if (progBar) {
+            progBar.classList.remove('success');
+            progBar.style.width = Math.max(5, Math.min(progress || 0, 99)) + '%';
+        }
+        if (progText) {
+            progText.textContent = message || t('progressStart');
+        }
+
+        startProgressMonitor();
+    }
+
+    function startProgressMonitor() {
+        if (window.progressPoller) clearInterval(window.progressPoller);
+
+        window.progressPoller = setInterval(function() {
+            if (!isProcessing) {
+                clearInterval(window.progressPoller);
+                window.progressPoller = null;
+                return;
+            }
+
+            xhrGet('/api?action=update_state', function(err, data) {
+                if (!isProcessing) return;
+                if (err || !data) return;
+
+                var isRunning = data.running === true;
+                var percent = data.progress || 0;
+                var msg = data.message || '';
+
+                if (msg.indexOf('❌') !== -1 || msg.indexOf('corrupt') !== -1 || msg.indexOf('تالف') !== -1) {
+                    if (updateCompletionHandled) return;
+                    updateCompletionHandled = true;
+                    clearInterval(window.progressPoller);
+                    window.progressPoller = null;
+                    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+                    var pc = $('progressContainer');
+                    if (pc) pc.style.display = 'none';
+                    finishUpdateUI();
+                    showMsg(t('corruptFileError'), 'error', 4000);
+                    return;
+                }
+
+                var progContainer = $('progressContainer');
+                var progBar = $('progressBar');
+                var progText = $('progressText');
+
+                if (progContainer) {
+                    progContainer.style.display = 'block';
+                    progContainer.style.opacity = '1';
+                }
+                if (progBar) {
+                    progBar.classList.remove('success');
+                    progBar.style.width = Math.max(5, Math.min(percent, 99)) + '%';
+                }
+                if (progText) {
+                    progText.textContent = msg || (percent + '%');
+                }
+
+                if (!isRunning) {
+                    if (updateCompletionHandled) return;
+                    updateCompletionHandled = true;
+                    clearInterval(window.progressPoller);
+                    window.progressPoller = null;
+                    if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+
+                    if (progBar) {
+                        progBar.style.width = '100%';
+                        progBar.classList.add('success');
+                    }
+                    showMsg(t('updateStatusDone'), 'success');
+
+                    setTimeout(function() {
+                        if (progContainer) {
+                            progContainer.style.opacity = '0';
+                            setTimeout(function() {
+                                if (progContainer) {
+                                    progContainer.style.display = 'none';
+                                    progContainer.style.opacity = '1';
+                                }
+                                if (progBar) {
+                                    progBar.classList.remove('success');
+                                    progBar.style.width = '0%';
+                                }
+                                if (progText) progText.textContent = '0%';
+                                finishUpdateUI();
+                                currentUpdateState = 'up_to_date';
+                                updateSmartUpdateButtonUI();
+                                loadProfile();
+                                refreshAll(true);
+                            }, 500);
+                        }
+                    }, 1500);
+                }
+            });
+        }, 1000);
+    }
+
+    function finishUpdateUI() {
+        isProcessing = false;
+        $('applyBtn').disabled = false;
+        $('updateBtnWrapper').style.pointerEvents = 'auto';
+        $('saveAllowBtn').disabled = false;
+        $('saveDenyBtn').disabled = false;
+        $('toggleBtn').disabled = false;
+        $('restartBtn').disabled = false;
+    }
+
     function applyProfile(forceUpdate) {
         if (isProcessing || rulesState.isSaving) return;
         var select = $('profileSelect'), profile = select.value;
@@ -2447,19 +2594,84 @@
         showConfirmModal(warningPrefix + t('applyConfirm') + '"' + name + '"?', function(confirmed) {
             if (!confirmed) return;
 
-            if (editStates.allow === EditState.EDIT && countChanges('allow') > 0) {
-                saveWithOptimistic('allow');
-            }
-            if (editStates.deny === EditState.EDIT && countChanges('deny') > 0) {
-                saveWithOptimistic('deny');
+            var needsAllowSave = (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0;
+            var needsDenySave = (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0;
+
+            if (!needsAllowSave && !needsDenySave) {
+                executeProfileUpdate(profile);
+                return;
             }
 
-            setTimeout(function() { executeProfileUpdate(profile); }, 600);
+            rulesState.isSaving = true;
+            $('saveAllowBtn').disabled = true;
+            $('saveDenyBtn').disabled = true;
+            $('cancelAllowBtn').disabled = true;
+            $('cancelDenyBtn').disabled = true;
+            $('allowlistInput').disabled = true;
+            $('denylistInput').disabled = true;
+            $('applyBtn').disabled = true;
+            $('updateBtnWrapper').style.pointerEvents = 'none';
+
+            var unlockUI = function() {
+                rulesState.isSaving = false;
+                $('saveAllowBtn').disabled = false;
+                $('saveDenyBtn').disabled = false;
+                $('cancelAllowBtn').disabled = false;
+                $('cancelDenyBtn').disabled = false;
+                $('allowlistInput').disabled = false;
+                $('denylistInput').disabled = false;
+                $('applyBtn').disabled = false;
+                $('updateBtnWrapper').style.pointerEvents = 'auto';
+            };
+
+            var onSaveDone = function(err, data) {
+                unlockUI();
+                if (err || !data || data.status !== 'ok') {
+                    var msg = (err && err.code === 409) ? t('conflictDetected') : t('serverError');
+                    showMsg(msg, 'error', 4000);
+                    if (needsAllowSave) transitionTo('allow', EditState.ROLLBACK);
+                    if (needsDenySave) transitionTo('deny', EditState.ROLLBACK);
+                    return;
+                }
+                if (data.allow_hash) rulesState.serverAllowHash = data.allow_hash;
+                if (data.deny_hash) rulesState.serverDenyHash = data.deny_hash;
+                if (needsAllowSave) {
+                    originalValues.allow = $('allowlistInput').value;
+                    clearDraft('allow');
+                    $('allowDraftBadge').classList.remove('visible');
+                    transitionTo('allow', EditState.VIEW);
+                }
+                if (needsDenySave) {
+                    originalValues.deny = $('denylistInput').value;
+                    clearDraft('deny');
+                    $('denyDraftBadge').classList.remove('visible');
+                    transitionTo('deny', EditState.VIEW);
+                }
+                executeProfileUpdate(profile);
+            };
+
+            if (needsAllowSave && needsDenySave) {
+                xhrPost('/api/save_custom_rules',
+                    'allowlist=' + encodeURIComponent($('allowlistInput').value) +
+                    '&denylist=' + encodeURIComponent($('denylistInput').value),
+                    onSaveDone);
+            } else if (needsAllowSave) {
+                xhrPost('/api/save_allowlist',
+                    'allowlist=' + encodeURIComponent($('allowlistInput').value) +
+                    '&expected_hash=' + rulesState.serverAllowHash,
+                    onSaveDone);
+            } else {
+                xhrPost('/api/save_denylist',
+                    'denylist=' + encodeURIComponent($('denylistInput').value) +
+                    '&expected_hash=' + rulesState.serverDenyHash,
+                    onSaveDone);
+            }
         });
     }
 
     function executeProfileUpdate(profile) {
         isProcessing = true;
+        updateCompletionHandled = false;
         $('applyBtn').disabled = true;
         $('updateBtnWrapper').style.pointerEvents = 'none';
         $('saveAllowBtn').disabled = true;
@@ -2477,89 +2689,32 @@
         if (safetyTimer) clearTimeout(safetyTimer);
         safetyTimer = setTimeout(function() {
             if (isProcessing) {
-                isProcessing = false;
-                $('applyBtn').disabled = false;
-                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                $('saveAllowBtn').disabled = false;
-                $('saveDenyBtn').disabled = false;
-                $('toggleBtn').disabled = false;
-                $('restartBtn').disabled = false;
                 progContainer.style.display = 'none';
-                if (window.progressPoller) clearInterval(window.progressPoller);
+                finishUpdateUI();
+                if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
                 showMsg(t('safetyTimeout'), 'warning', 5000);
             }
             safetyTimer = null;
         }, 120000);
 
-        if (window.progressPoller) clearInterval(window.progressPoller);
-        window.progressPoller = setInterval(function() {
-            if (!isProcessing) { clearInterval(window.progressPoller); return; }
-            xhrGet('/api?action=get_progress', function(err, data) {
-                if (err || !data || !data.progress) return;
-                var parts = data.progress.split('|');
-                var percent = parseInt(parts[0]) || 0;
-                var progressMsg = parts[1] || '';
-                if (progressMsg.indexOf('❌') !== -1 || progressMsg.indexOf('corrupt') !== -1 || progressMsg.indexOf('تالف') !== -1) {
-                    clearInterval(window.progressPoller);
-                    if (safetyTimer) clearTimeout(safetyTimer);
-                    isProcessing = false;
-                    progContainer.style.display = 'none';
-                    $('applyBtn').disabled = false;
-                    $('updateBtnWrapper').style.pointerEvents = 'auto';
-                    $('saveAllowBtn').disabled = false;
-                    $('saveDenyBtn').disabled = false;
-                    $('toggleBtn').disabled = false;
-                    $('restartBtn').disabled = false;
-                    showMsg(t('corruptFileError'), 'error', 4000);
-                    return;
-                }
-                if (percent === 100 || (percent === 0 && progBar.style.width !== '5%')) {
-                    clearInterval(window.progressPoller);
-                    if (safetyTimer) clearTimeout(safetyTimer);
-                    if (isProcessing) {
-                        progBar.style.width = '100%';
-                        progBar.classList.add('success');
-                        showMsg(t('updateStatusDone'), 'success');
-                        setTimeout(function() {
-                            progContainer.style.opacity = '0';
-                            setTimeout(function() {
-                                progContainer.style.display = 'none';
-                                progContainer.style.opacity = '1';
-                                progBar.classList.remove('success');
-                                progBar.style.width = '0%';
-                                isProcessing = false;
-                                $('applyBtn').disabled = false;
-                                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                                $('saveAllowBtn').disabled = false;
-                                $('saveDenyBtn').disabled = false;
-                                $('toggleBtn').disabled = false;
-                                $('restartBtn').disabled = false;
+        startProgressMonitor();
 
-                                currentUpdateState = 'up_to_date';
-                                updateSmartUpdateButtonUI();
-
-                                loadProfile();
-                                refreshAll(true);
-                            }, 500);
-                        }, 1500);
-                    }
-                }
-            });
-        }, 1000);
-
-        xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err) {
+        xhrPost('/api/update_profile', 'profile=' + encodeURIComponent(profile), function(err, data) {
             if (err) {
                 if (safetyTimer) clearTimeout(safetyTimer);
-                if (window.progressPoller) clearInterval(window.progressPoller);
-                isProcessing = false;
-                $('applyBtn').disabled = false;
-                $('updateBtnWrapper').style.pointerEvents = 'auto';
-                $('saveAllowBtn').disabled = false;
-                $('saveDenyBtn').disabled = false;
-                $('toggleBtn').disabled = false;
-                $('restartBtn').disabled = false;
+                if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
                 progContainer.style.display = 'none';
+                finishUpdateUI();
                 showMsg(t('serverError'), 'error', 4000);
+                return;
+            }
+            if (data && data.status === 'already_running') {
+                if (progBar) {
+                    progBar.style.width = Math.max(5, Math.min(data.progress || 0, 99)) + '%';
+                }
+                if ($('progressText')) {
+                    $('progressText').textContent = data.text || t('progressStart');
+                }
             }
         });
     }
@@ -2681,6 +2836,13 @@
         if (statsInterval) clearInterval(statsInterval);
         statsInterval = setInterval(fetchStatsAndResources, 30000);
         fetchStatsAndResources();
+
+        if (window.updateStatePoller) clearInterval(window.updateStatePoller);
+        window.updateStatePoller = setInterval(function() {
+            if (appInitialized && !isProcessing && !rulesState.isSaving) {
+                checkServerUpdateState();
+            }
+        }, 10000);
     }
 
     window.addEventListener('beforeunload', function(e) {
@@ -2695,6 +2857,7 @@
         if (safetyTimer) clearTimeout(safetyTimer);
         if (window.sseHeartbeat) clearInterval(window.sseHeartbeat);
         if (window.progressPoller) clearInterval(window.progressPoller);
+        if (window.updateStatePoller) clearInterval(window.updateStatePoller);
         if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
         if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
@@ -3055,6 +3218,7 @@
             if (document.visibilityState === 'visible') {
                 if (appInitialized && !isProcessing && !isCheckingUpdates && !rulesState.isSaving) {
                     checkForUpdates(false);
+                    checkServerUpdateState();
                 }
                 startUpdatePolling();
             } else {
