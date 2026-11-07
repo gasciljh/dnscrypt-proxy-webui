@@ -114,13 +114,16 @@
         #updateBtnWrapper:active { transform: scale(0.98); }
 
         .btn-edit { background:linear-gradient(135deg,#8957e5,#6e40c9); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; }
-        .btn-edit:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(137,87,229,0.4); }
+        .btn-edit:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 20px rgba(137,87,229,0.4); }
+        .btn-edit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         .btn-cancel-edit { background:rgba(139,148,158,0.15); border:1px solid rgba(139,148,158,0.3); color:var(--text-muted); padding:10px 16px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer; width:100%; margin-top:6px; font-family:inherit; transition:0.2s; display:none; }
-        .btn-cancel-edit:hover { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
+        .btn-cancel-edit:hover:not(:disabled) { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
+        .btn-cancel-edit:disabled { opacity: 0.5; cursor: not-allowed; }
         .rule-box textarea.editing { border-color:var(--warning) !important; background:rgba(210,153,34,0.05) !important; box-shadow:0 0 10px rgba(210,153,34,0.15); }
         .rule-box textarea.rollback { border-color:var(--danger) !important; background:rgba(248,81,73,0.05) !important; }
         .rule-box textarea:read-only { cursor:pointer; opacity:0.85; }
         .rule-box textarea:read-only:hover { border-color:rgba(88,166,255,0.3); }
+        .rule-box textarea:disabled { opacity: 0.5; cursor: not-allowed; }
         .edit-badge { display:none; background:rgba(210,153,34,0.15); color:var(--warning); font-size:10px; padding:2px 10px; border-radius:10px; border:1px solid rgba(210,153,34,0.3); margin-right:8px; animation:pulse-edit 1.5s ease-in-out infinite; }
         .edit-badge.visible { display:inline-block; }
         @keyframes pulse-edit { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
@@ -639,9 +642,8 @@
             editAllowText: '✏️ Edit Allowlist', editDenyText: '✏️ Edit Denylist',
             cancelEdit: '✕ Cancel Edit', editBadge: '🔓 Edit Mode', draftBadge: '💾 Draft',
             noAllowChanges: '⚠️ No changes in allowlist', noDenyChanges: '⚠️ No changes in denylist',
-            allowSavedMsg: '✅ Allowlist saved', denySavedMsg: '✅ Denylist saved',
-            allowSaveFailed: '❌ Allowlist save failed, rolled back',
-            denySaveFailed: '❌ Denylist save failed, rolled back',
+            allowSavedMsg: '✅ Rules saved successfully', denySavedMsg: '✅ Rules saved successfully',
+            allowSaveFailed: '❌ Save failed, rolled back', denySaveFailed: '❌ Save failed, rolled back',
             cancelConfirm: '⚠️ You have unsaved changes. Discard them?',
             unsavedWarning: '⚠️ You have unsaved changes in the rules!',
             draftRestored: '💾 Draft restored',
@@ -652,7 +654,7 @@
             statsRunningBefore: '(service',
             statsRunningAfter: 'running)',
             statsPausedBefore: '(paused',
-            statsPausedAfter: '\u2014 service stopped)',
+            statsPausedAfter: '— service stopped)',
             toggleOn: '▶️ Start Service', toggleOff: '⏹️ Stop Service',
             toggleSuccess: '✅ Status changed', toggleError: '❌ Failed to change status',
             restartBtn: '🔄 Restart', restartSuccess: '✅ Service restarted', restartError: '❌ Failed to restart',
@@ -755,9 +757,8 @@
             editAllowText: '✏️ تعديل القائمة البيضاء', editDenyText: '✏️ تعديل القائمة السوداء',
             cancelEdit: '✕ إلغاء التعديل', editBadge: '🔓 وضع التعديل', draftBadge: '💾 مسودة',
             noAllowChanges: '⚠️ لا توجد تغييرات في القائمة البيضاء', noDenyChanges: '⚠️ لا توجد تغييرات في القائمة السوداء',
-            allowSavedMsg: '✅ تم حفظ القائمة البيضاء', denySavedMsg: '✅ تم حفظ القائمة السوداء',
-            allowSaveFailed: '❌ فشل حفظ القائمة البيضاء، تم التراجع',
-            denySaveFailed: '❌ فشل حفظ القائمة السوداء، تم التراجع',
+            allowSavedMsg: '✅ تم حفظ القواعد بنجاح', denySavedMsg: '✅ تم حفظ القواعد بنجاح',
+            allowSaveFailed: '❌ فشل الحفظ، تم التراجع', denySaveFailed: '❌ فشل الحفظ، تم التراجع',
             cancelConfirm: '⚠️ لديك تعديلات غير محفوظة. هل تريد تجاهلها؟',
             unsavedWarning: '⚠️ لديك تعديلات غير محفوظة في القوائم!',
             draftRestored: '💾 تم استرجاع المسودة المحفوظة',
@@ -866,7 +867,15 @@
     var appInitialized = false, isLoginAttempt = false, sessionExpiredShown = false;
     var runtimeInfoLoaded = false, runtimeInfoData = null, rawJsonVisible = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
-    var rulesState = { savingAllow: false, savingDeny: false, serverAllowHash: '', serverDenyHash: '' };
+    
+    // Core state for rules management with Atomic UI Lock
+    var rulesState = { 
+        savingAllow: false, 
+        savingDeny: false, 
+        serverAllowHash: '', 
+        serverDenyHash: '',
+        isSaving: false 
+    };
 
     var currentStatus = '';
 
@@ -1061,6 +1070,7 @@
     }
 
     function handleEditBtnClick(listType) {
+        if (rulesState.isSaving) return;
         if (editStates[listType] === EditState.VIEW) {
             enterEditMode(listType);
         } else if (editStates[listType] === EditState.EDIT || editStates[listType] === EditState.ROLLBACK) {
@@ -1101,6 +1111,7 @@
     }
 
     function cancelEdit(listType) {
+        if (rulesState.isSaving) return;
         var changes = countChanges(listType);
         if (changes > 0) {
             showConfirmModal(t('cancelConfirm'), function(confirmed) {
@@ -1126,53 +1137,85 @@
         el.className = 'rule-status' + (type ? ' ' + type : '');
     }
 
-    function saveWithOptimistic(listType) {
-        var ta = listType === 'allow' ? $('allowlistInput') : $('denylistInput');
-        var statusId = listType === 'allow' ? 'allowStatus' : 'denyStatus';
-        var content = ta.value;
-        var hash = listType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
-        var savingFlag = listType === 'allow' ? 'savingAllow' : 'savingDeny';
-        var originalValue = originalValues[listType];
+    function saveWithOptimistic(targetListType) {
+        if (rulesState.isSaving) return;
 
-        if (countChanges(listType) === 0) {
-            showMsg(listType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+        var targetHasChanges = countChanges(targetListType) > 0;
+        
+        if (!targetHasChanges) {
+            showMsg(targetListType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
             return;
         }
 
-        rulesState[savingFlag] = true;
-        transitionTo(listType, EditState.VIEW);
-        setRuleStatus(statusId, '⏳ ' + (currentLang === 'ar' ? 'جاري الحفظ...' : 'Saving...'), 'pending');
+        rulesState.isSaving = true;
+        
+        // Activate Atomic UI Lock for all inputs
+        $('saveAllowBtn').disabled = true;
+        $('saveDenyBtn').disabled = true;
+        $('cancelAllowBtn').disabled = true;
+        $('cancelDenyBtn').disabled = true;
+        $('allowlistInput').disabled = true;
+        $('denylistInput').disabled = true;
 
-        var url = listType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
-        var params = (listType === 'allow' ? 'allowlist=' : 'denylist=') +
+        var content = targetListType === 'allow' ? $('allowlistInput').value : $('denylistInput').value;
+        var hash = targetListType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+        
+        var url = targetListType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
+        var params = (targetListType === 'allow' ? 'allowlist=' : 'denylist=') +
                      encodeURIComponent(content) +
                      '&expected_hash=' + hash;
+                     
+        setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus', '⏳ Saving...', 'pending');
 
         xhrPost(url, params, function(err, data) {
-            rulesState[savingFlag] = false;
+            rulesState.isSaving = false;
+            
+            // Release Atomic UI Lock
+            $('saveAllowBtn').disabled = false;
+            $('saveDenyBtn').disabled = false;
+            $('cancelAllowBtn').disabled = false;
+            $('cancelDenyBtn').disabled = false;
+            $('allowlistInput').disabled = false;
+            $('denylistInput').disabled = false;
 
             if (err || !data || data.status !== 'ok') {
-                ta.value = originalValue;
-                transitionTo(listType, EditState.ROLLBACK);
-                setRuleStatus(statusId, listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
-                showMsg(listType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error', 4000);
-                saveDraft(listType, content);
+                if (err && err.code === 409) {
+                    showMsg(t('conflictDetected'), 'warning', 4000);
+                    loadCustomRules(); 
+                } else {
+                    showMsg(t('serverError'), 'error', 4000);
+                }
+                
+                transitionTo(targetListType, EditState.ROLLBACK);
+                setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus', 
+                              targetListType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
                 return;
             }
 
-            var newHash = data.hash || '';
-            if (listType === 'allow') {
-                rulesState.serverAllowHash = newHash;
+            if (data.allow_hash) rulesState.serverAllowHash = data.allow_hash;
+            if (data.deny_hash) rulesState.serverDenyHash = data.deny_hash;
+
+            if (targetListType === 'allow') {
+                originalValues.allow = content;
+                clearDraft('allow');
+                $('allowDraftBadge').classList.remove('visible');
+                transitionTo('allow', EditState.VIEW);
+                setRuleStatus('allowStatus', t('allowSavedMsg'), 'saved');
             } else {
-                rulesState.serverDenyHash = newHash;
+                originalValues.deny = content;
+                clearDraft('deny');
+                $('denyDraftBadge').classList.remove('visible');
+                transitionTo('deny', EditState.VIEW);
+                setRuleStatus('denyStatus', t('denySavedMsg'), 'saved');
             }
-            clearDraft(listType);
-            originalValues[listType] = content;
-            var badge = $(listType === 'allow' ? 'allowDraftBadge' : 'denyDraftBadge');
-            if (badge) badge.classList.remove('visible');
-            setRuleStatus(statusId, listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'saved');
-            showMsg(listType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
-            setTimeout(function() { setRuleStatus(statusId, '', ''); }, 3000);
+
+            showMsg(targetListType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
+            
+            setTimeout(function() { 
+                setRuleStatus('allowStatus', '', ''); 
+                setRuleStatus('denyStatus', '', ''); 
+            }, 3000);
+            
             setTimeout(loadProfile, 500);
         });
     }
@@ -1185,6 +1228,7 @@
     document.addEventListener('keydown', function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
+            if (rulesState.isSaving) return;
             if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
                 saveWithOptimistic('allow');
             } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
@@ -1192,6 +1236,7 @@
             }
         }
         if (e.key === 'Escape') {
+            if (rulesState.isSaving) return;
             if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
                 cancelEdit('allow');
             } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
@@ -1768,6 +1813,7 @@
     }
 
     function toggleLanguage() {
+        if (rulesState.isSaving) return;
         currentLang = currentLang === 'ar' ? 'en' : 'ar';
         try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
         document.documentElement.lang = currentLang;
@@ -2012,8 +2058,6 @@
                 } else if (xhr.status === 409) {
                     var e409 = new Error('HTTP 409'); e409.code = 409;
                     cb(e409, null);
-                    showMsg(t('conflictDetected'), 'warning', 3000);
-                    loadCustomRules();
                 } else if (xhr.status === 413) {
                     var e413 = new Error('HTTP 413'); e413.code = 413;
                     cb(e413, null);
@@ -2183,7 +2227,7 @@
     }
 
     function handleToggle() {
-        if (isProcessing || isToggling) return;
+        if (isProcessing || isToggling || rulesState.isSaving) return;
         isToggling = true;
         var btn = $('toggleBtn');
         btn.disabled = true;
@@ -2201,7 +2245,7 @@
     }
 
     function handleRestart() {
-        if (isProcessing || isToggling) return;
+        if (isProcessing || isToggling || rulesState.isSaving) return;
         showConfirmModal(t('restartConfirm'), function(confirmed) {
             if (!confirmed) return;
             isToggling = true;
@@ -2222,7 +2266,7 @@
     }
 
     function forceRefresh() {
-        if (isProcessing) return;
+        if (isProcessing || rulesState.isSaving) return;
         showMsg(t('forceRefreshStart'), 'info', 1500);
         try {
             if ('caches' in window) caches.keys().then(function(names) {
@@ -2235,7 +2279,7 @@
     }
 
     function refreshAll(isSilent) {
-        if (isProcessing) return;
+        if (isProcessing || rulesState.isSaving) return;
         var startTime = Date.now();
         if (!isSilent) showMsg(t('syncStart'), 'info');
         var completed = 0, total = 4;
@@ -2278,7 +2322,7 @@
         }
     }
     function loadProfile(callback) {
-        if (isProcessing) { if (callback) callback(); return; }
+        if (isProcessing || rulesState.isSaving) { if (callback) callback(); return; }
         xhrGet('/api?action=get_profile', function(err, data) {
             if (err || !data.key) { if (callback) callback(); return; }
             renderProfileData(data);
@@ -2350,7 +2394,7 @@
     }
 
     function checkForUpdates(isManual) {
-        if (currentProfileIsEmpty) {
+        if (currentProfileIsEmpty || rulesState.isSaving) {
             var wrapper = $('updateBtnWrapper');
             if (wrapper) wrapper.style.display = 'none';
             return;
@@ -2389,7 +2433,7 @@
     }
 
     function applyProfile(forceUpdate) {
-        if (isProcessing) return;
+        if (isProcessing || rulesState.isSaving) return;
         var select = $('profileSelect'), profile = select.value;
 
         if (!forceUpdate && profile === currentProfileKey && !currentProfileIsEmpty) {
@@ -2521,7 +2565,7 @@
     }
 
     function showLogs() {
-        if (isProcessing) return;
+        if (isProcessing || rulesState.isSaving) return;
         var modal = $('logModal'), content = $('logContent');
         modal.style.display = 'flex';
         content.textContent = t('loadingLogs');
@@ -2535,7 +2579,7 @@
     }
     function closeLogs() { $('logModal').style.display = 'none'; }
     function clearLogs() {
-        if (isProcessing) return;
+        if (isProcessing || rulesState.isSaving) return;
         showConfirmModal(t('clearLogsConfirm'), function(confirmed) {
             if (!confirmed) return;
             xhrPost('/api/clear_logs', '', function(err, data) {
@@ -2717,7 +2761,7 @@
     function handleCompanionInstall() {
         var btn = $('pwaInstallBtn');
         if (!btn || btn.dataset.mode === 'none') return;
-        if (btn.disabled || companionInstallInFlight) return;
+        if (btn.disabled || companionInstallInFlight || rulesState.isSaving) return;
         companionInstallInFlight = true;
         btn.disabled = true;
         xhrGet('/api?action=install_token', function(err, data) {
@@ -2873,7 +2917,7 @@
         var updateWrapper = $('updateBtnWrapper');
         if (updateWrapper) {
             updateWrapper.addEventListener('click', function(e) {
-                if (isProcessing || isCheckingUpdates) return;
+                if (isProcessing || isCheckingUpdates || rulesState.isSaving) return;
 
                 if (currentUpdateState === 'up_to_date') {
                     showMsg(t('updateNotNeededMsg'), 'info', 3000);
@@ -2886,7 +2930,7 @@
         }
 
         $('profileSelect').addEventListener('change', function() {
-            if (isProcessing || isCheckingUpdates) return;
+            if (isProcessing || isCheckingUpdates || rulesState.isSaving) return;
             var selectedProfile = this.value;
             var wrapper = $('updateBtnWrapper');
 
@@ -2911,9 +2955,11 @@
         $('denylistInput').addEventListener('input', function() { updateChangeCounter('deny'); });
 
         $('allowlistInput').addEventListener('click', function() {
+            if (rulesState.isSaving) return;
             if (editStates.allow === EditState.VIEW) enterEditMode('allow');
         });
         $('denylistInput').addEventListener('click', function() {
+            if (rulesState.isSaving) return;
             if (editStates.deny === EditState.VIEW) enterEditMode('deny');
         });
 
@@ -2999,7 +3045,7 @@
         function startUpdatePolling() {
             if (updateCheckTimer) clearInterval(updateCheckTimer);
             updateCheckTimer = setInterval(function() {
-                if (appInitialized && !isProcessing && !isCheckingUpdates) {
+                if (appInitialized && !isProcessing && !isCheckingUpdates && !rulesState.isSaving) {
                     checkForUpdates(false);
                 }
             }, 30 * 60 * 1000);
@@ -3007,7 +3053,7 @@
 
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible') {
-                if (appInitialized && !isProcessing && !isCheckingUpdates) {
+                if (appInitialized && !isProcessing && !isCheckingUpdates && !rulesState.isSaving) {
                     checkForUpdates(false);
                 }
                 startUpdatePolling();
