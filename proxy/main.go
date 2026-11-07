@@ -5,8 +5,6 @@
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
-// HTTP backend for the DNSCrypt Smart Filter module.
-// ============================================================
 
 package main
 
@@ -565,11 +563,19 @@ var (
 )
 
 // [8c] Smart Update state
+//
+// PREMIUM: cachedUpdateStatus tracks when we last got a real answer
+// (LastSuccessAt) and whether this entry is a stale fallback
+// (IsStale). This enables stale-while-revalidate: on network failure
+// we return the last good answer instead of scaring the user with
+// "unknown".
 type cachedUpdateStatus struct {
-	Status    string
-	LocalVer  string
-	RemoteVer string
-	Timestamp time.Time
+	Status        string
+	LocalVer      string
+	RemoteVer     string
+	Timestamp     time.Time
+	LastSuccessAt time.Time
+	IsStale       bool
 }
 
 var (
@@ -2123,7 +2129,7 @@ func ensureExecutable(path string) bool {
 	return true
 }
 
-// [20] Service lifecycle helpers — idempotent primitives
+// [20] Service lifecycle helpers
 func getServiceLockPath() string {
 	return filepath.Join(getActiveRunDir(), ".service.start.lock")
 }
@@ -2188,7 +2194,6 @@ func waitForPortFree(port int, timeout time.Duration) bool {
 	return false
 }
 
-// [20a] Service lifecycle — idempotent
 func startService() {
 	defer func() { recover() }()
 	logEvent("▶️ Starting service...")
@@ -3001,11 +3006,7 @@ func buildProfileResponse() map[string]interface{} {
 	}
 }
 
-// [28] Update profile — premium (defensive + server-authoritative)
-//
-// updateProfileBody runs on its own goroutine, protected by the
-// caller which atomically sets isUpdating = true before launching.
-// All resources are released via defer to prevent stale locks on panic.
+// [28] Update profile
 func updateProfileBody(key string) {
 	defer func() {
 		updatingMu.Lock()
@@ -3016,7 +3017,6 @@ func updateProfileBody(key string) {
 	defer func() {
 		if r := recover(); r != nil {
 			logWithLevel("error", fmt.Sprintf("PANIC in updateProfileBody: %v", r))
-			// Best-effort progress reset so clients don't get stuck on 5%
 			writeProgress(0, "❌ Internal error")
 		}
 	}()
@@ -3083,8 +3083,6 @@ func updateProfileBody(key string) {
 	writeProgress(90, "Applying custom rules...")
 	time.Sleep(500 * time.Millisecond)
 
-	// [PREMIUM] All service operations wrapped in applyUpdatePhase,
-	// which uses defer to guarantee mutex release on panic.
 	if err := applyUpdatePhase(key); err != nil {
 		writeProgress(0, "❌ "+err.Error())
 		return
@@ -3110,9 +3108,6 @@ func updateProfileBody(key string) {
 	debug.FreeOSMemory()
 }
 
-// applyUpdatePhase performs the locked service-application phase with
-// defensive defer-based mutex release. Any panic inside is caught by
-// the caller's recover, and the mutex is guaranteed to be released.
 func applyUpdatePhase(key string) error {
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
@@ -4040,7 +4035,6 @@ func (h *apiHandler) dispatchPost(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// PREMIUM: atomic reservation, returns "already_running" for concurrent requests
 func (h *apiHandler) postUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if !requireFormContentType(w, r) {
 		return
@@ -4089,7 +4083,6 @@ func (h *apiHandler) postUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// PREMIUM: Server-authoritative update state
 func (h *apiHandler) getUpdateStateAction(r *http.Request) map[string]interface{} {
 	updatingMu.Lock()
 	running := isUpdating
@@ -4489,16 +4482,16 @@ func (h *apiHandler) getInstallTokenAction(r *http.Request) map[string]interface
 	}
 }
 
-// [32b] Smart Update check logic
-func extractVersion(text string) string {
-	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(line, "# Version:") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "# Version:"))
-		}
-	}
-	return ""
-}
-
+// [32b] Smart Update check logic — PREMIUM
+//
+// Two-stage strategy:
+//   1. Fast-cache path: return the cached entry if fresh enough.
+//      Stale entries have TTL=60s so retries are quick. The cached
+//      last_success is only returned if it is non-zero (avoids the
+//      spurious "0001-01-01T00:00:00Z" for first failures).
+//   2. Network path: fetch upstream. On success, cache as fresh.
+//      On failure, return the last known-good answer marked stale.
+//      If we never had a good answer, return "unknown" cached for 60s.
 func checkUpdateStatus(profileKey string) map[string]interface{} {
 	updatingMu.Lock()
 	if isUpdating {
@@ -4508,12 +4501,25 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	updatingMu.Unlock()
 
 	updateCheckMu.Lock()
-	if cached, ok := updateCheckCache[profileKey]; ok && time.Since(cached.Timestamp) < 5*time.Minute {
-		updateCheckMu.Unlock()
-		return map[string]interface{}{
-			"status":         cached.Status,
-			"local_version":  cached.LocalVer,
-			"remote_version": cached.RemoteVer,
+	if cached, ok := updateCheckCache[profileKey]; ok {
+		ttl := 5 * time.Minute
+		if cached.IsStale {
+			ttl = 60 * time.Second
+		}
+		if time.Since(cached.Timestamp) < ttl {
+			result := map[string]interface{}{
+				"status":         cached.Status,
+				"local_version":  cached.LocalVer,
+				"remote_version": cached.RemoteVer,
+			}
+			if cached.IsStale {
+				result["stale"] = true
+				if !cached.LastSuccessAt.IsZero() {
+					result["last_success"] = cached.LastSuccessAt.Format(time.RFC3339)
+				}
+			}
+			updateCheckMu.Unlock()
+			return result
 		}
 	}
 	updateCheckMu.Unlock()
@@ -4539,6 +4545,36 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	remoteVer := fetchRemoteVersion(profile.URL)
 
 	if remoteVer == "" {
+		updateCheckMu.Lock()
+		if cached, ok := updateCheckCache[profileKey]; ok && !cached.LastSuccessAt.IsZero() {
+			updateCheckCache[profileKey] = cachedUpdateStatus{
+				Status:        cached.Status,
+				LocalVer:      cached.LocalVer,
+				RemoteVer:     cached.RemoteVer,
+				Timestamp:     time.Now(),
+				LastSuccessAt: cached.LastSuccessAt,
+				IsStale:       true,
+			}
+			updateCheckMu.Unlock()
+			return map[string]interface{}{
+				"status":         cached.Status,
+				"local_version":  cached.LocalVer,
+				"remote_version": cached.RemoteVer,
+				"stale":          true,
+				"last_success":   cached.LastSuccessAt.Format(time.RFC3339),
+			}
+		}
+		updateCheckMu.Unlock()
+
+		updateCheckMu.Lock()
+		updateCheckCache[profileKey] = cachedUpdateStatus{
+			Status:    "unknown",
+			LocalVer:  localVer,
+			Timestamp: time.Now(),
+			IsStale:   true,
+		}
+		updateCheckMu.Unlock()
+
 		return map[string]interface{}{
 			"status": "unknown",
 			"reason": "remote_version_unavailable",
@@ -4550,12 +4586,15 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 		status = "available"
 	}
 
+	now := time.Now()
 	updateCheckMu.Lock()
 	updateCheckCache[profileKey] = cachedUpdateStatus{
-		Status:    status,
-		LocalVer:  localVer,
-		RemoteVer: remoteVer,
-		Timestamp: time.Now(),
+		Status:        status,
+		LocalVer:      localVer,
+		RemoteVer:     remoteVer,
+		Timestamp:     now,
+		LastSuccessAt: now,
+		IsStale:       false,
 	}
 	updateCheckMu.Unlock()
 
@@ -4566,41 +4605,45 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 }
 
+// fetchRemoteVersion — PREMIUM
+//
+// 3 attempts with exponential backoff (1s, 2s). Each attempt has an
+// 8-second budget. Worst case ~27s, but typical success on first try.
+// This is critical because blocklist downloads elsewhere may saturate
+// the network, causing transient DNS/HTTPS failures.
 func fetchRemoteVersion(url string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	client := getDownloadClient()
 
-	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
-	req.Header.Set("Range", "bytes=0-4096")
-	req.Header.Set("User-Agent", USER_AGENT)
+	for attempt := 0; attempt < 3; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 
-	resp, err := client.Do(req)
-	if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent) {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		resp.Body.Close()
-		v := extractVersion(string(body))
-		if v != "" {
-			return v
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			cancel()
+			continue
 		}
-	} else if resp != nil {
-		resp.Body.Close()
-	}
+		req.Header.Set("Range", "bytes=0-4096")
+		req.Header.Set("User-Agent", USER_AGENT)
+		req.Header.Set("Cache-Control", "no-cache")
 
-	req, _ = http.NewRequestWithContext(ctx, "GET", url, nil)
-	req.Header.Set("User-Agent", USER_AGENT)
-
-	resp, err = client.Do(req)
-	if err == nil && resp.StatusCode == http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		resp.Body.Close()
-		v := extractVersion(string(body))
-		if v != "" {
-			return v
+		resp, err := client.Do(req)
+		if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent) {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			resp.Body.Close()
+			cancel()
+			if v := extractVersion(string(body)); v != "" {
+				return v
+			}
+		} else if resp != nil {
+			resp.Body.Close()
+			cancel()
+		} else {
+			cancel()
 		}
-	} else if resp != nil {
-		resp.Body.Close()
+
+		if attempt < 2 {
+			time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
+		}
 	}
 
 	return ""
@@ -4730,18 +4773,18 @@ func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType strin
 		path        string
 		contentType string
 	}{
-		"/sw.js":                       {SW_FILE, "application/javascript; charset=utf-8"},
-		"/manifest.json":               {MANIFEST_FILE, "application/json; charset=utf-8"},
-		"/icon-192.svg":                {ICON_192_SVG_FILE, "image/svg+xml"},
-		"/icon-512.svg":                {ICON_512_SVG_FILE, "image/svg+xml"},
-		"/icon-192.png":                {ICON_192_PNG_FILE, "image/png"},
-		"/icon-512.png":                {ICON_512_PNG_FILE, "image/png"},
-		"/apple-touch-icon.png":        {APPLE_TOUCH_FILE, "image/png"},
-		"/favicon-32x32.png":           {FAVICON_32_FILE, "image/png"},
-		"/favicon-16x16.png":           {FAVICON_16_FILE, "image/png"},
-		"/favicon.ico":                 {FAVICON_ICO_FILE, "image/x-icon"},
-		"/offline.html":                {OFFLINE_FILE, "text/html; charset=utf-8"},
-		"/app-debug.apk":               {APK_FILE, "application/vnd.android.package-archive"},
+		"/sw.js":                {SW_FILE, "application/javascript; charset=utf-8"},
+		"/manifest.json":        {MANIFEST_FILE, "application/json; charset=utf-8"},
+		"/icon-192.svg":         {ICON_192_SVG_FILE, "image/svg+xml"},
+		"/icon-512.svg":         {ICON_512_SVG_FILE, "image/svg+xml"},
+		"/icon-192.png":         {ICON_192_PNG_FILE, "image/png"},
+		"/icon-512.png":         {ICON_512_PNG_FILE, "image/png"},
+		"/apple-touch-icon.png": {APPLE_TOUCH_FILE, "image/png"},
+		"/favicon-32x32.png":    {FAVICON_32_FILE, "image/png"},
+		"/favicon-16x16.png":    {FAVICON_16_FILE, "image/png"},
+		"/favicon.ico":          {FAVICON_ICO_FILE, "image/x-icon"},
+		"/offline.html":         {OFFLINE_FILE, "text/html; charset=utf-8"},
+		"/app-debug.apk":        {APK_FILE, "application/vnd.android.package-archive"},
 	}
 
 	for urlPath, asset := range staticAssets {

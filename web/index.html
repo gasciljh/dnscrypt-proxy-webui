@@ -666,6 +666,7 @@
             updateAvailableMsg: '🔄 Blocklist Update Available Now',
             updateUpToDate: '✅ List is Up-to-Date',
             updateUnknown: '⚠️ Check Failed - Tap to Retry',
+            networkUnstable: '📡 Network unstable, retrying...',
             updateNotNeededMsg: '✅ You are already using the latest version.',
             updateCurrentListText: '🔄 Update Current Lists',
             serverError: '❌ Connection failed.',
@@ -781,6 +782,7 @@
             updateAvailableMsg: '🔄 تحديث قوائم الحجب متاح الآن',
             updateUpToDate: '✅ القائمة محدثة',
             updateUnknown: '⚠️ تعذر الفحص - إعادة المحاولة',
+            networkUnstable: '📡 الشبكة غير مستقرة، جاري إعادة المحاولة...',
             updateNotNeededMsg: '✅ أنت تستخدم أحدث إصدار بالفعل.',
             updateCurrentListText: '🔄 تحديث القوائم الحالية',
             serverError: '❌ فشل الاتصال.',
@@ -913,10 +915,22 @@
     var currentUpdateState = 'checking';
     var isCheckingUpdates = false;
 
-    // Completion guard prevents double handling from SSE + poller.
-    // It stays true after completion until a new update starts
-    // (executeProfileUpdate or attachToRunningUpdate resets it).
+    // PREMIUM: completion guard prevents double handling from SSE + poller.
+    // Stays true after completion until a new update starts.
     var updateCompletionHandled = false;
+
+    // PREMIUM: last known good update state (survives transient
+    // network failures, so the UI doesn't flip to "Check Failed" on
+    // every hiccup while another app is downloading).
+    var lastKnownUpdateState = null;
+
+    // PREMIUM: silent retry with exponential backoff
+    var updateCheckRetryTimer = null;
+    var updateCheckRetryDelay = 5000;
+    var UPDATE_CHECK_MAX_RETRY = 30000;
+
+    // PREMIUM: track consecutive failures (informational)
+    var updateCheckFailures = 0;
 
     var $ = function(id) { return document.getElementById(id); };
     function t(k) { return translations[currentLang][k] || k; }
@@ -1927,6 +1941,7 @@
                 if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
                 if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
                 if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+                if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
                 if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
                 if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
                 location.reload();
@@ -2002,6 +2017,23 @@
         verifyFailures = 0;
         verifyBackoff = 3000;
         sseBackoff = 5000;
+
+        // PREMIUM FIX: release any in-progress UI state that was
+        // orphaned by the session loss. Without this, a session
+        // expiring mid-update leaves isProcessing=true and every
+        // button disabled forever, because checkServerUpdateState
+        // skips when isProcessing is true.
+        isProcessing = false;
+        updateCompletionHandled = false;
+        isCheckingUpdates = false;
+        rulesState.isSaving = false;
+        var pc = $('progressContainer');
+        if (pc) { pc.style.display = 'none'; pc.style.opacity = '1'; }
+        var pb = $('progressBar');
+        if (pb) { pb.style.width = '0%'; pb.classList.remove('success'); }
+        var pt = $('progressText');
+        if (pt) pt.textContent = '0%';
+
         if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
         if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
         if (sse) { sse.close(); sse = null; }
@@ -2010,6 +2042,7 @@
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
         if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
         if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+        if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
         showLoginScreen();
         if (!wasInitialized) return;
         showConfirmModal(t('sessionExpiredMsg'), function(ok) {
@@ -2029,6 +2062,10 @@
         if (method === 'POST' && url.indexOf('update_profile') !== -1) return 310000;
         if (url.indexOf('install_companion_app') !== -1) return 120000;
         if (url.indexOf('toggle_service') !== -1 || url.indexOf('restart_service') !== -1) return 60000;
+        // PREMIUM: server-side check_update can take up to ~27s in
+        // worst-case network (3 attempts × 8s + backoff). Give the
+        // client 30s to avoid premature timeout / duplicate retries.
+        if (url.indexOf('check_update') !== -1) return 30000;
         return 15000;
     }
 
@@ -2125,6 +2162,7 @@
                             $('progressText').textContent = '0%';
                             finishUpdateUI();
                             currentUpdateState = 'up_to_date';
+                            lastKnownUpdateState = 'up_to_date';
                             updateSmartUpdateButtonUI();
                             loadProfile();
                             refreshAll(true);
@@ -2158,6 +2196,7 @@
                     var data = JSON.parse(e.data);
                     if (data.status === 'up_to_date') {
                         currentUpdateState = 'up_to_date';
+                        lastKnownUpdateState = 'up_to_date';
                         updateSmartUpdateButtonUI();
                     }
                 } catch(ex) {}
@@ -2393,6 +2432,10 @@
         }
     }
 
+    // PREMIUM: resilient update check with stale-while-revalidate and
+    // silent retry with exponential backoff. The UI never flips to a
+    // scary "Check Failed" state on a transient network hiccup — it
+    // keeps the last known good state and retries in the background.
     function checkForUpdates(isManual) {
         if (currentProfileIsEmpty || rulesState.isSaving) {
             var wrapper = $('updateBtnWrapper');
@@ -2404,32 +2447,91 @@
         isCheckingUpdates = true;
 
         var wrapper = $('updateBtnWrapper');
-
         if (wrapper) wrapper.style.pointerEvents = 'none';
-        currentUpdateState = 'checking';
-        updateSmartUpdateButtonUI();
+
+        // Only show "checking" spinner if we don't have a stable state to display
+        if (currentUpdateState !== 'up_to_date' && currentUpdateState !== 'available') {
+            currentUpdateState = 'checking';
+            updateSmartUpdateButtonUI();
+        }
 
         xhrGet('/api?action=check_update', function(err, data) {
             isCheckingUpdates = false;
             if (wrapper) wrapper.style.pointerEvents = 'auto';
 
-            if (err || !data || data.status === 'unknown') {
-                currentUpdateState = 'unknown';
+            // ---- SUCCESS PATH ----
+            if (!err && data && data.status !== 'unknown') {
+                updateCheckFailures = 0;
+                updateCheckRetryDelay = 5000;
+                if (updateCheckRetryTimer) {
+                    clearTimeout(updateCheckRetryTimer);
+                    updateCheckRetryTimer = null;
+                }
+
+                // Server may mark the answer as stale (cached fallback).
+                var isStale = data.stale === true;
+
+                if (data.status === 'available') {
+                    currentUpdateState = 'available';
+                    lastKnownUpdateState = 'available';
+                } else {
+                    currentUpdateState = 'up_to_date';
+                    lastKnownUpdateState = 'up_to_date';
+                }
                 updateSmartUpdateButtonUI();
-                if (isManual) showMsg(t('updateUnknown'), 'warning', 3000);
+
+                if (!isStale) {
+                    if (isManual) {
+                        if (data.status === 'available') {
+                            showMsg(t('updateAvailableMsg'), 'info', 5000);
+                        } else {
+                            showMsg(t('updateUpToDate'), 'success', 2500);
+                        }
+                    }
+                } else {
+                    // Server returned a cached fallback (network still flaky).
+                    // Keep showing it, but retry silently in the background.
+                    scheduleUpdateCheckRetry();
+                }
                 return;
             }
 
-            if (data.status === 'available') {
-                currentUpdateState = 'available';
+            // ---- FAILURE PATH ----
+            updateCheckFailures++;
+
+            if (lastKnownUpdateState) {
+                // Keep the last good state so the UI doesn't oscillate.
+                currentUpdateState = lastKnownUpdateState;
                 updateSmartUpdateButtonUI();
-                showMsg(t('updateAvailableMsg'), 'info', 5000);
-            } else {
-                currentUpdateState = 'up_to_date';
-                updateSmartUpdateButtonUI();
-                if (isManual) showMsg(t('updateUpToDate'), 'success', 2500);
+
+                if (isManual) {
+                    showMsg(t('networkUnstable'), 'warning', 3000);
+                }
+                scheduleUpdateCheckRetry();
+                return;
             }
+
+            // No prior state — genuinely unknown (first check ever failed).
+            currentUpdateState = 'unknown';
+            updateSmartUpdateButtonUI();
+
+            if (isManual) {
+                showMsg(t('updateUnknown'), 'warning', 3000);
+            }
+            scheduleUpdateCheckRetry();
         });
+    }
+
+    // PREMIUM: silent retry with exponential backoff (5s → 10s → 20s → 30s cap)
+    function scheduleUpdateCheckRetry() {
+        if (updateCheckRetryTimer) clearTimeout(updateCheckRetryTimer);
+        updateCheckRetryTimer = setTimeout(function() {
+            updateCheckRetryTimer = null;
+            if (appInitialized && !isProcessing && !rulesState.isSaving) {
+                checkForUpdates(false);
+            }
+        }, updateCheckRetryDelay);
+        updateCheckRetryDelay = Math.min(updateCheckRetryDelay * 2, UPDATE_CHECK_MAX_RETRY);
     }
 
     function checkServerUpdateState() {
@@ -2558,6 +2660,7 @@
                                 if (progText) progText.textContent = '0%';
                                 finishUpdateUI();
                                 currentUpdateState = 'up_to_date';
+                                lastKnownUpdateState = 'up_to_date';
                                 updateSmartUpdateButtonUI();
                                 loadProfile();
                                 refreshAll(true);
@@ -2569,6 +2672,10 @@
         }, 1000);
     }
 
+    // finishUpdateUI releases the UI but intentionally does NOT reset
+    // updateCompletionHandled. That flag stays true until a new update
+    // starts (executeProfileUpdate / attachToRunningUpdate reset it),
+    // preventing stale SSE/poller events from re-activating the UI.
     function finishUpdateUI() {
         isProcessing = false;
         $('applyBtn').disabled = false;
@@ -2858,6 +2965,7 @@
         if (window.sseHeartbeat) clearInterval(window.sseHeartbeat);
         if (window.progressPoller) clearInterval(window.progressPoller);
         if (window.updateStatePoller) clearInterval(window.updateStatePoller);
+        if (updateCheckRetryTimer) clearTimeout(updateCheckRetryTimer);
         if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
         if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
@@ -3083,7 +3191,8 @@
                 if (isProcessing || isCheckingUpdates || rulesState.isSaving) return;
 
                 if (currentUpdateState === 'up_to_date') {
-                    showMsg(t('updateNotNeededMsg'), 'info', 3000);
+                    // PREMIUM: manual re-check in case the network was flaky
+                    checkForUpdates(true);
                 } else if (currentUpdateState === 'unknown') {
                     checkForUpdates(true);
                 } else if (currentUpdateState === 'available') {
