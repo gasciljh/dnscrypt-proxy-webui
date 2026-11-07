@@ -4661,51 +4661,6 @@ func fetchRemoteVersion(url string) string {
 	return ""
 }
 
-
-// fetchRemoteVersion — PREMIUM
-//
-// 3 attempts with exponential backoff (1s, 2s). Each attempt has an
-// 8-second budget. Worst case ~27s, but typical success on first try.
-// This is critical because blocklist downloads elsewhere may saturate
-// the network, causing transient DNS/HTTPS failures.
-func fetchRemoteVersion(url string) string {
-	client := getDownloadClient()
-
-	for attempt := 0; attempt < 3; attempt++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			cancel()
-			continue
-		}
-		req.Header.Set("Range", "bytes=0-4096")
-		req.Header.Set("User-Agent", USER_AGENT)
-		req.Header.Set("Cache-Control", "no-cache")
-
-		resp, err := client.Do(req)
-		if err == nil && (resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent) {
-			body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-			resp.Body.Close()
-			cancel()
-			if v := extractVersion(string(body)); v != "" {
-				return v
-			}
-		} else if resp != nil {
-			resp.Body.Close()
-			cancel()
-		} else {
-			cancel()
-		}
-
-		if attempt < 2 {
-			time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
-		}
-	}
-
-	return ""
-}
-
 // [33] Login handler
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	ip := getClientIP(r)
