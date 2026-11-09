@@ -131,9 +131,6 @@ _fallback_get_run_dir() {
 }
 
 # --- Fallback: is_port_open ---
-# Three probes: /proc/net → ss → netstat.
-# The trailing space in ":$hex_port " prevents :1F90 from
-# matching :1F90A.
 _inline_is_port_open() {
     local port="$1"
     local proto="${2:-tcp}"
@@ -223,24 +220,13 @@ _inline_get_port() {
     printf "9090"
 }
 
-# --- Fallback: start_webui (v1.5.0+fix) ---
-# Three-way launch: setsid → busybox setsid → nohup.
-#
-# v1.5.0+fix: polling wait after pkill (100 ms × 30 = 3 s),
-# matching the pattern in service.sh and watchdog.sh. Without
-# it, the port 9090 can still be bound when the new binary
-# tries to bind, causing "address already in use".
-#
-# This fallback only runs when functions.sh failed to load —
-# a degraded mode. In the normal path, start_native_webui
-# (already idempotent) is used instead.
+# --- Fallback: start_webui ---
 _inline_start_webui() {
     local bin="$1"
     local port="$2"
 
     log_msg_fallback "Starting WebUI (inline, port: $port)"
 
-    # --- Kill existing + polling wait ---
     if pgrep -x dnscrypt-webui >/dev/null 2>&1; then
         pkill -9 -x dnscrypt-webui 2>/dev/null
 
@@ -255,7 +241,6 @@ _inline_start_webui() {
     fi
     rm -f "$WEBUI_PID_FILE" 2>/dev/null
 
-    # --- Wait for port to be free ---
     local _port_wait=0
     while [ "$_port_wait" -lt 30 ]; do
         if ! _inline_is_port_open "$port" tcp; then
@@ -265,7 +250,6 @@ _inline_start_webui() {
         _port_wait=$((_port_wait + 1))
     done
 
-    # --- Launch ---
     export HOME=/data/local/tmp
 
     if command -v setsid >/dev/null 2>&1; then
@@ -310,12 +294,11 @@ _inline_list_snapshots() {
                 current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
-                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
-                || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
+            # PREMIUM FIX: Extract timestamp from directory name
+            _ts=$(printf "%s" "$_d" | cut -d'-' -f1,2)
+            case "$_ts" in ''|*[!0-9-]*) _ts="00000000-000000" ;; esac
+            printf '%s %s\n' "$_ts" "$_d"
+        done | LC_ALL=C sort -r -k1,1 | awk '{print $2}'
     )
 
     [ -z "$list" ] && return 0
@@ -347,37 +330,12 @@ _inline_backup_summary() {
     local newest
     newest=$(printf '%s\n' "$_list" | head -n1)
 
-    local epoch age now age_str
-    epoch=$(stat -c %Y "$PERSISTENT_BACKUP/$newest" 2>/dev/null) \
-        || epoch=$(stat -f %m "$PERSISTENT_BACKUP/$newest" 2>/dev/null) \
-        || epoch=0
-
-    if ! echo "$epoch" | grep -qE '^[0-9]+$'; then
-        epoch=0
-    fi
-
-    age_str="unknown time"
-    if [ "$epoch" -gt 0 ]; then
-        now=$(date +%s 2>/dev/null)
-        case "$now" in
-            ''|*[!0-9]*) now=0 ;;
-        esac
-
-        if [ "$now" -gt 0 ]; then
-            age=$((now - epoch))
-            if [ "$age" -lt 60 ]; then
-                age_str="${age}s ago"
-            elif [ "$age" -lt 3600 ]; then
-                age_str="$((age / 60))m ago"
-            elif [ "$age" -lt 86400 ]; then
-                age_str="$((age / 3600))h ago"
-            else
-                age_str="$((age / 86400))d ago"
-            fi
-        fi
-    fi
-
-    printf "%s snapshot(s), latest %s" "$count" "$age_str"
+    # PREMIUM FIX: Extract timestamp from directory name instead of ModTime
+    local _ts
+    _ts=$(printf "%s" "$newest" | cut -d'-' -f1,2)
+    local date_str="${_ts:0:4}-${_ts:4:2}-${_ts:6:2}"
+    local time_str="${_ts:9:2}:${_ts:11:2}"
+    printf "%s snapshot(s), latest %s %s UTC" "$count" "$date_str" "$time_str"
 }
 
 # ============================================================
@@ -809,13 +767,6 @@ fi
 # ============================================================
 # [16] Start WebUI (if needed)
 # ============================================================
-# Two entry conditions decide whether a start is needed:
-#   1. --restart was passed       → always start.
-#   2. The WebUI port is closed   → start.
-#
-# In every other case (WebUI running, no --restart), the
-# function prints "already running" and proceeds to [17] —
-# the browser-open still runs.
 STARTED_NOW=0
 
 if [ "$FORCE_RESTART" = "1" ]; then
@@ -855,8 +806,6 @@ else
     printf "ℹ️  WebUI is already running on port %s\n" "$PORT"
 fi
 
-# One-second delay when we actually started the WebUI. Lets
-# the SSE / HTTP stack settle before the browser hits it.
 if [ "$STARTED_NOW" = "1" ]; then
     sleep 1
 fi
@@ -864,17 +813,6 @@ fi
 # ============================================================
 # [17] Open browser (5 fallback methods + timeout)
 # ============================================================
-# Launches the default browser at http://127.0.0.1:$PORT.
-#
-# Try 5 race condition fix:
-#   On POSIX shells, a background job started with `&` inherits
-#   the parent's process group. When the parent calls `exit 0`,
-#   the kernel delivers SIGHUP to every process in that group.
-#   Two protections:
-#     (a) SUBSHELL ISOLATION — `( ... ) &` runs the child in a
-#         NEW process group, decoupled from the parent's group.
-#     (b) FORK GRACE PERIOD — a 0.3 s sleep before `exit 0`
-#         gives the subshell time to fork and reach exec().
 URL="http://127.0.0.1:$PORT"
 
 act_log "Opening browser at $URL"

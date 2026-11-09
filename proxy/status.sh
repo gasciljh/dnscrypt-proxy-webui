@@ -27,16 +27,6 @@
 #   1 = nothing running
 #   2 = partial (only one service running)
 #   3 = module disabled
-#
-# Design:
-#   • This is a DIAGNOSTIC tool. It MUST always produce a
-#     report, even when functions.sh is unavailable or
-#     corrupt — a broken module is precisely when the user
-#     needs this tool most.
-#   • Sources functions.sh when available for accurate data
-#     (is_dnscrypt_running, is_webui_running, get_dashboard_port).
-#   • Falls back to inline primitives when functions.sh fails.
-#   • Version is read dynamically from module.prop (SSOT).
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -85,24 +75,20 @@ CONF_FILE="$BIN_DIR/webui.conf"
 TOML_FILE="$BIN_DIR/dnscrypt-proxy.toml"
 SELECTED_FILE="$BIN_DIR/selected_profile.txt"
 
-# --- Data preservation paths ---
 PERSISTENT_BACKUP="/sdcard/dnscrypt-webui-backup"
 PENDING_NOTIFY_FILE="$PERSISTENT_BACKUP/.pending_notification"
 LAST_STABLE_FILE="$PERSISTENT_BACKUP/.last_stable"
 LAST_AUTO_BACKUP_MARKER="$PERSISTENT_BACKUP/.last_auto_backup"
 USER_FILES="webui.conf dnscrypt-proxy.toml selected_profile.txt allowlist.txt denylist.txt"
 
-# --- Recovery mode trigger files ---
 RECOVERY_TRIGGER_1="$MODDIR/recovery"
 RECOVERY_TRIGGER_2="/data/adb/dnscrypt-recovery"
 
-# --- Reserved port (finalized after loading functions.sh) ---
 _MONITORING_UI_PORT=""
 
 # ============================================================
 # [3] Parse command-line arguments
 # ============================================================
-# Primary modes are mutually exclusive; --verbose is a modifier only.
 SHORT_MODE=0
 JSON_MODE=0
 CHECK_MODE=0
@@ -128,13 +114,6 @@ Usage:
   status.sh --verbose/-V    Extended display (adds ports + config file paths)
   status.sh --diagnose/-d   Full diagnostic report (backups + user data)
   status.sh --help/-h       Show this help
-
-Mode rules:
-  • Primary modes --short, --check, --json, --diagnose are
-    mutually exclusive. Selecting two or more in one
-    invocation is a hard error.
-  • --verbose is a modifier for the default (no-primary-mode)
-    display. It cannot be combined with any primary mode.
 
 Exit codes:
   0 = everything running
@@ -164,23 +143,18 @@ _mode_list=""
 if [ "$_mode_count" -gt 1 ]; then
     echo "ERROR: only one primary mode may be selected at a time."
     echo "       got:$_mode_list"
-    echo "       See 'status.sh --help' for details."
     exit 1
 fi
 
 if [ "$VERBOSE_MODE" = "1" ] && [ "$_mode_count" -gt 0 ]; then
     echo "ERROR: --verbose cannot be combined with a primary mode."
     echo "       got:$_mode_list --verbose"
-    echo "       See 'status.sh --help' for details."
     exit 1
 fi
 
 # ============================================================
 # [4] Load functions.sh (sources boot-mini.sh)
 # ============================================================
-# Lenient: a functions.sh that exists but fails to source does
-# NOT abort status.sh. The script falls through to the inline
-# fallbacks in [5] and continues to produce a report.
 FUNCTIONS_LOADED=0
 if [ -f "$MODDIR/functions.sh" ]; then
     # shellcheck disable=SC1090
@@ -195,15 +169,11 @@ if [ -f "$MODDIR/functions.sh" ]; then
     fi
 fi
 
-# Finalize _MONITORING_UI_PORT: prefer the value from
-# boot-mini.sh (via functions.sh); fall back to 8080.
 _MONITORING_UI_PORT="${_MONITORING_UI_PORT:-8080}"
 
 # ============================================================
 # [5] Inline fallbacks
 # ============================================================
-# status.sh keeps a full fallback set — a broken module is
-# precisely when the user needs this tool most.
 _FALLBACK_RUN_DIR="$MODDIR/proxy/run"
 
 _fallback_get_run_dir() {
@@ -229,9 +199,6 @@ if [ "$FUNCTIONS_LOADED" = "0" ]; then
     WATCHDOG_PID_FILE="$_FB_RUN_DIR/watchdog.pid"
 fi
 
-# Three probes: /proc/net → ss → netstat.
-# The trailing space in ":$hex_port " prevents :1F90 from
-# matching :1F90A.
 _inline_is_port_open() {
     local port="$1"
     local proto="${2:-tcp}"
@@ -293,8 +260,6 @@ _inline_read_conf() {
     printf "%s" "$default"
 }
 
-# Leading zeros stripped before range check (some shells
-# interpret 090 as octal 72).
 _inline_read_port() {
     local conf="$1"
     local key="$2"
@@ -316,7 +281,6 @@ _inline_read_port() {
     printf "%s" "$default"
 }
 
-# /proc/net/if_inet6 lists one line per interface with an IPv6 address.
 _inline_is_ipv6_available() {
     if [ ! -f /proc/net/if_inet6 ]; then
         return 1
@@ -329,8 +293,6 @@ _inline_is_ipv6_available() {
     return 0
 }
 
-# Display-only — main.go is the authority. Table matches
-# main.go:memoryLimitForProfile and functions.sh:get_profile_memory_hint.
 _inline_get_profile_memory_hint() {
     local profile="pro"
 
@@ -418,11 +380,6 @@ MEMORY_HINT=$(mem_hint 2>/dev/null)
 # ============================================================
 # [7b] Backup resolver
 # ============================================================
-# SNAP-MANIFEST: a directory is a snapshot iff it contains
-# .manifest.json. Sort: mtime descending. Excludes current/,
-# txn-*, orphan-txn-*, .restore_snap.*, apk/.
-#
-# Subshell isolation prevents cd/loop vars from leaking.
 _list_snapshots() {
     local limit="${1:-0}"
     [ -d "$PERSISTENT_BACKUP" ] || return 0
@@ -437,12 +394,11 @@ _list_snapshots() {
                 current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
-                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
-                || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
+            
+            _ts=$(printf "%s" "$_d" | cut -d'-' -f1,2)
+            case "$_ts" in ''|*[!0-9-]*) _ts="00000000-000000" ;; esac
+            printf '%s %s\n' "$_ts" "$_d"
+        done | LC_ALL=C sort -r -k1,1 | awk '{print $2}'
     )
 
     [ -z "$list" ] && return 0
@@ -454,9 +410,6 @@ _list_snapshots() {
     fi
 }
 
-# Exactly 0 returns "0s ago" (not "N/A") — distinguishes
-# "created this second" from "age unknown". "N/A" for empty /
-# non-numeric / negative input.
 format_age() {
     local sec="$1"
     if [ -z "$sec" ] || ! echo "$sec" | grep -qE '^-?[0-9]+$' || [ "$sec" -lt 0 ]; then
@@ -474,13 +427,12 @@ format_age() {
     fi
 }
 
-# --- Collect backup state ---
 BACKUP_COUNT=0
 BACKUP_TXN_COUNT=0
 BACKUP_ORPHAN_COUNT=0
 BACKUP_LAST_TIME=""
 BACKUP_LAST_EPOCH=0
-BACKUP_LAST_AGE_SEC=0
+BACKUP_LAST_AGE_SEC=-1
 BACKUP_LAST_NAME=""
 BACKUP_LAST_STABLE=""
 BACKUP_STATUS="missing"
@@ -510,28 +462,22 @@ if [ -d "$PERSISTENT_BACKUP" ]; then
         BACKUP_LAST_NAME=$( _list_snapshots 1 )
 
         if [ -n "$BACKUP_LAST_NAME" ] && [ -d "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" ]; then
-            BACKUP_LAST_EPOCH=$(stat -c %Y "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
-                || BACKUP_LAST_EPOCH=$(stat -f %m "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" 2>/dev/null) \
-                || BACKUP_LAST_EPOCH=0
-
-            if ! echo "$BACKUP_LAST_EPOCH" | grep -qE '^[0-9]+$'; then
-                BACKUP_LAST_EPOCH=0
-            fi
-
-            if [ "$BACKUP_LAST_EPOCH" -gt 0 ]; then
-                # Use the directory as the reference file for
-                # `date -r` — `date -d @epoch` works on GNU
-                # coreutils but not Android's toybox.
-                BACKUP_LAST_TIME=$(date -d "@$BACKUP_LAST_EPOCH" '+%Y-%m-%d %H:%M' 2>/dev/null)
-                if [ -z "$BACKUP_LAST_TIME" ]; then
-                    BACKUP_LAST_TIME=$(date -r "$PERSISTENT_BACKUP/$BACKUP_LAST_NAME" '+%Y-%m-%d %H:%M' 2>/dev/null)
+            _bk_ts=$(printf "%s" "$BACKUP_LAST_NAME" | cut -d'-' -f1,2)
+            if [ -n "$_bk_ts" ] && [ ${#_bk_ts} -eq 15 ]; then
+                _bk_date="${_bk_ts:0:4}-${_bk_ts:4:2}-${_bk_ts:6:2}"
+                _bk_time="${_bk_ts:9:2}:${_bk_ts:11:2}"
+                BACKUP_LAST_TIME="${_bk_date} ${_bk_time} UTC"
+                
+                BACKUP_LAST_EPOCH=$(date -u -d "${_bk_date} ${_bk_time}:00" +%s 2>/dev/null || echo 0)
+                if [ "$BACKUP_LAST_EPOCH" -gt 0 ]; then
+                    _now=$(date +%s 2>/dev/null)
+                    case "$_now" in ''|*[!0-9]*) _now=0 ;; esac
+                    if [ "$_now" -gt 0 ]; then
+                        BACKUP_LAST_AGE_SEC=$((_now - BACKUP_LAST_EPOCH))
+                    fi
                 fi
-                [ -z "$BACKUP_LAST_TIME" ] && BACKUP_LAST_TIME="unknown"
-
-                _now=$(date +%s)
-                if echo "$_now" | grep -qE '^[0-9]+$'; then
-                    BACKUP_LAST_AGE_SEC=$((_now - BACKUP_LAST_EPOCH))
-                fi
+            else
+                BACKUP_LAST_TIME="unknown"
             fi
         fi
     fi
@@ -567,8 +513,6 @@ DASHBOARD_PORT=$(read_dashboard_port)
 [ -z "$DASHBOARD_PORT" ] && DASHBOARD_PORT="9091"
 
 # [8b] DNS Engine status
-# Prefer functions.sh's is_dnscrypt_running (PID + comm + port
-# cross-check). Fallback: pgrep -x + is_udp_open 5354.
 DNS_RUNNING="NO"
 if [ "$FUNCTIONS_LOADED" = "1" ] && command -v is_dnscrypt_running >/dev/null 2>&1; then
     if is_dnscrypt_running; then
@@ -705,10 +649,6 @@ ROOT_SOLUTION=$(detect_root_solution)
 # ============================================================
 # [9] JSON escaping helpers
 # ============================================================
-# Minimal JSON string escaper. In sed, `\b` is a word-boundary
-# anchor (not backspace), so a `s/\b/\\b/g` rule would corrupt
-# every string field. Backspace does not appear in any value
-# this function is used on — no replacement needed.
 esc_json() {
     if [ -z "$1" ]; then
         printf ''
@@ -723,7 +663,6 @@ esc_json() {
     ' | tr '\n' ' '
 }
 
-# Empty → literal `null`; non-empty → quoted JSON string.
 _json_str() {
     if [ -z "$1" ]; then
         printf 'null'
@@ -735,10 +674,6 @@ _json_str() {
 # ============================================================
 # [10] Quick check mode (single line)
 # ============================================================
-# Eight pipe-separated fields for shell scripting:
-#   <version> | DNS=<UP|DOWN> | WEBUI=<UP|DOWN> |
-#   PROFILE=<key> | MEM=<hint> | ENTRIES=<count> |
-#   BACKUP=<count>snap/<age> | RUNDIR=<path>[ DISABLED]
 if [ "$CHECK_MODE" = "1" ]; then
     dns_str="DNS=$( [ "$DNS_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
     webui_str="WEBUI=$( [ "$WEBUI_RUNNING" = "YES" ] && echo "UP" || echo "DOWN" )"
@@ -767,8 +702,6 @@ fi
 # ============================================================
 # [11] JSON mode
 # ============================================================
-# Hand-formatted (no jq dependency). Nullable fields use
-# `_json_str` (emits literal `null` for empty values, not "").
 if [ "$JSON_MODE" = "1" ]; then
     CHECKED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null)
 
@@ -848,7 +781,6 @@ fi
 # ============================================================
 # [12] Short mode
 # ============================================================
-# One word on stdout: OK / DNS_ONLY / WEBUI_ONLY / STOPPED / DISABLED.
 if [ "$SHORT_MODE" = "1" ]; then
     if [ "$IS_DISABLED" = "YES" ]; then
         echo "DISABLED"
@@ -871,8 +803,6 @@ fi
 # ============================================================
 # [13] Diagnose mode
 # ============================================================
-# Full diagnostic report. Intended to be pasted verbatim into a
-# GitHub issue. Colors applied only when stdout is a TTY.
 if [ "$DIAGNOSE_MODE" = "1" ]; then
     if [ -t 1 ]; then
         C_RED=$(printf '\033[0;31m'); C_GREEN=$(printf '\033[0;32m')
@@ -890,7 +820,6 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     echo "================================================================="
     echo ""
 
-    # --- System info ---
     echo "${C_BOLD}─── System Information ───${C_NC}"
     echo "  Android:       $(getprop ro.build.version.release 2>/dev/null) (API $(getprop ro.build.version.sdk 2>/dev/null))"
     echo "  Device:        $(getprop ro.product.model 2>/dev/null)"
@@ -903,7 +832,6 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     fi
     echo ""
 
-    # --- Module info ---
     echo "${C_BOLD}─── Module Information ───${C_NC}"
     echo "  Version:       $MODULE_VERSION"
     echo "  Module path:   $MODDIR"
@@ -911,7 +839,6 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     echo "  functions.sh:  $([ "$FUNCTIONS_LOADED" = "1" ] && echo 'loaded' || echo 'NOT loaded (using fallback)')"
     echo ""
 
-    # --- Service status ---
     echo "${C_BOLD}─── Service Status ───${C_NC}"
     if [ "$DNS_RUNNING" = "YES" ]; then
         echo "  ${C_GREEN}✓${C_NC} DNS Engine:   running (port 5354/UDP)"
@@ -933,13 +860,11 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     fi
     echo ""
 
-    # --- Recovery mode + pending notification ---
     echo "${C_BOLD}─── Recovery & Notifications ───${C_NC}"
     if [ "$RECOVERY_MODE_ACTIVE" = "YES" ]; then
         echo "  ${C_YELLOW}⚠${C_NC} Recovery mode: ${C_YELLOW}TRIGGER FILE PRESENT${C_NC}"
         [ -f "$RECOVERY_TRIGGER_1" ] && echo "     - $RECOVERY_TRIGGER_1"
         [ -f "$RECOVERY_TRIGGER_2" ] && echo "     - $RECOVERY_TRIGGER_2"
-        echo "     ${C_DIM}The next install will restore the last known good config.${C_NC}"
     else
         echo "  ${C_GREEN}✓${C_NC} Recovery mode: not triggered"
     fi
@@ -947,13 +872,11 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     if [ -n "$PENDING_NOTIFY_CONTENT" ]; then
         echo "  ${C_CYAN}ℹ${C_NC} Pending notification:"
         echo "     ${C_DIM}$PENDING_NOTIFY_CONTENT${C_NC}"
-        echo "     ${C_DIM}(main.go will log and delete this at startup)${C_NC}"
     else
         echo "  ${C_DIM}−${C_NC} Pending notification: none"
     fi
     echo ""
 
-    # --- User data files ---
     echo "${C_BOLD}─── User Data Files ───${C_NC}"
     echo "  Location: $BIN_DIR"
     echo ""
@@ -971,14 +894,12 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     done
     echo ""
 
-    # --- Backups ---
     echo "${C_BOLD}─── Backups ───${C_NC}"
     echo "  Location: $PERSISTENT_BACKUP"
 
     case "$BACKUP_STATUS" in
         missing)
             echo "  ${C_YELLOW}⚠${C_NC} Directory not found"
-            echo "     ${C_DIM}(It is created on first successful install or first auto-backup)${C_NC}"
             ;;
         empty)
             echo "  ${C_YELLOW}⚠${C_NC} Directory exists but contains no snapshots"
@@ -1000,7 +921,15 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
                 [ -z "$_file_count" ] && _file_count=0
                 _has_manifest=""
                 [ -f "$PERSISTENT_BACKUP/$_snap/.manifest.json" ] && _has_manifest=" +manifest"
-                _snap_time=$(date -r "$PERSISTENT_BACKUP/$_snap" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "?")
+                
+                # PREMIUM FIX: Extract timestamp from directory name
+                _ts=$(printf "%s" "$_snap" | cut -d'-' -f1,2)
+                if [ ${#_ts} -eq 15 ]; then
+                    _snap_time="${_ts:0:4}-${_ts:4:2}-${_ts:6:2} ${_ts:9:2}:${_ts:11:2} UTC"
+                else
+                    _snap_time="?"
+                fi
+                
                 printf "    ${C_DIM}%2d.${C_NC} %-30s ${C_DIM}(%s files%s, %s)${C_NC}\n" \
                     "$_bk_i" "$_snap" "$_file_count" "$_has_manifest" "$_snap_time"
             done <<EOF
@@ -1011,55 +940,20 @@ EOF
                 echo ""
                 echo "  ${C_BOLD}.last_stable:${C_NC} $BACKUP_LAST_STABLE"
             fi
-
-            if [ -f "$LAST_AUTO_BACKUP_MARKER" ]; then
-                _auto_mtime=$(stat -c %Y "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
-                    || _auto_mtime=$(stat -f %m "$LAST_AUTO_BACKUP_MARKER" 2>/dev/null) \
-                    || _auto_mtime=0
-                if echo "$_auto_mtime" | grep -qE '^[0-9]+$' && [ "$_auto_mtime" -gt 0 ]; then
-                    _auto_now=$(date +%s 2>/dev/null)
-                    case "$_auto_now" in ''|*[!0-9]*) _auto_now=0 ;; esac
-                    if [ "$_auto_now" -gt 0 ]; then
-                        _auto_age=$((_auto_now - _auto_mtime))
-                        echo "  ${C_BOLD}Last auto-backup:${C_NC} $(format_age "$_auto_age")"
-                    fi
-                fi
-            fi
             ;;
     esac
 
-    # --- In-flight transactions ---
     if [ "$BACKUP_TXN_COUNT" -gt 0 ]; then
         echo ""
         echo "  ${C_YELLOW}⚠${C_NC} In-flight transactions: $BACKUP_TXN_COUNT"
-        echo "     ${C_DIM}(An install may be in progress, or a previous install was interrupted)${C_NC}"
-        (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d txn-*/ 2>/dev/null | \
-            sed 's:/$::' | \
-            while IFS= read -r _txn; do
-                [ -z "$_txn" ] && continue
-                _state=$(cat "$PERSISTENT_BACKUP/$_txn/.state" 2>/dev/null | tr -d '\r\n ')
-                [ -z "$_state" ] && _state="(no state)"
-                printf "     ${C_DIM}•${C_NC} %-30s ${C_DIM}[%s]${C_NC}\n" "$_txn" "$_state"
-            done)
     fi
 
-    # --- Orphan transactions ---
     if [ "$BACKUP_ORPHAN_COUNT" -gt 0 ]; then
         echo ""
         echo "  ${C_YELLOW}⚠${C_NC} Orphan transactions: $BACKUP_ORPHAN_COUNT"
-        echo "     ${C_DIM}(Preserved from a previous interrupted install; inspect manually)${C_NC}"
-        (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d orphan-txn-*/ 2>/dev/null | \
-            sed 's:/$::' | \
-            while IFS= read -r _orphan; do
-                [ -z "$_orphan" ] && continue
-                printf "     ${C_DIM}•${C_NC} %s\n" "$_orphan"
-            done)
     fi
     echo ""
 
-    # --- Health checks ---
     echo "${C_BOLD}─── Health Checks ───${C_NC}"
     _health_issues=0
 
@@ -1105,9 +999,9 @@ EOF
 
     if [ "$IS_DISABLED" = "NO" ]; then
         if [ "$STATUS_FROM_FILE" = "ON" ] && [ "$DNS_RUNNING" = "NO" ]; then
-            echo "  ${C_YELLOW}⚠${C_NC} STATUS_FILE=ON but DNS engine is not running (Watchdog should recover it)"
+            echo "  ${C_YELLOW}⚠${C_NC} STATUS_FILE=ON but DNS engine is not running"
         elif [ "$STATUS_FROM_FILE" = "OFF" ] && [ "$DNS_RUNNING" = "YES" ]; then
-            echo "  ${C_YELLOW}⚠${C_NC} STATUS_FILE=OFF but DNS engine is running (user intent mismatch)"
+            echo "  ${C_YELLOW}⚠${C_NC} STATUS_FILE=OFF but DNS engine is running"
         fi
     fi
 
@@ -1128,21 +1022,14 @@ EOF
 
     echo ""
 
-    # --- Diagnosis ---
     echo "${C_BOLD}─── Diagnosis ───${C_NC}"
     if [ "$IS_DISABLED" = "YES" ]; then
         echo "  ${C_YELLOW}⚠  Module is disabled.${C_NC}"
         echo "     To enable: remove $MODDIR/disable and reboot"
     elif [ "$DNS_RUNNING" = "YES" ] && [ "$WEBUI_RUNNING" = "YES" ] && [ "$_health_issues" -eq 0 ]; then
         echo "  ${C_GREEN}✅ All systems operational${C_NC}"
-        if [ "$BACKUP_COUNT" -eq 0 ]; then
-            echo "  ${C_YELLOW}⚠  No backups available yet${C_NC}"
-            echo "     ${C_DIM}A backup will be created on next boot (auto) or before the next risky operation${C_NC}"
-        fi
     elif [ "$_health_issues" -gt 0 ]; then
         echo "  ${C_RED}❌ $_health_issues critical issue(s) detected${C_NC}"
-        echo "     See the 'Health Checks' section above"
-        echo "     Full guide: docs/GUIDE.md §7"
     else
         echo "  ${C_YELLOW}⚠  Services not fully running${C_NC}"
         echo "     Try: su -c 'sh $MODDIR/action.sh --restart'"
@@ -1151,8 +1038,6 @@ EOF
     echo ""
     echo "================================================================="
     echo "  End of report"
-    echo "  Attach this to your bug report:"
-    echo "    https://github.com/gasciljh/dnscrypt-proxy-webui/issues"
     echo "================================================================="
     echo ""
 
@@ -1168,7 +1053,6 @@ fi
 # ============================================================
 # [14] Full mode (default)
 # ============================================================
-# Multi-section, colored, human-readable report.
 if [ -t 1 ]; then
     RED=$(printf '\033[0;31m')
     GREEN=$(printf '\033[0;32m')
@@ -1183,7 +1067,6 @@ else
     RED=''; GREEN=''; YELLOW=''; BLUE=''; CYAN=''; DIM=''; BOLD=''; MAGENTA=''; NC=''
 fi
 
-# --- Overall status ---
 if [ "$IS_DISABLED" = "YES" ]; then
     OVERALL="${YELLOW}WARNING: DISABLED${NC}"
 elif [ "$DNS_RUNNING" = "YES" ] && [ "$WEBUI_RUNNING" = "YES" ]; then
@@ -1205,9 +1088,6 @@ WATCHDOG_TEXT=$([ "$WATCHDOG_RUNNING" = "YES" ] && printf "running (PID: %s)" "$
 
 IPV6_ICON=$([ "$IPV6_AVAILABLE" = "YES" ] && printf "${GREEN}[+]${NC}" || printf "${DIM}[-]${NC}")
 
-# ============================================================
-# [15] Display
-# ============================================================
 echo ""
 echo "============================================================"
 printf "  DNSCrypt Smart Filter %s\n" "$MODULE_VERSION"
@@ -1256,7 +1136,6 @@ case "$BACKUP_STATUS" in
     missing)
         printf "  ${YELLOW}⚠${NC}  Status:        ${YELLOW}no backup directory${NC}\n"
         printf "  ${DIM}Path:          %s${NC}\n" "$PERSISTENT_BACKUP"
-        printf "  ${DIM}(created automatically on first boot / install)${NC}\n"
         ;;
     empty)
         printf "  ${YELLOW}⚠${NC}  Status:        ${YELLOW}directory exists but empty${NC}\n"
@@ -1274,15 +1153,15 @@ case "$BACKUP_STATUS" in
 esac
 
 if [ "$BACKUP_TXN_COUNT" -gt 0 ]; then
-    printf "  ${YELLOW}⚠${NC}  In-flight:     %s txn dir(s) — install in progress or interrupted\n" "$BACKUP_TXN_COUNT"
+    printf "  ${YELLOW}⚠${NC}  In-flight:     %s txn dir(s)\n" "$BACKUP_TXN_COUNT"
 fi
 
 if [ "$BACKUP_ORPHAN_COUNT" -gt 0 ]; then
-    printf "  ${YELLOW}⚠${NC}  Orphans:       %s preserved orphan-txn dir(s)\n" "$BACKUP_ORPHAN_COUNT"
+    printf "  ${YELLOW}⚠${NC}  Orphans:       %s orphan-txn dir(s)\n" "$BACKUP_ORPHAN_COUNT"
 fi
 
 if [ "$RECOVERY_MODE_ACTIVE" = "YES" ]; then
-    printf "  ${YELLOW}⚠${NC}  Recovery mode: ${YELLOW}TRIGGER PRESENT${NC} — next install will restore\n"
+    printf "  ${YELLOW}⚠${NC}  Recovery mode: ${YELLOW}TRIGGER PRESENT${NC}\n"
 fi
 
 if [ -n "$PENDING_NOTIFY_CONTENT" ]; then
@@ -1320,9 +1199,6 @@ fi
 
 echo ""
 
-# ============================================================
-# [16] Verbose extra section
-# ============================================================
 if [ "$VERBOSE_MODE" = "1" ]; then
     printf "%s--- Verbose: Ports & Environment ---%s\n" "$MAGENTA" "$NC"
 
@@ -1354,53 +1230,23 @@ if [ "$VERBOSE_MODE" = "1" ]; then
             done
             [ -z "$_file_count" ] && _file_count=0
             _snap_size=$(du -sh "$PERSISTENT_BACKUP/$_snap" 2>/dev/null | cut -f1)
-            _snap_time=$(date -r "$PERSISTENT_BACKUP/$_snap" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "?")
+            
+            # PREMIUM FIX: Extract timestamp from directory name
+            _ts=$(printf "%s" "$_snap" | cut -d'-' -f1,2)
+            if [ ${#_ts} -eq 15 ]; then
+                _snap_time="${_ts:0:4}-${_ts:4:2}-${_ts:6:2} ${_ts:9:2}:${_ts:11:2} UTC"
+            else
+                _snap_time="?"
+            fi
+            
             printf "  %-30s ${DIM}%s files, %s, %s${NC}\n" "$_snap" "$_file_count" "$_snap_size" "$_snap_time"
         done <<EOF
 $(_list_snapshots)
 EOF
         echo ""
     fi
-
-    if [ "$BACKUP_TXN_COUNT" -gt 0 ]; then
-        printf "%s--- Verbose: In-flight Transactions ---%s\n" "$MAGENTA" "$NC"
-        (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d txn-*/ 2>/dev/null | \
-            sed 's:/$::' | \
-            while IFS= read -r _txn; do
-                [ -z "$_txn" ] && continue
-                _state=$(cat "$PERSISTENT_BACKUP/$_txn/.state" 2>/dev/null | tr -d '\r\n ')
-                _pid=$(cat "$PERSISTENT_BACKUP/$_txn/.pid" 2>/dev/null | tr -d '\r\n ')
-                printf "  %-30s ${DIM}state=%s pid=%s${NC}\n" "$_txn" "${_state:-none}" "${_pid:-none}"
-            done)
-        echo ""
-    fi
-
-    if [ "$BACKUP_ORPHAN_COUNT" -gt 0 ]; then
-        printf "%s--- Verbose: Orphan Transactions ---%s\n" "$MAGENTA" "$NC"
-        (cd "$PERSISTENT_BACKUP" 2>/dev/null && \
-            ls -1d orphan-txn-*/ 2>/dev/null | \
-            sed 's:/$::' | \
-            while IFS= read -r _orphan; do
-                [ -z "$_orphan" ] && continue
-                _orphan_size=$(du -sh "$PERSISTENT_BACKUP/$_orphan" 2>/dev/null | cut -f1)
-                _orphan_time=$(date -r "$PERSISTENT_BACKUP/$_orphan" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "?")
-                printf "  %-30s ${DIM}%s, %s${NC}\n" "$_orphan" "$_orphan_size" "$_orphan_time"
-            done)
-        echo ""
-    fi
-
-    if [ "$RECOVERY_MODE_ACTIVE" = "YES" ]; then
-        printf "%s--- Verbose: Recovery Triggers ---%s\n" "$MAGENTA" "$NC"
-        [ -f "$RECOVERY_TRIGGER_1" ] && printf "  ${YELLOW}•${NC} %s\n" "$RECOVERY_TRIGGER_1"
-        [ -f "$RECOVERY_TRIGGER_2" ] && printf "  ${YELLOW}•${NC} %s\n" "$RECOVERY_TRIGGER_2"
-        echo ""
-    fi
 fi
 
-# ============================================================
-# [17] Help hints
-# ============================================================
 if [ "$IS_DISABLED" = "YES" ]; then
     printf "%sWARNING: Module is disabled.${NC}\n" "$YELLOW"
     printf "   ${DIM}To enable: remove the file %s/disable${NC}\n" "$MODDIR"
@@ -1422,10 +1268,6 @@ if [ "$VERBOSE_MODE" != "1" ]; then
     echo ""
 fi
 
-# ============================================================
-# [18] Exit code
-# ============================================================
-# Mirrors the state model used by --check, --json, and --short.
 if [ "$IS_DISABLED" = "YES" ]; then
     exit 3
 elif [ "$DNS_RUNNING" = "YES" ] && [ "$WEBUI_RUNNING" = "YES" ]; then

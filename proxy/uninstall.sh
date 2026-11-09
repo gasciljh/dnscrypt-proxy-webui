@@ -19,58 +19,14 @@
 #     logs, caches).
 #   • Remove module configuration files.
 #   • Remove the module fingerprint + disable file.
-#   • Resolve txn-* directories:
-#       – COMMIT              → removed
-#       – ROLLBACK / empty    → removed
-#       – START / no state    → RENAMED to orphan-txn-* (preserved)
-#   • PRESERVE pre-existing orphan-txn-* directories.
-#   • Remove any legacy backup directory from v1.0.0.
+#   • Resolve txn-* directories (COMMIT/ROLLBACK removed,
+#     START/none renamed to orphan-txn-*).
 #   • PRESERVE the persistent backup directory and APK mirror.
-#
-# Options:
-#   uninstall.sh          Full cleanup (default)
-#   uninstall.sh --help   Show help
 #
 # Exit codes:
 #   0 = success
-#   1 = security violation (MODDIR outside expected paths)
+#   1 = security violation
 #   2 = unknown command-line argument
-#
-# Design: SELF-CONTAINED (deliberate)
-# ============================================================
-# This script does NOT source functions.sh. Sourcing it would:
-#   • create RUN_DIR and .bootstrap_cache — files this script
-#     is about to delete,
-#   • run functions.sh's top-level initialization, which is
-#     counterproductive at uninstall time.
-#
-# More importantly, uninstall.sh must work even when
-# functions.sh is missing or corrupt. It is the last script
-# the module runs — if it depends on a broken library, the
-# user is left with no way to clean up.
-#
-# Consequence: firewall cleanup and process cleanup below are
-# inline, even though equivalent functions live in
-# functions.sh. The duplication is intentional.
-#
-# Backup policy (IMPORTANT):
-# ============================================================
-# This script does NOT delete /sdcard/dnscrypt-webui-backup/.
-# It contains the 5 user config files snapshotted at every
-# upgrade, plus the companion APK mirror at apk/.
-#
-# The user can delete the whole directory at any time:
-#     su -c "rm -rf /sdcard/dnscrypt-webui-backup"
-#
-# Transaction handling:
-# ============================================================
-# Four cases for txn-* directories:
-#   1. State "COMMIT"      → removed
-#   2. State "ROLLBACK"    → removed
-#   3. State "START"       → renamed to orphan-txn-*, preserved
-#   4. No .state (or empty) → renamed to orphan-txn-*, preserved
-#
-# Any pre-existing orphan-txn-* directories are PRESERVED as-is.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -107,11 +63,6 @@ esac
 # ============================================================
 # [2] Parse command-line arguments
 # ============================================================
-# Unknown arguments are a hard error. Magisk does not pass
-# extra arguments to uninstall scripts, so a non-empty unknown
-# argument almost certainly means a manual invocation with a
-# typo — and silently proceeding would be dangerous on a
-# destructive script.
 for arg in "$@"; do
     case "$arg" in
         --help|-h)
@@ -122,11 +73,6 @@ Usage:
   uninstall.sh          Full cleanup (default)
   uninstall.sh --help   Show this help
 
-Exit codes:
-  0 = success
-  1 = security violation (MODDIR outside expected paths)
-  2 = unknown command-line argument
-
 Note:
   This script is normally invoked automatically by Magisk when the
   module is removed. Do not run it manually except for cleanup.
@@ -134,26 +80,6 @@ Note:
   Your persistent backup directory is PRESERVED so you can
   restore settings if you reinstall later:
     /sdcard/dnscrypt-webui-backup/
-
-  This includes the companion APK mirror:
-    /sdcard/dnscrypt-webui-backup/apk/
-
-  Any txn-* directory that was interrupted mid-flight (state=START
-  or missing .state) will be renamed to orphan-txn-* and PRESERVED.
-  Inspect manually before deleting.
-
-  A pending recovery trigger (/data/adb/dnscrypt-recovery), if any,
-  is REMOVED — it has no meaning once the module is gone.
-
-  The companion Android app APK is NOT touched by this script.
-  The module-internal copy is deleted with the module folder by
-  the root manager. Any separately-installed companion app is
-  unaffected.
-
-  If you want to keep your settings in a separate manual backup,
-  copy them before uninstalling:
-    su -c "cp -a /data/adb/modules/dnscrypt-proxy-webui/proxy/ \
-                /sdcard/dnscrypt-backup-manual/"
 EOF
             exit 0
             ;;
@@ -193,12 +119,6 @@ LEGACY_BACKUP_DIR="/data/local/tmp/dnscrypt_backup_uninstall"
 # ============================================================
 # [4] Protected log helper
 # ============================================================
-# Appends a timestamped line to $LOG_FILE with the
-# `[UNINSTALL]` prefix.
-#
-# The `LOG_DISABLED` flag short-circuits all writes once §[14]
-# has removed the log file. Without it, the log is auto-created
-# by every subsequent call.
 LOG_DISABLED=0
 
 log_msg() {
@@ -222,11 +142,6 @@ log_msg "Backup dir (preserved): $PERSISTENT_BACKUP"
 # ============================================================
 # [5] Security checks
 # ============================================================
-# Three validations before ANY destructive action:
-#
-#   1. MODDIR must be inside /data/adb/modules/.
-#   2. MODDIR must not be exactly /data/adb/modules.
-#   3. The module's basename should start with "dnscrypt".
 case "$MODDIR" in
     /data/adb/modules/*) ;;
     *)
@@ -252,17 +167,6 @@ esac
 # ============================================================
 # [5a] Snapshot enumeration helper
 # ============================================================
-# Prints one snapshot directory name per line, newest first.
-#
-# Detection and ordering:
-#   • SNAP-MANIFEST: directory is a snapshot iff it contains
-#     a `.manifest.json` file.
-#   • SNAP-MTIME: ordered by mtime, descending.
-#
-# Excludes (by name): current/, txn-*, orphan-txn-*,
-# .restore_snap.*, apk/.
-#
-# Uses SUBSHELL ISOLATION for internal loop variables.
 _uninstall_list_snapshots() {
     [ -d "$PERSISTENT_BACKUP" ] || return 0
 
@@ -275,19 +179,18 @@ _uninstall_list_snapshots() {
                 current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;;
             esac
             [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) \
-                || _mt=$(stat -f %m "$_d" 2>/dev/null) \
-                || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | LC_ALL=C sort -rn -k1,1 | awk '{print $2}'
+            
+            # PREMIUM FIX: Extract timestamp from directory name
+            _ts=$(printf "%s" "$_d" | cut -d'-' -f1,2)
+            case "$_ts" in ''|*[!0-9-]*) _ts="00000000-000000" ;; esac
+            printf '%s %s\n' "$_ts" "$_d"
+        done | LC_ALL=C sort -r -k1,1 | awk '{print $2}'
     )
 }
 
 # ============================================================
 # [5b] Read state for the final report
 # ============================================================
-# Collects the state that the final summary (§[18]) reports.
 ACTIVE_PROFILE="unknown"
 if [ -f "$BIN_DIR/selected_profile.txt" ]; then
     _ap=$(cat "$BIN_DIR/selected_profile.txt" 2>/dev/null | tr -d '\r\n ')
@@ -402,26 +305,12 @@ fi
 # ============================================================
 # [7] Save the current EXIT trap (informational)
 # ============================================================
-# uninstall.sh does NOT install its own EXIT trap. Any EXIT
-# trap the root manager may have installed remains in place.
 FUNCTIONS_LOADED=0
 log_msg "Using inline cleanup (self-contained uninstaller)"
 
 # ============================================================
 # [8] Internal cleanup functions (self-contained)
 # ============================================================
-# _kill_watchdogs_by_pattern — kills every live watchdog.sh
-# regardless of PID file state.
-#
-# Uses ps + grep (NOT pgrep -f, which would match this very
-# shell's argv when the script name contains "watchdog.sh").
-# Without this function, a ghost watchdog whose PID file was
-# lost or reused would survive a PID-file-based kill and
-# start fighting the freshly reinstalled watchdog for restart
-# attempts.
-#
-# Returns 0 on success (all watchdogs dead within 3s), 1 on
-# timeout (some survived — likely D-state).
 _kill_watchdogs_by_pattern() {
     local wd_pids
     wd_pids=$(ps -A -o PID,ARGS 2>/dev/null \
@@ -451,17 +340,6 @@ _kill_watchdogs_by_pattern() {
     return 1
 }
 
-# _inline_kill_all terminates daemons and WAITS for exit.
-#
-# Order:
-#   1. pkill -9 for proxy and webui.
-#   2. Pattern-based kill for watchdog.sh (regardless of PID
-#      file state).
-#   3. Poll for actual death (100 ms × 30 = 3 s max). A
-#      process in D-state (uninterruptible sleep on I/O) may
-#      survive SIGKILL briefly.
-#   4. fuser -k on the DNS ports (catches a process bound to
-#      5354/udp or 5354/tcp but not named dnscrypt-proxy).
 _inline_kill_all() {
     local _ki_wait=0
     local _ki_alive=0
@@ -501,19 +379,6 @@ _inline_kill_all() {
     fi
 }
 
-# _inline_cleanup_firewall — orphan prevention.
-#
-# Strategy:
-#   1. Delete the DNSCRYPT_OUT / DNSCRYPT_OUT6 Custom Chains.
-#   2. Best-effort legacy cleanup (rules from older versions).
-#   3. No dependency on functions.sh (self-contained).
-#
-# Synchronization note:
-#   This function removes the same SET of rules as:
-#     • customize.sh    : _inline_cleanup_firewall
-#     • post-fs-data.sh : inline_firewall_cleanup
-#     • functions.sh    : manage_firewall 0
-#   Any change to the RULES removed MUST be applied to all four.
 _inline_cleanup_firewall() {
     if command -v nft >/dev/null 2>&1; then
         nft delete table inet dnscrypt_filter 2>/dev/null
@@ -592,19 +457,6 @@ _inline_cleanup_firewall() {
 # ============================================================
 # [9] Resolve transaction directories
 # ============================================================
-# Case handling:
-#   • "COMMIT"   — removed. The install succeeded; the
-#                  directory is a leftover from an interrupted
-#                  cleanup step, not user data.
-#   • "ROLLBACK" — removed. The rollback was applied.
-#   • "START"    — renamed to orphan-txn-*, preserved.
-#   • ""/other   — renamed to orphan-txn-*, preserved.
-#
-# The rename prefix is `orphan-` prepended to the original
-# name with the `txn-` prefix stripped:
-#   txn-20260101-120000-1234  →  orphan-20260101-120000-1234
-# This preserves the timestamp and PID, letting a user
-# correlate an orphan with a specific failed install in the log.
 ORPHAN_TXN_CLEANED=0
 ORPHAN_TXN_RENAMED=0
 
@@ -671,19 +523,6 @@ fi
 # ============================================================
 # [11] Main cleanup
 # ============================================================
-# The cleanup runs exactly ONCE. The single invocation is:
-#   • Inline: _inline_kill_all + _inline_cleanup_firewall.
-#
-# _inline_kill_all:
-#   - kills dnscrypt-proxy and dnscrypt-webui,
-#   - kills watchdog.sh via pattern (v1.5.0+fix),
-#   - polls for actual death (0.1s × 30),
-#   - fuser -k on the DNS ports.
-#
-# _inline_cleanup_firewall:
-#   - nftables: delete the dnscrypt_filter table,
-#   - iptables: flush/delete DNSCRYPT_OUT + legacy cleanup,
-#   - ip6tables: flush/delete DNSCRYPT_OUT6.
 log_msg "🧹 Starting cleanup..."
 _inline_kill_all
 _inline_cleanup_firewall
@@ -692,14 +531,6 @@ log_msg "✅ Process & firewall cleanup completed"
 # ============================================================
 # [12] Reset DNS settings
 # ============================================================
-# Removes the module's changes to three system settings:
-#
-#   1. private_dns_mode
-#   2. net.ipv4.conf.all.route_localnet
-#   3. ndc resolver flushdefaultif
-#
-# All three are best-effort: a failure at any step is logged
-# but does not abort the uninstall.
 log_msg "🔄 Resetting DNS settings..."
 
 _wait=0
@@ -747,12 +578,6 @@ log_msg "✅ DNS reset completed"
 # ============================================================
 # [13] Cleanup run/ files
 # ============================================================
-# The module's run directory is at $MODDIR/proxy/run/. It
-# holds all runtime state. Removed with a single `rm -rf`.
-#
-# The success check is `[ ! -d "$RUN_DIR" ]` — it verifies
-# the directory is actually gone, rather than trusting `rm`'s
-# exit code.
 log_msg "🗑️  Removing run/ files..."
 
 RUN_COUNT=0
@@ -770,25 +595,10 @@ fi
 # ============================================================
 # [14] Cleanup runtime files (in /data/local/tmp)
 # ============================================================
-# ⚠️ IMPORTANT: this section removes `dnscrypt_main.log` and
-# then sets `LOG_DISABLED=1`. After this point, `log_msg()`
-# becomes a silent no-op — the file is NOT re-created by any
-# subsequent section.
-#
-# Categories of files removed:
-#   a) PID files (7 paths)
-#   b) STATUS + progress files (2 paths)
-#   c) Credentials files (2 paths)
-#   d) Log files (8 paths)
-#   e) Log rotation sidecars (patterns)
-#   f) Filter caches (patterns)
-#   g) Bootstrap cache (2 paths)
-#   h) Stale locks from crashed starts (v1.5.0+fix)
 log_msg "🗑️  Removing runtime files from /data/local/tmp..."
 
 RUNTIME_COUNT=0
 
-# --- (a) PID files ---
 for f in /data/local/tmp/dnscrypt.pid \
          /data/local/tmp/webui.pid \
          /data/local/tmp/watchdog.pid \
@@ -801,7 +611,6 @@ for f in /data/local/tmp/dnscrypt.pid \
     fi
 done
 
-# --- (b) Status + progress files ---
 for f in /data/local/tmp/dnscrypt.status \
          /data/local/tmp/update_progress.txt; do
     if [ -f "$f" ]; then
@@ -809,7 +618,6 @@ for f in /data/local/tmp/dnscrypt.status \
     fi
 done
 
-# --- (c) Credentials files ---
 for f in /data/local/tmp/dnscrypt_credentials.txt \
          /data/local/tmp/.dnscrypt_credentials_shown; do
     if [ -f "$f" ]; then
@@ -817,7 +625,6 @@ for f in /data/local/tmp/dnscrypt_credentials.txt \
     fi
 done
 
-# --- (d) Log files ---
 for f in /data/local/tmp/dnscrypt_install.log \
          /data/local/tmp/dnscrypt-query.log \
          /data/local/tmp/dnscrypt-blocked.log \
@@ -831,7 +638,6 @@ for f in /data/local/tmp/dnscrypt_install.log \
     fi
 done
 
-# --- (e) Log rotation sidecars ---
 for pattern in \
     "/data/local/tmp/dnscrypt_main.log.*.old" \
     "/data/local/tmp/dnscrypt_main.log.old" \
@@ -845,7 +651,6 @@ for pattern in \
     done
 done
 
-# --- (f) Filter caches ---
 for pattern in \
     "/data/local/tmp/*.filtered" \
     "/data/local/tmp/*.filtered.count" \
@@ -857,7 +662,6 @@ for pattern in \
     done
 done
 
-# --- (g) Bootstrap cache (both locations) ---
 for f in "$RUN_DIR/.bootstrap_cache" \
          "/data/local/tmp/.bootstrap_cache"; do
     if [ -f "$f" ]; then
@@ -865,13 +669,6 @@ for f in "$RUN_DIR/.bootstrap_cache" \
     fi
 done
 
-# --- (h) Stale locks from crashed starts (v1.5.0+fix) ---
-# main.go and watchdog.sh use atomic mkdir locks under
-# $RUN_DIR. If the module was uninstalled while a start was
-# in progress (rare but possible), the locks could remain
-# under /data/local/tmp (the fallback location). §[13] removed
-# $RUN_DIR entirely, but the /data/local/tmp copies are
-# removed here.
 for f in /data/local/tmp/.service.start.lock \
          /data/local/tmp/.watchdog.pid.lock; do
     if [ -d "$f" ]; then
@@ -879,26 +676,14 @@ for f in /data/local/tmp/.service.start.lock \
     fi
 done
 
-# ------------------------------------------------------------
-# Disable logging from this point forward.
-# The log file has just been removed above. Any subsequent
-# log_msg() call would re-create it — the LOG_DISABLED flag
-# short-circuits those calls.
-# ------------------------------------------------------------
 LOG_DISABLED=1
 
 # ============================================================
 # [15] Cleanup module configuration files
 # ============================================================
-# Removes every configuration and state file from $BIN_DIR.
-# After this section, the directory should contain only the
-# binaries. The root manager will remove the entire module
-# folder after this script exits, so the removal here is
-# defensive.
 MODULE_COUNT=0
 
 if [ -d "$BIN_DIR" ]; then
-    # --- (a) Profile + WebUI config ---
     for f in selected_profile.txt \
              webui.conf \
              webui.conf.tmp \
@@ -909,7 +694,6 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
-    # --- (b) Blocklist files ---
     for f in blocklist.txt \
              blocklist.txt.tmp \
              blocklist.txt.bak \
@@ -927,7 +711,6 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
-    # --- (c) Allowlist + denylist ---
     for f in allowlist.txt \
              allowlist.txt.tmp_write \
              denylist.txt \
@@ -937,14 +720,12 @@ if [ -d "$BIN_DIR" ]; then
         fi
     done
 
-    # --- (d) Auth files (legacy) ---
     for f in auth.json .auth_token; do
         if [ -f "$BIN_DIR/$f" ]; then
             rm -f "$BIN_DIR/$f" 2>/dev/null && MODULE_COUNT=$((MODULE_COUNT + 1))
         fi
     done
 
-    # --- (e) Resolver lists ---
     for f in public-resolvers.md \
              public-resolvers.md.minisig \
              relays.md \
@@ -958,12 +739,6 @@ fi
 # ============================================================
 # [16] Remove module fingerprint and disable file
 # ============================================================
-# Two files in the module root:
-#
-#   • .module.fingerprint — a single-line marker written by
-#     customize.sh §[20]. Read by main.go:checkOldModules()
-#     and main.go:removeModule().
-#   • disable — the Magisk/KernelSU "module disabled" marker.
 if [ -f "$MODDIR/.module.fingerprint" ]; then
     rm -f "$MODDIR/.module.fingerprint" 2>/dev/null
 fi
@@ -975,19 +750,6 @@ fi
 # ============================================================
 # [16b] Remove recovery triggers
 # ============================================================
-# Two recovery-trigger files exist:
-#
-#   • RECOVERY_TRIGGER_1 = $MODDIR/recovery
-#     In-module trigger. Removed here because if the module
-#     folder is left in place (partial uninstall, or
-#     reinstall-triggered race), a leftover trigger would
-#     spuriously enter recovery mode on the next install.
-#
-#   • RECOVERY_TRIGGER_2 = /data/adb/dnscrypt-recovery
-#     External trigger. Magisk does NOT remove it when the
-#     module is uninstalled. Its only meaning is "the NEXT
-#     install should enter recovery mode". Once the module is
-#     gone, that meaning is void — so the file is removed here.
 RECOVERY_TRIGGER_REMOVED=0
 RECOVERY_TRIGGER_INTERNAL_REMOVED=0
 
@@ -1006,48 +768,17 @@ fi
 # ============================================================
 # [17] PRESERVE the persistent backup directory
 # ============================================================
-# This section is the counterpart to [10]'s legacy cleanup.
-# Where [10] removes the v1.0.0 backup at
-# /data/local/tmp/dnscrypt_backup_uninstall/, [17] explicitly
-# PRESERVES the v1.2.0+ backup at /sdcard/dnscrypt-webui-backup/.
-#
-# The preservation is not implemented by an action — there is
-# no `mv` or `cp` here. The directory survives because NOTHING
-# in this script touches it.
-#
-# [18] reports what will survive, so the user sees the
-# preservation in the output before the script exits.
-# ============================================================
+# Intentionally left blank. The directory survives because
+# nothing in this script deletes it.
 
 # ============================================================
 # [17b] Compute the FINAL orphan-txn count
 # ============================================================
-# The initial BACKUP_ORPHAN_COUNT ([5b]) was captured BEFORE
-# [9] renamed any START/no-state transactions. The final report
-# must reflect the post-rename count.
 BACKUP_ORPHAN_FINAL=$((BACKUP_ORPHAN_COUNT + ORPHAN_TXN_RENAMED))
 
 # ============================================================
 # [18] User-facing final message
 # ============================================================
-# The counterpart to the (removed) log-based summary. This
-# section prints a human-friendly message to stdout. The
-# Magisk/KernelSU manager captures this stdout and shows it
-# to the user after the uninstall completes.
-#
-# Three cases drive the message body:
-#   Case A: backup dir exists AND has ≥ 1 snapshot
-#   Case B: backup dir exists but is empty
-#   Case C: backup dir does not exist
-#
-# Two optional blocks may be appended:
-#   • Orphan transaction notice (if BACKUP_ORPHAN_FINAL > 0).
-#   • Recovery trigger notice (if either trigger was removed).
-#
-# Note: [14] set LOG_DISABLED=1. From that point on, log_msg
-# is a silent no-op. This section uses raw `echo` (unaffected
-# by LOG_DISABLED) and is therefore the canonical place for
-# user-facing output.
 echo ""
 echo "════════════════════════════════════════════════════════════"
 echo "  DNSCrypt Smart Filter — Uninstall Complete"
@@ -1113,13 +844,6 @@ else
     echo "  so there is nothing to preserve."
 fi
 
-# ------------------------------------------------------------------
-# Orphan transaction notice
-# ------------------------------------------------------------------
-# Uses the FINAL count (BACKUP_ORPHAN_FINAL) which includes any
-# txn-* directories that [9] renamed to orphan-txn-* during
-# this run.
-# ------------------------------------------------------------------
 if [ "$BACKUP_ORPHAN_FINAL" -gt 0 ]; then
     echo ""
     echo "  ⚠️  Unfinished transactions were PRESERVED:"
@@ -1138,9 +862,6 @@ if [ "$BACKUP_ORPHAN_FINAL" -gt 0 ]; then
     echo "     su -c \"cat $PERSISTENT_BACKUP/orphan-txn-*/.state\""
 fi
 
-# ------------------------------------------------------------------
-# Recovery trigger notice
-# ------------------------------------------------------------------
 if [ "$RECOVERY_TRIGGER_REMOVED" = "1" ]; then
     echo ""
     echo "  ℹ️  A pending recovery trigger was removed:"
@@ -1154,9 +875,6 @@ if [ "$RECOVERY_TRIGGER_INTERNAL_REMOVED" = "1" ]; then
     echo "     $RECOVERY_TRIGGER_1"
 fi
 
-# ------------------------------------------------------------------
-# Companion app notice
-# ------------------------------------------------------------------
 echo ""
 echo "  ℹ️  The companion Android app is not affected by this uninstall:"
 echo "       • The module-internal APK is removed with the module folder."
@@ -1164,9 +882,6 @@ echo "       • The /sdcard/.../apk/ mirror survives (see above)."
 echo "       • Any separately-installed companion app remains on your"
 echo "         device — uninstall it from Android Settings if desired."
 
-# ------------------------------------------------------------------
-# Cleanup notices
-# ------------------------------------------------------------------
 if [ "$RUN_COUNT" = "1" ]; then
     echo ""
     echo "  🧹 Runtime directory (run/) was removed."
@@ -1185,17 +900,5 @@ echo ""
 
 # ============================================================
 # [19] Exit
-# ============================================================
-# No final `rm -f "$LOG_FILE"` is needed:
-#
-#   [14] removed $LOG_FILE and set LOG_DISABLED=1. From that
-#   point on, log_msg became a silent no-op, so [15]..[18] did
-#   NOT re-create the log file.
-#
-# The exit code is 0 — the uninstall completed successfully.
-# Errors during the cleanup phases were logged and reported
-# above, but the script's contract is "best-effort teardown":
-# the root manager removes the module folder after this
-# script exits regardless of any individual cleanup step.
 # ============================================================
 exit 0

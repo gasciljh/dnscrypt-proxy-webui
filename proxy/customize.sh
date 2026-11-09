@@ -204,7 +204,6 @@ write_manifest() {
     local manifest="$target_dir/.manifest.json"
 
     local version_escaped=$(json_escape "$MODULE_VERSION")
-    local timestamp_escaped=$(json_escape "$BACKUP_TIMESTAMP")
     local src_escaped=$(json_escape "$source")
     local root_escaped=$(json_escape "$ROOT_SOLUTION")
 
@@ -221,10 +220,15 @@ write_manifest() {
     done
     files_json="${files_json%,}"
 
+    # PREMIUM FIX: Use the SAME timestamp as the directory name
+    # to guarantee perfect consistency between the directory name
+    # and the manifest contents (no 1-second drift).
+    local ts="${BACKUP_TIMESTAMP:-$(date -u +%Y%m%d-%H%M%S)}"
+
     cat > "$manifest" << EOF
 {
   "version": "$version_escaped",
-  "timestamp": "$timestamp_escaped",
+  "timestamp": "$ts",
   "source": "$src_escaped",
   "root_solution": "$root_escaped",
   "files_count": $count,
@@ -315,26 +319,18 @@ CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP/current"
 
 if [ ! -d "$PERSISTENT_BACKUP/current" ]; then
     _newest_snap=""
-    _newest_mtime=0
     
-    for _d in "$PERSISTENT_BACKUP"/*; do
-        [ -d "$_d" ] || continue
-        [ -f "$_d/.manifest.json" ] || continue
-        
-        case "$(basename "$_d")" in
-            current|txn-*|orphan-txn-*|apk) continue ;;
-        esac
-        
-        _mtime=$(stat -c %Y "$_d" 2>/dev/null || stat -f %m "$_d" 2>/dev/null || echo 0)
-        if [ "$_mtime" -gt "$_newest_mtime" ]; then
-            _newest_mtime="$_mtime"
-            _newest_snap="$_d"
-        fi
-    done
+    _list=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && for _d in */; do
+        _d="${_d%/}"
+        case "$_d" in current|txn-*|orphan-txn-*|apk) continue ;; esac
+        [ -f "$_d/.manifest.json" ] && echo "$_d"
+    done | LC_ALL=C sort -r)
+    
+    _newest_snap=$(printf '%s\n' "$_list" | head -n 1)
     
     if [ -n "$_newest_snap" ]; then
-        CANDIDATE_SOURCES="$CANDIDATE_SOURCES $_newest_snap"
-        echo "Smart Fallback (Normal Install): Found newest snapshot at $_newest_snap" >> "$INSTALL_LOG"
+        CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP/$_newest_snap"
+        echo "Smart Fallback (Normal Install): Found newest snapshot at $PERSISTENT_BACKUP/$_newest_snap" >> "$INSTALL_LOG"
     fi
 fi
 
@@ -414,7 +410,6 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
     ui_print "  🚨 RECOVERY MODE ACTIVATED"
     ui_print "  ─────────────────────────────"
 
-    # 1. First Priority: Last Stable
     if [ -f "$PERSISTENT_BACKUP/.last_stable" ]; then
         LAST_STABLE=$(cat "$PERSISTENT_BACKUP/.last_stable" 2>/dev/null | tr -d '\r\n ')
         if [ -n "$LAST_STABLE" ] && [ -d "$PERSISTENT_BACKUP/$LAST_STABLE" ]; then
@@ -423,43 +418,34 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
         fi
     fi
 
-    # 2. Second Priority: Current
     if [ -z "$RESTORE_SOURCE" ] && [ -d "$PERSISTENT_BACKUP/current" ]; then
         RESTORE_SOURCE="$PERSISTENT_BACKUP/current"
         ui_print "  → Using: current (live snapshot)"
     fi
 
-    # 3. Third Priority: Smart Fallback (Newest Manual)
     if [ -z "$RESTORE_SOURCE" ]; then
         ui_print "  → Searching for newest valid manual/auto snapshot..."
         
         _newest_snap=""
-        _newest_mtime=0
         
-        for _d in "$PERSISTENT_BACKUP"/*; do
-            [ -d "$_d" ] || continue
-            [ -f "$_d/.manifest.json" ] || continue
-            case "$(basename "$_d")" in
-                current|txn-*|orphan-txn-*|apk) continue ;;
-            esac
-            _mtime=$(stat -c %Y "$_d" 2>/dev/null || stat -f %m "$_d" 2>/dev/null || echo 0)
-            if [ "$_mtime" -gt "$_newest_mtime" ]; then
-                _newest_mtime="$_mtime"
-                _newest_snap="$_d"
-            fi
-        done
+        _list=$(cd "$PERSISTENT_BACKUP" 2>/dev/null && for _d in */; do
+            _d="${_d%/}"
+            case "$_d" in current|txn-*|orphan-txn-*|apk) continue ;; esac
+            [ -f "$_d/.manifest.json" ] && echo "$_d"
+        done | LC_ALL=C sort -r)
+        
+        _newest_snap=$(printf '%s\n' "$_list" | head -n 1)
 
-        if [ -n "$_newest_snap" ] && [ -d "$_newest_snap" ]; then
-            if verify_backup_integrity "$_newest_snap" 1; then
-                RESTORE_SOURCE="$_newest_snap"
-                ui_print "  → Using: $(basename "$_newest_snap") (Smart Fallback)"
+        if [ -n "$_newest_snap" ] && [ -d "$PERSISTENT_BACKUP/$_newest_snap" ]; then
+            if verify_backup_integrity "$PERSISTENT_BACKUP/$_newest_snap" 1; then
+                RESTORE_SOURCE="$PERSISTENT_BACKUP/$_newest_snap"
+                ui_print "  → Using: $_newest_snap (Smart Fallback)"
             else
                 ui_print "  ⚠️ Newest snapshot failed integrity check, ignoring."
             fi
         fi
     fi
 
-    # 4. Fourth Priority: In-place Fallback
     if [ -z "$RESTORE_SOURCE" ] && [ -n "$FOUND_SOURCE" ]; then
         RESTORE_SOURCE="$FOUND_SOURCE"
         ui_print "  → Using: $FOUND_SOURCE (in-place)"
@@ -572,7 +558,7 @@ ui_print "- 🔥 Firewall rules cleaned"
 echo "Firewall cleanup attempted (Custom Chain + Legacy)" >> "$INSTALL_LOG"
 
 # [8c] Begin transactional upgrade
-BACKUP_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+BACKUP_TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
 BACKUP_DIR_NAME="${BACKUP_TIMESTAMP}-${MODULE_VERSION}-$$"
 BACKUP_DIR="$PERSISTENT_BACKUP/$BACKUP_DIR_NAME"
 
@@ -1656,10 +1642,10 @@ rotate_backups() {
             [ -d "$_d" ] || continue
             case "$_d" in current|txn-*|orphan-txn-*|.restore_snap.*|apk) continue ;; esac
             [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) || _mt=$(stat -f %m "$_d" 2>/dev/null) || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | LC_ALL=C sort -rn -k1,1
+            _ts=$(printf "%s" "$_d" | cut -d'-' -f1,2)
+            case "$_ts" in ''|*[!0-9-]*) _ts="00000000-000000" ;; esac
+            printf '%s %s\n' "$_ts" "$_d"
+        done | LC_ALL=C sort -r -k1,1
     )
 
     [ -z "$_list" ] && return 0
@@ -1675,8 +1661,8 @@ rotate_backups() {
         printf '%s\n' "$_list" | grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | head -n1 | awk '{print $2}'
     )
 
-    local _mt _name
-    while IFS=' ' read -r _mt _name; do
+    local _ts _name
+    while IFS=' ' read -r _ts _name; do
         [ -z "$_name" ] && continue
         if [ "$_name" = "$_protected" ]; then continue; fi
         if [ "$_name" = "$_newest_install" ]; then continue; fi

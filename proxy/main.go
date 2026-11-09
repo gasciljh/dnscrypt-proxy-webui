@@ -581,7 +581,6 @@ var (
 	backupQueue = make(chan string, 20)
 )
 
-// Read webui.conf settings
 func readConfValue(key, defaultValue string) (result string) {
 	result = defaultValue
 	defer func() { recover() }()
@@ -3620,6 +3619,7 @@ func buildBackupInfo() map[string]interface{} {
 		"orphan_txn":       0,
 		"last_backup":      nil,
 		"last_backup_name": nil,
+		"last_backup_unix": nil,
 		"last_stable":      nil,
 		"path":             PERSISTENT_BACKUP,
 	}
@@ -3666,19 +3666,22 @@ func buildBackupInfo() map[string]interface{} {
 	info["orphan_txn"] = orphanTxn
 
 	if len(snapshots) > 0 {
+		// PREMIUM FIX: Sort by directory name (YYYYMMDD-HHMMSS) which guarantees perfect chronological order
 		sort.Slice(snapshots, func(i, j int) bool {
-			fi, errI := snapshots[i].Info()
-			fj, errJ := snapshots[j].Info()
-			if errI != nil || errJ != nil {
-				return snapshots[i].Name() < snapshots[j].Name()
-			}
-			return fi.ModTime().Before(fj.ModTime())
+			return snapshots[i].Name() < snapshots[j].Name()
 		})
+		
 		newest := snapshots[len(snapshots)-1]
 		info["last_backup_name"] = newest.Name()
 
-		if fi, err := newest.Info(); err == nil {
-			info["last_backup"] = fi.ModTime().Format("2006-01-02 15:04:05")
+		// PREMIUM FIX: Extract timestamp from directory name instead of ModTime
+		parts := strings.Split(newest.Name(), "-")
+		if len(parts) >= 2 && len(parts[0]) == 8 && len(parts[1]) == 6 {
+			tsStr := parts[0] + parts[1]
+			if t, err := time.Parse("20060102150405", tsStr); err == nil {
+				info["last_backup_unix"] = t.Unix()
+				info["last_backup"] = t.Format("2006-01-02 15:04:05 UTC")
+			}
 		}
 	}
 
@@ -4946,15 +4949,14 @@ func createAutoBackup(reason string) {
 		return -1
 	}, reason)
 
-	ts := time.Now().Format("20060102-150405")
+	// PREMIUM FIX: Use UTC for backup directory names
+	ts := time.Now().UTC().Format("20060102-150405")
 	randBytes := make([]byte, 2)
 	_, _ = rand.Read(randBytes)
 	randSuffix := hex.EncodeToString(randBytes)
 	targetDir := fmt.Sprintf("%s/%s-manual-%d-%s",
 		PERSISTENT_BACKUP, ts, os.Getpid(), randSuffix)
 
-	// PREMIUM FIX: Pass BuildVersion to ensure the manifest records
-	// the correct module version instead of "unknown".
 	cmd := fmt.Sprintf(
 		". %s; ensure_backup_dir >/dev/null 2>&1; "+
 			"backup_user_files %s %s %s && "+

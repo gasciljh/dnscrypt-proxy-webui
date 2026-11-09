@@ -217,10 +217,6 @@
         button:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
 
-        /* Card-expand hint: centered in the viewport, so it cannot
-           overlap content regardless of the sticky section-nav's
-           height, card position, orientation, font scale, or
-           language. */
         .card-hint {
             position: fixed;
             top: 50%;
@@ -603,12 +599,6 @@ function updateBackToHomeLinks() {
 // ============================================================
 // [2] Token helpers — cookie-only
 // ============================================================
-// Auth is cookie-only (HttpOnly `dnscrypt_session`). These are
-// intentional no-ops kept for backward compatibility with the
-// XHR helper's `Authorization: Bearer` code path, which is
-// dormant because getStoredToken() always returns null.
-// Do NOT add Bearer token support here — the server never
-// issues one (see SECURITY.md §8.1).
 function getStoredToken() { return null; }
 function storeToken(tk) { void tk; }
 function clearStoredToken() { }
@@ -684,6 +674,31 @@ function formatMtime(mtime) {
     var hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
     return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
 }
+
+// PREMIUM FIX: Convert a backup directory name
+// (format: YYYYMMDD-HHMMSS-...) to local device time.
+// Returns null if the string is not a valid directory name.
+function dirNameToLocalTime(name) {
+    if (!name) return null;
+    var m = name.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+    if (!m) return null;
+    var utcDate = new Date(Date.UTC(
+        parseInt(m[1], 10),
+        parseInt(m[2], 10) - 1,
+        parseInt(m[3], 10),
+        parseInt(m[4], 10),
+        parseInt(m[5], 10),
+        parseInt(m[6], 10)
+    ));
+    if (isNaN(utcDate.getTime())) return null;
+    var opts = {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    };
+    return utcDate.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', opts);
+}
+
 function fileIcon(name) {
     if (name.indexOf('query') !== -1) return '📊';
     if (name.indexOf('blocked-ips') !== -1) return '🚫';
@@ -700,12 +715,6 @@ function fileIcon(name) {
 // ============================================================
 // [5] Modal
 // ============================================================
-// pendingConfirmCallback is ALWAYS set to a function — never
-// null. Callers may pass null safely; the no-op fallback
-// keeps the click listeners in §[19] functional.
-//
-// Focus moves INTO the modal when it opens. Deferred to rAF
-// so the browser has finished laying out the modal.
 function showConfirmModal(message, callback, options) {
     options = options || {};
     $('modalMessage').textContent = message;
@@ -898,8 +907,18 @@ function renderRuntimeInfo(data) {
     var bk = data.backups || {};
     var bkCount = Number(bk.available) || 0;
     var bkPath = bk.path || t('riBackupNotInit');
-    var bkLast = bk.last_backup_name || bk.last_backup || null;
-    var bkLastStable = bk.last_stable || null;
+
+    // PREMIUM FIX: Convert raw directory names to local time.
+    // Fallback chain: local-time from dirName → raw name → null.
+    var bkLast = dirNameToLocalTime(bk.last_backup_name) ||
+                 dirNameToLocalTime(bk.last_backup) ||
+                 bk.last_backup_name ||
+                 bk.last_backup ||
+                 null;
+    var bkLastStable = dirNameToLocalTime(bk.last_stable) ||
+                       bk.last_stable ||
+                       null;
+
     var bkInFlight = Number(bk.in_flight_txn) || 0;
     var bkOrphan = Number(bk.orphan_txn) || 0;
 
@@ -1187,19 +1206,6 @@ function showMsg(text, type, duration) {
 // ============================================================
 // [10b] Card-expand hint
 // ============================================================
-// Shown ONLY when the user clicks a section-nav button that
-// points to a collapsed card. Never shown on manual scroll.
-//
-// The hint lifecycle uses TWO timers:
-//   cardHintTimer       — 4 s "visible" window
-//   cardHintRemoveTimer — 400 ms fade-out before DOM removal
-// Both are cleared together so a rapid re-trigger cannot leave
-// a stale removal timer running.
-//
-// The hint is scheduled via scrollend when available, with a
-// 400 ms setTimeout fallback. Both paths share a single
-// cardHintScheduled guard so the hint fires at most once per
-// navigation click.
 function showCardHint() {
     var existing = document.getElementById('__cardHint');
     if (existing) {
@@ -1240,10 +1246,6 @@ function resetCardHintTimer(hintEl) {
 // ============================================================
 // [11] Diagnostics + network-down UI
 // ============================================================
-// setNetworkDownUI(true) sets the SSE label to the networkDown
-// string. Any subsequent updateDiagnostics() overwrites it with
-// the real SSE state — updateDiagnostics is the single source
-// of truth for that label.
 function setNetworkDownUI(isDown) {
     var txt = $('diagSse');
     if (!txt) return;
@@ -1253,17 +1255,11 @@ function setNetworkDownUI(isDown) {
         txt.style.color = 'var(--warning)';
         $('sseDot').className = 'sse-dot disconnected';
     }
-    // When isDown=false, leave the text for updateDiagnostics()
-    // to restore — it knows the real SSE state.
-
 }
 
 function updateDiagnostics() {
     var sseEl = $('diagSse');
     if (networkDownActive) {
-        // The fetch path already reported "network down". Do not
-        // overwrite it with the less-specific "SSE: Disconnected"
-        // until the network actually recovers (setNetworkDownUI(false)).
         sseEl.textContent = t('networkDown');
         sseEl.style.color = 'var(--warning)';
         $('sseDot').className = 'sse-dot disconnected';
@@ -1280,22 +1276,11 @@ function updateDiagnostics() {
     if (lastRefreshTime) refreshEl.textContent = t('diagLastRefresh') + formatLocalTime(lastRefreshTime);
     else refreshEl.textContent = t('diagLastRefresh') + t('never');
     $('diagFailures').textContent = t('diagFailures') + failureCount;
-
 }
 
 // ============================================================
 // [12] UI strings
 // ============================================================
-// The first two nav links must point at the real card IDs
-// (runtimeInfoCard, diagFilesCard). The pre-patch dash-cased
-// values (#runtime-info / #diag-files) matched no element.
-//
-// The modal string reset lines that used to live here have
-// been REMOVED. The modal writes its own text on every
-// showConfirmModal() invocation. Having updateUIStrings()
-// ALSO write them created a latent bug: a language toggle
-// while the modal was open would clobber any caller-supplied
-// custom title.
 function updateNavLinks() {
     var nav = $('sectionNav');
     var links = [
@@ -1525,8 +1510,6 @@ function toggleIdleResolvers() {
         xhr.timeout = 15000;
         xhr.onload = function() {
             if (xhr.status === 401) {
-                // Reset isRefreshing BEFORE calling handleSessionExpired
-                // so the refresh pipeline is never left blocked.
                 isRefreshing = false;
                 var refreshBtn = $('refreshBtn');
                 if (refreshBtn) refreshBtn.classList.remove('spinning');
@@ -1750,16 +1733,6 @@ function toggleIdleResolvers() {
 // ============================================================
 // [18] Session expired
 // ============================================================
-// The Dashboard has NO login form. Two distinct cases:
-//
-//   1. Cold start (no cached data yet): the user opened the
-//      Dashboard without a session. Navigate directly to the
-//      WebUI URL, which hosts the login form. This avoids
-//      the reload-loop that the pre-patch modal produced.
-//
-//   2. Mid-session expiry (data was already loaded): show a
-//      modal whose primary action navigates to the WebUI.
-//      The modal is informational; the redirect is the exit.
     function handleSessionExpired() {
         if (sessionExpired) return;
         sessionExpired = true;
@@ -1777,14 +1750,11 @@ function toggleIdleResolvers() {
         if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
 
-        // Case 1 — cold start. No data yet → redirect immediately.
         if (!dataCache) {
             window.location.replace(getWebUIUrl());
             return;
         }
 
-        // Case 2 — mid-session expiry. The modal's primary action
-        // is the redirect; there is no reload.
         showConfirmModal(t('sessionExpiredMsg'), null, {
             title: t('sessionExpiredTitle'),
             primaryText: t('sessionRelogin'),
@@ -1797,15 +1767,6 @@ function toggleIdleResolvers() {
 // ============================================================
 // [19] Bind events
 // ============================================================
-// The three modal listeners ALWAYS call closeConfirmModal(),
-// even when pendingConfirmCallback is null. Combined with the
-// no-op fallback installed by showConfirmModal(), this
-// guarantees that Cancel, Confirm, and backdrop clicks always
-// dismiss the dialog.
-//
-// Escape closes an open confirm modal. The listener is
-// registered once on the document; the `display === 'flex'`
-// guard is the gate.
     function bindEvents() {
         $('refreshBtn').addEventListener('click', manualRefresh);
         $('langToggle').addEventListener('click', toggleLanguage);
@@ -1854,21 +1815,6 @@ function toggleIdleResolvers() {
             diagCard.classList.toggle('open');
         });
 
-        // ------------------------------------------------------
-        // Section-nav click handler for collapsed cards
-        // ------------------------------------------------------
-        // Shown ONLY on an explicit nav button click. Manual scroll
-        // never triggers the hint.
-        //
-        // The hint is scheduled via scrollend when the browser
-        // supports it, with a 400 ms setTimeout fallback. Both
-        // paths share a single cardHintScheduled guard so the
-        // hint fires at most once per navigation click.
-        //
-        // Feature detection: `scrollend` is exposed via
-        // GlobalEventHandlers, which lives on the window prototype
-        // chain. Testing `'onscrollend' in document` always returns
-        // false — the event name is on window, not on document.
         var nav = $('sectionNav');
         nav.addEventListener('click', function(e) {
             var link = e.target.closest('a[href^="#"]');
@@ -1907,8 +1853,6 @@ function toggleIdleResolvers() {
 // ============================================================
 // [21] Boot
 // ============================================================
-// installControllerChangeHandler() is invoked from
-// setupSWUpdateHandler() below — no direct call here.
     function boot() {
         document.documentElement.lang = currentLang;
         document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
@@ -1920,8 +1864,6 @@ function toggleIdleResolvers() {
         bindEvents();
         bindSWUpdateButtons();
 
-        // Defensive: clear the `loading` class from the "Open WebUI"
-        // link if it was ever set.
         var ndAction = $('ndAction');
         if (ndAction) {
             dashboardLinkFallbackTimer = setTimeout(function() {

@@ -915,21 +915,11 @@
     var currentUpdateState = 'checking';
     var isCheckingUpdates = false;
 
-    // PREMIUM: completion guard prevents double handling from SSE + poller.
-    // Stays true after completion until a new update starts.
     var updateCompletionHandled = false;
-
-    // PREMIUM: last known good update state (survives transient
-    // network failures, so the UI doesn't flip to "Check Failed" on
-    // every hiccup while another app is downloading).
     var lastKnownUpdateState = null;
-
-    // PREMIUM: silent retry with exponential backoff
     var updateCheckRetryTimer = null;
     var updateCheckRetryDelay = 5000;
     var UPDATE_CHECK_MAX_RETRY = 30000;
-
-    // PREMIUM: track consecutive failures (informational)
     var updateCheckFailures = 0;
 
     var $ = function(id) { return document.getElementById(id); };
@@ -1479,6 +1469,16 @@
             var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
             var bkPath      = bk.path || t('riBackupDirMissing');
 
+            if (bk.last_backup_unix) {
+                var d = new Date(bk.last_backup_unix * 1000);
+                var options = { 
+                    year: 'numeric', month: '2-digit', day: '2-digit', 
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hour12: false 
+                };
+                bkDate = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', options);
+            }
+
             var html = '';
             var items = [
                 { label: t('riVersion'), value: data.version || 'unknown' },
@@ -2018,11 +2018,6 @@
         verifyBackoff = 3000;
         sseBackoff = 5000;
 
-        // PREMIUM FIX: release any in-progress UI state that was
-        // orphaned by the session loss. Without this, a session
-        // expiring mid-update leaves isProcessing=true and every
-        // button disabled forever, because checkServerUpdateState
-        // skips when isProcessing is true.
         isProcessing = false;
         updateCompletionHandled = false;
         isCheckingUpdates = false;
@@ -2062,9 +2057,6 @@
         if (method === 'POST' && url.indexOf('update_profile') !== -1) return 310000;
         if (url.indexOf('install_companion_app') !== -1) return 120000;
         if (url.indexOf('toggle_service') !== -1 || url.indexOf('restart_service') !== -1) return 60000;
-        // PREMIUM: server-side check_update can take up to ~27s in
-        // worst-case network (3 attempts × 8s + backoff). Give the
-        // client 30s to avoid premature timeout / duplicate retries.
         if (url.indexOf('check_update') !== -1) return 30000;
         return 15000;
     }
@@ -2432,10 +2424,6 @@
         }
     }
 
-    // PREMIUM: resilient update check with stale-while-revalidate and
-    // silent retry with exponential backoff. The UI never flips to a
-    // scary "Check Failed" state on a transient network hiccup — it
-    // keeps the last known good state and retries in the background.
     function checkForUpdates(isManual) {
         if (currentProfileIsEmpty || rulesState.isSaving) {
             var wrapper = $('updateBtnWrapper');
@@ -2449,7 +2437,6 @@
         var wrapper = $('updateBtnWrapper');
         if (wrapper) wrapper.style.pointerEvents = 'none';
 
-        // Only show "checking" spinner if we don't have a stable state to display
         if (currentUpdateState !== 'up_to_date' && currentUpdateState !== 'available') {
             currentUpdateState = 'checking';
             updateSmartUpdateButtonUI();
@@ -2459,7 +2446,6 @@
             isCheckingUpdates = false;
             if (wrapper) wrapper.style.pointerEvents = 'auto';
 
-            // ---- SUCCESS PATH ----
             if (!err && data && data.status !== 'unknown') {
                 updateCheckFailures = 0;
                 updateCheckRetryDelay = 5000;
@@ -2468,7 +2454,6 @@
                     updateCheckRetryTimer = null;
                 }
 
-                // Server may mark the answer as stale (cached fallback).
                 var isStale = data.stale === true;
 
                 if (data.status === 'available') {
@@ -2489,18 +2474,14 @@
                         }
                     }
                 } else {
-                    // Server returned a cached fallback (network still flaky).
-                    // Keep showing it, but retry silently in the background.
                     scheduleUpdateCheckRetry();
                 }
                 return;
             }
 
-            // ---- FAILURE PATH ----
             updateCheckFailures++;
 
             if (lastKnownUpdateState) {
-                // Keep the last good state so the UI doesn't oscillate.
                 currentUpdateState = lastKnownUpdateState;
                 updateSmartUpdateButtonUI();
 
@@ -2511,7 +2492,6 @@
                 return;
             }
 
-            // No prior state — genuinely unknown (first check ever failed).
             currentUpdateState = 'unknown';
             updateSmartUpdateButtonUI();
 
@@ -2522,7 +2502,6 @@
         });
     }
 
-    // PREMIUM: silent retry with exponential backoff (5s → 10s → 20s → 30s cap)
     function scheduleUpdateCheckRetry() {
         if (updateCheckRetryTimer) clearTimeout(updateCheckRetryTimer);
         updateCheckRetryTimer = setTimeout(function() {
@@ -2672,10 +2651,6 @@
         }, 1000);
     }
 
-    // finishUpdateUI releases the UI but intentionally does NOT reset
-    // updateCompletionHandled. That flag stays true until a new update
-    // starts (executeProfileUpdate / attachToRunningUpdate reset it),
-    // preventing stale SSE/poller events from re-activating the UI.
     function finishUpdateUI() {
         isProcessing = false;
         $('applyBtn').disabled = false;
@@ -3191,7 +3166,6 @@
                 if (isProcessing || isCheckingUpdates || rulesState.isSaving) return;
 
                 if (currentUpdateState === 'up_to_date') {
-                    // PREMIUM: manual re-check in case the network was flaky
                     checkForUpdates(true);
                 } else if (currentUpdateState === 'unknown') {
                     checkForUpdates(true);

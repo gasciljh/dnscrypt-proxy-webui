@@ -837,7 +837,8 @@ write_manifest() {
 
     local manifest="$target_dir/.manifest.json"
     local ts
-    ts=$(date +%Y%m%d-%H%M%S)
+    # PREMIUM FIX: Use UTC for all backup timestamps
+    ts=$(date -u +%Y%m%d-%H%M%S)
 
     local root_sol="${ROOT_SOLUTION:-}"
     if [ -z "$root_sol" ]; then
@@ -983,7 +984,8 @@ backup_user_files() {
             log_msg "❌ backup_user_files: cannot create backup root"
             return 1
         }
-        ts=$(date +%Y%m%d-%H%M%S)
+        # PREMIUM FIX: Use UTC for backup directory names
+        ts=$(date -u +%Y%m%d-%H%M%S)
         dst_dir="$PERSISTENT_BACKUP/$ts-manual-$$"
     fi
 
@@ -1174,10 +1176,12 @@ rotate_backups() {
             [ -d "$_d" ] || continue
             case "$_d" in current|txn-*|orphan-txn-*|apk|.restore_snap.*) continue ;; esac
             [ -f "$_d/.manifest.json" ] || continue
-            _mt=$(stat -c %Y "$_d" 2>/dev/null) || _mt=$(stat -f %m "$_d" 2>/dev/null) || _mt=0
-            case "$_mt" in ''|*[!0-9]*) _mt=0 ;; esac
-            printf '%s %s\n' "$_mt" "$_d"
-        done | LC_ALL=C sort -rn -k1,1
+            
+            # PREMIUM FIX: Extract timestamp from directory name instead of ModTime
+            _ts=$(printf "%s" "$_d" | cut -d'-' -f1,2)
+            case "$_ts" in ''|*[!0-9-]*) _ts="00000000-000000" ;; esac
+            printf '%s %s\n' "$_ts" "$_d"
+        done | LC_ALL=C sort -r -k1,1
     )
 
     [ -z "$_list" ] && return 0
@@ -1191,8 +1195,8 @@ rotate_backups() {
         printf '%s\n' "$_list" | grep -E ' [0-9]{8}-[0-9]{6}-v[0-9]' | head -n1 | awk '{print $2}'
     )
 
-    local _mt _name
-    while IFS=' ' read -r _mt _name; do
+    local _ts _name
+    while IFS=' ' read -r _ts _name; do
         [ -z "$_name" ] && continue
         if [ "$_name" = "$_protected" ]; then continue; fi
         if [ "$_name" = "$_newest_install" ]; then continue; fi
@@ -1233,7 +1237,8 @@ auto_backup_if_needed() {
     fi
 
     local ts
-    ts=$(date +%Y%m%d-%H%M%S)
+    # PREMIUM FIX: Use UTC for auto-backup directory names
+    ts=$(date -u +%Y%m%d-%H%M%S)
     local target="$PERSISTENT_BACKUP/$ts-auto-$$"
 
     if backup_user_files "$src_dir" "$target"; then
