@@ -39,7 +39,7 @@ import (
 	"unicode/utf8"
 )
 
-// [0] Build version variables
+// Build version variables
 var (
 	BuildVersion = "v1.5.0"
 	BuildCommit  = "unknown"
@@ -47,7 +47,6 @@ var (
 	ProjectURL   = "https://github.com/gasciljh/dnscrypt-proxy-webui"
 )
 
-// [1] User-Agent
 var USER_AGENT = ""
 
 func defaultUserAgent() string { return "DNSCrypt-SmartFilter/" + BuildVersion }
@@ -57,7 +56,7 @@ func buildUserAgent() string {
 		strings.TrimPrefix(BuildVersion, "v"), ProjectURL)
 }
 
-// [2] Global paths
+// Global paths
 var (
 	EXEC_PATH, _   = os.Executable()
 	REAL_PATH, _   = filepath.EvalSymlinks(EXEC_PATH)
@@ -107,7 +106,7 @@ var (
 	WATCHDOG_TOKEN_FILE string
 )
 
-// [3] Configuration constants
+// Configuration constants
 const (
 	DOWNLOAD_TIMEOUT       = 300
 	DOWNLOAD_RETRIES       = 3
@@ -171,7 +170,7 @@ const (
 	PORT_FREE_TIMEOUT     = 5 * time.Second
 )
 
-// [3b] Companion app install constants
+// Companion app install constants
 const (
 	INSTALL_SCRIPT_REL        = "install_app.sh"
 	INSTALL_TIMEOUT           = 90 * time.Second
@@ -181,7 +180,7 @@ const (
 	COMPANION_STATE_CACHE_TTL = 30 * time.Second
 )
 
-// [4] Types
+// Types
 type Profile struct {
 	Name string
 	URL  string
@@ -293,7 +292,7 @@ type portCacheEntry struct {
 	time time.Time
 }
 
-// [5] Rules state
+// Rules state
 type rulesStateSnapshot struct {
 	AllowlistHash string
 	DenylistHash  string
@@ -334,7 +333,7 @@ func initRulesState() {
 	rulesStateMu.Unlock()
 }
 
-// [6] HTTP client
+// HTTP client
 var (
 	downloadClientMu sync.Mutex
 	downloadClient   *http.Client
@@ -408,7 +407,7 @@ func resetDownloadClient() {
 	}
 }
 
-// [7] run/ directory initialization
+// run/ directory initialization
 var (
 	runDirUsableCached bool
 	runDirUsableTime   time.Time
@@ -460,7 +459,7 @@ func getActiveRunDir() string {
 	return filepath.Dir(STATUS_FILE)
 }
 
-// [8] Global variables
+// Global variables
 var (
 	updatingMu sync.Mutex
 	isUpdating bool
@@ -549,7 +548,7 @@ var (
 	cachedDashPortAt time.Time
 )
 
-// [8b] Companion app install state
+// Companion app install state
 var (
 	installTokens   = make(map[string]*InstallToken)
 	installTokensMu sync.Mutex
@@ -562,13 +561,7 @@ var (
 	companionStateMutex sync.Mutex
 )
 
-// [8c] Smart Update state
-//
-// PREMIUM: cachedUpdateStatus tracks when we last got a real answer
-// (LastSuccessAt) and whether this entry is a stale fallback
-// (IsStale). This enables stale-while-revalidate: on network failure
-// we return the last good answer instead of scaring the user with
-// "unknown".
+// Smart Update state
 type cachedUpdateStatus struct {
 	Status        string
 	LocalVer      string
@@ -583,12 +576,12 @@ var (
 	updateCheckCache = make(map[string]cachedUpdateStatus)
 )
 
-// [8d] Premium Backup Queue System
+// Backup Queue
 var (
 	backupQueue = make(chan string, 20)
 )
 
-// [9] Read webui.conf settings
+// Read webui.conf settings
 func readConfValue(key, defaultValue string) (result string) {
 	result = defaultValue
 	defer func() { recover() }()
@@ -672,21 +665,17 @@ func getDashboardPort() string {
 	return readConfPortCached("DASHBOARD_PORT", "9091", "dashboard")
 }
 
-// [9b] BIND_ADDR
 func getBindAddr() string {
 	addr := strings.TrimSpace(readConfValue("BIND_ADDR", "127.0.0.1"))
-
 	if addr == "localhost" {
 		return "127.0.0.1"
 	}
-
 	if net.ParseIP(addr) == nil {
 		if addr != "" {
 			logWithLevel("warn", "⚠️ Invalid BIND_ADDR: '"+addr+"' — using 127.0.0.1")
 		}
 		return "127.0.0.1"
 	}
-
 	return addr
 }
 
@@ -701,7 +690,6 @@ func isExposedBind(addr string) bool {
 	return true
 }
 
-// [9c] isSecureCookie
 func isSecureCookie() bool {
 	switch serverBindAddr {
 	case "127.0.0.1", "::1", "localhost":
@@ -720,7 +708,6 @@ func loadLogLevel() string {
 	}
 }
 
-// [9d] Memory limit helpers
 func readSelectedProfile() string {
 	data, err := os.ReadFile(SELECTED_FILE)
 	if err != nil {
@@ -772,7 +759,6 @@ func applyMemoryLimit(key string) {
 		prevLimit/(1024*1024), limit/(1024*1024), key))
 }
 
-// [9e] Companion app version reader
 var (
 	appVersionOnce sync.Once
 	appVersionVal  string
@@ -794,7 +780,7 @@ func readAppVersion() string {
 	return appVersionVal
 }
 
-// [10] Logging
+// Logging
 func logWithLevel(level, msg string) {
 	if !shouldLog(level) {
 		return
@@ -922,7 +908,7 @@ func cleanupOldGz(dir string) {
 	}
 }
 
-// [11] Atomic writes
+// Atomic writes
 func atomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(filename)
 
@@ -1028,7 +1014,7 @@ func syncParentDir(dir string) {
 	}
 }
 
-// [12] Shell command execution
+// Shell command execution
 func shellEnv() []string {
 	return append(os.Environ(),
 		"MODDIR="+MODDIR,
@@ -1118,7 +1104,7 @@ func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	return err
 }
 
-// [13] HTTP request helper
+// HTTP request helper
 func newHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
@@ -1133,7 +1119,7 @@ func newHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*h
 	return req, nil
 }
 
-// [14] SSE
+// SSE
 func broadcastEvent(event string, data string) {
 	sseMutex.Lock()
 	defer sseMutex.Unlock()
@@ -1208,7 +1194,7 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// [15] Statistics
+// Statistics
 func getBlockedStats() string {
 	statsMutex.Lock()
 	if time.Since(statsTime) < 300*time.Second && statsCache != "" {
@@ -1298,7 +1284,7 @@ func getResourceUsage() string {
 	return resourceCache
 }
 
-// [16] Local request detection
+// Local request detection
 func isLocalRequest(r *http.Request) bool {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -1319,7 +1305,7 @@ func getClientIP(r *http.Request) string {
 	return host
 }
 
-// [17] Authentication
+// Authentication
 func getMonitoringAuth() (username, password string) {
 	authCacheMu.RLock()
 	if !authCacheTime.IsZero() && time.Since(authCacheTime) < AUTH_CACHE_TTL {
@@ -1417,7 +1403,7 @@ func readMonitoringAuthFromFile() (username, password string) {
 	return username, password
 }
 
-// [17b] Watchdog token
+// Watchdog token
 func loadOrCreateWatchdogToken() string {
 	if data, err := os.ReadFile(WATCHDOG_TOKEN_FILE); err == nil {
 		tok := strings.TrimSpace(string(data))
@@ -1476,7 +1462,7 @@ func verifyWatchdogToken(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
 }
 
-// [17c] Sessions
+// Sessions
 func createSession(username string) string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -1593,7 +1579,7 @@ func checkAuth(r *http.Request) bool {
 	return false
 }
 
-// [17d] Companion app install helpers
+// Companion app install helpers
 func getInstallScript() string {
 	candidates := []string{
 		filepath.Join(MODDIR, INSTALL_SCRIPT_REL),
@@ -1864,7 +1850,7 @@ func getCompanionState() map[string]interface{} {
 	return result
 }
 
-// [18] Session GC + rate limiting
+// Session GC + rate limiting
 func startSessionGC() {
 	go func() {
 		ticker := time.NewTicker(SESSION_GC_PERIOD)
@@ -1994,7 +1980,7 @@ func isLockedOut(ip string) bool {
 	return true
 }
 
-// [19] Process and port checks
+// Process and port checks
 func isPidAlive(pid int) bool {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
 	if err != nil {
@@ -2129,7 +2115,7 @@ func ensureExecutable(path string) bool {
 	return true
 }
 
-// [20] Service lifecycle helpers
+// Service lifecycle helpers
 func getServiceLockPath() string {
 	return filepath.Join(getActiveRunDir(), ".service.start.lock")
 }
@@ -2352,7 +2338,7 @@ func restartService() {
 	broadcastEvent("status", getStatus())
 }
 
-// [21] getEntriesCount + validate + internet + progress
+// getEntriesCount + validate + internet + progress
 func getEntriesCount() int {
 	defer func() { recover() }()
 
@@ -2479,7 +2465,7 @@ func writeProgress(percent int, msg string) {
 	broadcastEvent("progress", fmt.Sprintf("%d|%s", percent, msg))
 }
 
-// [22] Download with progress
+// Download with progress
 func downloadWithProgress(urlStr, dest string) error {
 	defer func() { recover() }()
 	if !isInternetAvailable() {
@@ -2529,7 +2515,7 @@ func downloadWithProgress(urlStr, dest string) error {
 	})
 }
 
-// [23] Domain normalization
+// Domain normalization
 func normalizeDomain(line string) string {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
@@ -2569,7 +2555,7 @@ func isAllowedBySuffixes(norm string, allowSet map[string]struct{}) bool {
 	}
 }
 
-// [24] Rebuild blocklist.txt
+// Rebuild blocklist.txt
 func rebuildBlocklist() error {
 	rebuildMu.Lock()
 	defer rebuildMu.Unlock()
@@ -2660,7 +2646,7 @@ func rebuildBlocklist() error {
 	return nil
 }
 
-// [25] Atomic rules save
+// Atomic rules save
 type saveRulesRequest struct {
 	AllowContent      string
 	DenyContent       string
@@ -2858,7 +2844,7 @@ func restoreFile(path string, data []byte) {
 	}
 }
 
-// [26] Wrappers
+// Wrappers
 func saveAllowlist(content, expectedHash string) map[string]interface{} {
 	prev := getRulesState()
 	if expectedHash != "" && expectedHash != prev.AllowlistHash {
@@ -2973,7 +2959,7 @@ func appendDenylist(content string) map[string]interface{} {
 	return result
 }
 
-// [27] Profile response
+// Profile response
 func buildProfileResponse() map[string]interface{} {
 	data, _ := os.ReadFile(SELECTED_FILE)
 	key := strings.TrimSpace(string(data))
@@ -3006,7 +2992,7 @@ func buildProfileResponse() map[string]interface{} {
 	}
 }
 
-// [28] Update profile
+// Update profile
 func updateProfileBody(key string) {
 	defer func() {
 		updatingMu.Lock()
@@ -3145,7 +3131,7 @@ func applyUpdatePhase(key string) error {
 	return nil
 }
 
-// [29] Old modules
+// Old modules
 func checkOldModules() []OldModuleInfo {
 	defer func() { recover() }()
 	oldModulesMutex.Lock()
@@ -3273,7 +3259,7 @@ func removeModule(modulePath string) map[string]interface{} {
 	}
 }
 
-// [30] Log file management
+// Log file management
 func safeOpenRegular(path string) (*os.File, os.FileInfo, error) {
 	lfi, err := os.Lstat(path)
 	if err != nil {
@@ -3626,7 +3612,7 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, f)
 }
 
-// [31] runtime_info
+// runtime_info
 func buildBackupInfo() map[string]interface{} {
 	info := map[string]interface{}{
 		"available":        0,
@@ -3756,7 +3742,7 @@ func handleRuntimeInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(buildRuntimeInfo())
 }
 
-// [31b] /healthz and /readyz
+// /healthz and /readyz
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -3823,7 +3809,7 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(checks)
 }
 
-// [32] API handler
+// API handler
 func hasEndpoint(path, name string) bool {
 	if path == "/api/"+name {
 		return true
@@ -4482,19 +4468,7 @@ func (h *apiHandler) getInstallTokenAction(r *http.Request) map[string]interface
 	}
 }
 
-// [32b] Smart Update check logic — PREMIUM
-//
-// Two-stage strategy:
-//   1. Fast-cache path: return the cached entry if fresh enough.
-//      Stale entries have TTL=60s so retries are quick. The cached
-//      last_success is only returned if it is non-zero (avoids the
-//      spurious "0001-01-01T00:00:00Z" for first failures).
-//   2. Network path: fetch upstream. On success, cache as fresh.
-//      On failure, return the last known-good answer marked stale.
-//      If we never had a good answer, return "unknown" cached for 60s.
-
-// extractVersion parses the "# Version:" header from a blocklist file.
-// Returns "" if the header is missing.
+// Smart Update check logic
 func extractVersion(text string) string {
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "# Version:") {
@@ -4617,12 +4591,6 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 }
 
-// fetchRemoteVersion — PREMIUM
-//
-// 3 attempts with exponential backoff (1s, 2s). Each attempt has an
-// 8-second budget. Worst case ~27s, but typical success on first try.
-// This is critical because blocklist downloads elsewhere may saturate
-// the network, causing transient DNS/HTTPS failures.
 func fetchRemoteVersion(url string) string {
 	client := getDownloadClient()
 
@@ -4661,7 +4629,7 @@ func fetchRemoteVersion(url string) string {
 	return ""
 }
 
-// [33] Login handler
+// Login handler
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	ip := getClientIP(r)
 
@@ -4734,7 +4702,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// [34] Security headers
+// Security headers
 func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Security-Policy",
 		"default-src 'self'; "+
@@ -4779,7 +4747,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// [35] serveStaticAssets
+// serveStaticAssets
 func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType string) {
 	staticAssets := map[string]struct {
 		path        string
@@ -4812,7 +4780,7 @@ func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType strin
 	})
 }
 
-// [36] Metrics proxy handler
+// Metrics proxy handler
 func parsePrometheus(text string) map[string]float64 {
 	result := make(map[string]float64)
 	for _, line := range strings.Split(text, "\n") {
@@ -4951,7 +4919,7 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(dashboardJSON)
 }
 
-// [36b] Premium Backup System
+// Backup System
 func enqueueBackup(reason string) {
 	select {
 	case backupQueue <- reason:
@@ -4985,13 +4953,16 @@ func createAutoBackup(reason string) {
 	targetDir := fmt.Sprintf("%s/%s-manual-%d-%s",
 		PERSISTENT_BACKUP, ts, os.Getpid(), randSuffix)
 
+	// PREMIUM FIX: Pass BuildVersion to ensure the manifest records
+	// the correct module version instead of "unknown".
 	cmd := fmt.Sprintf(
 		". %s; ensure_backup_dir >/dev/null 2>&1; "+
-			"backup_user_files %s %s && "+
+			"backup_user_files %s %s %s && "+
 			". %s; rotate_backups 21 >/dev/null 2>&1",
 		shellQuote(funcsScript),
 		shellQuote(filepath.Join(MODDIR, "proxy")),
 		shellQuote(targetDir),
+		shellQuote(BuildVersion),
 		shellQuote(funcsScript),
 	)
 
@@ -5084,7 +5055,7 @@ func checkPendingNotifications() {
 	}
 }
 
-// [36c] Transaction cleanup at startup
+// Transaction cleanup at startup
 func cleanupOldTransactions() {
 	if _, err := os.Stat(PERSISTENT_BACKUP); err != nil {
 		return
@@ -5132,7 +5103,7 @@ func cleanupOldTransactions() {
 	}
 }
 
-// [37] main
+// main
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
