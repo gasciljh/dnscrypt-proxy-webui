@@ -192,7 +192,7 @@ copy_with_context() {
     return 0
 }
 
-# [7c] Backup Helper Functions (Moved here to fix execution order)
+# [7c] Backup Helper Functions
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr -d '\000-\010\013\014\016-\037'
 }
@@ -312,6 +312,32 @@ for _root in /data/adb/modules /data/adb/modules_update /data/adb/ksu/modules /d
 done
 
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP/current"
+
+if [ ! -d "$PERSISTENT_BACKUP/current" ]; then
+    _newest_snap=""
+    _newest_mtime=0
+    
+    for _d in "$PERSISTENT_BACKUP"/*; do
+        [ -d "$_d" ] || continue
+        [ -f "$_d/.manifest.json" ] || continue
+        
+        case "$(basename "$_d")" in
+            current|txn-*|orphan-txn-*|apk) continue ;;
+        esac
+        
+        _mtime=$(stat -c %Y "$_d" 2>/dev/null || stat -f %m "$_d" 2>/dev/null || echo 0)
+        if [ "$_mtime" -gt "$_newest_mtime" ]; then
+            _newest_mtime="$_mtime"
+            _newest_snap="$_d"
+        fi
+    done
+    
+    if [ -n "$_newest_snap" ]; then
+        CANDIDATE_SOURCES="$CANDIDATE_SOURCES $_newest_snap"
+        echo "Smart Fallback (Normal Install): Found newest snapshot at $_newest_snap" >> "$INSTALL_LOG"
+    fi
+fi
+
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES $PERSISTENT_BACKUP"
 CANDIDATE_SOURCES="$CANDIDATE_SOURCES /data/local/tmp/dnscrypt-webui-backup"
 
@@ -403,9 +429,7 @@ if [ -f "$RECOVERY_TRIGGER_1" ] || [ -f "$RECOVERY_TRIGGER_2" ]; then
         ui_print "  → Using: current (live snapshot)"
     fi
 
-    # =========================================================
-    # 3. Third Priority (Premium): Smart Fallback (Newest Manual)
-    # =========================================================
+    # 3. Third Priority: Smart Fallback (Newest Manual)
     if [ -z "$RESTORE_SOURCE" ]; then
         ui_print "  → Searching for newest valid manual/auto snapshot..."
         
