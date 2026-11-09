@@ -357,7 +357,7 @@ log_debug "OUTPUT_DIR resolved to: $OUTPUT_DIR_ABS"
 # version file. Fail hard.
 if [ ! -f "$DNS_VERSION_FILE" ]; then
     log_error "Missing: $DNS_VERSION_FILE"
-    log_info "Create it with: echo '2.1.18' > $DNS_VERSION_FILE"
+    log_info "Create it with: echo '2.1.20' > $DNS_VERSION_FILE"
     exit 2
 fi
 
