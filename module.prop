@@ -1,6 +1,6 @@
 # ============================================================
 # DNSCrypt Smart Filter — module.prop
-# Version: v1.5.0 (Global Edition)
+# Version: v1.5.1 (Global Edition)
 # Last updated: 2026-10-19
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
@@ -26,8 +26,8 @@
 
 id=dnscrypt-proxy-webui
 name=DNSCrypt Proxy (Smart Filter)
-version=v1.5.0
-versionCode=1050000
+version=v1.5.1
+versionCode=1050100
 author=gasciljh
 description=Smart DNS filtering with DNSCrypt. Local resolver on 127.0.0.1:5354, per-profile HaGeZi blocklists (Light→Ultimate), bilingual WebUI (EN/AR), JSON metrics Dashboard, installable PWA, 10-layer user-data preservation with transactional upgrades and recovery mode. v1.5.0 adds one-tap root install for the optional companion Android app. Zero telemetry.
 updateJson=https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/update.json
