@@ -1,7 +1,7 @@
 // ============================================================
 // DNSCrypt Smart Filter — main.go
 // Version: v1.5.0 (Global Edition)
-// Last updated: 2026-10-19
+// Last updated: 2026-11-11
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -39,7 +39,11 @@ import (
 	"unicode/utf8"
 )
 
-// Build version variables
+// ============================================================
+// [1] Build metadata
+// ============================================================
+// Injected via -ldflags at build time. Defaults are used when
+// the binary is built without ldflags (development builds).
 var (
 	BuildVersion = "v1.5.0"
 	BuildCommit  = "unknown"
@@ -56,7 +60,14 @@ func buildUserAgent() string {
 		strings.TrimPrefix(BuildVersion, "v"), ProjectURL)
 }
 
-// Global paths
+// ============================================================
+// [2] Global paths
+// ============================================================
+// Resolved once at startup. MODDIR is derived from the
+// executable's real path (after following symlinks). The
+// module is expected to live under /data/adb/modules/, so the
+// binary at .../proxy/dnscrypt-webui yields
+// MODDIR = .../dnscrypt-proxy-webui.
 var (
 	EXEC_PATH, _   = os.Executable()
 	REAL_PATH, _   = filepath.EvalSymlinks(EXEC_PATH)
@@ -106,7 +117,9 @@ var (
 	WATCHDOG_TOKEN_FILE string
 )
 
-// Configuration constants
+// ============================================================
+// [3] Configuration constants
+// ============================================================
 const (
 	DOWNLOAD_TIMEOUT       = 300
 	DOWNLOAD_RETRIES       = 3
@@ -142,6 +155,8 @@ const (
 	AUTH_CACHE_TTL           = 60 * time.Second
 	LAST_UPDATE_CACHE_TTL    = 5 * time.Second
 	CONF_PORT_CACHE_TTL      = 30 * time.Second
+	SELECTED_PROFILE_CACHE_TTL = 5 * time.Second
+	METRICS_CACHE_TTL          = 2 * time.Second
 
 	MEMORY_LIMIT_LIGHT    = 80 * 1024 * 1024
 	MEMORY_LIMIT_NORMAL   = 100 * 1024 * 1024
@@ -164,13 +179,22 @@ const (
 	AUTO_BACKUP_TIMEOUT    = 15 * time.Second
 	WATCHDOG_TOKEN_HEADER  = "X-Watchdog-Token"
 	METRICS_MAX_BODY       = 2 * 1024 * 1024
+	MAX_TOML_READ_BYTES    = 1 * 1024 * 1024
 
 	SERVICE_LOCK_TIMEOUT  = 5 * time.Second
 	PROCESS_DEATH_TIMEOUT = 5 * time.Second
 	PORT_FREE_TIMEOUT     = 5 * time.Second
 )
 
-// Companion app install constants
+// ============================================================
+// [4] Companion app install constants
+// ============================================================
+// Timeout hierarchy (client < server < cascade):
+//   Client (index.html) : 120 s
+//   Server (this file)  :  90 s
+//   Cascade (install_app.sh) : 75 s
+// The cascade < server timeout ensures the EXIT trap fires
+// before the server sends SIGKILL.
 const (
 	INSTALL_SCRIPT_REL        = "install_app.sh"
 	INSTALL_TIMEOUT           = 90 * time.Second
@@ -180,7 +204,9 @@ const (
 	COMPANION_STATE_CACHE_TTL = 30 * time.Second
 )
 
-// Types
+// ============================================================
+// [5] Data types
+// ============================================================
 type Profile struct {
 	Name string
 	URL  string
@@ -292,7 +318,12 @@ type portCacheEntry struct {
 	time time.Time
 }
 
-// Rules state
+// ============================================================
+// [6] Rules state
+// ============================================================
+// Tracks allowlist.txt and denylist.txt content hashes for
+// optimistic concurrency. saveMu serializes all write paths;
+// rulesStateMu protects only the hash snapshot.
 type rulesStateSnapshot struct {
 	AllowlistHash string
 	DenylistHash  string
@@ -302,6 +333,7 @@ var (
 	rulesStateMu sync.RWMutex
 	currentRules rulesStateSnapshot
 	rebuildMu    sync.Mutex
+	saveMu       sync.Mutex
 )
 
 func getRulesState() rulesStateSnapshot {
@@ -333,17 +365,134 @@ func initRulesState() {
 	rulesStateMu.Unlock()
 }
 
-// HTTP client
+// ============================================================
+// [7] Download HTTP client
+// ============================================================
+// Custom resolver that uses the bootstrap IPs from the TOML
+// instead of the system DNS (which is being intercepted by
+// our own DNAT rules — using system DNS would deadlock).
 var (
 	downloadClientMu sync.Mutex
 	downloadClient   *http.Client
-	bootstrapIPOnce  sync.Once
 )
 
-func getBootstrapIP() string { return "8.8.8.8" }
+// readBootstrapResolvers extracts bootstrap_resolvers IPs from
+// dnscrypt-proxy.toml.
+//
+// Accepted formats (per DNSCrypt spec):
+//   IPv4:port        → '94.140.14.14:53'    → 94.140.14.14
+//   IPv4 only        → '9.9.9.9'            → 9.9.9.9
+//   IPv6:port        → '[2001:db8::1]:53'   → 2001:db8::1
+//   IPv6 only        → '[2001:db8::1]'      → 2001:db8::1
+//   Bare IPv6        → '2001:db8::1'        → 2001:db8::1
+//
+// Bracket detection is explicit (Index/IndexByte, not Trim)
+// so that the trailing ']' in "[addr]:port" is never left
+// behind after the port is stripped.
+func readBootstrapResolvers() []string {
+	defaults := []string{"94.140.14.14", "9.9.9.9", "1.1.1.1"}
+
+	data, err := os.ReadFile(CONF)
+	if err != nil {
+		return defaults
+	}
+
+	var ips []string
+	lines := strings.Split(string(data), "\n")
+	inArray := false
+	done := false
+
+	for _, line := range lines {
+		if done {
+			break
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		if !inArray && strings.HasPrefix(trimmed, "bootstrap_resolvers") {
+			inArray = true
+		}
+		if !inArray {
+			continue
+		}
+
+		var current strings.Builder
+		var quote byte
+		for i := 0; i < len(trimmed); i++ {
+			c := trimmed[i]
+			if quote != 0 {
+				if c == quote {
+					val := normalizeBootstrapEntry(current.String())
+					if val != "" {
+						ips = append(ips, val)
+					}
+					current.Reset()
+					quote = 0
+				} else {
+					current.WriteByte(c)
+				}
+			} else if c == '\'' || c == '"' {
+				quote = c
+			}
+		}
+
+		if strings.Contains(trimmed, "]") {
+			done = true
+		}
+	}
+
+	if len(ips) == 0 {
+		return defaults
+	}
+	return ips
+}
+
+// normalizeBootstrapEntry converts a single bootstrap_resolvers
+// value into a bare IP address.
+//
+//   "[2001:db8::1]:53" → "2001:db8::1"   (bracketed + port)
+//   "[2001:db8::1]"    → "2001:db8::1"   (bracketed, no port)
+//   "94.140.14.14:53"  → "94.140.14.14"  (single colon, strip port)
+//   "9.9.9.9"          → "9.9.9.9"       (no colon, unchanged)
+//   "2001:db8::1"      → "2001:db8::1"   (bare IPv6, unchanged)
+//
+// The bracketed case uses Index("]") rather than LastIndex(":")
+// because IPv6 addresses contain colons. Trim("[]") is not used
+// because it strips '[' and ']' only from the ends — in
+// "[addr]:port" the trailing ']' is followed by ":port", so
+// Trim removes only the leading '['.
+func normalizeBootstrapEntry(raw string) string {
+	if raw == "" {
+		return ""
+	}
+
+	// Bracketed IPv6: extract content between '[' and ']'.
+	// The port (if any) after ']' is discarded.
+	if strings.HasPrefix(raw, "[") {
+		if closeIdx := strings.Index(raw, "]"); closeIdx > 0 {
+			return raw[1:closeIdx]
+		}
+		// Malformed (missing ']'): return as-is so the dial
+		// attempt fails visibly instead of silently producing
+		// a truncated address.
+		return raw
+	}
+
+	// Single colon → "IPv4:port" or "host:port". Strip the port.
+	// 2+ colons → bare IPv6 (no port). 0 colons → bare IPv4.
+	if strings.Count(raw, ":") == 1 {
+		if idx := strings.Index(raw, ":"); idx > 0 {
+			return raw[:idx]
+		}
+	}
+
+	return raw
+}
 
 func createDownloadClient() *http.Client {
-	primaryIP := getBootstrapIP()
+	bootstrapIPs := readBootstrapResolvers()
 
 	dialer := &net.Dialer{
 		Timeout:   2 * time.Second,
@@ -352,19 +501,17 @@ func createDownloadClient() *http.Client {
 	resolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			conn, err := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", primaryIP+":53")
-			if err == nil {
-				return conn, nil
+			var lastErr error
+			for _, ip := range bootstrapIPs {
+				for _, proto := range []string{"tcp", "udp"} {
+					conn, err := (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, proto, ip+":53")
+					if err == nil {
+						return conn, nil
+					}
+					lastErr = err
+				}
 			}
-			conn, err = (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "udp", primaryIP+":53")
-			if err == nil {
-				return conn, nil
-			}
-			conn, err = (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "tcp", "9.9.9.9:53")
-			if err == nil {
-				return conn, nil
-			}
-			return (&net.Dialer{Timeout: 2 * time.Second}).DialContext(ctx, "udp", "9.9.9.9:53")
+			return nil, lastErr
 		},
 	}
 	transport := &http.Transport{
@@ -407,7 +554,12 @@ func resetDownloadClient() {
 	}
 }
 
-// run/ directory initialization
+// ============================================================
+// [8] Run directory initialization
+// ============================================================
+// Probes RUN_DIR with a real write test, not just a permission
+// check. Some SELinux contexts report writable but reject the
+// actual write; a cached probe avoids the cost on every call.
 var (
 	runDirUsableCached bool
 	runDirUsableTime   time.Time
@@ -459,7 +611,9 @@ func getActiveRunDir() string {
 	return filepath.Dir(STATUS_FILE)
 }
 
-// Global variables
+// ============================================================
+// [9] Global state
+// ============================================================
 var (
 	updatingMu sync.Mutex
 	isUpdating bool
@@ -546,9 +700,19 @@ var (
 	cachedWebPortAt  time.Time
 	cachedDashPort   string
 	cachedDashPortAt time.Time
+
+	selectedProfileCache string
+	selectedProfileTime  time.Time
+	selectedProfileMu    sync.RWMutex
+
+	metricsProxyCache string
+	metricsProxyTime  time.Time
+	metricsProxyMu    sync.Mutex
 )
 
-// Companion app install state
+// ============================================================
+// [10] Companion app install state
+// ============================================================
 var (
 	installTokens   = make(map[string]*InstallToken)
 	installTokensMu sync.Mutex
@@ -561,7 +725,11 @@ var (
 	companionStateMutex sync.Mutex
 )
 
-// Smart Update state
+// ============================================================
+// [11] Smart Update state
+// ============================================================
+// Single-flight per profile: concurrent check_update calls for
+// the same profile collapse into one fetch.
 type cachedUpdateStatus struct {
 	Status        string
 	LocalVer      string
@@ -571,16 +739,34 @@ type cachedUpdateStatus struct {
 	IsStale       bool
 }
 
+type updateFlight struct {
+	done   chan struct{}
+	result map[string]interface{}
+}
+
 var (
 	updateCheckMu    sync.Mutex
 	updateCheckCache = make(map[string]cachedUpdateStatus)
+
+	updateFlightMu sync.Mutex
+	updateFlights  = make(map[string]*updateFlight)
 )
 
-// Backup Queue
+// ============================================================
+// [12] Backup queue
+// ============================================================
+// Async queue. Drop-on-full rather than block: a missed
+// backup is acceptable, a stalled HTTP handler is not.
 var (
 	backupQueue = make(chan string, 20)
 )
 
+// ============================================================
+// [13] Configuration file readers
+// ============================================================
+// webui.conf format: `KEY=VALUE`, no spaces around `=`, no
+// trailing comments. The parser tolerates ` # comment` for
+// legacy reasons but the shipped config never uses it.
 func readConfValue(key, defaultValue string) (result string) {
 	result = defaultValue
 	defer func() { recover() }()
@@ -621,6 +807,12 @@ func readConfPort(key, defaultPort string) (result string) {
 	return
 }
 
+// ============================================================
+// [14] Port resolution
+// ============================================================
+// Cached for CONF_PORT_CACHE_TTL (30 s) to avoid a file read
+// on every request. Invalidated never — ports only change on
+// module reinstall, which restarts the binary.
 func readConfPortCached(key, defaultPort, which string) string {
 	portConfMu.RLock()
 	var cached string
@@ -664,6 +856,13 @@ func getDashboardPort() string {
 	return readConfPortCached("DASHBOARD_PORT", "9091", "dashboard")
 }
 
+// ============================================================
+// [15] Bind address resolution
+// ============================================================
+// Exposed binds (anything other than loopback) require
+// configured credentials — enforced in main() at startup.
+// Invalid values silently fall back to 127.0.0.1 with a
+// logged warning.
 func getBindAddr() string {
 	addr := strings.TrimSpace(readConfValue("BIND_ADDR", "127.0.0.1"))
 	if addr == "localhost" {
@@ -689,6 +888,10 @@ func isExposedBind(addr string) bool {
 	return true
 }
 
+// Loopback-only binds get Secure=true cookies. This is correct
+// per RFC 6265 (127.0.0.1 is a potentially trustworthy origin
+// per W3C), and required to prevent cookie leakage if the user
+// later binds to a LAN address.
 func isSecureCookie() bool {
 	switch serverBindAddr {
 	case "127.0.0.1", "::1", "localhost":
@@ -707,21 +910,53 @@ func loadLogLevel() string {
 	}
 }
 
+// ============================================================
+// [16] Selected profile cache
+// ============================================================
+// The selected_profile.txt file changes only during an apply
+// operation. A 5 s cache eliminates repeated reads during a
+// burst of API calls without staleness risk: the apply path
+// explicitly invalidates the cache.
 func readSelectedProfile() string {
-	data, err := os.ReadFile(SELECTED_FILE)
-	if err != nil {
-		return "pro"
+	selectedProfileMu.RLock()
+	if time.Since(selectedProfileTime) < SELECTED_PROFILE_CACHE_TTL && selectedProfileCache != "" {
+		v := selectedProfileCache
+		selectedProfileMu.RUnlock()
+		return v
 	}
-	key := strings.TrimSpace(string(data))
-	if key == "" {
-		return "pro"
+	selectedProfileMu.RUnlock()
+
+	key := "pro"
+	if data, err := os.ReadFile(SELECTED_FILE); err == nil {
+		k := strings.TrimSpace(string(data))
+		if k != "" {
+			if _, ok := profiles[k]; ok {
+				key = k
+			}
+		}
 	}
-	if _, ok := profiles[key]; !ok {
-		return "pro"
-	}
+
+	selectedProfileMu.Lock()
+	selectedProfileCache = key
+	selectedProfileTime = time.Now()
+	selectedProfileMu.Unlock()
+
 	return key
 }
 
+func invalidateSelectedProfileCache() {
+	selectedProfileMu.Lock()
+	selectedProfileTime = time.Time{}
+	selectedProfileCache = ""
+	selectedProfileMu.Unlock()
+}
+
+// ============================================================
+// [17] Memory limit management
+// ============================================================
+// Go 1.19+ runtime soft limit. Set per profile so low-RAM
+// devices (light profile on a 1 GB phone) do not OOM during
+// large blocklist rebuilds.
 func memoryLimitForProfile(key string) int64 {
 	switch strings.ToLower(strings.TrimSpace(key)) {
 	case "light":
@@ -758,6 +993,9 @@ func applyMemoryLimit(key string) {
 		prevLimit/(1024*1024), limit/(1024*1024), key))
 }
 
+// ============================================================
+// [18] Companion app version
+// ============================================================
 var (
 	appVersionOnce sync.Once
 	appVersionVal  string
@@ -779,7 +1017,14 @@ func readAppVersion() string {
 	return appVersionVal
 }
 
-// Logging
+// ============================================================
+// [19] Logging
+// ============================================================
+// Multi-level: error/warn/info/debug. Filtered by
+// currentLogLevel set from webui.conf at startup.
+//
+// Rotation: > 1 MB triggers rename + async gzip. Keeps up to
+// MAX_GZ_FILES (5) compressed archives; older ones deleted.
 func logWithLevel(level, msg string) {
 	if !shouldLog(level) {
 		return
@@ -907,7 +1152,12 @@ func cleanupOldGz(dir string) {
 	}
 }
 
-// Atomic writes
+// ============================================================
+// [20] Atomic file writes
+// ============================================================
+// tmp-in-same-dir + rename + parent-dir fsync. The rename is
+// atomic on POSIX; the parent fsync ensures the rename itself
+// is durable across power loss.
 func atomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(filename)
 
@@ -951,6 +1201,9 @@ func atomicWriteFile(filename string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
+// Memory-bounded variant for blocklist rebuilds. The callback
+// writes directly to a buffered file, so a 1M-entry blocklist
+// never materializes in RAM.
 func atomicWriteStream(filename string, perm os.FileMode, writeFn func(io.Writer) error) error {
 	dir := filepath.Dir(filename)
 
@@ -1013,7 +1266,12 @@ func syncParentDir(dir string) {
 	}
 }
 
-// Shell command execution
+// ============================================================
+// [21] Shell command execution
+// ============================================================
+// All shell invocations go through runShell (15 s) or
+// runShellWithTimeout (explicit). Bounded stderr capture
+// (2 KB) prevents a runaway command from exhausting RAM.
 func shellEnv() []string {
 	return append(os.Environ(),
 		"MODDIR="+MODDIR,
@@ -1103,7 +1361,9 @@ func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	return err
 }
 
-// HTTP request helper
+// ============================================================
+// [22] Outbound HTTP requests
+// ============================================================
 func newHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
@@ -1118,7 +1378,12 @@ func newHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*h
 	return req, nil
 }
 
-// SSE
+// ============================================================
+// [23] Server-Sent Events
+// ============================================================
+// Broadcast to all connected clients. Slow consumers are
+// dropped (default case in select) rather than blocking the
+// broadcast — a single slow tab must not delay others.
 func broadcastEvent(event string, data string) {
 	sseMutex.Lock()
 	defer sseMutex.Unlock()
@@ -1193,7 +1458,15 @@ func sseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Statistics
+// ============================================================
+// [24] Live statistics
+// ============================================================
+// Two separate caches:
+//   • statsCache   — 5 min TTL (blocked-today count is slow
+//                    to compute: full log scan)
+//   • resourceCache — 10 s TTL (RSS read is fast but called
+//                    on every SSE tick; 10 s coalesces bursts)
+
 func getBlockedStats() string {
 	statsMutex.Lock()
 	if time.Since(statsTime) < 300*time.Second && statsCache != "" {
@@ -1252,6 +1525,8 @@ func getResourceUsage() string {
 		return resourceCache
 	}
 
+	// Two-stage verification: PID file could point to a
+	// recycled PID after reboot.
 	commData, err := os.ReadFile("/proc/" + pid + "/comm")
 	if err != nil {
 		resourceCache = "N/A"
@@ -1283,7 +1558,12 @@ func getResourceUsage() string {
 	return resourceCache
 }
 
-// Local request detection
+// ============================================================
+// [25] Client IP detection
+// ============================================================
+// Handles both IPv4 and IPv6 (bracketed) remote addresses.
+// Used by rate-limiting (login, install) and by isLocalRequest
+// for localhost-only endpoint gates.
 func isLocalRequest(r *http.Request) bool {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -1304,7 +1584,21 @@ func getClientIP(r *http.Request) string {
 	return host
 }
 
-// Authentication
+// ============================================================
+// [26] Authentication
+// ============================================================
+// Two-layer auth model:
+//   1. Watchdog token (X-Watchdog-Token header) — allows the
+//      watchdog script to call ensure_running_service without
+//      the user's password. Constant-time compared.
+//   2. Session / Basic Auth — everything else.
+//
+// When username and password are both empty, auth is disabled
+// (localhost-only development). main() refuses to start in
+// this state if the bind is exposed.
+//
+// Auth is cached for AUTH_CACHE_TTL (60 s) so the TOML file
+// is read at most once per minute per burst of requests.
 func getMonitoringAuth() (username, password string) {
 	authCacheMu.RLock()
 	if !authCacheTime.IsZero() && time.Since(authCacheTime) < AUTH_CACHE_TTL {
@@ -1352,12 +1646,25 @@ func parseTOMLValue(s string) string {
 	return s
 }
 
+// readMonitoringAuthFromFile parses only the [monitoring_ui]
+// section of dnscrypt-proxy.toml. Any other section containing
+// username/password keys is ignored. Refuses files > 1 MB as
+// a defense against corrupted TOML causing a memory spike.
 func readMonitoringAuthFromFile() (username, password string) {
 	defer func() {
 		if recover() != nil {
 			username, password = "", ""
 		}
 	}()
+
+	if fi, err := os.Stat(CONF); err != nil {
+		return "", ""
+	} else if fi.Size() > MAX_TOML_READ_BYTES {
+		logWithLevel("warn", fmt.Sprintf(
+			"readMonitoringAuthFromFile: %s exceeds %d bytes, skipping",
+			CONF, MAX_TOML_READ_BYTES))
+		return "", ""
+	}
 
 	data, err := os.ReadFile(CONF)
 	if err != nil {
@@ -1402,7 +1709,14 @@ func readMonitoringAuthFromFile() (username, password string) {
 	return username, password
 }
 
-// Watchdog token
+// ============================================================
+// [27] Watchdog token
+// ============================================================
+// A 64-hex-char token generated once, stored 0600 in
+// .watchdog_token, and rotated only when the file is missing
+// or corrupted (< 32 chars). The watchdog script sends this
+// token in X-Watchdog-Token to call ensure_running_service
+// without user credentials.
 func loadOrCreateWatchdogToken() string {
 	if data, err := os.ReadFile(WATCHDOG_TOKEN_FILE); err == nil {
 		tok := strings.TrimSpace(string(data))
@@ -1461,7 +1775,13 @@ func verifyWatchdogToken(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
 }
 
-// Sessions
+// ============================================================
+// [28] Sessions
+// ============================================================
+// In-memory session store: token → Session. TTL slides on
+// every access (ExpiresAt extended). GC runs every 30 min via
+// startSessionGC to remove expired entries even when no
+// request touches them.
 func createSession(username string) string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -1536,6 +1856,12 @@ func destroySession(token string) {
 	sessionsMu.Unlock()
 }
 
+// checkAuth is the single auth gate. Order:
+//   1. Watchdog token path (ensure_running_service only).
+//   2. No credentials configured → allow (localhost dev).
+//   3. Valid Bearer token.
+//   4. Valid session cookie.
+//   5. Basic Auth (with rate limiting).
 func checkAuth(r *http.Request) bool {
 	if hasEndpoint(r.URL.Path, "ensure_running_service") {
 		if r.Method == http.MethodPost && isLocalRequest(r) {
@@ -1578,7 +1904,18 @@ func checkAuth(r *http.Request) bool {
 	return false
 }
 
-// Companion app install helpers
+// ============================================================
+// [29] Companion app install
+// ============================================================
+// The install flow involves three processes:
+//   Browser → main.go → install_app.sh → pm install
+// Communication uses a one-time token minted by
+// /api?action=install_token (60 s TTL, single-use) so a
+// replay of the form does not re-trigger pm install.
+//
+// Errors are translated by install_app.sh into localized
+// message_ar/message_en and returned verbatim to the browser.
+
 func getInstallScript() string {
 	candidates := []string{
 		filepath.Join(MODDIR, INSTALL_SCRIPT_REL),
@@ -1616,6 +1953,9 @@ func generateInstallToken() string {
 	return tok
 }
 
+// validateAndConsumeInstallToken iterates the whole map to
+// keep the comparison constant-time per candidate (avoiding
+// early-exit timing oracles on partial matches).
 func validateAndConsumeInstallToken(tok string) bool {
 	if tok == "" {
 		return false
@@ -1697,6 +2037,9 @@ func invalidateCompanionStateCache() {
 	companionStateMutex.Unlock()
 }
 
+// callInstallScript invokes install_app.sh with the given
+// mode and parses the last JSON line from its stdout. Any
+// non-JSON output (debug echoes, warnings) is ignored.
 func callInstallScript(mode string) map[string]interface{} {
 	script := getInstallScript()
 	if _, err := os.Stat(script); err != nil {
@@ -1816,6 +2159,9 @@ func uninstallCompanionApp() map[string]interface{} {
 	return result
 }
 
+// getCompanionState caches the pm state for 30 s. TryLock
+// ensures concurrent callers do not double-fetch: the loser
+// gets the cached (possibly stale) value instead of blocking.
 func getCompanionState() map[string]interface{} {
 	companionStateMutex.Lock()
 	if !companionStateTime.IsZero() &&
@@ -1849,7 +2195,16 @@ func getCompanionState() map[string]interface{} {
 	return result
 }
 
-// Session GC + rate limiting
+// ============================================================
+// [30] Session GC + login rate limiting
+// ============================================================
+// Four maps are GC'd periodically:
+//   • sessions       — expired after SESSION_TTL (24 h)
+//   • loginAttempts  — removed after 1 h of inactivity
+//   • installAttempts — same
+//   • installTokens  — expired after INSTALL_TOKEN_TTL (60 s)
+//
+// startSessionGC runs every SESSION_GC_PERIOD (30 min).
 func startSessionGC() {
 	go func() {
 		ticker := time.NewTicker(SESSION_GC_PERIOD)
@@ -1979,7 +2334,12 @@ func isLockedOut(ip string) bool {
 	return true
 }
 
-// Process and port checks
+// ============================================================
+// [31] Process + port checks
+// ============================================================
+// isPidAlive reads /proc/<pid>/comm — rejects recycled PIDs
+// pointing to a different binary. The system's pgrep is a
+// fallback for cases where the PID file was lost.
 func isPidAlive(pid int) bool {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
 	if err != nil {
@@ -2015,6 +2375,9 @@ func isProcessRunning() (string, bool) {
 	return "", false
 }
 
+// isPortOpen checks /proc/net/udp{,6} directly. Falls back to
+// the shell is_port_open when /proc is unreadable (rare, but
+// happens on some hardened kernels).
 func isPortOpen(port int) bool {
 	defer func() { recover() }()
 
@@ -2041,6 +2404,8 @@ func isPortOpen(port int) bool {
 	return runShellWithTimeout(cmd, PORT_PROBE_TIMEOUT) == nil
 }
 
+// Cached for PORT_CACHE_TTL (5 s) to coalesce SSE ticks and
+// concurrent API calls hitting the same check.
 func isPortOpenCached(port int) bool {
 	portCacheMu.Lock()
 	defer portCacheMu.Unlock()
@@ -2114,7 +2479,16 @@ func ensureExecutable(path string) bool {
 	return true
 }
 
-// Service lifecycle helpers
+// ============================================================
+// [32] Service lifecycle
+// ============================================================
+// startService: kill old → wait death → wait port free →
+//   launch → wait bind → set firewall → set status
+// stopService: set status OFF first (intent) → kill → wait
+//   → clear firewall → clear PID
+//
+// Locking via mkdir (POSIX atomic). Stale locks older than
+// SERVICE_LOCK_TIMEOUT (5 s) are reclaimed automatically.
 func getServiceLockPath() string {
 	return filepath.Join(getActiveRunDir(), ".service.start.lock")
 }
@@ -2244,7 +2618,7 @@ func startService() {
 		}
 	}()
 
-	atomicWriteFile(PID_FILE, []byte(strconv.Itoa(pid)), 0666)
+	atomicWriteFile(PID_FILE, []byte(strconv.Itoa(pid)), 0600)
 
 	if !waitForProcessAndPort(SERVICE_START_TIMEOUT) {
 		if cmd.Process != nil {
@@ -2253,7 +2627,7 @@ func startService() {
 		_ = runShell("pkill -9 -x dnscrypt-proxy")
 		_ = runShell(". " + shellQuote(getFunctionsScript()) + "; cleanup_proxy")
 		os.Remove(PID_FILE)
-		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
+		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
 		invalidateStatusCache()
 		logWithLevel("error", "❌ startService: engine failed to bind 5354 within timeout")
 		return
@@ -2264,7 +2638,7 @@ func startService() {
 		". "+shellQuote(getFunctionsScript())+"; manage_firewall 1",
 		90*time.Second)
 
-	atomicWriteFile(STATUS_FILE, []byte("ON"), 0666)
+	atomicWriteFile(STATUS_FILE, []byte("ON"), 0600)
 	invalidateStatusCache()
 
 	logEvent("✅ Service started (PID: " + strconv.Itoa(pid) + ")")
@@ -2277,7 +2651,10 @@ func stopService() {
 	defer func() { recover() }()
 	logEvent("⏹️ Stopping service...")
 
-	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
+	// Status OFF first: user intent is recorded before the kill
+	// so a crash mid-shutdown does not leave status=ON while
+	// the process is dead.
+	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
 
 	portCacheMu.Lock()
 	portCacheMap = make(map[int]portCacheEntry)
@@ -2307,7 +2684,7 @@ func stopService() {
 		". "+shellQuote(getFunctionsScript())+"; manage_firewall 0",
 		90*time.Second)
 
-	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
+	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
 	invalidateStatusCache()
 
 	logEvent("✅ Service stopped")
@@ -2337,7 +2714,14 @@ func restartService() {
 	broadcastEvent("status", getStatus())
 }
 
-// getEntriesCount + validate + internet + progress
+// ============================================================
+// [33] Blocklist entry counting + validation
+// ============================================================
+// getEntriesCount caches the line count keyed on
+// (size, mtime, inode). The inode check catches the
+// "editor rewrites file in place without changing size" case
+// that size+mtime alone would miss.
+
 func getEntriesCount() int {
 	defer func() { recover() }()
 
@@ -2427,14 +2811,20 @@ func validateBlocklist(path string) error {
 
 func isInternetAvailable() bool {
 	defer func() { recover() }()
-	out, err := exec.Command("getprop", "gsm.network.type").Output()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	out, err := exec.CommandContext(ctx, "getprop", "gsm.network.type").Output()
+	cancel()
 	if err == nil {
 		netType := strings.TrimSpace(string(out))
 		if netType != "" && !strings.Contains(netType, "Unknown") {
 			return true
 		}
 	}
-	out, err = exec.Command("getprop", "wifi.interface").Output()
+
+	ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
+	out, err = exec.CommandContext(ctx, "getprop", "wifi.interface").Output()
+	cancel()
 	if err == nil && strings.TrimSpace(string(out)) != "" {
 		return true
 	}
@@ -2458,13 +2848,22 @@ func isInternetAvailable() bool {
 	return false
 }
 
+// writeProgress publishes "percent|message" atomically. The
+// reader (SSE feeder + progress API) parses the pipe as a
+// field separator, so the pipe is escaped to "/" first.
 func writeProgress(percent int, msg string) {
 	msg = strings.ReplaceAll(msg, "|", "/")
-	atomicWriteFile(PROGRESS_FILE, []byte(fmt.Sprintf("%d|%s", percent, msg)), 0666)
+	atomicWriteFile(PROGRESS_FILE, []byte(fmt.Sprintf("%d|%s", percent, msg)), 0600)
 	broadcastEvent("progress", fmt.Sprintf("%d|%s", percent, msg))
 }
 
-// Download with progress
+// ============================================================
+// [34] Blocklist download
+// ============================================================
+// Streams to a tmp file via atomicWriteStream. Progress is
+// reported every 5% through the ProgressWriter. On network
+// failure, the download client is reset so the next attempt
+// rebuilds the bootstrap resolver chain.
 func downloadWithProgress(urlStr, dest string) error {
 	defer func() { recover() }()
 	if !isInternetAvailable() {
@@ -2514,7 +2913,12 @@ func downloadWithProgress(urlStr, dest string) error {
 	})
 }
 
-// Domain normalization
+// ============================================================
+// [35] Domain normalization
+// ============================================================
+// Strips the prefixes/suffixes used by different blocklist
+// formats: ||domain^, *.domain, .domain, domain. Case-folded
+// to lowercase for consistent matching.
 func normalizeDomain(line string) string {
 	line = strings.TrimSpace(line)
 	if line == "" || strings.HasPrefix(line, "#") {
@@ -2528,6 +2932,8 @@ func normalizeDomain(line string) string {
 	return line
 }
 
+// stripDenySections removes any previously-appended deny block
+// so the raw source can be re-copied without duplication.
 func stripDenySections(content string) string {
 	if idx := strings.Index(content, DENY_MARKER_START); idx >= 0 {
 		content = content[:idx]
@@ -2538,6 +2944,11 @@ func stripDenySections(content string) string {
 	return strings.TrimRight(content, " \t\r\n") + "\n"
 }
 
+// isAllowedBySuffixes walks up the domain hierarchy: for
+// "a.b.example.com", it checks "a.b.example.com",
+// "b.example.com", "example.com", "com" against the allow set.
+// This makes an allowlist entry for "example.com" override
+// blocklist entries for any subdomain.
 func isAllowedBySuffixes(norm string, allowSet map[string]struct{}) bool {
 	if norm == "" {
 		return false
@@ -2554,7 +2965,16 @@ func isAllowedBySuffixes(norm string, allowSet map[string]struct{}) bool {
 	}
 }
 
-// Rebuild blocklist.txt
+// ============================================================
+// [36] Blocklist rebuild
+// ============================================================
+// Streams blocklist.raw → blocklist.txt, removing allowed
+// entries and appending the deny block. Memory-bounded:
+// blocklist.raw can be 50 MB but the rebuild never holds
+// more than STREAM_READ_BUFFER (64 KB) in memory.
+//
+// Write failures trigger an atomicWriteStream rollback (the
+// tmp file is unlinked before the callback returns).
 func rebuildBlocklist() error {
 	rebuildMu.Lock()
 	defer rebuildMu.Unlock()
@@ -2634,6 +3054,8 @@ func rebuildBlocklist() error {
 		return fmt.Errorf("stream write: %w", writeErr)
 	}
 
+	// Invalidate the count cache so the next getEntriesCount
+	// reads the fresh file.
 	countCacheMu.Lock()
 	cachedCount = 0
 	lastSize = 0
@@ -2645,7 +3067,18 @@ func rebuildBlocklist() error {
 	return nil
 }
 
-// Atomic rules save
+// ============================================================
+// [37] Atomic rules save
+// ============================================================
+// Three-phase save protocol:
+//   Phase 1 — write files under rulesStateMu
+//   Phase 2 — rebuild blocklist WITHOUT rulesStateMu (slow)
+//   Phase 3 — update state hash under rulesStateMu (fast)
+//   Phase 4 — enqueue backup outside every lock
+//
+// Conflicting writes are rejected with status="conflict" if
+// the expected hash does not match. Rollback restores the
+// previous file contents on any failure.
 type saveRulesRequest struct {
 	AllowContent      string
 	DenyContent       string
@@ -2683,6 +3116,9 @@ func runAtomicSave(req saveRulesRequest, primary string) map[string]interface{} 
 }
 
 func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
+	saveMu.Lock()
+	defer saveMu.Unlock()
+
 	prev := getRulesState()
 
 	if req.UpdateAllow && req.ExpectedAllowHash != "" &&
@@ -2724,11 +3160,12 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 		}, false
 	}
 
+	// Phase 1: Recheck + write files under lock (fast)
 	rulesStateMu.Lock()
-	defer rulesStateMu.Unlock()
 
 	if (req.UpdateAllow && currentRules.AllowlistHash != prev.AllowlistHash) ||
-	   (req.UpdateDeny && currentRules.DenylistHash != prev.DenylistHash) {
+		(req.UpdateDeny && currentRules.DenylistHash != prev.DenylistHash) {
+		rulesStateMu.Unlock()
 		logWithLevel("warn", "⚠️ save: state changed during save, aborting")
 		return saveRulesResult{
 			Status:  "conflict",
@@ -2741,6 +3178,7 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 
 	if req.UpdateAllow {
 		if err := atomicWriteFile(ALLOWLIST_FILE, []byte(req.AllowContent), 0644); err != nil {
+			rulesStateMu.Unlock()
 			logWithLevel("error", "❌ save: write allowlist failed: "+err.Error())
 			return saveRulesResult{
 				Status:  "error",
@@ -2750,10 +3188,11 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 	}
 	if req.UpdateDeny {
 		if err := atomicWriteFile(DENYLIST_FILE, []byte(req.DenyContent), 0644); err != nil {
-			logWithLevel("error", "❌ save: write denylist failed: "+err.Error())
 			if req.UpdateAllow {
 				restoreFile(ALLOWLIST_FILE, prevAllowData)
 			}
+			rulesStateMu.Unlock()
+			logWithLevel("error", "❌ save: write denylist failed: "+err.Error())
 			return saveRulesResult{
 				Status:  "error",
 				Message: "Failed to save denylist",
@@ -2761,15 +3200,20 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 		}
 	}
 
+	rulesStateMu.Unlock()
+
+	// Phase 2: Rebuild without holding rulesStateMu (reads pass through)
 	if err := rebuildBlocklist(); err != nil {
 		logWithLevel("error", "❌ save: rebuild failed: "+err.Error())
 
+		rulesStateMu.Lock()
 		if req.UpdateAllow {
 			restoreFile(ALLOWLIST_FILE, prevAllowData)
 		}
 		if req.UpdateDeny {
 			restoreFile(DENYLIST_FILE, prevDenyData)
 		}
+		rulesStateMu.Unlock()
 
 		if err2 := rebuildBlocklist(); err2 != nil {
 			logWithLevel("error", "❌ rollback rebuild failed: "+err2.Error())
@@ -2781,20 +3225,13 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 		}, false
 	}
 
+	// Phase 3: Update state under lock (fast)
+	rulesStateMu.Lock()
 	currentRules = rulesStateSnapshot{
 		AllowlistHash: newAllowHash,
 		DenylistHash:  newDenyHash,
 	}
-
-	backupReason := "post-save"
-	if req.UpdateAllow && req.UpdateDeny {
-		backupReason = "post-custom-save"
-	} else if req.UpdateAllow {
-		backupReason = "post-allow-save"
-	} else if req.UpdateDeny {
-		backupReason = "post-deny-save"
-	}
-	enqueueBackup(backupReason)
+	rulesStateMu.Unlock()
 
 	aH, dH := newAllowHash, newDenyHash
 	if len(aH) > 12 {
@@ -2804,6 +3241,17 @@ func atomicSaveRulesInternal(req saveRulesRequest) (saveRulesResult, bool) {
 		dH = dH[:12]
 	}
 	logEvent(fmt.Sprintf("✅ save applied: allow=%s deny=%s", aH, dH))
+
+	// Phase 4: Enqueue backup outside every lock
+	backupReason := "post-save"
+	if req.UpdateAllow && req.UpdateDeny {
+		backupReason = "post-custom-save"
+	} else if req.UpdateAllow {
+		backupReason = "post-allow-save"
+	} else if req.UpdateDeny {
+		backupReason = "post-deny-save"
+	}
+	enqueueBackup(backupReason)
 
 	return saveRulesResult{
 		Status:    "ok",
@@ -2843,7 +3291,13 @@ func restoreFile(path string, data []byte) {
 	}
 }
 
-// Wrappers
+// ============================================================
+// [38] Individual rule save helpers
+// ============================================================
+// Thin wrappers over runAtomicSave. Each one short-circuits the
+// "no change" case so the caller gets an immediate ok response
+// without a full file write.
+
 func saveAllowlist(content, expectedHash string) map[string]interface{} {
 	prev := getRulesState()
 	if expectedHash != "" && expectedHash != prev.AllowlistHash {
@@ -2958,7 +3412,13 @@ func appendDenylist(content string) map[string]interface{} {
 	return result
 }
 
-// Profile response
+// ============================================================
+// [39] Profile response builder
+// ============================================================
+// Combines the selected profile file, the blocklist file, and
+// the last-update cache into a single JSON-friendly map. The
+// last-update value is cached for LAST_UPDATE_CACHE_TTL (5 s)
+// to avoid an os.Stat call on every poll.
 func buildProfileResponse() map[string]interface{} {
 	data, _ := os.ReadFile(SELECTED_FILE)
 	key := strings.TrimSpace(string(data))
@@ -2991,7 +3451,18 @@ func buildProfileResponse() map[string]interface{} {
 	}
 }
 
-// Update profile
+// ============================================================
+// [40] Profile update
+// ============================================================
+// The update flow runs in a goroutine (started by the HTTP
+// handler) so the browser gets an immediate "started" response.
+// Progress is published via writeProgress → SSE.
+//
+// applyUpdatePhase stops the engine, rebuilds the blocklist,
+// swaps the selected profile, and restarts if it was running.
+// It holds serviceMutex for the whole sequence so concurrent
+// toggles cannot race with the restart.
+
 func updateProfileBody(key string) {
 	defer func() {
 		updatingMu.Lock()
@@ -3111,7 +3582,8 @@ func applyUpdatePhase(key string) error {
 		return fmt.Errorf("Failed to rebuild blocklist")
 	}
 
-	atomicWriteFile(SELECTED_FILE, []byte(key), 0666)
+	atomicWriteFile(SELECTED_FILE, []byte(key), 0644)
+	invalidateSelectedProfileCache()
 	applyMemoryLimit(key)
 
 	updateCheckMu.Lock()
@@ -3130,7 +3602,17 @@ func applyUpdatePhase(key string) error {
 	return nil
 }
 
-// Old modules
+// ============================================================
+// [41] Old module detection and removal
+// ============================================================
+// Detects modules in /data/adb/modules/ whose
+// .module.fingerprint file mentions dnscrypt-proxy-webui but
+// differs from the current fingerprint. Those are leftovers
+// from a previous version with a different id.
+//
+// removeModule uses securejoin to prevent path traversal via
+// a malicious module.prop value.
+
 func checkOldModules() []OldModuleInfo {
 	defer func() { recover() }()
 	oldModulesMutex.Lock()
@@ -3258,7 +3740,14 @@ func removeModule(modulePath string) map[string]interface{} {
 	}
 }
 
-// Log file management
+// ============================================================
+// [42] Log file management
+// ============================================================
+// Every file read goes through safeOpenRegular (O_NOFOLLOW +
+// SameFile recheck) to prevent symlink-swap races. Every
+// filename goes through sanitizeLogFileName to prevent
+// traversal. Sensitive files require explicit confirmation.
+
 func safeOpenRegular(path string) (*os.File, os.FileInfo, error) {
 	lfi, err := os.Lstat(path)
 	if err != nil {
@@ -3603,15 +4092,33 @@ func handleDownloadLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Escape " in the filename before embedding in the header
+	// value. safeName already blocks /, \, NUL and .., but a
+	// stray quote in a root-created file could otherwise
+	// terminate the quoted-string early.
+	headerSafeName := strings.ReplaceAll(safeName, `"`, `\"`)
+
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, safeName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, headerSafeName))
 	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 
 	io.Copy(w, f)
 }
 
-// runtime_info
+// ============================================================
+// [43] Runtime info + health endpoints
+// ============================================================
+// buildRuntimeInfo assembles the /api/runtime_info payload:
+// build metadata, module paths, ports, memory limit, and the
+// backup status summary.
+//
+// buildBackupInfo parses PERSISTENT_BACKUP and counts:
+//   - snapshots (timestamped dirs with .manifest.json)
+//   - in_flight_txn (txn-*)
+//   - orphan_txn (orphan-txn-*)
+// and reads .last_stable.
+
 func buildBackupInfo() map[string]interface{} {
 	info := map[string]interface{}{
 		"available":        0,
@@ -3666,15 +4173,13 @@ func buildBackupInfo() map[string]interface{} {
 	info["orphan_txn"] = orphanTxn
 
 	if len(snapshots) > 0 {
-		// PREMIUM FIX: Sort by directory name (YYYYMMDD-HHMMSS) which guarantees perfect chronological order
 		sort.Slice(snapshots, func(i, j int) bool {
 			return snapshots[i].Name() < snapshots[j].Name()
 		})
-		
+
 		newest := snapshots[len(snapshots)-1]
 		info["last_backup_name"] = newest.Name()
 
-		// PREMIUM FIX: Extract timestamp from directory name instead of ModTime
 		parts := strings.Split(newest.Name(), "-")
 		if len(parts) >= 2 && len(parts[0]) == 8 && len(parts[1]) == 6 {
 			tsStr := parts[0] + parts[1]
@@ -3745,14 +4250,22 @@ func handleRuntimeInfo(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(buildRuntimeInfo())
 }
 
-// /healthz and /readyz
+// handleHealthz always returns 200 with a tiny body. Used by
+// offline.html's reconnect probe and by any external uptime
+// checker. HEAD requests get headers only.
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
+	if r.Method == http.MethodHead {
+		return
+	}
 	fmt.Fprint(w, "ok")
 }
 
+// handleReadyz is localhost-only and returns 503 with a JSON
+// status map if any readiness check fails. HEAD requests get
+// headers only.
 func handleReadyz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -3809,10 +4322,21 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 		checks["status"] = "ready"
 	}
 
+	if r.Method == http.MethodHead {
+		return
+	}
+
 	json.NewEncoder(w).Encode(checks)
 }
 
-// API handler
+// ============================================================
+// [44] API handler
+// ============================================================
+// Single entry point for /api and /api/*. Dispatches by
+// method + path suffix. Handles OPTIONS, enforces POST-only
+// on mutating endpoints, and returns 405 with Allow header
+// for unsupported methods.
+
 func hasEndpoint(path, name string) bool {
 	if path == "/api/"+name {
 		return true
@@ -4186,8 +4710,13 @@ func (h *apiHandler) postClearLogs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// postToggleService returns 503 when serviceMutex is held, so
+// the frontend treats it as an error instead of showing a
+// false success message.
 func (h *apiHandler) postToggleService(w http.ResponseWriter, r *http.Request) {
 	if !serviceMutex.TryLock() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
 			"message": "Service is busy",
@@ -4218,6 +4747,8 @@ func (h *apiHandler) postToggleService(w http.ResponseWriter, r *http.Request) {
 
 func (h *apiHandler) postRestartService(w http.ResponseWriter, r *http.Request) {
 	if !serviceMutex.TryLock() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
 			"message": "Service is busy",
@@ -4234,6 +4765,10 @@ func (h *apiHandler) postRestartService(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": newStatus})
 }
 
+// postEnsureRunningService is called by watchdog.sh when the
+// DNS engine is dead but STATUS_FILE=ON. Returns 503 when busy
+// so the watchdog escalates its backoff instead of resetting
+// it on a false success.
 func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Request) {
 	statusData, _ := os.ReadFile(STATUS_FILE)
 	userIntent := strings.TrimSpace(string(statusData))
@@ -4258,6 +4793,8 @@ func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !serviceMutex.TryLock() {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "error",
 			"action":  "busy",
@@ -4471,7 +5008,17 @@ func (h *apiHandler) getInstallTokenAction(r *http.Request) map[string]interface
 	}
 }
 
-// Smart Update check logic
+// ============================================================
+// [45] Smart Update
+// ============================================================
+// Fetches the remote blocklist's "# Version:" header and
+// compares it to the local version. Results are cached for
+// 5 min (60 s if stale, i.e. the last fetch failed).
+//
+// Concurrent calls for the same profile collapse into one
+// fetch via the updateFlights map. The loser blocks on
+// flight.done and returns flight.result.
+
 func extractVersion(text string) string {
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "# Version:") {
@@ -4513,6 +5060,30 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 	}
 	updateCheckMu.Unlock()
 
+	// Single-flight: if another goroutine is already fetching
+	// this profile, wait for it and reuse its result.
+	updateFlightMu.Lock()
+	if flight, ok := updateFlights[profileKey]; ok {
+		updateFlightMu.Unlock()
+		<-flight.done
+		return flight.result
+	}
+	flight := &updateFlight{done: make(chan struct{})}
+	updateFlights[profileKey] = flight
+	updateFlightMu.Unlock()
+
+	result := doFetchUpdateStatus(profileKey)
+	flight.result = result
+
+	updateFlightMu.Lock()
+	delete(updateFlights, profileKey)
+	updateFlightMu.Unlock()
+	close(flight.done)
+
+	return result
+}
+
+func doFetchUpdateStatus(profileKey string) map[string]interface{} {
 	localVer := ""
 	f, err := os.Open(RAW_BLOCKLIST_FILE)
 	if err != nil {
@@ -4597,6 +5168,11 @@ func checkUpdateStatus(profileKey string) map[string]interface{} {
 func fetchRemoteVersion(url string) string {
 	client := getDownloadClient()
 
+	ua := USER_AGENT
+	if ua == "" {
+		ua = defaultUserAgent()
+	}
+
 	for attempt := 0; attempt < 3; attempt++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 
@@ -4606,7 +5182,7 @@ func fetchRemoteVersion(url string) string {
 			continue
 		}
 		req.Header.Set("Range", "bytes=0-4096")
-		req.Header.Set("User-Agent", USER_AGENT)
+		req.Header.Set("User-Agent", ua)
 		req.Header.Set("Cache-Control", "no-cache")
 
 		resp, err := client.Do(req)
@@ -4632,7 +5208,13 @@ func fetchRemoteVersion(url string) string {
 	return ""
 }
 
-// Login handler
+// ============================================================
+// [46] Login handler
+// ============================================================
+// Supports both JSON and form-encoded bodies. The response
+// does NOT include a profile (which would block 100-200 ms on
+// the blocklist scan); the frontend fetches it asynchronously
+// via startPolling() → loadProfile().
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	ip := getClientIP(r)
 
@@ -4663,7 +5245,6 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "ok",
 			"message": "No auth required",
-			"profile": buildProfileResponse(),
 		})
 		return
 	}
@@ -4701,11 +5282,17 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "ok",
 		"message": "Login successful",
-		"profile": buildProfileResponse(),
 	})
 }
 
-// Security headers
+// ============================================================
+// [47] Static file serving
+// ============================================================
+// Every response carries the same security headers (CSP,
+// X-Frame-Options, Cross-Origin-*). APK downloads get
+// Cache-Control: public, max-age=3600, immutable; everything
+// else gets no-store.
+
 func setSecurityHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Security-Policy",
 		"default-src 'self'; "+
@@ -4750,7 +5337,6 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// serveStaticAssets
 func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType string) {
 	staticAssets := map[string]struct {
 		path        string
@@ -4783,7 +5369,23 @@ func serveStaticAssets(mux *http.ServeMux, defaultFile string, contentType strin
 	})
 }
 
-// Metrics proxy handler
+// ============================================================
+// [48] Metrics proxy
+// ============================================================
+// The dashboard server proxies /api/metrics to the upstream
+// dnscrypt-proxy monitoring endpoint on 127.0.0.1:8080 using
+// Basic Auth. The response is cached for METRICS_CACHE_TTL
+// (2 s) so N tabs collapse into 1 upstream call.
+//
+// If the upstream returns non-JSON (Prometheus text format),
+// parsePrometheus + buildDashboardJSON convert it. Every
+// field that has a local data source is computed:
+//   • uptime         — from /proc/<pid>/stat + /proc/uptime
+//   • queries_per_second — total / uptime
+//   • cache_size, min_ttl, max_ttl — from dnscrypt-proxy.toml
+// The remaining fields (resolver_health, top_domains, etc.)
+// require monitoring_ui and stay at their zero values.
+
 func parsePrometheus(text string) map[string]float64 {
 	result := make(map[string]float64)
 	for _, line := range strings.Split(text, "\n") {
@@ -4817,6 +5419,122 @@ func findMetric(prom map[string]float64, names ...string) float64 {
 	return 0
 }
 
+// getProcessUptimeSeconds reads /proc/<pid>/stat starttime and
+// subtracts it from /proc/uptime to compute how long the DNS
+// engine has been running.
+//
+// The kernel format is:
+//   pid (comm) state ppid pgrp ...
+//
+// comm is enclosed in parentheses and MAY contain spaces (it
+// is a free-form string up to TASK_COMM_LEN bytes). Splitting
+// the whole line with strings.Fields would shift every field
+// index to the right whenever comm contains a space, causing
+// the wrong field to be read as starttime. To stay correct
+// under that case, we locate the LAST ')' in the line — that
+// is always the end of comm — and split only the substring
+// that follows.
+//
+// After the last ')' the fields are:
+//   [0]  state       [1]  ppid        [2]  pgrp        [3]  session
+//   [4]  tty_nr      [5]  tpgid       [6]  flags       [7]  minflt
+//   [8]  cminflt     [9]  majflt      [10] cmajflt     [11] utime
+//   [12] stime       [13] cutime      [14] cstime      [15] priority
+//   [16] nice        [17] num_threads [18] itrealvalue [19] starttime
+func getProcessUptimeSeconds() int64 {
+	pidStr, found := isProcessRunning()
+	if !found {
+		return 0
+	}
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return 0
+	}
+
+	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0
+	}
+
+	stat := string(statData)
+	closeIdx := strings.LastIndex(stat, ")")
+	if closeIdx < 0 || closeIdx+2 >= len(stat) {
+		return 0
+	}
+
+	fields := strings.Fields(stat[closeIdx+2:])
+	if len(fields) < 20 {
+		return 0
+	}
+	startTicks, err := strconv.ParseInt(fields[19], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	uptimeData, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0
+	}
+	upFields := strings.Fields(string(uptimeData))
+	if len(upFields) < 1 {
+		return 0
+	}
+	systemUp, err := strconv.ParseFloat(upFields[0], 64)
+	if err != nil {
+		return 0
+	}
+
+	const hz = 100.0
+	processStartSec := float64(startTicks) / hz
+	processUp := systemUp - processStartSec
+	if processUp < 0 {
+		return 0
+	}
+	return int64(processUp)
+}
+
+// readCacheConfig reads cache_size, cache_min_ttl, cache_max_ttl
+// from dnscrypt-proxy.toml. Falls back to the shipped defaults.
+func readCacheConfig() (size, minTTL, maxTTL int64) {
+	size = 10240
+	minTTL = 2400
+	maxTTL = 86400
+
+	data, err := os.ReadFile(CONF)
+	if err != nil {
+		return
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || trimmed == "" {
+			continue
+		}
+		parts := strings.SplitN(trimmed, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		if idx := strings.Index(val, "#"); idx > 0 {
+			val = strings.TrimSpace(val[:idx])
+		}
+		n, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			continue
+		}
+		switch key {
+		case "cache_size":
+			size = n
+		case "cache_min_ttl":
+			minTTL = n
+		case "cache_max_ttl":
+			maxTTL = n
+		}
+	}
+	return
+}
+
 func buildDashboardJSON(prom map[string]float64) map[string]interface{} {
 	totalQ := findMetric(prom, "dnscrypt_proxy_query_total", "dnscrypt_query_total", "dnscrypt_proxy_queries_total")
 	blockedQ := findMetric(prom, "dnscrypt_proxy_blocked_query_total", "dnscrypt_blocked_query_total", "dnscrypt_proxy_blocked_queries_total")
@@ -4828,23 +5546,31 @@ func buildDashboardJSON(prom map[string]float64) map[string]interface{} {
 		hitRatio = cacheHits / total
 	}
 
+	uptime := getProcessUptimeSeconds()
+	qps := 0.0
+	if uptime > 0 {
+		qps = totalQ / float64(uptime)
+	}
+
+	cacheSize, cacheMinTTL, cacheMaxTTL := readCacheConfig()
+
 	return map[string]interface{}{
 		"generated_at":       time.Now().UTC().Format(time.RFC3339),
 		"total_queries":      totalQ,
 		"blocked_queries":    blockedQ,
-		"queries_per_second": 0,
-		"uptime_seconds":     0,
+		"queries_per_second": qps,
+		"uptime_seconds":     uptime,
 		"avg_response_time":  0,
 		"cache_stats": map[string]interface{}{
 			"enabled":         cacheHits > 0 || cacheMisses > 0,
 			"cache_hit_ratio": hitRatio,
 			"cache_hits":      cacheHits,
 			"cache_misses":    cacheMisses,
-			"configured_size": 0,
+			"configured_size": cacheSize,
 			"entries":         0,
-			"capacity":        0,
-			"min_ttl":         0,
-			"max_ttl":         0,
+			"capacity":        cacheSize,
+			"min_ttl":         cacheMinTTL,
+			"max_ttl":         cacheMaxTTL,
 		},
 		"query_types":     []interface{}{},
 		"resolver_health": []interface{}{},
@@ -4868,6 +5594,16 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Unauthorized Access"})
 		return
 	}
+
+	metricsProxyMu.Lock()
+	if time.Since(metricsProxyTime) < METRICS_CACHE_TTL && metricsProxyCache != "" {
+		cached := metricsProxyCache
+		metricsProxyMu.Unlock()
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, cached)
+		return
+	}
+	metricsProxyMu.Unlock()
 
 	u, p := getMonitoringAuth()
 	if u == "" || p == "" {
@@ -4911,6 +5647,12 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	var upstream map[string]interface{}
 	if err := json.Unmarshal(body, &upstream); err == nil {
+		if b, merr := json.Marshal(upstream); merr == nil {
+			metricsProxyMu.Lock()
+			metricsProxyCache = string(b)
+			metricsProxyTime = time.Now()
+			metricsProxyMu.Unlock()
+		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(upstream)
 		return
@@ -4918,11 +5660,30 @@ func metricsProxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	prom := parsePrometheus(string(body))
 	dashboardJSON := buildDashboardJSON(prom)
+
+	if b, merr := json.Marshal(dashboardJSON); merr == nil {
+		metricsProxyMu.Lock()
+		metricsProxyCache = string(b)
+		metricsProxyTime = time.Now()
+		metricsProxyMu.Unlock()
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(dashboardJSON)
 }
 
-// Backup System
+// ============================================================
+// [49] Automatic backups
+// ============================================================
+// Backup worker drains backupQueue and calls createAutoBackup
+// for each request. Failures do not retry — the next request
+// (or the next user action) re-triggers.
+//
+// checkPendingNotifications reads .pending_notification (a
+// hint from the installer), logs it, and deletes the file.
+// cleanupOldTransactions removes COMMIT'd txn-* dirs and any
+// orphan-txn-* older than 24 h.
+
 func enqueueBackup(reason string) {
 	select {
 	case backupQueue <- reason:
@@ -4949,7 +5710,6 @@ func createAutoBackup(reason string) {
 		return -1
 	}, reason)
 
-	// PREMIUM FIX: Use UTC for backup directory names
 	ts := time.Now().UTC().Format("20060102-150405")
 	randBytes := make([]byte, 2)
 	_, _ = rand.Read(randBytes)
@@ -5057,7 +5817,6 @@ func checkPendingNotifications() {
 	}
 }
 
-// Transaction cleanup at startup
 func cleanupOldTransactions() {
 	if _, err := os.Stat(PERSISTENT_BACKUP); err != nil {
 		return
@@ -5105,7 +5864,17 @@ func cleanupOldTransactions() {
 	}
 }
 
-// main
+// ============================================================
+// [50] main
+// ============================================================
+// Startup sequence:
+//   1. initPaths — resolve STATUS_FILE etc.
+//   2. Load log level, apply memory limit.
+//   3. Refuse to start if WEB_FILE is missing.
+//   4. Verify ports + bind address.
+//   5. Initialize rules state, sessions, backup worker.
+//   6. Register signal handlers (with escalation).
+//   7. Start the two HTTP servers (WebUI + Dashboard).
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -5120,6 +5889,17 @@ func main() {
 
 	initialProfile := readSelectedProfile()
 	applyMemoryLimit(initialProfile)
+
+	if _, err := os.Stat(WEB_FILE); err != nil {
+		fmt.Fprintf(os.Stderr,
+			"❌ FATAL: WebUI file missing: %s\n"+
+				"   The module is incomplete. Reinstall or restore from backup.\n",
+			WEB_FILE)
+		os.Exit(1)
+	}
+	if _, err := os.Stat(DASHBOARD_FILE); err != nil {
+		logWithLevel("warn", "⚠️ Dashboard file missing: "+DASHBOARD_FILE+" (dashboard disabled)")
+	}
 
 	watchdogToken := getWatchdogToken()
 	if watchdogToken == "" {
@@ -5195,10 +5975,10 @@ func main() {
 	}
 
 	if _, err := os.Stat(SELECTED_FILE); err != nil {
-		atomicWriteFile(SELECTED_FILE, []byte("pro"), 0666)
+		atomicWriteFile(SELECTED_FILE, []byte("pro"), 0644)
 	}
 	if _, err := os.Stat(STATUS_FILE); err != nil {
-		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0666)
+		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
 	}
 
 	if _, err := os.Stat(RAW_BLOCKLIST_FILE); os.IsNotExist(err) {
@@ -5277,7 +6057,26 @@ func main() {
 
 	go func() {
 		<-sigChan
-		logEvent("🛑 Shutdown signal received")
+		logEvent("🛑 Shutdown signal received, cleaning up...")
+
+		// Escalation: a second signal forces an immediate
+		// exit, skipping the remaining graceful steps.
+		// Without this, a hung `manage_firewall 0` shell call
+		// (bounded at 90 s) would run to its timeout before
+		// the process exited, leaving the firewall half-
+		// cleaned if a supervisor (Magisk, OOM killer) sent
+		// SIGKILL first.
+		//
+		// Exit code 1 is deliberate: it signals "forced
+		// shutdown, cleanup may be incomplete" to any
+		// monitoring or logging layer. A normal shutdown
+		// still exits with code 0 below.
+		go func() {
+			<-sigChan
+			logWithLevel("warn", "⚠️ Second signal received, forcing exit")
+			os.Exit(1)
+		}()
+
 		runShellWithTimeout(
 			". "+shellQuote(getFunctionsScript())+"; manage_firewall 0",
 			90*time.Second)
@@ -5285,6 +6084,8 @@ func main() {
 		defer cancel()
 		mainServer.Shutdown(ctx)
 		dashboardServer.Shutdown(ctx)
+
+		logEvent("✅ Clean shutdown complete")
 		os.Exit(0)
 	}()
 
