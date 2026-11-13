@@ -179,10 +179,10 @@ jobs:
           _check_required customize.sh 'v1.2.0 addition'      'Layer 8: config migrations'
 
           # Layer 9: functions.sh + service.sh + lib/backup.sh
-          _check_required functions.sh    'auto_backup_if_needed' 'Layer 9: auto-backup helper'
+          _check_required lib/backup.sh   'auto_backup_if_needed' 'Layer 9: auto-backup helper (lib/backup.sh)'
           _check_required lib/backup.sh   'rotate_backups'        'Layer 9: backup rotation (lib/backup.sh)'
           _check_required lib/backup.sh   'backup_user_files'     'Layer 9: backup_user_files helper'
-          _check_required functions.sh    'restore_user_files'    'Layer 9: restore_user_files helper'
+          _check_required lib/backup.sh   'restore_user_files'    'Layer 9: restore_user_files helper'
           _check_required service.sh      'auto_backup_if_needed' 'Layer 9: service.sh calls auto-backup'
 
           # Layer 10: status.sh
