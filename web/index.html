@@ -339,7 +339,7 @@
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
             </p>
-            <button id="pwaInstallBtn" class="pwa-install-btn" type="button"
+            <button id="pwaInstallBtn" class="pwa-install-btn" type="button" style="display: none;"
                     data-mode="install"
                     aria-label="Install companion Android app">
                 <span class="pwa-install-icon">📲</span>
@@ -577,7 +577,9 @@
             toggleSuccess: '✅ Status changed', toggleError: '❌ Failed to change status',
             restartBtn: '🔄 Restart', restartSuccess: '✅ Service restarted', restartError: '❌ Failed to restart',
             editorTitle: '📝 Select Blocklist', sourceCount: 'Choose protection level',
-            entriesLabel: 'Protection entries', currentLabel: 'Current Profile:', lastUpdateLabel: '🕒 Last update: ',
+            entriesLabel: 'Protection entries', currentLabel: 'Current Profile:', 
+            lastUpdateLabel: '🕒 Last update: ',
+            lastUpdateEmpty: '🕒 No active blocklist',
             apply: 'Apply', alreadyActive: '⚠️ This profile is already active', applyConfirm: 'Are you sure you want to apply rules and "',
             profileLight: '☀️ Light', profileNormal: '🧹 Normal', profilePro: '🛡️ PRO',
             profileProPlus: '⚡ PRO Plus', profileUltimate: '🔥 Ultimate',
@@ -705,7 +707,9 @@
             toggleSuccess: '✅ تم تغيير الحالة بنجاح', toggleError: '❌ فشل تغيير الحالة',
             restartBtn: '🔄 إعادة تشغيل', restartSuccess: '✅ تم إعادة تشغيل الخدمة بنجاح', restartError: '❌ فشل إعادة التشغيل',
             editorTitle: '📝 اختيار القائمة', sourceCount: 'اختر مستوى الحماية',
-            entriesLabel: 'مدخلة حماية', currentLabel: 'القائمة الحالية:', lastUpdateLabel: '🕒 آخر تحديث: ',
+            entriesLabel: 'مدخلة حماية', currentLabel: 'القائمة الحالية:', 
+            lastUpdateLabel: '🕒 آخر تحديث: ',
+            lastUpdateEmpty: '🕒 لا توجد قائمة نشطة',
             apply: 'تطبيق', alreadyActive: '⚠️ هذه القائمة مفعلة بالفعل', applyConfirm: 'هل أنت متأكد من تطبيق القواعد وقائمة ',
             profileLight: '☀️ خفيف', profileNormal: '🧹 عادي', profilePro: '🛡️ احترافي',
             profileProPlus: '⚡ احترافي بلس', profileUltimate: '🔥 حماية أقصى',
@@ -811,6 +815,9 @@
     var appInitialized = false, isLoginAttempt = false, sessionExpiredShown = false;
     var runtimeInfoLoaded = false, runtimeInfoData = null, rawJsonVisible = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
+    
+    var lastProfileData = null; 
+    var lastOldModulesData = null;
 
     var rulesState = {
         savingAllow: false, savingDeny: false,
@@ -1504,18 +1511,46 @@
 
     function renderProfileData(data) {
         if (!data || !data.key) return;
+        
+        lastProfileData = data; 
+
         currentProfileKey = data.key;
         currentProfileIsEmpty = data.is_empty;
         $('profileSelect').value = data.key;
         $('currentProfileName').textContent = data.name;
+        
         var count = data.entries || 0;
         $('sourceCountText').textContent = t('entriesLabel') + ' ' + count.toLocaleString('en-US');
         
+        var isEmpty = data.is_empty || count === 0;
         var lu = formatUnixTimestamp(data.last_update_unix);
-        if (lu) {
+
+        if (isEmpty) {
+            $('lastUpdateText').textContent = t('lastUpdateEmpty');
+            $('lastUpdateText').style.color = 'var(--text-muted)';
+        } else if (lu && data.last_update_unix > 0) {
             $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + lu;
+            $('lastUpdateText').style.color = '';
         } else if (data.last_update) {
-            $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + data.last_update;
+            try {
+                var d = new Date(data.last_update);
+                if (!isNaN(d.getTime())) {
+                    var opts = {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                    };
+                    var localStr = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', opts);
+                    $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + localStr;
+                } else {
+                    $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + data.last_update;
+                }
+            } catch (e) {
+                $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + data.last_update;
+            }
+            $('lastUpdateText').style.color = '';
+        } else {
+            $('lastUpdateText').textContent = t('lastUpdateEmpty');
+            $('lastUpdateText').style.color = 'var(--text-muted)';
         }
 
         if (currentProfileIsEmpty) {
@@ -2089,6 +2124,48 @@
         });
     }
 
+    function renderOldModules(data) {
+        var card = $('oldModulesCard'), list = $('oldModulesList');
+        if (!data || data.count === undefined || data.count === 0 || !data.modules || data.modules.length === 0) {
+            card.style.display = 'none';
+            return;
+        }
+        card.style.display = 'block';
+        list.innerHTML = '';
+        for (var i = 0; i < data.modules.length; i++) {
+            var mod = data.modules[i];
+            var itemDiv = document.createElement('div');
+            itemDiv.className = 'old-module-item';
+            var infoDiv = document.createElement('div');
+            infoDiv.className = 'info';
+            var nameStrong = document.createElement('strong');
+            nameStrong.textContent = mod.name;
+            var versionSpan = document.createElement('span');
+            versionSpan.className = 'version';
+            versionSpan.textContent = mod.version ? ' (' + t('oldModuleInfo') + mod.version + ')' : '';
+            var nameWrapper = document.createElement('div');
+            nameWrapper.appendChild(nameStrong);
+            nameWrapper.appendChild(versionSpan);
+            var pathDiv = document.createElement('div');
+            pathDiv.className = 'path';
+            pathDiv.textContent = mod.path;
+            var statusSpan = document.createElement('span');
+            statusSpan.className = 'status ' + (mod.disabled ? 'disabled' : 'active');
+            statusSpan.textContent = mod.disabled ? t('statusDisabled') : t('statusActive');
+            infoDiv.appendChild(nameWrapper);
+            infoDiv.appendChild(pathDiv);
+            infoDiv.appendChild(statusSpan);
+            var delBtn = document.createElement('button');
+            delBtn.className = 'btn-delete-old';
+            delBtn.textContent = t('deleteBtn');
+            delBtn.dataset.path = mod.path;
+            delBtn.addEventListener('click', function() { deleteOldModule(this); });
+            itemDiv.appendChild(infoDiv);
+            itemDiv.appendChild(delBtn);
+            list.appendChild(itemDiv);
+        }
+    }
+
     function checkOldModules() {
         var card = $('oldModulesCard'), list = $('oldModulesList');
         card.style.display = 'none';
@@ -2096,44 +2173,14 @@
         xhrGet('/api?action=check_old_modules', function(err, data) {
             if (err || !data || data.count === undefined || data.count === 0 || !data.modules || data.modules.length === 0) {
                 card.style.display = 'none';
+                lastOldModulesData = null;
                 return;
             }
-            card.style.display = 'block';
-            list.innerHTML = '';
-            for (var i = 0; i < data.modules.length; i++) {
-                var mod = data.modules[i];
-                var itemDiv = document.createElement('div');
-                itemDiv.className = 'old-module-item';
-                var infoDiv = document.createElement('div');
-                infoDiv.className = 'info';
-                var nameStrong = document.createElement('strong');
-                nameStrong.textContent = mod.name;
-                var versionSpan = document.createElement('span');
-                versionSpan.className = 'version';
-                versionSpan.textContent = mod.version ? ' (' + t('oldModuleInfo') + mod.version + ')' : '';
-                var nameWrapper = document.createElement('div');
-                nameWrapper.appendChild(nameStrong);
-                nameWrapper.appendChild(versionSpan);
-                var pathDiv = document.createElement('div');
-                pathDiv.className = 'path';
-                pathDiv.textContent = mod.path;
-                var statusSpan = document.createElement('span');
-                statusSpan.className = 'status ' + (mod.disabled ? 'disabled' : 'active');
-                statusSpan.textContent = mod.disabled ? t('statusDisabled') : t('statusActive');
-                infoDiv.appendChild(nameWrapper);
-                infoDiv.appendChild(pathDiv);
-                infoDiv.appendChild(statusSpan);
-                var delBtn = document.createElement('button');
-                delBtn.className = 'btn-delete-old';
-                delBtn.textContent = t('deleteBtn');
-                delBtn.dataset.path = mod.path;
-                delBtn.addEventListener('click', function() { deleteOldModule(this); });
-                itemDiv.appendChild(infoDiv);
-                itemDiv.appendChild(delBtn);
-                list.appendChild(itemDiv);
-            }
+            lastOldModulesData = data;
+            renderOldModules(data);
         });
     }
+
     function deleteOldModule(btn) {
         var path = btn.getAttribute('data-path');
         if (!path) return;
@@ -2186,12 +2233,87 @@
         }, 10000);
     }
 
+    function renderRuntimeInfo(data) {
+        var content = $('runtimeInfoContent');
+        if (!content || !data) return;
+        
+        var memDisplay = 'unknown';
+        if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+            memDisplay = String(data.memory_limit_mb) + ' MB';
+        }
+        var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
+        var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
+        var bkLatest    = bk.last_backup_name || t('riBackupNone');
+        var bkDate      = bk.last_backup      || t('riBackupNone');
+        var bkLastStbl  = bk.last_stable      || t('riBackupNone');
+        var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
+        var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
+        var bkPath      = bk.path || t('riBackupDirMissing');
+
+        if (bk.last_backup_unix) {
+            var d = new Date(bk.last_backup_unix * 1000);
+            var options = {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            };
+            bkDate = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', options);
+        }
+
+        var html = '';
+        var items = [
+            { label: t('riVersion'), value: data.version || 'unknown' },
+            { label: t('riCommit'), value: data.commit || 'unknown' },
+            { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
+            { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
+            { label: t('riWebuiPort'), value: data.webui_port || '9090' },
+            { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+            { label: t('riProfile'), value: data.profile_key || 'unknown' },
+            { label: t('riMemoryLimit'), value: memDisplay },
+            { label: t('riRunDir'), value: data.run_dir || 'unknown' },
+            { label: t('riStatusFile'), value: data.status_file || 'unknown' },
+            { label: t('riPidFile'), value: data.pid_file || 'unknown' },
+            { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
+            { label: t('riLogFile'), value: data.log_file || 'unknown' },
+            { label: t('riBackupCount'), value: bkAvailable, warn: bkAvailable === '0' },
+            { label: t('riBackupLatest'), value: bkLatest, warn: !bk.last_backup_name },
+            { label: t('riBackupDate'), value: bkDate, warn: !bk.last_backup },
+            { label: t('riBackupLastStable'), value: bkLastStbl, warn: !bk.last_stable },
+            { label: t('riBackupInFlight'), value: bkInFlight, warn: parseInt(bkInFlight, 10) > 0 },
+            { label: t('riBackupOrphan'), value: bkOrphan, warn: parseInt(bkOrphan, 10) > 0 },
+            { label: t('riBackupPath'), value: bkPath }
+        ];
+        for (var i = 0; i < items.length; i++) {
+            var valHtml;
+            if (items[i].isLink && items[i].value !== 'unknown') {
+                valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+            } else {
+                valHtml = escapeHtml(items[i].value);
+            }
+            var labelClass = 'ri-label';
+            if (items[i].warn) labelClass += ' ri-warn';
+            html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+        }
+        html += '<div class="ri-actions">'
+             + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
+             + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
+             + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
+             + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+        content.innerHTML = html;
+
+        var copyBtn = $('riCopyBtn');
+        if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
+        var rawBtn = $('riRawJsonBtn');
+        if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+    }
+
     function loadRuntimeInfo(cb) {
         var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
         if (!content) { if (typeof cb === 'function') cb(); return; }
         if (card) card.style.display = 'block';
         if (refreshBtn) refreshBtn.disabled = true;
         content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
+        
         xhrGet('/api?action=runtime_info', function(err, data) {
             if (refreshBtn) refreshBtn.disabled = false;
             if (err || !data) {
@@ -2201,6 +2323,7 @@
             }
             runtimeInfoData = data;
             runtimeInfoLoaded = true;
+            
             if (data.webui_port) PORTS.webui = String(data.webui_port);
             if (data.dashboard_port) {
                 PORTS.dashboard = String(data.dashboard_port);
@@ -2223,75 +2346,8 @@
                 }
                 if (linkText) linkText.textContent = t('projectLink');
             }
-            var memDisplay = 'unknown';
-            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-                memDisplay = String(data.memory_limit_mb) + ' MB';
-            }
-            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
-            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
-            var bkLatest    = bk.last_backup_name || t('riBackupNone');
-            var bkDate      = bk.last_backup      || t('riBackupNone');
-            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
-            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
-            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
-            var bkPath      = bk.path || t('riBackupDirMissing');
 
-            if (bk.last_backup_unix) {
-                var d = new Date(bk.last_backup_unix * 1000);
-                var options = {
-                    year: 'numeric', month: '2-digit', day: '2-digit',
-                    hour: '2-digit', minute: '2-digit', second: '2-digit',
-                    hour12: false
-                };
-                bkDate = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', options);
-            }
-
-            var html = '';
-            var items = [
-                { label: t('riVersion'), value: data.version || 'unknown' },
-                { label: t('riCommit'), value: data.commit || 'unknown' },
-                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
-                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
-                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
-                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
-                { label: t('riProfile'), value: data.profile_key || 'unknown' },
-                { label: t('riMemoryLimit'), value: memDisplay },
-                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
-                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
-                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
-                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
-                { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                { label: t('riBackupCount'), value: bkAvailable, warn: bkAvailable === '0' },
-                { label: t('riBackupLatest'), value: bkLatest, warn: !bk.last_backup_name },
-                { label: t('riBackupDate'), value: bkDate, warn: !bk.last_backup },
-                { label: t('riBackupLastStable'), value: bkLastStbl, warn: !bk.last_stable },
-                { label: t('riBackupInFlight'), value: bkInFlight, warn: parseInt(bkInFlight, 10) > 0 },
-                { label: t('riBackupOrphan'), value: bkOrphan, warn: parseInt(bkOrphan, 10) > 0 },
-                { label: t('riBackupPath'), value: bkPath }
-            ];
-            for (var i = 0; i < items.length; i++) {
-                var valHtml;
-                if (items[i].isLink && items[i].value !== 'unknown') {
-                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
-                } else {
-                    valHtml = escapeHtml(items[i].value);
-                }
-                var labelClass = 'ri-label';
-                if (items[i].warn) labelClass += ' ri-warn';
-                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
-            }
-            html += '<div class="ri-actions">'
-                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
-                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
-                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
-                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
-            content.innerHTML = html;
-
-            var copyBtn = $('riCopyBtn');
-            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
-            var rawBtn = $('riRawJsonBtn');
-            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
-
+            renderRuntimeInfo(data);
             if (typeof cb === 'function') cb();
         });
     }
@@ -2623,12 +2679,15 @@
         try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
         document.documentElement.lang = currentLang;
         document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        
         updateUIStrings();
+        
+        if (lastProfileData) renderProfileData(lastProfileData);
+        if (runtimeInfoData) renderRuntimeInfo(runtimeInfoData); 
+        if (lastOldModulesData) renderOldModules(lastOldModulesData);
+        
         if (appInitialized) {
-            loadProfile();
-            checkOldModules();
-            if (runtimeInfoLoaded) loadRuntimeInfo();
-            refreshCompanionState();
+            refreshCompanionState(); 
         }
     }
 
@@ -2733,6 +2792,13 @@
                 clearDraft('allow');
                 clearDraft('deny');
                 try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
+                
+                // ⚡ Clean memory caches
+                lastProfileData = null;
+                lastOldModulesData = null;
+                runtimeInfoData = null;
+                runtimeInfoLoaded = false;
+                
                 if (sse) { sse.close(); sse = null; }
                 if (statusPollInterval) clearInterval(statusPollInterval);
                 if (statsInterval) clearInterval(statsInterval);
@@ -2989,12 +3055,19 @@
             if (icon) icon.textContent = '\u23F3';
             txt.textContent = t('installing');
             btn.disabled = true;
+            btn.style.display = 'inline-flex';
             return;
         }
 
         var installed = companionState.installed;
         var vname = companionState.version_name;
         var expected = companionState.expected_version;
+
+        // Hide button if state hasn't loaded yet
+        if (!expected && !installed) {
+            btn.style.display = 'none';
+            return;
+        }
 
         if (!installed) {
             if (icon) icon.textContent = '\uD83D\uDCF2';
@@ -3015,6 +3088,7 @@
             btn.dataset.mode = 'install';
             btn.disabled = false;
         }
+        btn.style.display = 'inline-flex';
     }
 
     function handleCompanionInstall() {

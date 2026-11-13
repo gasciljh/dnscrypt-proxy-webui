@@ -3214,25 +3214,40 @@ func buildProfileResponse() map[string]interface{} {
 	var lastUpdateStr string
 	var lastUpdateUnix int64
 
-	lastUpdateMu.Lock()
-	if time.Since(lastUpdateTime) >= LAST_UPDATE_CACHE_TTL || lastUpdateCache == "" {
-		if fi, err := os.Stat(BLOCKLIST_FILE); err == nil {
-			modTime := fi.ModTime()
-			lastUpdateStr = modTime.UTC().Format(time.RFC3339)
-			lastUpdateUnix = modTime.Unix()
+	if entries > 0 {
+		lastUpdateMu.Lock()
+		if time.Since(lastUpdateTime) >= LAST_UPDATE_CACHE_TTL || lastUpdateCache == "" {
+			if fi, err := os.Stat(BLOCKLIST_FILE); err == nil {
+				modTime := fi.ModTime()
+				lastUpdateStr = modTime.UTC().Format(time.RFC3339)
+				lastUpdateUnix = modTime.Unix()
 
-			lastUpdateCache = lastUpdateStr
-			lastUpdateUnixCache = lastUpdateUnix
+				lastUpdateCache = lastUpdateStr
+				lastUpdateUnixCache = lastUpdateUnix
+			} else {
+				lastUpdateStr = lastUpdateCache
+				lastUpdateUnix = lastUpdateUnixCache
+				if lastUpdateUnix == 0 {
+					now := time.Now()
+					lastUpdateStr = now.UTC().Format(time.RFC3339)
+					lastUpdateUnix = now.Unix()
+				}
+			}
+			lastUpdateTime = time.Now()
 		} else {
 			lastUpdateStr = lastUpdateCache
 			lastUpdateUnix = lastUpdateUnixCache
 		}
-		lastUpdateTime = time.Now()
+		lastUpdateMu.Unlock()
 	} else {
-		lastUpdateStr = lastUpdateCache
-		lastUpdateUnix = lastUpdateUnixCache
+		lastUpdateMu.Lock()
+		if lastUpdateCache != "" || lastUpdateUnixCache != 0 {
+			lastUpdateCache = ""
+			lastUpdateUnixCache = 0
+			lastUpdateTime = time.Now()
+		}
+		lastUpdateMu.Unlock()
 	}
-	lastUpdateMu.Unlock()
 
 	return map[string]interface{}{
 		"key":              key,
