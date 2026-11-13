@@ -235,13 +235,19 @@ jobs:
             fi
           done
 
-          # --- 2. Downstream files: variable reference required ---
+          # --- 2. Downstream files: variable OR delegation required ---
+          #
+          # v1.6.0 (ADR-0003): backup logic moved from functions.sh (Layer 2)
+          # to lib/backup.sh (Layer 0). functions.sh no longer performs any
+          # backup operation — it is intentionally removed from this list.
+          #
+          # service.sh calls auto_backup_if_needed (delegation) without
+          # touching $PERSISTENT_BACKUP directly — accept EITHER form.
           echo ""
-          echo "  Checking downstream references (variable)..."
+          echo "  Checking downstream references (variable or delegation)..."
           for f in \
             lib/backup.sh \
             customize.sh \
-            functions.sh \
             service.sh \
             status.sh \
             uninstall.sh; do
@@ -253,8 +259,10 @@ jobs:
 
             if grep -qE '\$\{?PERSISTENT_BACKUP' "$f"; then
               echo "    ✅ $f references \$PERSISTENT_BACKUP"
+            elif grep -qE 'auto_backup_if_needed|restore_user_files|backup_create|rotate_backups|list_snapshots|count_snapshots' "$f"; then
+              echo "    🔗 $f delegates to lib/backup.sh (v1.6.0)"
             else
-              echo "::error::$f does not reference \$PERSISTENT_BACKUP"
+              echo "::error::$f references neither \$PERSISTENT_BACKUP nor lib/backup.sh functions"
               exit 1
             fi
           done
