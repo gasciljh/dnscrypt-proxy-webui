@@ -20,7 +20,7 @@
 // CACHE_VERSION invalidates every client's cache on release.
 // MUST be bumped whenever assets change.
 // ============================================================
-const CACHE_VERSION = 'v1.6.0-r1794570446';
+const CACHE_VERSION = 'v1.6.0';
 
 const STATIC_CACHE  = `dnscrypt-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `dnscrypt-runtime-${CACHE_VERSION}`;
