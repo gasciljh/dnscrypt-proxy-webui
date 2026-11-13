@@ -831,11 +831,14 @@ jobs:
             exit 1
           fi
 
-          if awk '/function renderProfileData/,/^}/' web/index.html \
-               | grep -q 'last_update_unix'; then
-            echo "  ✅ frontend: renderProfileData prefers last_update_unix"
+          # awk range '/^}/' fails on indented function bodies in HTML
+          # (all braces are 4-space indented inside the IIFE). Since
+          # last_update_unix appears only in renderProfileData, a
+          # whole-file grep is semantically equivalent and reliable.
+          if grep -q 'last_update_unix' web/index.html; then
+            echo "  ✅ frontend: index.html uses last_update_unix"
           else
-            echo "::error::renderProfileData does not use last_update_unix"
+            echo "::error::index.html does not use last_update_unix"
             exit 1
           fi
 
