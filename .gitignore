@@ -209,4 +209,5 @@ orphan-txn-*/
 proxy/dnscrypt-proxy-arm64
 proxy/dnscrypt-proxy-arm
 proxy/dnscrypt-proxy-x86_64
-proxy/dnscrypt-proxy-x86validate_rebuild.sh
+proxy/dnscrypt-proxy-x86
+validate_rebuild.sh
