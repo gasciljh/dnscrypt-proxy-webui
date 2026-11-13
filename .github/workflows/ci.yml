@@ -748,7 +748,7 @@ jobs:
           # --- 2. boot-mini.sh §[4]: fallback pattern ---
           BOOT_LINE="$(grep '^_MONITORING_UI_PORT=' boot-mini.sh | head -n1 || true)"
           case "$BOOT_LINE" in
-            '_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-'*'}')
+            '_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-'*)
               echo "  ✓ boot-mini.sh §[4]: fallback pattern OK"
               ;;
             *)
