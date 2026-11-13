@@ -2,8 +2,8 @@
 
 > What's coming next — the forward-looking plan.
 
-**Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-19
+**Version**: v1.6.0 (Global Edition)
+**Last updated**: 2026-11-13
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
 **Author**: gasciljh
 
@@ -12,7 +12,7 @@
 ## Table of Contents
 
 1. [Philosophy & Priorities](#1-philosophy--priorities)
-2. [v1.6.0 — Planned](#2-v160--planned)
+2. [v1.7.0 — Planned](#2-v170--planned)
 3. [v2.0.0 — 2028](#3-v200--2028)
 4. [Under Consideration](#4-under-consideration)
 5. [Permanently Excluded](#5-permanently-excluded)
@@ -36,13 +36,12 @@
 ### 1.2 Priority Criteria
 
 Every proposed feature is evaluated on six axes:
-
 - 🎯 **Impact** — how many users benefit?
 - ⚡ **Cost** — how long does implementation take?
 - 🔒 **Security** — does it improve or weaken security?
 - 🎨 **Complexity** — does it increase project complexity?
 - 🧪 **Testability** — can it be tested automatically?
-- ⚠️ **Stability** — does it affect RACE-1 (concurrency), PORT-2 (dynamic ports), or the v1.5.0 install cascade?
+- ⚠️ **Stability** — does it affect RACE-1 (concurrency), PORT-2 (dynamic ports), or the install cascade?
 
 ### 1.3 Symbols
 
@@ -62,8 +61,9 @@ Every proposed feature is evaluated on six axes:
 | v1.2.0 | 2026-09-29 | Data-preservation | ✅ shipped |
 | v1.3.0 | 2026-10-02 | Feature | ✅ shipped |
 | v1.4.0 | 2026-10-06 | Integration | ✅ shipped |
-| **v1.5.0** | **2026-10-13** | **Global Edition** | ✅ **current** |
-| v1.6.0 | 2027 Q1–Q2 | Feature + hardening | 📅 planned |
+| v1.5.0 | 2026-10-19 | Global Edition | ✅ shipped |
+| **v1.6.0** | **2026-11-12** | **Architecture & UX** | ✅ **current** |
+| v1.7.0 | 2027 Q1–Q2 | Feature + hardening | 📅 planned |
 | v2.0.0 | 2028 | Major rewrite | 💡 under study |
 
 For what was delivered in each shipped version, see
@@ -71,17 +71,13 @@ For what was delivered in each shipped version, see
 
 ---
 
-## 2. v1.6.0 — Planned
+## 2. v1.7.0 — Planned
 
 **Type**: Feature + hardening (MINOR).
 **Goal**: Security hardening + PWA unification + advanced features.
 **Status**: 📅 Planned.
 
-> **Scope note**: v1.6.0 consolidates deferred work from v1.5.0
-> (CSP hardening, PWA unification, backup integrity hardening)
-> with the previously planned features (multi-language, 2FA,
-> audit log, JWT). The release may ship in multiple MINOR
-> iterations (v1.6.0, v1.6.x, v1.7.0).
+> **Scope note**: v1.6.0 shipped as a focused Architecture & UX release (WebUI timezone fix, PWA cache bump, modularized `lib/` directory, and codebase cleanup). The heavy features originally planned for v1.6.0 (CSP hardening, PWA unification, 2FA) are now consolidated here for v1.7.0.
 
 ### 2.1 Core Features (15 items)
 
@@ -97,8 +93,8 @@ For what was delivered in each shipped version, see
 | 8 | **JWT authentication** — Bearer token alongside cookie; configurable expiry | 🟢 | 🟡 | 1 week |
 | 9 | **Resolver health UI** — Prometheus metrics without `query_log` | 🟡 | 🟡 | 1–2 weeks |
 | 10 | **Advanced rules editor** — syntax highlight + auto-complete + real-time validation + diff view | 🟡 | 🟡 | 2–3 weeks |
-| 11 | **`append_denylist` with content** — WebUI sends `content` parameter (bug from v1.2.0) | 🟡 | 🟢 | 2–3 days |
-| 12 | **Companion deep-links** — `dnsproxy://webui` + `dnsproxy://dashboard` | 🟢 | 🟢 | 2–3 days |
+| 11 | **`append_denylist` with content** — Wire `/api/append_denylist` into the WebUI (dead endpoint since v1.2.0) | 🟡 | 🟢 | 2–3 days |
+| 12 | **Companion deep-link** — `dnsproxy://open` (single entry point; tab query parameter for dashboard) | 🟢 | 🟢 | 2–3 days |
 | 13 | **Companion version automation** — extend `make check-app-version` to compare with GitHub release | 🟢 | 🟢 | 1–2 days |
 | 14 | **Backup export to PC** — `GET /api/export_backup` returning `.tar.gz` | 🟡 | 🟢 | 3–5 days |
 | 15 | **Import/Export settings JSON** — single blob reusing v1.2.0 backup infra | 🟡 | 🟡 | 1 week |
@@ -107,7 +103,7 @@ For what was delivered in each shipped version, see
 
 | # | Fix | Complexity |
 |:-:|---|:---:|
-| 16 | **`pgrep -x` on Android 5.x** — detect broken `pgrep -x`, fall back to `ps -ef \| grep` | 🟢 |
+| 16 | **`pgrep -x` performance** — Cache its availability per boot to avoid fallback-to-/proc overhead on devices where `pgrep -x` works correctly | 🟢 |
 | 17 | **`awk` parser with `]` in TOML comment** — refine end-of-array match | 🟡 |
 | 18 | **CSS cleanup** — remove unused rules from `index.html` (~1,500 lines today) | 🟢 |
 | 19 | **Consolidate modal state** — replace `installModalActive` + `companionInstallInFlight` with `currentModal` state machine | 🟡 |
@@ -167,9 +163,6 @@ For what was delivered in each shipped version, see
 
 ## 4. Under Consideration
 
-These are not committed to any release. They are recorded for
-community discussion and future prioritization.
-
 ### 4.1 Possible Features
 
 | Feature | Initial Evaluation |
@@ -210,8 +203,7 @@ community discussion and future prioritization.
 
 ### 4.3 Deferred (Not Permanently Excluded)
 
-These items are **deferred** — not permanently excluded, but not
-shipped as of v1.5.0. They may be revisited in v1.6.0 or later.
+These items are **deferred** — not permanently excluded, but not shipped as of v1.6.0.
 
 | Feature | Reason | Target |
 |---|---|---|
@@ -240,15 +232,13 @@ shipped as of v1.5.0. They may be revisited in v1.6.0 or later.
 ## 6. See Also
 
 - **What was delivered** → [`CHANGELOG.md`](../CHANGELOG.md)
-- **How to contribute to priorities** →
-  [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) §9
-- **Development workflow priorities** →
-  [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) §10
+- **How to contribute to priorities** → [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) §9
+- **Development workflow priorities** → [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) §10
 - **Why a decision was made** → [`docs/MAP.md`](MAP.md) §8
 - **Full documentation structure** → [`docs/MAP.md`](MAP.md)
 
 ---
 
-*Last updated: 2026-10-17*
-*Version: v1.5.0 (Global Edition)*
+*Last updated: 2026-11-13*
+*Version: v1.6.0 (Global Edition)*
 *Author: gasciljh*

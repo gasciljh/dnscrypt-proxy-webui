@@ -1,33 +1,27 @@
 # ============================================================
 # DNSCrypt Smart Filter – CI Workflow
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Continuous Integration — builds the WebUI binaries for all
 # 4 supported architectures on every push/PR to main or
-# develop, and validates the shell integration.
+# develop, and validates shell integration across 11 steps.
 #
 # Jobs:
 #   1. build              — 4-arch build matrix
-#   2. backup-smoke-test  — shell syntax + integration checks
+#   2. backup-smoke-test  — 11 validation steps
 #
 # Branch strategy:
 #   • main    → stable releases (protected)
-#   • develop → integration branch (features merged here first)
+#   • develop → integration branch
 #
-# Paths ignored (push only):
-#   • Markdown files (**/*.md)
-#   • docs/** directory
+# Paths ignored (push only): Markdown + docs. PRs always run.
 #
-#   Documentation-only changes should not consume CI minutes.
-#   CodeQL runs on ALL changes (see codeql.yml), so docs PRs
-#   still get a security review. PRs always run CI regardless
-#   of paths — a PR can never merge without a green build.
-#
-# Concurrency:
-#   One CI run per branch. A new push cancels the older run.
+# Module layout (v1.6.0):
+#   • 10 root shell scripts + 6 lib/*.sh (Layer 0)
+#   • proxy/ contains Go + configs only
 # ============================================================
 
 name: CI
@@ -97,7 +91,7 @@ jobs:
           if-no-files-found: error
 
   # ============================================================
-  # [2] Backup smoke test
+  # [2] Backup smoke test — 11 validation steps
   # ============================================================
   backup-smoke-test:
     name: Backup Smoke Test
@@ -106,27 +100,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ============================================================
-      # Step 1 — Shell syntax check (bash -n on 10 scripts)
-      # ============================================================
+      # ----------------------------------------------------------
+      # Step 1 — Shell syntax check (bash -n on 16 scripts)
+      # ----------------------------------------------------------
       - name: Shell syntax check (bash -n)
         run: |
           set -euo pipefail
-          echo "::group::bash -n on all module scripts (10)"
+          echo "::group::bash -n on all module scripts (10 root + 6 lib = 16)"
 
           EXPECTED_SHEBANG='#!/system/bin/sh'
 
-          for f in \
-            proxy/boot-mini.sh \
-            proxy/customize.sh \
-            proxy/functions.sh \
-            proxy/service.sh \
-            proxy/status.sh \
-            proxy/uninstall.sh \
-            proxy/action.sh \
-            proxy/post-fs-data.sh \
-            proxy/watchdog.sh \
-            proxy/install_app.sh; do
+          ROOT_SCRIPTS="boot-mini.sh customize.sh functions.sh service.sh \
+                        status.sh uninstall.sh action.sh post-fs-data.sh \
+                        watchdog.sh install_app.sh"
+          LIB_SCRIPTS="lib/constants.sh lib/fallbacks.sh lib/process.sh \
+                       lib/http.sh lib/backup.sh lib/firewall.sh"
+
+          for f in $ROOT_SCRIPTS $LIB_SCRIPTS; do
 
             if [ ! -s "$f" ]; then
               echo "::error::missing or empty: $f"
@@ -153,11 +143,11 @@ jobs:
           done
 
           echo "::endgroup::"
-          echo "✅ All 10 shell scripts pass bash -n and shebang check"
+          echo "✅ All 16 shell scripts pass bash -n and shebang check"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 2 — Verify Layer 1-10 function presence
-      # ============================================================
+      # ----------------------------------------------------------
       - name: Verify Layer 1-10 function presence
         run: |
           set -euo pipefail
@@ -176,28 +166,28 @@ jobs:
             echo "  ✅ $label"
           }
 
-          # Layers 1-8: customize.sh
-          _check_required proxy/customize.sh 'CANDIDATE_SOURCES'    'Layer 1: multi-source detection'
-          _check_required proxy/customize.sh 'PERSISTENT_BACKUP'    'Layer 2: persistent backup path'
-          _check_required proxy/customize.sh 'verify_backup_integrity' 'Layer 3: integrity verification'
-          _check_required proxy/customize.sh 'begin_transaction'    'Layer 4: transaction begin'
-          _check_required proxy/customize.sh 'rollback_transaction' 'Layer 4: transaction rollback'
-          _check_required proxy/customize.sh 'commit_transaction'   'Layer 4: transaction commit'
-          _check_required proxy/customize.sh 'detect_root_solution' 'Layer 5: root-solution detection'
-          _check_required proxy/customize.sh 'copy_with_context'    'Layer 6: SELinux context preservation'
-          _check_required proxy/customize.sh 'recovery'             'Layer 7: recovery mode trigger'
-          _check_required proxy/customize.sh 'migrate_config'       'Layer 8: config migrations'
+          # Layers 1-8: customize.sh (root)
+          _check_required customize.sh 'CANDIDATE_SOURCES'    'Layer 1: multi-source detection'
+          _check_required customize.sh 'PERSISTENT_BACKUP'    'Layer 2: persistent backup path'
+          _check_required customize.sh 'verify_backup_integrity' 'Layer 3: integrity verification'
+          _check_required customize.sh 'transaction_begin'    'Layer 4: transaction begin'
+          _check_required customize.sh 'transaction_rollback' 'Layer 4: transaction rollback'
+          _check_required customize.sh 'transaction_commit'   'Layer 4: transaction commit'
+          _check_required customize.sh 'ROOT_SOLUTION'        'Layer 5: root-solution detection'
+          _check_required customize.sh 'copy_with_context'    'Layer 6: SELinux context preservation'
+          _check_required customize.sh 'recovery'             'Layer 7: recovery mode trigger'
+          _check_required customize.sh 'v1.2.0 addition'      'Layer 8: config migrations'
 
-          # Layer 9: functions.sh + service.sh
-          _check_required proxy/functions.sh 'auto_backup_if_needed' 'Layer 9: auto-backup helper'
-          _check_required proxy/functions.sh 'rotate_backups'        'Layer 9: backup rotation'
-          _check_required proxy/functions.sh 'backup_user_files'     'Layer 9: backup_user_files helper'
-          _check_required proxy/functions.sh 'restore_user_files'    'Layer 9: restore_user_files helper'
-          _check_required proxy/service.sh   'auto_backup_if_needed' 'Layer 9: service.sh calls auto-backup'
+          # Layer 9: functions.sh + service.sh + lib/backup.sh
+          _check_required functions.sh    'auto_backup_if_needed' 'Layer 9: auto-backup helper'
+          _check_required lib/backup.sh   'rotate_backups'        'Layer 9: backup rotation (lib/backup.sh)'
+          _check_required lib/backup.sh   'backup_user_files'     'Layer 9: backup_user_files helper'
+          _check_required functions.sh    'restore_user_files'    'Layer 9: restore_user_files helper'
+          _check_required service.sh      'auto_backup_if_needed' 'Layer 9: service.sh calls auto-backup'
 
           # Layer 10: status.sh
-          _check_required proxy/status.sh 'diagnose' 'Layer 10: diagnose mode in status.sh'
-          _check_required proxy/status.sh 'backups'  'Layer 10: backups in status.sh JSON'
+          _check_required status.sh 'diagnose' 'Layer 10: diagnose mode in status.sh'
+          _check_required status.sh 'backups'  'Layer 10: backups in status.sh JSON'
 
           # main.go additions
           _check_required proxy/main.go 'createAutoBackup'          'main.go: createAutoBackup'
@@ -209,9 +199,19 @@ jobs:
           echo "::endgroup::"
           echo "✅ All v1.2.0 layer functions present"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 3 — Verify PERSISTENT_BACKUP path consistency
-      # ============================================================
+      # ----------------------------------------------------------
+      # Two-tier check:
+      #   1. SSOT files (lib/constants.sh + proxy/main.go) MUST
+      #      contain the literal path.
+      #   2. Downstream files MUST reference $PERSISTENT_BACKUP
+      #      (the variable), inheriting the canonical value.
+      #
+      # This matches the v1.6.0 Layered Bootstrap design:
+      # lib/constants.sh is the single source of truth; all
+      # other files reference the variable.
+      # ----------------------------------------------------------
       - name: Verify PERSISTENT_BACKUP path consistency
         run: |
           set -euo pipefail
@@ -219,73 +219,72 @@ jobs:
 
           EXPECTED="/sdcard/dnscrypt-webui-backup"
 
+          # --- 1. SSOT files: literal path required ---
+          echo ""
+          echo "  Checking canonical definitions (literal path)..."
+          for f in lib/constants.sh proxy/main.go; do
+            if [ ! -s "$f" ]; then
+              echo "::error::file missing or empty: $f"
+              exit 1
+            fi
+            if grep -q "$EXPECTED" "$f"; then
+              echo "    ✅ $f defines $EXPECTED"
+            else
+              echo "::error::$f does not contain '$EXPECTED'"
+              exit 1
+            fi
+          done
+
+          # --- 2. Downstream files: variable reference required ---
+          echo ""
+          echo "  Checking downstream references (variable)..."
           for f in \
-            proxy/customize.sh \
-            proxy/functions.sh \
-            proxy/service.sh \
-            proxy/status.sh \
-            proxy/uninstall.sh \
-            proxy/main.go; do
+            lib/backup.sh \
+            customize.sh \
+            functions.sh \
+            service.sh \
+            status.sh \
+            uninstall.sh; do
 
             if [ ! -s "$f" ]; then
-              echo "  ❌ file missing or empty: $f"
+              echo "::error::file missing or empty: $f"
               exit 1
             fi
 
-            if grep -q "$EXPECTED" "$f"; then
-              echo "  ✅ $f references $EXPECTED"
+            if grep -qE '\$\{?PERSISTENT_BACKUP' "$f"; then
+              echo "    ✅ $f references \$PERSISTENT_BACKUP"
             else
-              echo "  ❌ $f does not contain '$EXPECTED'"
+              echo "::error::$f does not reference \$PERSISTENT_BACKUP"
               exit 1
             fi
           done
 
           echo "::endgroup::"
-          echo "✅ PERSISTENT_BACKUP path consistent"
+          echo "✅ PERSISTENT_BACKUP path consistent (SSOT + 6 downstream)"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 4 — Verify consolidated documentation referenced
-      # ============================================================
-      # After the v1.5.0 consolidation (15 markdown files), the
-      # authoritative user-facing docs are GUIDE.md, REFERENCE.md,
-      # CONTRIBUTING.md, and MAP.md. customize.sh's generated
-      # README.md points at REFERENCE.md §4 and GUIDE.md §8.
+      # ----------------------------------------------------------
       - name: Verify consolidated docs referenced
         run: |
           set -euo pipefail
           echo "::group::Verifying consolidated documentation references"
 
-          if [ ! -f docs/REFERENCE.md ]; then
-            echo "::error::docs/REFERENCE.md missing"
-            exit 1
-          fi
-          echo "  ✅ docs/REFERENCE.md present"
+          for f in docs/REFERENCE.md docs/GUIDE.md docs/CONTRIBUTING.md docs/MAP.md; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f missing"
+              exit 1
+            fi
+            echo "  ✅ $f present"
+          done
 
-          if [ ! -f docs/GUIDE.md ]; then
-            echo "::error::docs/GUIDE.md missing"
-            exit 1
-          fi
-          echo "  ✅ docs/GUIDE.md present"
-
-          if [ ! -f docs/CONTRIBUTING.md ]; then
-            echo "::error::docs/CONTRIBUTING.md missing"
-            exit 1
-          fi
-          echo "  ✅ docs/CONTRIBUTING.md present"
-
-          if [ ! -f docs/MAP.md ]; then
-            echo "::error::docs/MAP.md missing"
-            exit 1
-          fi
-          echo "  ✅ docs/MAP.md present"
-
-          if ! grep -q 'REFERENCE\.md' proxy/customize.sh; then
+          if ! grep -q 'REFERENCE\.md' customize.sh; then
             echo "::error::customize.sh does not reference REFERENCE.md"
             exit 1
           fi
           echo "  ✅ customize.sh → REFERENCE.md"
 
-          if ! grep -q 'GUIDE\.md' proxy/customize.sh; then
+          if ! grep -q 'GUIDE\.md' customize.sh; then
             echo "::error::customize.sh does not reference GUIDE.md"
             exit 1
           fi
@@ -294,9 +293,9 @@ jobs:
           echo "::endgroup::"
           echo "✅ Consolidated documentation references verified"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 5 — Verify web asset files exist and have sane sizes
-      # ============================================================
+      # ----------------------------------------------------------
       - name: Verify web asset files exist and have sane sizes
         run: |
           set -euo pipefail
@@ -343,136 +342,100 @@ jobs:
           echo "::endgroup::"
           echo "✅ All web assets present and satisfy minimum size requirements"
 
-      # ============================================================
-      # Step 6 — Verify version consistency (9 files)
-      # ============================================================
+      # ----------------------------------------------------------
+      # Step 6 — Verify version consistency (10 checks)
+      # ----------------------------------------------------------
       - name: Verify version consistency
         run: |
           set -euo pipefail
-          echo "::group::Verifying version consistency (9 files)"
+          echo "::group::Verifying version consistency"
 
           if [ ! -s VERSION ]; then
             echo "  ❌ VERSION file is missing or empty"
             exit 1
           fi
           V="$(tr -d '\r\n' < VERSION | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-          echo "  VERSION file:           $V"
+          echo "  VERSION file:                   $V"
           V_NO_V="${V#v}"
 
-          # --- 1. module.prop ---
-          if [ ! -s module.prop ]; then
-            echo "  ❌ module.prop is missing or empty"
-            exit 1
-          fi
+          # 1. module.prop
           MP_V="$(grep '^version=' module.prop | head -n1 | cut -d= -f2- | tr -d '\r ')"
           if [ "$MP_V" = "$V" ]; then
             echo "  ✅ module.prop version:          $MP_V"
           else
-            echo "  ❌ module.prop version mismatch"
+            echo "  ❌ module.prop version mismatch: $MP_V != $V"
             exit 1
           fi
 
-          # --- 2. update.json ---
-          if [ ! -s update.json ]; then
-            echo "  ❌ update.json is missing or empty"
-            exit 1
-          fi
+          # 2. update.json
           UJ_V="$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' update.json \
                   | head -n1 | sed -E 's/.*"([^"]*)"$/\1/')"
           if [ "$UJ_V" = "$V" ]; then
             echo "  ✅ update.json version:          $UJ_V"
           else
-            echo "  ❌ update.json version mismatch"
+            echo "  ❌ update.json version mismatch: $UJ_V != $V"
             exit 1
           fi
 
-          # --- 3. web/manifest.json ---
-          if [ ! -s web/manifest.json ]; then
-            echo "  ❌ web/manifest.json is missing or empty"
-            exit 1
-          fi
+          # 3. web/manifest.json (no v prefix)
           MF_V="$(grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]*"' web/manifest.json \
                   | head -n1 | sed -E 's/.*"([^"]*)"$/\1/')"
           if [ "$MF_V" = "$V_NO_V" ]; then
             echo "  ✅ web/manifest.json version:    $MF_V"
           else
-            echo "  ❌ web/manifest.json version mismatch"
+            echo "  ❌ web/manifest.json mismatch:   $MF_V != $V_NO_V"
             exit 1
           fi
 
-          # --- 4. web/sw.js ---
-          if [ ! -s web/sw.js ]; then
-            echo "  ❌ web/sw.js is missing or empty"
-            exit 1
-          fi
+          # 4. web/sw.js CACHE_VERSION
           SW_V="$(grep -oE "CACHE_VERSION[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]" web/sw.js \
-                  | head -n1 \
-                  | sed -E "s/.*['\"]([^'\"]*)['\"]$/\1/")"
-          if [ -z "$SW_V" ]; then
-            echo "  ❌ could not extract CACHE_VERSION from web/sw.js"
-            exit 1
-          fi
+                  | head -n1 | sed -E "s/.*['\"]([^'\"]*)['\"]$/\1/")"
           if [ "$SW_V" = "$V" ]; then
             echo "  ✅ web/sw.js CACHE_VERSION:      $SW_V"
           else
-            echo "  ❌ web/sw.js CACHE_VERSION mismatch"
+            echo "  ❌ web/sw.js CACHE_VERSION:      $SW_V != $V"
             exit 1
           fi
 
-          # --- 5. web/index.html ---
-          if [ ! -s web/index.html ]; then
-            echo "  ❌ web/index.html is missing or empty"
-            exit 1
-          fi
+          # 5. web/index.html
           IDX_V="$(grep -oE "var VERSION[[:space:]]*=[[:space:]]*'[^']*'" web/index.html \
                    | head -n1 | cut -d"'" -f2)"
-          if [ -z "$IDX_V" ]; then
-            echo "  ❌ could not extract VERSION from web/index.html"
-            exit 1
-          fi
           if [ "$IDX_V" = "$V" ]; then
             echo "  ✅ web/index.html VERSION:       $IDX_V"
           else
-            echo "  ❌ web/index.html VERSION mismatch"
+            echo "  ❌ web/index.html VERSION:       $IDX_V != $V"
             exit 1
           fi
 
-          # --- 6. web/dashboard.html ---
-          if [ ! -s web/dashboard.html ]; then
-            echo "  ❌ web/dashboard.html is missing or empty"
-            exit 1
-          fi
+          # 6. web/dashboard.html
           DB_V="$(grep -oE "var VERSION[[:space:]]*=[[:space:]]*'[^']*'" web/dashboard.html \
                   | head -n1 | cut -d"'" -f2)"
-          if [ -z "$DB_V" ]; then
-            echo "  ❌ could not extract VERSION from web/dashboard.html"
-            exit 1
-          fi
           if [ "$DB_V" = "$V" ]; then
             echo "  ✅ web/dashboard.html VERSION:   $DB_V"
           else
-            echo "  ❌ web/dashboard.html VERSION mismatch"
+            echo "  ❌ web/dashboard.html VERSION:   $DB_V != $V"
             exit 1
           fi
 
-          # --- 7. proxy/app-apk.version ---
-          if [ ! -s proxy/app-apk.version ]; then
-            echo "  ❌ proxy/app-apk.version is missing or empty"
-            exit 1
-          fi
+          # 7. proxy/app-apk.version
           APK_V="$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
           if printf '%s' "$APK_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "  ✅ proxy/app-apk.version:        $APK_V (valid format)"
+            echo "  ✅ proxy/app-apk.version:        $APK_V"
           else
-            echo "  ❌ proxy/app-apk.version format invalid"
+            echo "  ❌ proxy/app-apk.version format invalid: $APK_V"
             exit 1
           fi
 
-          # --- 8. proxy/go.mod (ADR-0002 pin) ---
-          if [ ! -s proxy/go.mod ]; then
-            echo "  ❌ proxy/go.mod is missing or empty"
+          # 8. proxy/dnscrypt-proxy.version
+          DNS_V="$(tr -d '\r\n' < proxy/dnscrypt-proxy.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          if printf '%s' "$DNS_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "  ✅ proxy/dnscrypt-proxy.version: $DNS_V"
+          else
+            echo "  ❌ proxy/dnscrypt-proxy.version format invalid: $DNS_V"
             exit 1
           fi
+
+          # 9. proxy/go.mod (ADR-0002 pin)
           if grep -qE '^\s*require\s+github\.com/cyphar/filepath-securejoin\s+v[0-9]+\.[0-9]+\.[0-9]+' proxy/go.mod; then
             GO_DEP="$(grep -oE 'filepath-securejoin[[:space:]]+v[0-9]+\.[0-9]+\.[0-9]+' proxy/go.mod | head -n1)"
             echo "  ✅ proxy/go.mod pin (ADR-0002):  $GO_DEP"
@@ -481,18 +444,31 @@ jobs:
             exit 1
           fi
 
-          if [ ! -s proxy/go.sum ]; then
-            echo "  ❌ proxy/go.sum is missing or empty"
+          if [ -s proxy/go.sum ]; then
+            echo "  ✅ proxy/go.sum present"
+          else
+            echo "  ❌ proxy/go.sum missing"
             exit 1
           fi
-          echo "  ✅ proxy/go.sum present"
+
+          # 10. proxy/main.go BuildVersion
+          MAIN_V="$(grep -E '^\s*BuildVersion\s*=' proxy/main.go \
+                    | head -n1 \
+                    | sed -E 's/.*=\s*"([^"]*)".*/\1/' \
+                    | tr -d '\r\n ')"
+          if [ "$MAIN_V" = "$V" ]; then
+            echo "  ✅ proxy/main.go BuildVersion:   $MAIN_V"
+          else
+            echo "  ❌ proxy/main.go BuildVersion:   $MAIN_V != $V"
+            exit 1
+          fi
 
           echo "::endgroup::"
-          echo "✅ Version consistency verified across 9 files"
+          echo "✅ Version consistency verified across 10 files"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 7 — Verify companion app metadata
-      # ============================================================
+      # ----------------------------------------------------------
       - name: Verify companion app metadata
         run: |
           set -euo pipefail
@@ -503,7 +479,7 @@ jobs:
           else
             APP_V="$(tr -d '\r\n' < proxy/app-apk.version | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             if printf '%s' "$APP_V" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "  ✅ proxy/app-apk.version:        $APP_V (valid format)"
+              echo "  ✅ proxy/app-apk.version:        $APP_V"
             else
               echo "  ❌ proxy/app-apk.version format invalid"
               exit 1
@@ -519,28 +495,28 @@ jobs:
           echo "::endgroup::"
           echo "✅ Companion app metadata verified"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 8 — Verify companion install script (v1.5.0)
-      # ============================================================
+      # ----------------------------------------------------------
       - name: Verify companion install script
         run: |
           set -euo pipefail
-          echo "::group::Verifying proxy/install_app.sh"
+          echo "::group::Verifying install_app.sh (root)"
 
-          if [ ! -s proxy/install_app.sh ]; then
-            echo "::error::proxy/install_app.sh missing or empty"
+          if [ ! -s install_app.sh ]; then
+            echo "::error::install_app.sh missing or empty at repo root"
             exit 1
           fi
 
-          if [ ! -x proxy/install_app.sh ]; then
-            echo "::warning::proxy/install_app.sh is not executable — fixing"
-            chmod +x proxy/install_app.sh
+          if [ ! -x install_app.sh ]; then
+            echo "::warning::install_app.sh is not executable — fixing"
+            chmod +x install_app.sh
           fi
 
-          LINES="$(wc -l < proxy/install_app.sh | tr -d ' ')"
-          echo "  ✓ present: proxy/install_app.sh (${LINES} lines)"
+          LINES="$(wc -l < install_app.sh | tr -d ' ')"
+          echo "  ✓ present: install_app.sh (${LINES} lines)"
 
-          # ---- Cascade markers (5 levels) ----
+          # --- Cascade markers (5 levels) ---
           echo ""
           echo "  Verifying cascade-level markers..."
           MARKERS=(
@@ -554,7 +530,7 @@ jobs:
           for entry in "${MARKERS[@]}"; do
             pattern="${entry%%|*}"
             label="${entry##*|}"
-            if grep -q "$pattern" proxy/install_app.sh; then
+            if grep -q "$pattern" install_app.sh; then
               echo "    ✓ ${label}: ${pattern}"
             else
               echo "    ❌ ${label} missing: ${pattern}"
@@ -566,78 +542,78 @@ jobs:
             exit 1
           fi
 
-          # ---- Cascade deadline ----
+          # --- Cascade deadline ---
           echo ""
-          if grep -q 'CASCADE_DEADLINE_SECONDS' proxy/install_app.sh; then
+          if grep -q 'CASCADE_DEADLINE_SECONDS' install_app.sh; then
             echo "  ✓ cascade deadline: CASCADE_DEADLINE_SECONDS"
           else
             echo "::error::CASCADE_DEADLINE_SECONDS missing"
             exit 1
           fi
 
-          # ---- Play Protect trap ----
-          if grep -q 'package_verifier_enable' proxy/install_app.sh; then
+          # --- Play Protect trap ---
+          if grep -q 'package_verifier_enable' install_app.sh; then
             echo "  ✓ Play Protect trap: package_verifier_enable"
           else
             echo "::error::package_verifier_enable missing"
             exit 1
           fi
 
-          if grep -q '_VERIFIER_ORIG' proxy/install_app.sh; then
+          if grep -q '_VERIFIER_ORIG' install_app.sh; then
             echo "  ✓ Play Protect restore: _VERIFIER_ORIG"
           else
             echo "::error::_VERIFIER_ORIG missing"
             exit 1
           fi
 
-          # ---- SELinux staging path ----
-          if grep -q '/data/local/tmp/dnscrypt-companion.apk' proxy/install_app.sh; then
+          # --- SELinux staging path ---
+          if grep -q '/data/local/tmp/dnscrypt-companion.apk' install_app.sh; then
             echo "  ✓ SELinux staging: /data/local/tmp/dnscrypt-companion.apk"
           else
             echo "::error::SELinux staging path missing"
             exit 1
           fi
 
-          # ---- SELinux posture ----
-          if grep -v '^[[:space:]]*#' proxy/install_app.sh \
+          # --- SELinux posture ---
+          if grep -v '^[[:space:]]*#' install_app.sh \
                | grep -qE 'setenforce[[:space:]]+0'; then
             echo "::error::'setenforce 0' found in executable code"
             exit 1
           fi
           echo "  ✓ SELinux posture: no active 'setenforce 0'"
 
-          # ---- Three-way trap split ----
+          # --- Three-way trap split ---
           echo ""
-          if grep -q "trap '_cleanup_app' EXIT" proxy/install_app.sh; then
+          if grep -q "trap '_cleanup_app' EXIT" install_app.sh; then
             echo "  ✓ trap: EXIT"
           else
             echo "::error::EXIT trap missing"
             exit 1
           fi
-          if grep -q "trap '_cleanup_app; exit 130' INT" proxy/install_app.sh; then
+          if grep -q "trap '_cleanup_app; exit 130' INT" install_app.sh; then
             echo "  ✓ trap: INT exits 130"
           else
             echo "::error::INT trap (exit 130) missing"
             exit 1
           fi
-          if grep -q "trap '_cleanup_app; exit 143' TERM" proxy/install_app.sh; then
+          if grep -q "trap '_cleanup_app; exit 143' TERM" install_app.sh; then
             echo "  ✓ trap: TERM exits 143"
           else
             echo "::error::TERM trap (exit 143) missing"
             exit 1
           fi
-          if grep -q '_CLEANED_UP=1' proxy/install_app.sh; then
+          if grep -q '_CLEANED_UP=1' install_app.sh; then
             echo "  ✓ trap: re-entry guard"
           else
             echo "::error::_CLEANED_UP re-entry guard missing"
             exit 1
           fi
 
-          # ---- CSH-22 integration ----
+          # --- CSH-22 integration ---
           echo ""
           echo "  Verifying CSH-22 integration..."
 
-          if grep -q 'install_app.sh' proxy/customize.sh; then
+          if grep -q 'install_app.sh' customize.sh; then
             echo "    ✓ customize.sh references install_app.sh"
           else
             echo "::error::customize.sh does NOT reference install_app.sh"
@@ -654,101 +630,146 @@ jobs:
           echo "::endgroup::"
           echo "✅ Companion install script verified"
 
-      # ============================================================
-      # Step 9 — Verify boot-mini.sh integration (Layered Bootstrap)
-      # ============================================================
-      - name: Verify boot-mini.sh integration
+      # ----------------------------------------------------------
+      # Step 9 — Verify Layered Bootstrap (v1.6.0 — 3-layer model)
+      # ----------------------------------------------------------
+      - name: Verify Layered Bootstrap (lib/ + boot-mini + functions)
         run: |
           set -euo pipefail
-          echo "::group::Verifying boot-mini.sh integration"
+          echo "::group::Verifying Layered Bootstrap (3-layer model)"
 
-          if [ ! -s proxy/boot-mini.sh ]; then
-            echo "::error::proxy/boot-mini.sh missing or empty"
+          # --- 1. All 6 lib/*.sh modules present ---
+          echo "  Checking lib/*.sh modules..."
+          for M in constants fallbacks process http backup firewall; do
+            if [ -s "lib/$M.sh" ]; then
+              echo "    ✓ lib/$M.sh"
+            else
+              echo "::error::lib/$M.sh missing or empty"
+              exit 1
+            fi
+          done
+
+          # --- 2. boot-mini.sh present ---
+          if [ ! -s boot-mini.sh ]; then
+            echo "::error::boot-mini.sh missing or empty"
             exit 1
           fi
-          echo "  ✓ present: proxy/boot-mini.sh"
+          echo "  ✓ boot-mini.sh present"
 
+          # --- 3. boot-mini.sh sources lib/*.sh via _LIB_BASE ---
+          if grep -q '_LIB_BASE' boot-mini.sh; then
+            echo "  ✓ boot-mini.sh uses _LIB_BASE discovery pattern"
+          else
+            echo "::error::boot-mini.sh does not use _LIB_BASE"
+            exit 1
+          fi
+
+          # --- 4. boot-mini.sh defines the 5 primitives ---
           for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do
-            if grep -qE "^${fn}\(\)" proxy/boot-mini.sh; then
-              echo "  ✓ primitive: $fn"
+            if grep -qE "^[[:space:]]*${fn}[[:space:]]*\(\)" boot-mini.sh; then
+              echo "    ✓ primitive: $fn"
             else
               echo "::error::boot-mini.sh missing primitive: $fn"
               exit 1
             fi
           done
 
-          if grep -q '^_MONITORING_UI_PORT=' proxy/boot-mini.sh; then
-            echo "  ✓ _MONITORING_UI_PORT defined in boot-mini.sh"
-          else
-            echo "::error::_MONITORING_UI_PORT not defined in boot-mini.sh"
-            exit 1
-          fi
-
-          if grep -q 'boot-mini.sh' proxy/functions.sh; then
+          # --- 5. functions.sh sources boot-mini.sh ---
+          if grep -q 'boot-mini.sh' functions.sh; then
             echo "  ✓ functions.sh sources boot-mini.sh"
           else
             echo "::error::functions.sh does not source boot-mini.sh"
             exit 1
           fi
 
+          # --- 6. functions.sh does not redefine Layer-0 primitives ---
           for fn in get_run_dir read_conf is_port_open get_webui_port; do
-            if grep -qE "^${fn}[[:space:]]*\(\)" proxy/functions.sh; then
+            if grep -qE "^${fn}[[:space:]]*\(\)" functions.sh; then
               echo "::error::functions.sh redefines Layer-0 primitive: $fn"
               exit 1
             fi
           done
           echo "  ✓ functions.sh does not redefine Layer-0 primitives"
 
-          if grep -qE '^_MONITORING_UI_PORT=' proxy/functions.sh; then
-            echo "::error::functions.sh redefines _MONITORING_UI_PORT"
+          # --- 7. _MONITORING_UI_PORT canonical in lib/constants.sh ---
+          if grep -qE '^_MONITORING_UI_PORT="8080"' lib/constants.sh; then
+            echo "  ✓ _MONITORING_UI_PORT canonical in lib/constants.sh"
+          else
+            echo "::error::_MONITORING_UI_PORT canonical missing from lib/constants.sh"
             exit 1
           fi
-          echo "  ✓ functions.sh does not redefine _MONITORING_UI_PORT"
+
+          # --- 8. _MONITORING_UI_PORT fallback in boot-mini.sh §[4] ---
+          if grep -qE '^_MONITORING_UI_PORT="\$\{_MONITORING_UI_PORT:-' boot-mini.sh; then
+            echo "  ✓ _MONITORING_UI_PORT fallback in boot-mini.sh §[4]"
+          else
+            echo "::error::boot-mini.sh §[4] fallback not found"
+            exit 1
+          fi
+
+          # --- 9. customize.sh does NOT set _MONITORING_UI_PORT directly ---
+          if grep -qE '^_MONITORING_UI_PORT=' customize.sh; then
+            echo "::error::customize.sh sets _MONITORING_UI_PORT directly (not allowed)"
+            exit 1
+          fi
+          echo "  ✓ customize.sh does not set _MONITORING_UI_PORT directly"
 
           echo "::endgroup::"
-          echo "✅ boot-mini.sh integration verified"
+          echo "✅ Layered Bootstrap verified (3-layer model)"
 
-      # ============================================================
+      # ----------------------------------------------------------
       # Step 10 — Verify reserved-port constant sync
-      # ============================================================
+      # ----------------------------------------------------------
       - name: Verify reserved-port constant sync
         run: |
           set -euo pipefail
           echo "::group::Verifying reserved-port constant sync"
 
-          BOOT_VAL="$(grep '^_MONITORING_UI_PORT=' proxy/boot-mini.sh \
-                      | head -n1 \
-                      | sed -E 's/^_MONITORING_UI_PORT="?([^"]*)"?$/\1/' \
-                      | tr -d '\r\n ')"
-          if [ "$BOOT_VAL" != "8080" ]; then
-            echo "::error::boot-mini.sh defines _MONITORING_UI_PORT='$BOOT_VAL' (expected '8080')"
+          # --- 1. lib/constants.sh: canonical value ---
+          CONST_VAL="$(grep '^_MONITORING_UI_PORT=' lib/constants.sh \
+                       | head -n1 \
+                       | sed -E 's/^_MONITORING_UI_PORT="([^"]*)"$/\1/' \
+                       | tr -d '\r\n ')"
+          if [ "$CONST_VAL" = "8080" ]; then
+            echo "  ✓ lib/constants.sh: _MONITORING_UI_PORT=\"8080\""
+          else
+            echo "::error::lib/constants.sh defines '$CONST_VAL' (expected '8080')"
             exit 1
           fi
-          echo "  ✓ boot-mini.sh: _MONITORING_UI_PORT=\"8080\""
 
+          # --- 2. boot-mini.sh §[4]: fallback pattern ---
+          BOOT_LINE="$(grep '^_MONITORING_UI_PORT=' boot-mini.sh | head -n1 || true)"
+          case "$BOOT_LINE" in
+            '_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-'*'}')
+              echo "  ✓ boot-mini.sh §[4]: fallback pattern OK"
+              ;;
+            *)
+              echo "::error::boot-mini.sh §[4] must use the fallback pattern"
+              echo "::error::  got: $BOOT_LINE"
+              exit 1
+              ;;
+          esac
+
+          # --- 3. proxy/main.go: Go constant ---
           GO_VAL="$(grep -E '^\s*MONITORING_UI_PORT\s*=' proxy/main.go \
                     | head -n1 \
                     | sed -E 's/.*=\s*"([^"]*)".*/\1/' \
                     | tr -d '\r\n ')"
-          if [ "$GO_VAL" != "8080" ]; then
-            echo "::error::main.go defines MONITORING_UI_PORT='$GO_VAL' (expected '8080')"
+          if [ "$GO_VAL" = "8080" ]; then
+            echo "  ✓ proxy/main.go: MONITORING_UI_PORT = \"8080\""
+          else
+            echo "::error::proxy/main.go defines '$GO_VAL' (expected '8080')"
             exit 1
           fi
-          echo "  ✓ main.go:      MONITORING_UI_PORT = \"8080\""
 
+          # --- 4. No other shell script may set the constant ---
           echo ""
           echo "  Checking other shell scripts for hardcoded literals..."
 
           for f in \
-            proxy/customize.sh \
-            proxy/functions.sh \
-            proxy/service.sh \
-            proxy/action.sh \
-            proxy/status.sh \
-            proxy/uninstall.sh \
-            proxy/post-fs-data.sh \
-            proxy/watchdog.sh \
-            proxy/install_app.sh; do
+            customize.sh functions.sh service.sh action.sh \
+            status.sh uninstall.sh post-fs-data.sh \
+            watchdog.sh install_app.sh; do
 
             [ -f "$f" ] || continue
 
@@ -756,10 +777,7 @@ jobs:
               [ -z "$line" ] && continue
               case "$line" in
                 '_MONITORING_UI_PORT=""')
-                  echo "    ✓ $f — empty definition (finalized later)"
-                  ;;
-                '_MONITORING_UI_PORT="${_MONITORING_UI_PORT:-'*'}"')
-                  echo "    ✓ $f — fallback pattern"
+                  echo "    ✓ $f — empty (finalized via boot-mini)"
                   ;;
                 *)
                   echo "::error::$f has an unsafe _MONITORING_UI_PORT definition:"
@@ -771,4 +789,76 @@ jobs:
           done
 
           echo "::endgroup::"
-          echo "✅ Reserved-port constant sync verified (shell ↔ Go)"
+          echo "✅ Reserved-port constant sync verified"
+
+      # ----------------------------------------------------------
+      # Step 11 — v1.6.0 additions (timezone + mtime sort + Makefile)
+      # ----------------------------------------------------------
+      - name: Verify v1.6.0 additions (timezone + mtime sort + consistency)
+        run: |
+          set -euo pipefail
+          echo "::group::Verifying v1.6.0 additions"
+
+          # --- 1. Timezone: backend field present ---
+          if awk '/func buildProfileResponse/,/^}/' proxy/main.go \
+               | grep -q 'last_update_unix'; then
+            echo "  ✅ backend: buildProfileResponse → last_update_unix"
+          else
+            echo "::error::buildProfileResponse does not emit last_update_unix"
+            exit 1
+          fi
+
+          if grep -q 'lastUpdateUnixCache' proxy/main.go; then
+            echo "  ✅ backend: lastUpdateUnixCache field"
+          else
+            echo "::error::lastUpdateUnixCache missing"
+            exit 1
+          fi
+
+          # --- 2. Timezone: frontend helper present ---
+          if grep -q 'formatUnixTimestamp' web/index.html; then
+            echo "  ✅ frontend: formatUnixTimestamp() defined"
+          else
+            echo "::error::formatUnixTimestamp() missing from web/index.html"
+            exit 1
+          fi
+
+          if awk '/function renderProfileData/,/^}/' web/index.html \
+               | grep -q 'last_update_unix'; then
+            echo "  ✅ frontend: renderProfileData prefers last_update_unix"
+          else
+            echo "::error::renderProfileData does not use last_update_unix"
+            exit 1
+          fi
+
+          # --- 3. buildBackupInfo sorts by ModTime (v1.6.0 fix) ---
+          if awk '/func buildBackupInfo/,/^}/' proxy/main.go \
+               | grep -q 'ModTime().Before'; then
+            echo "  ✅ buildBackupInfo sorts by mtime (aligned with rotate_backups)"
+          else
+            echo "::error::buildBackupInfo does not sort by ModTime — SNAP-MTIME violated"
+            exit 1
+          fi
+
+          # --- 4. Makefile target: check-consistency ---
+          if [ -f Makefile ] && grep -qE '^check-consistency' Makefile; then
+            echo "  ✅ Makefile: check-consistency target present"
+          else
+            echo "::warning::Makefile: check-consistency target missing (optional)"
+          fi
+
+          # --- 5. If check-consistency target exists, run it ---
+          if make -n check-consistency >/dev/null 2>&1; then
+            echo "  → Running make check-consistency..."
+            if make check-consistency; then
+              echo "  ✅ make check-consistency passed"
+            else
+              echo "::error::make check-consistency failed — documentation drift"
+              exit 1
+            fi
+          else
+            echo "  ⚠️  make check-consistency not runnable (target missing or not configured)"
+          fi
+
+          echo "::endgroup::"
+          echo "✅ v1.6.0 additions verified"

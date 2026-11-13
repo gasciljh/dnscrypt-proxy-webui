@@ -1,71 +1,55 @@
 # ============================================================
 # DNSCrypt Smart Filter — Makefile
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-# ============================================================
-# Unified commands for building, packaging, releasing, and
-# validating the module.
-#
-# The release targets accept a CLI override:
-#     make release VERSION=v1.5.1
-#
-# All other targets read VERSION from the VERSION file.
 # ============================================================
 
 SHELL := /bin/sh
 
-# ────────────────────────────────────────────────────────────
-# Version resolution
-# ────────────────────────────────────────────────────────────
-# CLI_VERSION captures a command-line `VERSION=...` before the
-# `override` directive below makes VERSION immune to it. The
-# release targets read CLI_VERSION; every other target reads
-# VERSION — which is always the file's value.
-#
-# This isolates "did the user pass a version?" from the variable
-# used by build/package/check targets, so a CLI value cannot
-# silently disagree with the file.
-# ────────────────────────────────────────────────────────────
+# ============================================================
+# Version
+# ============================================================
 VERSION_FILE := VERSION
 
 CLI_VERSION := $(VERSION)
 override VERSION := $(shell cat $(VERSION_FILE) 2>/dev/null || echo "unknown")
 
-# ────────────────────────────────────────────────────────────
-# Syntax checker — matches ci.yml
-# ────────────────────────────────────────────────────────────
-# The CI workflow's `bash -n` step is the authoritative syntax
-# check. Local `make check-backup` uses the SAME tool so a green
-# local run means a green CI run.
-# ────────────────────────────────────────────────────────────
 SH_CHECK := bash
 
-PROXY_DIR   := $(shell pwd)/proxy
-DIST_DIR    := $(shell pwd)/dist
-DOCS_DIR    := $(shell pwd)/docs
-SCRIPTS_DIR := $(shell pwd)/scripts
+# ============================================================
+# Directories
+# ============================================================
+ROOT_DIR    := $(shell pwd)
+LIB_DIR     := $(ROOT_DIR)/lib
+PROXY_DIR   := $(ROOT_DIR)/proxy
+DIST_DIR    := $(ROOT_DIR)/dist
+DOCS_DIR    := $(ROOT_DIR)/docs
+SCRIPTS_DIR := $(ROOT_DIR)/scripts
 ADR_DIR     := $(DOCS_DIR)/adr
 
-# ────────────────────────────────────────────────────────────
-# Lists
-# ────────────────────────────────────────────────────────────
+# ============================================================
+# File lists
+# ============================================================
 SHELL_SCRIPTS := \
-	$(PROXY_DIR)/post-fs-data.sh \
-	$(PROXY_DIR)/customize.sh \
-	$(PROXY_DIR)/functions.sh \
-	$(PROXY_DIR)/boot-mini.sh \
-	$(PROXY_DIR)/service.sh \
-	$(PROXY_DIR)/watchdog.sh \
-	$(PROXY_DIR)/action.sh \
-	$(PROXY_DIR)/status.sh \
-	$(PROXY_DIR)/uninstall.sh \
-	$(PROXY_DIR)/install_app.sh
+	$(ROOT_DIR)/post-fs-data.sh \
+	$(ROOT_DIR)/customize.sh \
+	$(ROOT_DIR)/functions.sh \
+	$(ROOT_DIR)/boot-mini.sh \
+	$(ROOT_DIR)/service.sh \
+	$(ROOT_DIR)/watchdog.sh \
+	$(ROOT_DIR)/action.sh \
+	$(ROOT_DIR)/status.sh \
+	$(ROOT_DIR)/uninstall.sh \
+	$(ROOT_DIR)/install_app.sh \
+	$(LIB_DIR)/constants.sh \
+	$(LIB_DIR)/fallbacks.sh \
+	$(LIB_DIR)/process.sh \
+	$(LIB_DIR)/http.sh \
+	$(LIB_DIR)/backup.sh \
+	$(LIB_DIR)/firewall.sh
 
-# Post-v1.5.0 consolidation (15 user-facing files, 2 of which
-# are GitHub meta-files not checked here). The list below matches
-# docs/MAP.md §1.
 REQUIRED_DOCS := \
 	README.md \
 	SECURITY.md \
@@ -77,9 +61,6 @@ REQUIRED_DOCS := \
 	docs/MAP.md \
 	docs/ROADMAP.md
 
-# Files that MUST NOT exist after the v1.5.0 consolidation.
-# A stray `git checkout -- docs/` or a rebase accident cannot
-# silently recreate them without failing `check-docs`.
 FORBIDDEN_DOCS := \
 	docs/INSTALL.md \
 	docs/UPGRADE.md \
@@ -109,7 +90,6 @@ FORBIDDEN_DOCS := \
 	docs/adr/0008-layered-bootstrap.md \
 	docs/adr/0009-documentation-budget.md
 
-# The 3 ADRs + the index, matching docs/adr/README.md.
 COMMITTED_ADRS := \
 	docs/adr/README.md \
 	docs/adr/0001-release-workflow.md \
@@ -118,15 +98,16 @@ COMMITTED_ADRS := \
 
 APP_VERSION_FILE := proxy/app-apk.version
 APP_FETCH_SCRIPT := scripts/fetch_app_apk.sh
-INSTALL_APP_FILE := proxy/install_app.sh
+INSTALL_APP_FILE := install_app.sh
 
-BOOT_MINI_FILE := proxy/boot-mini.sh
-FUNCTIONS_FILE := proxy/functions.sh
+BOOT_MINI_FILE := $(ROOT_DIR)/boot-mini.sh
+FUNCTIONS_FILE := $(ROOT_DIR)/functions.sh
+CONSTANTS_FILE := $(LIB_DIR)/constants.sh
 
 .PHONY: all help version build package clean dist-clean \
         fetch-apk check-app-version check-install-app check-boot-mini \
-        check-backup check-all check-docs check-adr diagnose-help \
-        release release-patch sync
+        check-backup check-all check-docs check-adr check-consistency \
+        diagnose-help release release-patch sync
 
 all: build
 
@@ -144,13 +125,14 @@ help:
 	@echo ""
 	@echo "  make fetch-apk          Fetch companion APK into dist/"
 	@echo "  make check-app-version  Validate proxy/app-apk.version"
-	@echo "  make check-install-app  Verify proxy/install_app.sh"
-	@echo "  make check-boot-mini    Verify proxy/boot-mini.sh (Layer 0)"
+	@echo "  make check-install-app  Verify install_app.sh"
+	@echo "  make check-boot-mini    Verify Layer 0/1/2 (lib/ + boot-mini)"
 	@echo ""
 	@echo "  make check-backup       Validate all runtime shell scripts"
-	@echo "  make check-all          Run all local validations"
 	@echo "  make check-docs         Verify documentation consistency"
 	@echo "  make check-adr          Verify committed ADRs"
+	@echo "  make check-consistency  Verify docs don't reference wrong paths"
+	@echo "  make check-all          Run all local validations"
 	@echo "  make diagnose-help      Show device-side diagnostic commands"
 	@echo ""
 	@echo "  make release VERSION=vX.Y.Z        Stable release"
@@ -239,10 +221,10 @@ check-app-version:
 	fi
 
 # ============================================================
-# Companion APK — install script
+# Companion APK — install script (root-level, not proxy/)
 # ============================================================
 check-install-app:
-	@echo "━━━ Checking proxy/install_app.sh ━━━"
+	@echo "━━━ Checking $(INSTALL_APP_FILE) (module root) ━━━"
 	@if [ ! -f "$(INSTALL_APP_FILE)" ]; then \
 		echo "  ❌ $(INSTALL_APP_FILE) missing"; exit 1; \
 	fi
@@ -292,41 +274,61 @@ check-install-app:
 	fi
 
 # ============================================================
-# Layered Bootstrap — boot-mini.sh (Layer 0)
+# Layered Bootstrap (v1.6.0 — 3-layer model)
 # ============================================================
 check-boot-mini:
-	@echo "━━━ Checking proxy/boot-mini.sh (Layer 0) ━━━"
+	@echo "━━━ Checking Layered Bootstrap (lib/ + boot-mini.sh + functions.sh) ━━━"
 	@if [ ! -s "$(BOOT_MINI_FILE)" ]; then \
 		echo "  ❌ $(BOOT_MINI_FILE) missing or empty"; \
 		exit 1; \
 	fi
+	@if [ ! -s "$(FUNCTIONS_FILE)" ]; then \
+		echo "  ❌ $(FUNCTIONS_FILE) missing or empty"; \
+		exit 1; \
+	fi
 	@_lines=$$(wc -l < "$(BOOT_MINI_FILE)" | tr -d ' '); \
-	echo "  ✅ present ($$_lines lines)"
+	echo "  ✅ boot-mini.sh present ($$_lines lines)"
+	@_lib_missing=0; \
+	for lib in constants fallbacks process http backup firewall; do \
+		if [ -f "$(LIB_DIR)/$$lib.sh" ]; then \
+			printf "    ✓ lib/%s.sh\n" "$$lib"; \
+		else \
+			printf "    ✗ lib/%s.sh\n" "$$lib"; \
+			_lib_missing=$$((_lib_missing + 1)); \
+		fi; \
+	done; \
+	if [ "$$_lib_missing" -gt 0 ]; then \
+		echo "  ❌ $$_lib_missing lib/*.sh module(s) missing"; \
+		exit 1; \
+	fi
 	@_missing=0; \
 	for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do \
-		if grep -qE "^$$fn\(\)" "$(BOOT_MINI_FILE)"; then \
-			printf "    ✓ %s\n" "$$fn"; \
+		if grep -qE "^[[:space:]]*$$fn[[:space:]]*\\(\\)" "$(BOOT_MINI_FILE)"; then \
+			printf "    ✓ %s (defined in Layer 1)\n" "$$fn"; \
 		else \
 			printf "    ✗ %s\n" "$$fn"; \
 			_missing=$$((_missing + 1)); \
 		fi; \
 	done; \
 	if [ "$$_missing" -gt 0 ]; then \
-		echo "  ❌ $$_missing primitive(s) missing"; \
+		echo "  ❌ $$_missing primitive(s) missing from boot-mini.sh"; \
 		exit 1; \
 	fi
-	@if grep -q '^_MONITORING_UI_PORT=' "$(BOOT_MINI_FILE)"; then \
-		echo "  ✅ _MONITORING_UI_PORT defined (single source of truth)"; \
+	@if grep -qE '^_MONITORING_UI_PORT="8080"' "$(CONSTANTS_FILE)"; then \
+		echo "  ✅ _MONITORING_UI_PORT canonical in lib/constants.sh"; \
 	else \
-		echo "  ❌ _MONITORING_UI_PORT not defined in boot-mini.sh"; \
+		echo "  ❌ _MONITORING_UI_PORT canonical missing from lib/constants.sh"; \
 		exit 1; \
 	fi
-	@if [ ! -f "$(FUNCTIONS_FILE)" ]; then \
-		echo "  ❌ $(FUNCTIONS_FILE) missing"; \
+	@if grep -qE '^_MONITORING_UI_PORT="\$${_MONITORING_UI_PORT:-' "$(BOOT_MINI_FILE)"; then \
+		echo "  ✅ _MONITORING_UI_PORT fallback in boot-mini.sh (partial extraction)"; \
+	else \
+		echo "  ❌ _MONITORING_UI_PORT fallback not found in boot-mini.sh"; \
+		echo "     ci.yml Step 10 treats this as a hard failure — align make with CI"; \
 		exit 1; \
 	fi
 	@if grep -q 'boot-mini.sh' "$(FUNCTIONS_FILE)"; then \
-		echo "  ✅ functions.sh sources boot-mini.sh"; \
+		echo "  ✅ functions.sh sources boot-mini.sh (Layer 2 → Layer 1)"; \
 	else \
 		echo "  ❌ functions.sh does not source boot-mini.sh"; \
 		exit 1; \
@@ -341,12 +343,8 @@ check-boot-mini:
 	if [ "$$_redef" -gt 0 ]; then \
 		exit 1; \
 	fi
-	@if grep -qE '^_MONITORING_UI_PORT=' "$(FUNCTIONS_FILE)"; then \
-		echo "  ❌ functions.sh redefines _MONITORING_UI_PORT"; \
-		exit 1; \
-	fi
 	@echo "  ✅ functions.sh does not redefine Layer-0 primitives"
-	@echo "✅ boot-mini.sh integration verified"
+	@echo "✅ Layered Bootstrap verified"
 
 # ============================================================
 # Validation — all shell scripts
@@ -387,9 +385,6 @@ check-backup:
 # ============================================================
 # Validation — documentation consistency
 # ============================================================
-# Two-part check:
-#   1. Every REQUIRED_DOCS file must exist.
-#   2. No FORBIDDEN_DOCS file may exist (consolidation guard).
 check-docs:
 	@echo "━━━ Documentation consistency ━━━"
 	@if [ -x "$(SCRIPTS_DIR)/check-docs.sh" ]; then \
@@ -434,9 +429,35 @@ check-adr:
 	echo "  ✅ Present: $$_present / Missing: $$_missing"
 
 # ============================================================
+# Consistency sweep — prevents documentation drift
+# ============================================================
+check-consistency:
+	@echo "━━━ Consistency sweep ━━━"
+	@_err=0; \
+	for script in boot-mini functions customize install_app service watchdog status action uninstall post-fs-data; do \
+		_hits=$$(grep -rn "proxy/$$script\.sh" docs/ *.md 2>/dev/null || true); \
+		if [ -n "$$_hits" ]; then \
+			echo "  ❌ RC-1: proxy/$$script.sh referenced in docs (should be at root)"; \
+			echo "$$_hits" | head -3 | sed 's/^/     /'; \
+			_err=$$((_err + 1)); \
+		fi; \
+	done; \
+	_hits2=$$(grep -rn "customize\.sh.*§\[2\].*_MONITORING_UI_PORT" docs/ *.md 2>/dev/null || true); \
+	if [ -n "$$_hits2" ]; then \
+		echo "  ❌ RC-2: _MONITORING_UI_PORT attributed to customize.sh §[2] (correct: boot-mini.sh §[4])"; \
+		echo "$$_hits2" | head -3 | sed 's/^/     /'; \
+		_err=$$((_err + 1)); \
+	fi; \
+	if [ "$$_err" -gt 0 ]; then \
+		echo "  ❌ $$_err consistency violation(s) found"; \
+		exit 1; \
+	fi; \
+	echo "  ✅ No consistency violations"
+
+# ============================================================
 # Validation — all local checks
 # ============================================================
-check-all: check-backup check-docs check-app-version check-install-app check-boot-mini
+check-all: check-backup check-docs check-app-version check-install-app check-boot-mini check-consistency
 	@echo "━━━ Additional validations ━━━"
 	@echo "  [1/2] scripts/ syntax check..."
 	@for f in "$(SCRIPTS_DIR)"/*.sh; do \
@@ -504,7 +525,7 @@ diagnose-help:
 release:
 	@if [ -z "$(CLI_VERSION)" ] || [ "$(CLI_VERSION)" = "unknown" ]; then \
 		echo "❌ No version specified."; \
-		echo "   Usage: make release VERSION=v1.5.0"; \
+		echo "   Usage: make release VERSION=v1.6.0"; \
 		echo "   Current VERSION file: $(VERSION)"; \
 		exit 1; \
 	fi
@@ -517,7 +538,8 @@ release:
 release-patch:
 	@if [ -z "$(CLI_VERSION)" ] || [ "$(CLI_VERSION)" = "unknown" ]; then \
 		echo "❌ No version specified."; \
-		echo "   Usage: make release-patch VERSION=v1.5.1"; \
+		echo "   Usage: make release-patch VERSION=v1.6.1"; \
+		echo "   Current VERSION file: $(VERSION)"; \
 		exit 1; \
 	fi
 	@echo "🔧 Preparing PATCH release: $(CLI_VERSION)"

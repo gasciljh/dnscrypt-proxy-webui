@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter — release-patch.sh
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # ============================================================
 # Automates a PATCH release (hotfix) from the `main` branch.
 #

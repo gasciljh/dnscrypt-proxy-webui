@@ -1,14 +1,10 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Offline Page
-     Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-19
+     Version: v1.6.0 (Global Edition)
+     Last updated: 2026-11-13
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-     ============================================================
-     Bilingual offline page (English default / Arabic toggle).
-     Served by the Service Worker when the local WebUI server
-     cannot be reached.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -19,7 +15,7 @@
     <meta http-equiv="Expires" content="0">
     <meta name="theme-color" content="#0d1117">
     <meta name="robots" content="noindex, nofollow">
-    <title>Offline — DNSCrypt Smart Filter v1.5.0</title>
+    <title>Offline — DNSCrypt Smart Filter v1.6.0</title>
 
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
@@ -40,493 +36,216 @@
 
     <style>
         :root {
-            --bg: #0d1117;
-            --bg-card: rgba(22, 27, 34, 0.92);
-            --primary: #58a6ff;
-            --primary-dark: #1f6feb;
-            --success: #3fb950;
-            --danger: #f85149;
-            --warning: #d29922;
-            --text: #e6edf3;
-            --text-muted: #8b949e;
-            --border: rgba(255, 255, 255, 0.06);
-            --radius: 20px;
+            --bg: #0d1117; --bg-card: rgba(22, 27, 34, 0.92);
+            --primary: #58a6ff; --primary-dark: #1f6feb;
+            --success: #3fb950; --danger: #f85149; --warning: #d29922;
+            --text: #e6edf3; --text-muted: #8b949e;
+            --border: rgba(255, 255, 255, 0.06); --radius: 20px;
         }
-
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-
         body {
-            background: var(--bg);
-            color: var(--text);
+            background: var(--bg); color: var(--text);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            min-height: 100dvh;
-            padding: 20px;
-            overflow-x: hidden;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; min-height: 100dvh; padding: 20px; overflow-x: hidden;
         }
-
         .container {
-            max-width: 560px;
-            width: 100%;
-            margin: auto 0;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 40px 28px;
-            text-align: center;
-            box-shadow:
-                0 30px 80px rgba(0, 0, 0, 0.7),
-                0 0 0 1px rgba(88, 166, 255, 0.05) inset;
+            max-width: 560px; width: 100%; margin: auto 0;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 40px 28px; text-align: center;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(88, 166, 255, 0.05) inset;
             animation: fadeIn 0.4s ease-out;
-            position: relative;
-            overflow: hidden;
+            position: relative; overflow: hidden;
         }
-
         .container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
             background: linear-gradient(90deg, var(--primary), var(--primary-dark));
         }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .lang-toggle {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            padding: 6px 12px;
-            border-radius: 10px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: 0.2s;
-            font-family: inherit;
-            z-index: 10;
+            position: absolute; top: 16px; right: 16px;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border);
+            color: var(--text-muted); padding: 6px 12px; border-radius: 10px;
+            font-size: 12px; cursor: pointer; transition: 0.2s; font-family: inherit; z-index: 10;
         }
-
-        .lang-toggle:hover {
-            background: rgba(255, 255, 255, 0.12);
-            color: var(--text);
-        }
-
-        html[dir="rtl"] .lang-toggle {
-            right: auto;
-            left: 16px;
-        }
-
+        .lang-toggle:hover { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+        html[dir="rtl"] .lang-toggle { right: auto; left: 16px; }
         .icon-wrapper {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 100px; height: 100px; border-radius: 50%;
             background: radial-gradient(circle at center, rgba(248, 81, 73, 0.15), transparent 70%);
-            margin: 0 auto 24px;
-            animation: pulse 2.5s ease-in-out infinite;
+            margin: 0 auto 24px; animation: pulse 2.5s ease-in-out infinite;
         }
-
-        .icon-wrapper .icon {
-            font-size: 56px;
-            line-height: 1;
-            filter: drop-shadow(0 4px 12px rgba(248, 81, 73, 0.3));
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50%      { transform: scale(1.05); opacity: 0.85; }
-        }
-
-        h1 {
-            font-size: 26px;
-            font-weight: 900;
-            color: var(--danger);
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-        }
-
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 14px;
-            line-height: 1.7;
-            margin-bottom: 24px;
-        }
-
+        .icon-wrapper .icon { font-size: 56px; line-height: 1; filter: drop-shadow(0 4px 12px rgba(248, 81, 73, 0.3)); }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.85; } }
+        h1 { font-size: 26px; font-weight: 900; color: var(--danger); margin-bottom: 12px; letter-spacing: -0.5px; }
+        .subtitle { color: var(--text-muted); font-size: 14px; line-height: 1.7; margin-bottom: 24px; }
         code {
-            background: rgba(88, 166, 255, 0.1);
-            color: var(--primary);
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-            font-size: 13px;
-            direction: ltr;
-            display: inline-block;
-            margin: 0 2px;
-            white-space: nowrap;
+            background: rgba(88, 166, 255, 0.1); color: var(--primary);
+            padding: 2px 8px; border-radius: 6px;
+            font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 13px;
+            direction: ltr; display: inline-block; margin: 0 2px; white-space: nowrap;
         }
-
         .info-box li code {
-            display: inline-block;
-            max-width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            white-space: nowrap;
-            vertical-align: middle;
-            box-sizing: border-box;
+            display: inline-block; max-width: 100%;
+            overflow-x: auto; overflow-y: hidden;
+            -webkit-overflow-scrolling: touch; white-space: nowrap;
+            vertical-align: middle; box-sizing: border-box;
         }
-
         .info-box li code::-webkit-scrollbar { height: 4px; }
         .info-box li code::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
         .info-box li code::-webkit-scrollbar-thumb { background: rgba(88,166,255,0.4); border-radius: 2px; }
-
         .info-box {
-            background: rgba(88, 166, 255, 0.05);
-            border: 1px solid rgba(88, 166, 255, 0.15);
-            border-radius: 12px;
-            padding: 16px;
-            margin: 20px 0;
-            text-align: start;
+            background: rgba(88, 166, 255, 0.05); border: 1px solid rgba(88, 166, 255, 0.15);
+            border-radius: 12px; padding: 16px; margin: 20px 0; text-align: start;
         }
-
         .info-box h2 {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
         }
-
         .info-box ul { list-style: none; padding: 0; margin: 0; }
-
         .info-box li {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            padding: 6px 0;
-            padding-inline-start: 20px;
-            position: relative;
-            line-height: 1.5;
+            font-size: 12.5px; color: var(--text-muted); padding: 6px 0;
+            padding-inline-start: 20px; position: relative; line-height: 1.5;
         }
-
         .info-box li::before {
-            content: '→';
-            position: absolute;
-            inset-inline-start: 0;
-            color: var(--primary);
-            font-weight: 700;
+            content: '→'; position: absolute; inset-inline-start: 0;
+            color: var(--primary); font-weight: 700;
         }
-
         html[dir="rtl"] .info-box li::before { content: '←'; }
-
         .info-box li strong { color: var(--text); font-weight: 600; }
-
         .safe-box {
-            background: rgba(63, 185, 80, 0.06);
-            border: 1px solid rgba(63, 185, 80, 0.25);
-            border-radius: 12px;
-            padding: 14px 16px;
-            margin: 20px 0;
-            text-align: start;
+            background: rgba(63, 185, 80, 0.06); border: 1px solid rgba(63, 185, 80, 0.25);
+            border-radius: 12px; padding: 14px 16px; margin: 20px 0; text-align: start;
         }
-
         .safe-box h2 {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--success);
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 13px; font-weight: 700; color: var(--success); margin-bottom: 8px;
+            display: flex; align-items: center; gap: 6px;
         }
-
-        .safe-box p {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            line-height: 1.55;
-        }
-
+        .safe-box p { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
         .safe-box p + p { margin-top: 8px; }
         .safe-box code { background: rgba(63, 185, 80, 0.1); color: var(--success); }
-
         .ports-box {
-            background: rgba(63, 185, 80, 0.05);
-            border: 1px solid rgba(63, 185, 80, 0.15);
-            border-radius: 12px;
-            padding: 16px;
-            margin: 20px 0;
-            text-align: start;
+            background: rgba(63, 185, 80, 0.05); border: 1px solid rgba(63, 185, 80, 0.15);
+            border-radius: 12px; padding: 16px; margin: 20px 0; text-align: start;
         }
-
         .ports-box h2 {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--success);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            font-size: 13px; font-weight: 700; color: var(--success); margin-bottom: 12px;
+            display: flex; align-items: center; gap: 6px;
         }
-
         .port-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            font-size: 12.5px;
-            gap: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 12.5px; gap: 10px;
         }
-
         .port-row:last-child { border-bottom: none; }
-
-        .port-label {
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
+        .port-label { color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
         .port-value {
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--text);
-            background: rgba(0, 0, 0, 0.3);
-            padding: 2px 10px;
-            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace; color: var(--text);
+            background: rgba(0, 0, 0, 0.3); padding: 2px 10px; border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 11.5px;
-            direction: ltr;
+            font-size: 11.5px; direction: ltr;
         }
-
         .port-value a { color: var(--primary); text-decoration: none; }
         .port-value a:hover { text-decoration: underline; }
-
         .ports-note {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid rgba(255, 255, 255, 0.04);
-            font-style: italic;
-            line-height: 1.5;
+            font-size: 11px; color: var(--text-muted); margin-top: 10px;
+            padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-style: italic; line-height: 1.5;
         }
-
-        /* ============================================================
-           Persistent auto-retry-stopped banner
-           Shown after AUTO_RETRY_MAX attempts are exhausted.
-           Replaces the transient toast as the primary signal.
-           ============================================================ */
         .auto-retry-stopped-banner {
             display: none;
             background: linear-gradient(135deg, rgba(210, 153, 34, 0.15), rgba(248, 81, 73, 0.1));
             border: 1px solid rgba(210, 153, 34, 0.4);
-            border-radius: 12px;
-            padding: 14px 16px;
-            margin: 20px 0;
-            text-align: start;
-            animation: bannerSlideIn 0.35s ease-out;
+            border-radius: 12px; padding: 14px 16px; margin: 20px 0;
+            text-align: start; animation: bannerSlideIn 0.35s ease-out;
         }
-
-        .auto-retry-stopped-banner.visible {
-            display: block;
-        }
-
+        .auto-retry-stopped-banner.visible { display: block; }
         @keyframes bannerSlideIn {
             from { opacity: 0; transform: translateY(-8px); }
-            to   { opacity: 1; transform: translateY(0); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
         .auto-retry-stopped-banner .banner-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--warning);
-            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 8px;
+            font-size: 13px; font-weight: 700; color: var(--warning); margin-bottom: 8px;
         }
-
-        .auto-retry-stopped-banner .banner-icon {
-            font-size: 18px;
-            line-height: 1;
-        }
-
+        .auto-retry-stopped-banner .banner-icon { font-size: 18px; line-height: 1; }
         .auto-retry-stopped-banner .banner-message {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            line-height: 1.55;
-            margin-bottom: 12px;
+            font-size: 12.5px; color: var(--text-muted); line-height: 1.55; margin-bottom: 12px;
         }
-
         .auto-retry-stopped-banner .banner-action {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            background: rgba(210, 153, 34, 0.2);
-            border: 1px solid rgba(210, 153, 34, 0.4);
-            color: var(--warning);
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-family: inherit;
-            font-size: 12.5px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(210, 153, 34, 0.2); border: 1px solid rgba(210, 153, 34, 0.4);
+            color: var(--warning); padding: 8px 16px; border-radius: 8px;
+            font-family: inherit; font-size: 12.5px; font-weight: 700;
+            cursor: pointer; transition: 0.2s;
         }
-
         .auto-retry-stopped-banner .banner-action:hover {
             background: rgba(210, 153, 34, 0.3);
             transform: translateY(-1px);
         }
-
-        .auto-retry-stopped-banner .banner-action:active {
-            transform: translateY(0);
-        }
-
-        .actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 24px;
-        }
-
+        .auto-retry-stopped-banner .banner-action:active { transform: translateY(0); }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
         .btn {
-            flex: 1;
-            min-width: 140px;
-            padding: 14px 20px;
-            border: none;
-            border-radius: 12px;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: inherit;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-decoration: none;
-            color: white;
+            flex: 1; min-width: 140px; padding: 14px 20px; border: none;
+            border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
+            transition: all 0.2s ease; font-family: inherit;
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; text-decoration: none; color: white;
         }
-
         .btn-primary {
             background: linear-gradient(135deg, var(--primary-dark), var(--primary));
             box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
         }
-
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(31, 111, 235, 0.4); }
         .btn-primary:active { transform: translateY(0); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
         .btn-secondary {
-            background: rgba(139, 148, 158, 0.15);
-            border: 1px solid rgba(139, 148, 158, 0.3);
+            background: rgba(139, 148, 158, 0.15); border: 1px solid rgba(139, 148, 158, 0.3);
             color: var(--text-muted);
         }
-
         .btn-secondary:hover { background: rgba(139, 148, 158, 0.25); color: var(--text); }
-
         .btn-success {
             background: linear-gradient(135deg, #238636, #2ea043);
             box-shadow: 0 4px 12px rgba(35, 134, 54, 0.3);
         }
-
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(35, 134, 54, 0.4); }
         .btn-success:active { transform: translateY(0); }
-
         .footer {
-            margin-top: 24px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border);
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: 1.8;
+            margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+            font-size: 11px; color: var(--text-muted); line-height: 1.8;
         }
-
         .footer .version {
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--primary);
-            background: rgba(88, 166, 255, 0.1);
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace; color: var(--primary);
+            background: rgba(88, 166, 255, 0.1); padding: 2px 8px; border-radius: 6px; font-size: 10px;
         }
-
         .footer a { color: var(--primary); text-decoration: none; }
         .footer a:hover { text-decoration: underline; }
-
         .connectivity-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 16px;
-            background: rgba(210, 153, 34, 0.1);
-            border: 1px solid rgba(210, 153, 34, 0.3);
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 14px; border-radius: 20px; font-size: 12px;
+            font-weight: 600; margin-top: 16px;
+            background: rgba(210, 153, 34, 0.1); border: 1px solid rgba(210, 153, 34, 0.3);
             color: var(--warning);
         }
-
         .connectivity-status .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--warning);
-            animation: blink 1.5s ease-in-out infinite;
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--warning); animation: blink 1.5s ease-in-out infinite;
         }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50%      { opacity: 0.3; }
-        }
-
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         .toast {
-            position: fixed;
-            top: 50%;
-            left: 50%;
+            position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0.92);
-            background: rgba(248, 81, 73, 0.9);
-            color: white;
-            padding: 14px 24px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 700;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-            z-index: 20000;
-            opacity: 0;
-            pointer-events: none;
+            background: rgba(248, 81, 73, 0.9); color: white;
+            padding: 14px 24px; border-radius: 12px; font-size: 14px; font-weight: 700;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6); z-index: 20000;
+            opacity: 0; pointer-events: none;
             transition: opacity 0.3s ease, transform 0.3s ease;
-            text-align: center;
-            max-width: 85%;
+            text-align: center; max-width: 85%;
         }
-
-        .toast.visible {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1);
-        }
-
-        button:focus-visible, a:focus-visible {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
-        }
-
+        .toast.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: 0.01ms !important;
@@ -534,7 +253,6 @@
                 transition-duration: 0.01ms !important;
             }
         }
-
         @media (max-width: 380px) {
             .container { padding: 28px 20px; }
             h1 { font-size: 22px; }
@@ -546,11 +264,7 @@
 <body>
 
 <div class="container">
-
-    <button
-        class="lang-toggle"
-        id="langToggle"
-        type="button">
+    <button class="lang-toggle" id="langToggle" type="button">
         <span id="langToggleText">🇸🇦 العربية</span>
     </button>
 
@@ -571,7 +285,6 @@
         <span id="statusText">Reconnecting...</span>
     </div>
 
-    <!-- Persistent banner shown after auto-retry exhausts its 10 attempts -->
     <div class="auto-retry-stopped-banner" id="autoRetryStoppedBanner" role="alert" aria-live="assertive">
         <div class="banner-header">
             <span class="banner-icon" aria-hidden="true">⚠️</span>
@@ -629,7 +342,8 @@
             </span>
         </div>
         <div class="ports-note" id="portsNote">
-            ⚠️ If you changed ports in <code>webui.conf</code>, use the actual values. This page runs from the Service Worker cache and cannot read settings.
+            ⚠️ If you changed ports in <code>webui.conf</code>, use the actual values.
+            This page runs from the Service Worker cache and cannot read settings.
         </div>
     </div>
 
@@ -665,50 +379,35 @@
             <li id="recovery1">
                 Create the recovery trigger file:
                 <br>
-                <code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>
+                <code>su -c "touch /data/adb/dnscrypt-recovery"</code>
             </li>
             <li id="recovery2">
-                Reboot the device:
+                In <strong>Magisk</strong> or <strong>KernelSU</strong>, <strong>reinstall the module ZIP</strong>.
                 <br>
-                <code>su -c "reboot"</code>
+                The installer will detect the trigger and restore the last known-good configuration.
             </li>
             <li id="recovery3">
-                On next boot, the installer will restore the last
-                known-good configuration from
-                <code>/sdcard/dnscrypt-webui-backup/</code>.
+                Reboot the device to apply the restored configuration.
             </li>
             <li id="recovery4">
-                Full guide: <strong>docs/EMERGENCY.md</strong>
+                Full guide: <strong>docs/GUIDE.md §8</strong> (see the project on GitHub)
             </li>
         </ul>
     </div>
 
     <div class="actions">
-        <button
-            class="btn btn-primary"
-            id="retryBtn"
-            type="button"
-            aria-label="Retry connection">
+        <button class="btn btn-primary" id="retryBtn" type="button" aria-label="Retry connection">
             <span aria-hidden="true">🔄</span>
             <span id="retryText">Retry</span>
         </button>
 
-        <a
-            class="btn btn-success"
-            id="openDashBtn"
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Open Dashboard">
+        <a class="btn btn-success" id="openDashBtn" href="#" target="_blank"
+           rel="noopener noreferrer" aria-label="Open Dashboard">
             <span aria-hidden="true">📊</span>
             <span id="openDashText">Open Dashboard</span>
         </a>
 
-        <button
-            class="btn btn-secondary"
-            id="diagnoseBtn"
-            type="button"
-            aria-label="Show diagnostics">
+        <button class="btn btn-secondary" id="diagnoseBtn" type="button" aria-label="Show diagnostics">
             <span aria-hidden="true">🔧</span>
             <span id="diagnoseText">Diagnose</span>
         </button>
@@ -732,19 +431,16 @@
         <div>
             <span aria-hidden="true">🛡️</span>
             DNSCrypt Smart Filter
-            <span class="version" id="versionBadge">v1.5.0</span>
+            <span class="version" id="versionBadge">v1.6.0</span>
         </div>
         <div style="margin-top: 6px;">
-            <a
-                href="https://github.com/gasciljh/dnscrypt-proxy-webui"
-                target="_blank"
-                rel="noopener noreferrer">
+            <a href="https://github.com/gasciljh/dnscrypt-proxy-webui"
+               target="_blank" rel="noopener noreferrer">
                 <span aria-hidden="true">🔗</span>
                 <span id="projectText">Project on GitHub</span>
             </a>
         </div>
     </div>
-
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -753,17 +449,9 @@
 (function() {
     'use strict';
 
-    // ============================================================
-    // [1] Translations
-    // ============================================================
-    // NOTE: these strings are static — they contain no
-    // user-controlled content. applyLanguage() uses innerHTML to
-    // render them, which is safe ONLY because the values are
-    // authored here and never interpolated with dynamic data.
-    // ============================================================
     var translations = {
         en: {
-            pageTitle: 'Offline — DNSCrypt Smart Filter v1.5.0',
+            pageTitle: 'Offline — DNSCrypt Smart Filter v1.6.0',
             langToggle: '🇸🇦 العربية',
             langToggleAriaLabel: 'Toggle language to Arabic',
             title: 'Offline',
@@ -782,10 +470,10 @@
             help3: 'Tap the <strong>Action</strong> button to restart.',
             help4: 'Or from terminal:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
             recoveryTitle: 'If the module is unbootable',
-            recovery1: 'Create the recovery trigger file:<br><code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>',
-            recovery2: 'Reboot the device:<br><code>su -c "reboot"</code>',
-            recovery3: 'On next boot, the installer will restore the last known-good configuration from <code>/sdcard/dnscrypt-webui-backup/</code>.',
-            recovery4: 'Full guide: <strong>docs/EMERGENCY.md</strong>',
+            recovery1: 'Create the recovery trigger file:<br><code>su -c "touch /data/adb/dnscrypt-recovery"</code>',
+            recovery2: 'In <strong>Magisk</strong> or <strong>KernelSU</strong>, <strong>reinstall the module ZIP</strong>.<br>The installer will detect the trigger and restore the last known-good configuration.',
+            recovery3: 'Reboot the device to apply the restored configuration.',
+            recovery4: 'Full guide: <strong>docs/GUIDE.md §8</strong> (see the project on GitHub)',
             retryText: 'Retry',
             openDashText: 'Open Dashboard',
             diagnoseText: 'Diagnose',
@@ -803,7 +491,7 @@
             autoRetryStoppedToastMsg: '⚠️ Auto-retry stopped — press Retry manually'
         },
         ar: {
-            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.5.0',
+            pageTitle: 'غير متصل — DNSCrypt Smart Filter v1.6.0',
             langToggle: '🇬🇧 English',
             langToggleAriaLabel: 'تبديل اللغة إلى الإنجليزية',
             title: 'غير متصل',
@@ -811,7 +499,7 @@
             statusText: 'جاري إعادة الاتصال...',
             safeTitle: 'بياناتك بأمان',
             safeMsg1: 'هذه الصفحة تظهر لأن خادم WebUI المحلي لا يستجيب. هذا <strong>لا</strong> يعني أن إعداداتك قد فُقدت.',
-            safeMsg2: 'منذ v1.2.0، تُحفظ جميع ملفات الإعداد الخمسة على <code>/sdcard/dnscrypt-webui-backup/</code> وتُستعاد تلقائيًا عند إعادة تثبيت الموديول.',
+            safeMsg2: 'منذ v1.2.0، تُحفظ جميع ملفات الإعداد الخمسة على <code>/sdcard/dnscrypt-webui-backup/</code> وتُستعاد تلقائياً عند إعادة تثبيت الموديول.',
             portsTitle: 'المنافذ الافتراضية',
             portsWebuiLabel: 'WebUI',
             portsDashLabel: 'لوحة المراقبة',
@@ -822,10 +510,10 @@
             help3: 'اضغط زر <strong>Action</strong> لإعادة التشغيل.',
             help4: 'أو من الطرفية:<br><code>su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --restart"</code>',
             recoveryTitle: 'إذا كان الموديول غير قابل للتمهيد',
-            recovery1: 'أنشئ ملف تفعيل الاستعادة:<br><code>su -c "touch /data/adb/modules/dnscrypt-proxy-webui/recovery"</code>',
-            recovery2: 'أعد تشغيل الجهاز:<br><code>su -c "reboot"</code>',
-            recovery3: 'عند التمهيد التالي، سيستعيد المُثبِّت آخر إعداد صالح من <code>/sdcard/dnscrypt-webui-backup/</code>.',
-            recovery4: 'الدليل الكامل: <strong>docs/EMERGENCY.md</strong>',
+            recovery1: 'أنشئ ملف تفعيل الاستعادة:<br><code>su -c "touch /data/adb/dnscrypt-recovery"</code>',
+            recovery2: 'في <strong>Magisk</strong> أو <strong>KernelSU</strong>، <strong>أعد تثبيت ملف ZIP للوحدة</strong>.<br>سيكتشف المُثبِّت التفعيل ويستعيد آخر إعداد صالح.',
+            recovery3: 'أعد تشغيل الجهاز لتطبيق الإعداد المُستعاد.',
+            recovery4: 'الدليل الكامل: <strong>docs/GUIDE.md §8</strong> (انظر المشروع على GitHub)',
             retryText: 'إعادة المحاولة',
             openDashText: 'فتح لوحة المراقبة',
             diagnoseText: 'تشخيص',
@@ -838,22 +526,17 @@
             projectText: 'المشروع على GitHub',
             retryFailedMsg: '❌ لا يزال الخادم غير قابل للوصول',
             autoRetryStoppedTitle: 'توقّفت إعادة المحاولة التلقائية',
-            autoRetryStoppedMsg: 'تمت 10 محاولات لإعادة الاتصال دون نجاح. قد يكون الخادم لا يزال متوقفًا. استخدم الزر أدناه للمحاولة يدويًا.',
+            autoRetryStoppedMsg: 'تمت 10 محاولات لإعادة الاتصال دون نجاح. قد يكون الخادم لا يزال متوقفاً. استخدم الزر أدناه للمحاولة يدوياً.',
             autoRetryStoppedRetryText: 'إعادة المحاولة الآن',
             autoRetryStoppedToastMsg: '⚠️ توقّفت إعادة المحاولة التلقائية — اضغط Retry يدوياً'
         }
     };
 
     var currentLang = 'en';
-    try {
-        currentLang = localStorage.getItem('dnscrypt-lang') || 'en';
-    } catch (e) {}
+    try { currentLang = localStorage.getItem('dnscrypt-lang') || 'en'; } catch (e) {}
 
     function $(id) { return document.getElementById(id); }
-
-    function t(k) {
-        return (translations[currentLang] && translations[currentLang][k]) || k;
-    }
+    function t(k) { return (translations[currentLang] && translations[currentLang][k]) || k; }
 
     function escapeHtml(s) {
         if (s === null || s === undefined) return '';
@@ -888,38 +571,19 @@
         var dashUrl  = getDashboardUrl();
 
         var wl = $('portsWebuiLink');
-        if (wl) {
-            wl.href = webuiUrl;
-            wl.textContent = webuiUrl;
-        }
+        if (wl) { wl.href = webuiUrl; wl.textContent = webuiUrl; }
         var dl = $('portsDashLink');
-        if (dl) {
-            dl.href = dashUrl;
-            dl.textContent = dashUrl;
-        }
+        if (dl) { dl.href = dashUrl; dl.textContent = dashUrl; }
         var ob = $('openDashBtn');
-        if (ob) {
-            ob.href = dashUrl;
-        }
+        if (ob) ob.href = dashUrl;
     }
 
-    // ============================================================
-    // [2] Language
-    // ============================================================
-    // applyLanguage() uses innerHTML to render the translation
-    // strings. This is safe ONLY because every string is static
-    // (authored here, never built from runtime data).
-    //
-    // Local variable is named `tr` (not `t`) to avoid shadowing
-    // the global helper.
-    // ============================================================
     function applyLanguage(lang) {
         var tr = translations[lang];
         if (!tr) return;
 
         document.documentElement.lang = lang;
         document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
-
         document.title = tr.pageTitle;
 
         var setText = function(id, html) {
@@ -953,15 +617,10 @@
         setText('diagnoseText', tr.diagnoseText);
         setText('diagTitle', tr.diagTitle);
         setText('projectText', tr.projectText);
-
-        // Persistent auto-retry-stopped banner
         setText('autoRetryStoppedTitle', tr.autoRetryStoppedTitle);
         setText('autoRetryStoppedMsg', tr.autoRetryStoppedMsg);
         setText('autoRetryStoppedRetryText', tr.autoRetryStoppedRetryText);
 
-        // OFF-9: keep the aria-label in sync with the visible
-        // label's language. This is now the ONLY way the aria-label
-        // is set — the static HTML attribute was removed in v1.5.0.
         var langBtn = $('langToggle');
         if (langBtn && tr.langToggleAriaLabel) {
             langBtn.setAttribute('aria-label', tr.langToggleAriaLabel);
@@ -969,24 +628,18 @@
 
         applyRuntimeUrls();
 
-        try {
-            localStorage.setItem('dnscrypt-lang', lang);
-        } catch (e) {}
+        try { localStorage.setItem('dnscrypt-lang', lang); } catch (e) {}
     }
 
     function toggleLanguage() {
         currentLang = (currentLang === 'ar') ? 'en' : 'ar';
         applyLanguage(currentLang);
-
         var box = $('diagnosticsBox');
         if (box && box.style.display === 'block') {
             renderDiagnostics();
         }
     }
 
-    // ============================================================
-    // [3] Toast
-    // ============================================================
     var _toastTimer = null;
     function showToast(msg, durationMs) {
         var el = $('toast');
@@ -1000,28 +653,14 @@
         }, durationMs || 2500);
     }
 
-    // ============================================================
-    // [4] Persistent auto-retry-stopped banner
-    // ============================================================
-    // Shown ONCE the auto-retry budget is exhausted. Unlike the
-    // one-time toast, the banner remains visible until either:
-    //   • a manual retry succeeds (page redirects away), or
-    //   • the user navigates away.
-    //
-    // This is the OFF-DEF-03 replacement for the pre-patch silent
-    // 5s toast that left the user without a clear next action.
-    // ============================================================
     function showAutoRetryStoppedBanner() {
         var banner = $('autoRetryStoppedBanner');
         if (!banner) return;
         banner.classList.add('visible');
-
-        // Focus moves to the banner's action button so keyboard
-        // users land on the next actionable element.
         var btn = $('autoRetryStoppedRetryBtn');
         if (btn) {
             requestAnimationFrame(function() {
-                try { btn.focus(); } catch (e) { /* non-fatal */ }
+                try { btn.focus(); } catch (e) { }
             });
         }
     }
@@ -1032,9 +671,6 @@
         banner.classList.remove('visible');
     }
 
-    // ============================================================
-    // [5] Auto-retry state + control
-    // ============================================================
     var autoRetryCount = 0;
     var AUTO_RETRY_MAX = 10;
     var AUTO_RETRY_INTERVAL = 15000;
@@ -1048,64 +684,43 @@
         }
     }
 
-    // ============================================================
-    // [6] Retry handlers
-    // ============================================================
-    function handleRetry() {
-        // Cancel any pending auto-retry timer so exactly one
-        // /healthz probe is in flight at a time.
-        stopAutoRetry();
+    function _onRetryFailed(btn) {
+        if (btn) btn.disabled = false;
+        updateStatus(false);
+        showToast(t('retryFailedMsg'), 2500);
+        autoRetryCount = 0;
+        autoRetryStoppedNotified = false;
+        startAutoRetry();
+    }
 
+    function handleRetry() {
+        stopAutoRetry();
         var btn = $('retryBtn');
         if (btn) btn.disabled = true;
 
         var url = '/healthz?t=' + Date.now();
-
         var xhr = new XMLHttpRequest();
         xhr.open('HEAD', url, true);
         xhr.timeout = 3000;
 
         xhr.onload = function() {
             if (xhr.status === 200) {
+                hideAutoRetryStoppedBanner();
                 window.location.replace('/?_=' + Date.now());
             } else {
-                if (btn) btn.disabled = false;
-                updateStatus(false);
-                showToast(t('retryFailedMsg'), 2500);
+                _onRetryFailed(btn);
             }
         };
-
-        xhr.onerror = function() {
-            if (btn) btn.disabled = false;
-            updateStatus(false);
-            showToast(t('retryFailedMsg'), 2500);
-        };
-
-        xhr.ontimeout = function() {
-            if (btn) btn.disabled = false;
-            updateStatus(false);
-            showToast(t('retryFailedMsg'), 2500);
-        };
-
+        xhr.onerror = function() { _onRetryFailed(btn); };
+        xhr.ontimeout = function() { _onRetryFailed(btn); };
         xhr.send();
     }
 
-    // ------------------------------------------------------------
-    // [7] updateStatus(isOnline)
-    // ------------------------------------------------------------
-    // Sets the connectivity-status pill's appearance.
-    //
-    // OFF-6: the two call sites in this file always pass `false`.
-    // The offline page exists because the local server was
-    // unreachable. `navigator.onLine === true` says nothing about
-    // whether 127.0.0.1:9090 is answering.
-    // ------------------------------------------------------------
     function updateStatus(isOnline) {
         var statusEl = $('statusText');
         var statusBox = document.querySelector('.connectivity-status');
-        var tr = translations[currentLang];
-
         if (!statusBox) return;
+        var tr = translations[currentLang];
         var dot = statusBox.querySelector('.dot');
 
         if (isOnline) {
@@ -1113,42 +728,24 @@
             statusBox.style.background = 'rgba(63, 185, 80, 0.1)';
             statusBox.style.borderColor = 'rgba(63, 185, 80, 0.3)';
             statusBox.style.color = 'var(--success)';
-            if (dot) {
-                dot.style.background = 'var(--success)';
-                dot.style.animation = 'none';
-            }
+            if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'none'; }
         } else {
             if (statusEl) statusEl.textContent = tr.statusText;
             statusBox.style.background = 'rgba(210, 153, 34, 0.1)';
             statusBox.style.borderColor = 'rgba(210, 153, 34, 0.3)';
             statusBox.style.color = 'var(--warning)';
-            if (dot) {
-                dot.style.background = 'var(--warning)';
-                dot.style.animation = '';
-            }
+            if (dot) { dot.style.background = 'var(--warning)'; dot.style.animation = ''; }
         }
     }
 
-    // ------------------------------------------------------------
-    // [8] renderDiagnostics()
-    // ------------------------------------------------------------
-    // OFF-5: the `navigator.onLine` limitation is documented
-    // here. It reports the BROWSER's view of connectivity, not
-    // the LOCAL server's reachability. The value is shown for
-    // reference only — it MUST NOT be interpreted as "server up".
-    // ------------------------------------------------------------
     function renderDiagnostics() {
         var tr = translations[currentLang];
 
         var urlEl = $('diagUrl');
-        if (urlEl) {
-            urlEl.innerHTML = tr.diagUrlLabel + ' <code>' + escapeHtml(window.location.href) + '</code>';
-        }
+        if (urlEl) urlEl.innerHTML = tr.diagUrlLabel + ' <code>' + escapeHtml(window.location.href) + '</code>';
 
         var timeEl = $('diagTime');
-        if (timeEl) {
-            timeEl.innerHTML = tr.diagTimeLabel + ' <code>' + new Date().toISOString() + '</code>';
-        }
+        if (timeEl) timeEl.innerHTML = tr.diagTimeLabel + ' <code>' + new Date().toISOString() + '</code>';
 
         var uaEl = $('diagUa');
         if (uaEl) {
@@ -1157,9 +754,7 @@
         }
 
         var protoEl = $('diagProto');
-        if (protoEl) {
-            protoEl.innerHTML = tr.diagProtoLabel + ' <code>' + escapeHtml(window.location.protocol) + '</code>';
-        }
+        if (protoEl) protoEl.innerHTML = tr.diagProtoLabel + ' <code>' + escapeHtml(window.location.protocol) + '</code>';
 
         var onlineEl = $('diagOnline');
         if (onlineEl) {
@@ -1171,27 +766,14 @@
     function handleDiagnose() {
         var box = $('diagnosticsBox');
         if (!box) return;
-
         if (box.style.display === 'block') {
             box.style.display = 'none';
             return;
         }
-
         renderDiagnostics();
         box.style.display = 'block';
     }
 
-    // ============================================================
-    // [9] Auto-retry
-    // ============================================================
-    // v1.5.0 (OFF-DEF-03): when the 10-attempt budget is
-    // exhausted, emit BOTH:
-    //   • a one-time toast (immediate, transient), AND
-    //   • a persistent banner (indicator + manual Retry action).
-    //
-    // The timeout ID is stored in autoRetryTimer so handleRetry()
-    // can cancel it.
-    // ============================================================
     function startAutoRetry() {
         if (autoRetryCount >= AUTO_RETRY_MAX) {
             if (!autoRetryStoppedNotified) {
@@ -1212,21 +794,18 @@
 
             xhr.onload = function() {
                 if (xhr.status === 200) {
+                    hideAutoRetryStoppedBanner();
                     window.location.replace('/?_=' + Date.now());
                 } else {
                     startAutoRetry();
                 }
             };
-
             xhr.onerror = function() { startAutoRetry(); };
             xhr.ontimeout = function() { startAutoRetry(); };
             xhr.send();
         }, AUTO_RETRY_INTERVAL);
     }
 
-    // ============================================================
-    // [10] Boot
-    // ============================================================
     function boot() {
         applyLanguage(currentLang);
 
@@ -1239,24 +818,13 @@
         var diagBtn = $('diagnoseBtn');
         if (diagBtn) diagBtn.addEventListener('click', handleDiagnose);
 
-        // Persistent banner's Retry action reuses handleRetry()
-        // and hides the banner (the user is actively trying).
         var bannerRetryBtn = $('autoRetryStoppedRetryBtn');
         if (bannerRetryBtn) {
-            bannerRetryBtn.addEventListener('click', function() {
-                hideAutoRetryStoppedBanner();
-                handleRetry();
-            });
+            bannerRetryBtn.addEventListener('click', handleRetry);
         }
 
-        // OFF-6: always start in the "Reconnecting..." state.
         updateStatus(false);
 
-        // OFF-7: the 'online' event means the BROWSER regained
-        // network connectivity. It does NOT mean the local WebUI
-        // server is back up. The correct response is to probe
-        // the server (handleRetry()), not to paint a green
-        // "Connected" pill.
         window.addEventListener('online', function() { handleRetry(); });
         window.addEventListener('offline', function() { updateStatus(false); });
 

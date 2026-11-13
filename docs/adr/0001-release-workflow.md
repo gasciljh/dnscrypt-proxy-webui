@@ -3,6 +3,7 @@
 **Status**: ✅ Accepted
 **Date**: 2026-09-24
 **Consolidated**: 2026-10-19 (v1.5.0 Global Edition — merges ADRs 0001–0006)
+**Verified in**: 2026-11-12 (v1.6.0 Global Edition — 7th release cycle)
 **Authors**: [@gasciljh](https://github.com/gasciljh)
 **Supersedes**: —
 **Superseded by**: —
@@ -12,6 +13,11 @@
 > PR template and its immediate reversal, and the `release-patch.sh` rename.
 > The six sources are preserved as immutability history in Git; the
 > surviving authoritative record is this file.
+>
+> **v1.6.0 note**: This ADR was **verified** — not changed — by the v1.6.0
+> release. The seventh consecutive release cycle used the two-branch model,
+> the automated release pipeline, the post-release sync, and the split PR
+> templates without modification. See `CHANGELOG.md` §[v1.6.0] for details.
 
 ---
 
@@ -79,12 +85,12 @@ verifiable, the pipeline must be understandable by a future contributor.
 >
 > - **SHA-256 checksum** (`.sha256` file) — the only integrity artifact.
 > - **Annotated tag** (`git tag -a`) — **not** a signed tag (`git tag -s`).
-> - **GitHub Actions run log** — the build provenance.
+> - **GitHub Actions run log** — the unsigned build record.
 >
 > Users who need to verify a release today should rely **only** on the
 > SHA-256 checksum. A future ADR will either formally drop Cosign/SBOM or
 > re-affirm them with a concrete implementation plan. Tracked in
-> `ROADMAP.md` §2.
+> `ROADMAP.md` §4.3 (Deferred — Not Permanently Excluded).
 
 ### 3. Post-release sync (`main → develop`)
 
@@ -110,7 +116,7 @@ so we never sync `develop` with a failed build.
   plan; release-specific reviewer checklist.
 - **Selection**: GitHub only auto-applies the default. Release PRs are
   opened with `?template=release.md`. This is documented in
-  `CONTRIBUTING.md` §5.4 and §11.
+  `CONTRIBUTING.md` §7.5 and §11.
 
 **Reversal history**: ADR-0004 initially adopted a single unified template,
 then reversed on the same day via ADR-0005 because release PRs and feature
@@ -144,8 +150,8 @@ delegates all bump logic to `release.sh`.
 - ✅ Reproducible builds. Same commit → same SHA-256.
 - ✅ Zero manual toil on the sync step. `develop` never diverges from `main`.
 - ✅ Focused review per PR type. Feature and release checklists do not mix.
-- ✅ Validated across **six release cycles** (v1.0.0 through v1.5.0) without
-  branch-protection bypasses or manual sync interventions.
+- ✅ Validated across **seven release cycles** (v1.0.0 through v1.6.0)
+  without branch-protection bypasses or manual sync interventions.
 
 ### Negative
 
@@ -200,9 +206,9 @@ delegates all bump logic to `release.sh`.
   [`.github/PULL_REQUEST_TEMPLATE.md`](../../.github/PULL_REQUEST_TEMPLATE.md),
   [`.github/PULL_REQUEST_TEMPLATE/release.md`](../../.github/PULL_REQUEST_TEMPLATE/release.md).
 - **Narrative**: `CONTRIBUTING.md` §5 (branch strategy), §6 (commit
-  convention), §11 (release process), §12 (branch protection), §13 (hotfix
-  flow); `REFERENCE.md` §3.12 (`install_app.sh` contract and release
-  artifacts); `CHANGELOG.md` §[v1.0.0] through §[v1.5.0].
+  convention), §7.5 (PR templates), §11 (release process), §12 (branch
+  protection), §13 (hotfix flow); `REFERENCE.md` §3.13 (`install_app.sh`
+  contract and release artifacts); `CHANGELOG.md` §[v1.0.0] through §[v1.6.0].
 - **External**: [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html),
   [Conventional Commits](https://www.conventionalcommits.org/),
   [Reproducible Builds](https://reproducible-builds.org/),
@@ -211,4 +217,7 @@ delegates all bump logic to `release.sh`.
 ---
 
 *This ADR is immutable. To reverse or amend it, create a new ADR that
-supersedes it and update its Status line.*
+supersedes it and update its Status line. The v1.6.0 verification note
+added at the top is a metadata update — it confirms the seventh release
+cycle continued to use this workflow unchanged. See `docs/adr/README.md`
+§"Metadata vs decision" for the exact rule.*

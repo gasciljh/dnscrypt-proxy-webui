@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — Issue Templates Configuration
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -17,19 +17,23 @@
 #   • .github/PULL_REQUEST_TEMPLATE/release.md     — release PR template
 #   • SECURITY.md                                  — security policy
 #   • docs/GUIDE.md §2, §5, §7, §8, §10            — install, update, troubleshooting, emergency, FAQ
-#   • docs/REFERENCE.md §2, §3, §4, §5             — API, internals, backup, compatibility
+#   • docs/REFERENCE.md §1, §2, §4, §5, §7         — architecture, API, backup, compatibility, manifest
 #   • docs/CONTRIBUTING.md §5, §11, §13, §14       — branch, release, hotfix, recognition
 #   • docs/adr/README.md                           — ADR index
-#   • docs/ROADMAP.md                              — future versions
-#   • CHANGELOG.md                                 — version history
+#   • docs/ROADMAP.md                              — future versions (v1.7.0, v2.0.0)
+#   • CHANGELOG.md                                 — version history (v1.0.0 → v1.6.0)
 # ============================================================
-# v1.5.0 additions:
-#   • Version bumped to v1.5.0.
-#   • All links updated to the consolidated documentation
-#     (v1.5.0 merged 35 markdown files → 15).
-#   • ADR count "8" → "3" (v1.5.0 renumbering, ADR-0002 + ADR-0003).
-#   • Roadmap "planned for v1.6.0 and v2.0.0".
-#   • Changelog "through v1.5.0".
+# v1.6.0 additions:
+#   • Version bumped to v1.6.0.
+#   • Changelog link updated to "through v1.6.0".
+#   • Roadmap link retargeted to "v1.7.0 and v2.0.0" — v1.6.0
+#     is now shipped.
+#   • Install guide description updated to reflect the
+#     v1.6.0 architecture (lib/*.sh + boot-mini + functions).
+#   • Compatibility description updated to include the
+#     v1.6.0 modular shell details.
+#   • Added a new contact link for the "Modular Shell (lib/)"
+#     troubleshooting section (docs/REFERENCE.md §1.4).
 # ============================================================
 
 # ============================================================
@@ -39,13 +43,11 @@
 # template, which automatically ensures the required information
 # is collected (version, device, logs, etc.).
 #
-# v1.5.0 note: the strictness is more important than ever. The
-# v1.5.0 companion-install flow introduces new failure modes
-# (token expiry, localhost gate, rate limit, cascade exhaustion,
-# SELinux staging, Play Protect) and the Layer 0/1 split
-# introduces new shell failure modes. Both diagnostics blocks
-# are only reachable through the bug report template — a blank
-# issue would silently lose all that context.
+# v1.6.0 note: the modular shell split (lib/*.sh + boot-mini +
+# functions) introduces new shell-side failure modes. Combined
+# with the v1.5.0 companion-install failure modes, the bug
+# report template is the ONLY structured place to collect that
+# context. A blank issue would silently lose it.
 # ============================================================
 blank_issues_enabled: false
 
@@ -56,23 +58,21 @@ blank_issues_enabled: false
 # channel.
 #
 # Ordering:
-#   1. FAQ                 — before asking anything
-#   2. Troubleshooting     — before opening a bug
-#   3. Backup reference    — data-loss / restore questions
-#   4. Emergency recovery  — bootloop / lost-data scenarios
-#   5. Upgrade guide       — version-to-version questions
-#   6. Discussions         — general questions
-#   7. Security            — private vulnerability reports
-#   8. Install             — installation questions
-#   9. Branching           — before opening a PR
-#  10. Release Process     — how releases are cut
-#  11. ADRs                — architectural decisions
-#  12. Compatibility       — "will it work on my device?"
-#  13. Changelog           — "what's new?"
-#  14. Roadmap             — "will feature X be added?"
-#
-# `about:` values are two-line summaries. GitHub renders them
-# in a narrow card with a very limited vertical budget.
+#   1. FAQ                  — before asking anything
+#   2. Troubleshooting      — before opening a bug
+#   3. Backup reference     — data-loss / restore questions
+#   4. Emergency recovery   — bootloop / lost-data scenarios
+#   5. Upgrade guide        — version-to-version questions
+#   6. Discussions          — general questions
+#   7. Security             — private vulnerability reports
+#   8. Install              — installation questions
+#   9. Branching            — before opening a PR
+#  10. Release Process      — how releases are cut
+#  11. ADRs                 — architectural decisions
+#  12. Compatibility        — "will it work on my device?"
+#  13. Modular Shell        — v1.6.0 lib/ layer troubleshooting
+#  14. Changelog            — "what's new?"
+#  15. Roadmap              — "will feature X be added?"
 # ============================================================
 contact_links:
 
@@ -118,8 +118,8 @@ contact_links:
   - name: ⬆️ Version upgrade guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#5-update
     about: |
-      Upgrade paths v1.0.0 → v1.1.0 → v1.2.0 → v1.3.0 → v1.4.0 → v1.5.0,
-      settings preservation, and rollback.
+      Upgrade paths v1.0.0 → v1.6.0, settings preservation, and rollback.
+      Includes the v1.6.0 PWA cache refresh requirement.
 
   # ------------------------------------------------------------
   # [2.6] General discussions (questions, ideas, discussions)
@@ -145,7 +145,7 @@ contact_links:
   - name: 📘 Installation guide
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#2-install
     about: |
-      Install for Magisk / KernelSU / APatch, plus the v1.5.0 one-tap
+      Install for Magisk / KernelSU / APatch, plus the one-tap
       companion install flow (5-level pm install cascade).
 
   # ------------------------------------------------------------
@@ -173,7 +173,7 @@ contact_links:
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md
     about: |
       The "why" behind major architectural decisions (3 ADRs — including
-      v1.5.0's filepath-securejoin + Layered Bootstrap).
+      filepath-securejoin + Layered Bootstrap (extended to 3-layer in v1.6.0)).
 
   # ------------------------------------------------------------
   # [2.12] Compatibility matrix
@@ -182,22 +182,33 @@ contact_links:
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#5-compatibility-matrix
     about: |
       Compatibility by Android version, ROM, kernel, chipset, and root.
-      Covers v1.1.0 profiles, v1.2.0 backup, v1.3.0 rotation, and v1.5.0 Layer 0/1.
+      Covers v1.1.0 profiles, v1.2.0 backup, v1.3.0 rotation, v1.5.0 companion
+      install, and v1.6.0 modular shell (lib/*.sh).
 
   # ------------------------------------------------------------
-  # [2.13] Changelog
+  # [2.13] Modular shell (lib/) reference — v1.6.0
+  # ------------------------------------------------------------
+  - name: 🧩 Modular shell (lib/) reference
+    url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#14-layered-bootstrap-adr-0003
+    about: |
+      3-layer architecture (lib/*.sh → boot-mini.sh → functions.sh),
+      single source of truth for _MONITORING_UI_PORT, and the CI guard
+      that enforces the layer boundaries.
+
+  # ------------------------------------------------------------
+  # [2.14] Changelog
   # ------------------------------------------------------------
   - name: 📋 Changelog
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md
     about: |
-      All notable changes from v1.0.0 through v1.5.0.
+      All notable changes from v1.0.0 through v1.6.0.
       See what's new in the latest release.
 
   # ------------------------------------------------------------
-  # [2.14] Roadmap
+  # [2.15] Roadmap
   # ------------------------------------------------------------
   - name: 🗺️ Project roadmap
     url: https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md
     about: |
-      What is planned for v1.6.0 and v2.0.0.
+      What is planned for v1.7.0 and v2.0.0.
       Check here before proposing a feature.

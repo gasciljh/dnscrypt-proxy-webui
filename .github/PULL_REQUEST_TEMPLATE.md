@@ -1,7 +1,7 @@
 <!-- ============================================================
      DNSCrypt Smart Filter – Pull Request Template
-     Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-19
+     Version: v1.6.0 (Global Edition)
+     Last updated: 2026-11-13
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -11,16 +11,17 @@
      For release/hotfix PRs targeting `main`, use the release
      template instead (see "Before You Start" below).
 
-     Cross-references:
-       • docs/CONTRIBUTING.md §5, §7, §11 — branch, PR, release
-       • docs/REFERENCE.md §1, §3     — architecture, data flow
-       • docs/REFERENCE.md §2         — HTTP API
-       • docs/REFERENCE.md §5         — compatibility
-       • SECURITY.md §5.31–§5.36      — security model
-       • SECURITY.md §15              — audit corrections registry
-       • docs/GUIDE.md §5, §7, §8     — upgrade, troubleshoot, recovery
-       • docs/adr/0002-external-dependency.md
-       • docs/adr/0003-layered-bootstrap.md
+     Layout note (v1.6.0): shell scripts live at the repository
+     root, not under proxy/. Only Go sources, the WebUI, and
+     version/config files reside under proxy/:
+       • Shell scripts (root): customize.sh, install_app.sh,
+         boot-mini.sh, functions.sh, service.sh, watchdog.sh,
+         status.sh, action.sh, uninstall.sh, post-fs-data.sh
+       • lib/*.sh (Layer 0): constants, fallbacks, process,
+         http, backup, firewall
+       • proxy/ (8 files): main.go, go.mod, go.sum, build.sh,
+         dnscrypt-proxy.toml, dnscrypt-proxy.version,
+         webui.conf, app-apk.version
      ============================================================ -->
 
 > ## 🚨 Before You Start
@@ -29,36 +30,28 @@
 > refactors, and tests targeting `develop`.
 >
 > **If your PR is a RELEASE** (`release/*` → `main` or `hotfix/*` → `main`),
-> please **use the release template instead**:
+> use the release template instead:
 >
 > ```text
 > https://github.com/gasciljh/dnscrypt-proxy-webui/compare/main...<your-branch>?template=release.md
 > ```
->
-> **See:** [`docs/CONTRIBUTING.md`](../docs/CONTRIBUTING.md) §5 (Branch Strategy)
-> and §11 (Release Process).
 
 ---
 
 ## 🎯 Target Branch
 
-> ⚠️ **Read this first — it prevents your PR from being closed.**
->
-> This project uses a **two-branch strategy** (`main` + `develop`).
-> Choosing the wrong base branch will block your PR.
+> ⚠️ Choosing the wrong base branch will block your PR.
 
 **Choose exactly one:**
 
 - [ ] **Target: `develop`** — for `feature/*`, `fix/*`, `docs/*`, `chore/*`, `refactor/*`, `test/*`
-  *(This is the correct choice for 99% of PRs.)*
+  *(Correct for 99% of PRs.)*
 - [ ] **Target: `main`** — **only** for `release/*` or `hotfix/*` branches
-  *(If you check this, switch to the release template — see the callout above.)*
+  *(If you check this, switch to the release template.)*
 
-**Quick rule:**
-
-| Your branch starts with… | Open the PR against… | Template |
+| Your branch starts with… | PR base | Template |
 |---|---|---|
-| `feature/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/` | `develop` | **This one** (default) |
+| `feature/`, `fix/`, `docs/`, `chore/`, `refactor/`, `test/` | `develop` | **This one** |
 | `release/`, `hotfix/` | `main` | **Release** (`?template=release.md`) |
 
 📖 Full details: [`docs/CONTRIBUTING.md`](../docs/CONTRIBUTING.md) §5.
@@ -67,19 +60,7 @@
 
 ## 📝 Description
 
-<!--
-  Brief and clear description of what this PR does.
-  Explain "what" and "why" — not just "how".
-
-  Good example:
-    "Fixes versionCode inconsistency between module.prop and update.json.
-     Before: 1040000 (correct).
-     After:  1040000 (unchanged — but doc comment now matches).
-     Impact: Magisk Manager update detection stays correct."
-
-  Bad example:
-    "Fix bugs and various improvements" ← says nothing!
--->
+<!-- Brief and clear description: what and why — not just how. -->
 
 
 
@@ -87,27 +68,13 @@
 
 ## 🔗 Related Issue
 
-<!--
-  Reference the Issue this PR resolves.
-  GitHub links it automatically and closes the Issue on merge.
-  Examples:
-    Closes #123
-    Fixes #456
-    Resolves #789
-    Refs #101  ← (does not close, just a reference)
--->
+<!-- Examples: Closes #123, Fixes #456, Resolves #789, Refs #101 -->
 
 Closes #
 
 ---
 
 ## 🏷️ Change Type
-
-<!--
-  Select applicable types. Choose at least one.
-  Helps determine the next version number (SemVer).
-  See docs/CONTRIBUTING.md §5 for which branch to use.
--->
 
 - [ ] 🐛 **Bug fix** — fixes an error (PATCH)
 - [ ] ✨ **Feature** — new feature (MINOR)
@@ -120,70 +87,53 @@ Closes #
 - [ ] 🔧 **Chore/Build** — routine tasks or build system
 - [ ] ⚙️ **CI/CD** — CI workflows
 - [ ] 🌐 **Translation** — translation (EN/AR)
-- [ ] 📋 **ADR** — Architecture Decision Record (see §📖 Documentation)
-- [ ] 💾 **Data preservation** — touches the 10 defensive layers (see §🔒)
-- [ ] 🔄 **Rotation semantics (v1.3.0)** — touches SNAP-MANIFEST,
-      SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, or ROT-PROTECT
-- [ ] 📱 **Companion app (v1.4.0)** — touches `proxy/app-apk.version`,
-      `scripts/fetch_app_apk.sh`, or the `/app-debug.apk` route
-- [ ] 🆕 **Companion install flow (v1.5.0)** — touches
-      `proxy/install_app.sh`, the 4 install endpoints, the install
-      token store, or the install-method modal (IDX-24)
-- [ ] 🧩 **Layered Bootstrap (v1.5.0)** — touches `proxy/boot-mini.sh`,
-      `proxy/functions.sh`, or the Layer-0 primitive ownership
+- [ ] 📋 **ADR** — Architecture Decision Record
+- [ ] 💾 **Data preservation** — touches the 10 defensive layers
+- [ ] 🔄 **Rotation semantics** — touches SNAP-MANIFEST, SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, or ROT-PROTECT
+- [ ] 📱 **Companion app** — touches `proxy/app-apk.version`, `scripts/fetch_app_apk.sh`, or the `/app-debug.apk` route
+- [ ] 🆕 **Companion install flow** — touches `install_app.sh`, the 4 install endpoints, the install token store, or the install-method modal (IDX-24)
+- [ ] 🧩 **Layered Bootstrap** — touches `lib/*.sh`, `boot-mini.sh`, or `functions.sh`
+- [ ] 🕐 **Timezone rendering (v1.6.0)** — touches `last_update_unix` (backend) or `formatUnixTimestamp` (frontend)
 
 ---
 
 ## 🔍 Audit Correction (for security/architecture fixes)
 
 <!--
-  Fill this section only if the PR fixes an architectural or security issue.
-  See SECURITY.md and docs/REFERENCE.md.
+  Fill only if the PR fixes an architectural or security issue.
 
   ┌─────────────────────────────────────────────────┐
   │  Audit Corrections Registry (v1.0.0)                    │
   ├─────────────────────────────────────────────────┤
-  │  #13     CSRF-GET → POST-only                v1.0.0     │
-  │  #14     pgrep -x (no false positives)       v1.0.0     │
-  │  #15-a   Remove token from login response    v1.0.0     │
-  │  #15-b   Allow: POST header for 405          v1.0.0     │
-  │  #16-a/b IPv4/IPv6 firewall separation       v1.0.0     │
-  │  #17     Custom Chains (Orphan Fix)          v1.0.0     │
-  │  #18     STATUS_FILE Semantics               v1.0.0     │
-  │  #19     IPv6 Rate Limit Bypass              v1.0.0     │
-  │  #20     Port Collision 8080                 v1.0.0     │
-  │  #21     Section-Restricted TOML             v1.0.0     │
-  │  #22     Basic Auth Rate Limit               v1.0.0     │
-  │  #23     Section header with comment         v1.0.0     │
-  │  #24     Exact endpoint matching             v1.0.0     │
-  │  #25     Dashboard JSON Conversion           v1.0.0     │
-  │  #26     Preserve Settings on Upgrade        v1.0.0     │
-  │  #27     fuser PID parsing                   v1.0.0     │
-  │  #28     Login POST-only (CSRF)              v1.0.0     │
-  │  #29     readConfPort range check            v1.0.0     │
-  │  #30     /readyz localhost-only              v1.0.0     │
-  │  #31     shellQuote injection protection     v1.0.0     │
-  │  #32     rebuildMu mutex (RACE-1)            v1.0.0     │
-  │  #33     runtime_info dynamic ports          v1.0.0     │
+  │  #13  CSRF-GET → POST-only                v1.0.0        │
+  │  #14  pgrep -x (no false positives)       v1.0.0        │
+  │  #15-a Remove token from login response   v1.0.0        │
+  │  #15-b Allow: POST header for 405         v1.0.0        │
+  │  #16-a/b IPv4/IPv6 firewall separation    v1.0.0        │
+  │  #17  Custom Chains (Orphan Fix)          v1.0.0        │
+  │  #18  STATUS_FILE Semantics               v1.0.0        │
+  │  #19  IPv6 Rate Limit Bypass              v1.0.0        │
+  │  #20  Port Collision 8080                 v1.0.0        │
+  │  #21  Section-Restricted TOML             v1.0.0        │
+  │  #22  Basic Auth Rate Limit               v1.0.0        │
+  │  #23  Section header with comment         v1.0.0        │
+  │  #24  Exact endpoint matching             v1.0.0        │
+  │  #25  Dashboard JSON Conversion           v1.0.0        │
+  │  #26  Preserve Settings on Upgrade        v1.0.0        │
+  │  #27  fuser PID parsing                   v1.0.0        │
+  │  #28  Login POST-only (CSRF)              v1.0.0        │
+  │  #29  readConfPort range check            v1.0.0        │
+  │  #30  /readyz localhost-only              v1.0.0        │
+  │  #31  shellQuote injection protection     v1.0.0        │
+  │  #32  rebuildMu mutex (RACE-1)            v1.0.0        │
+  │  #33  runtime_info dynamic ports          v1.0.0        │
   └─────────────────────────────────────────────────┘
 
-  ℹ️  This box shows corrections **#13–#33** (security-focused,
-     v1.0.0). For the full registry (**#1–#33**, including the
-     absorbed-range rows), see `SECURITY.md` §15.1.
-
-  ⚠️ v1.1.0 through v1.5.0 do NOT add new audit corrections —
-     they are runtime-improvement, data-preservation, feature,
-     integration, and polish releases. See SECURITY.md §15.2
-     for the per-version breakdown.
-
-  The registry above remains the authoritative record through
-  v1.0.0. If your PR fixes a new security/architecture issue,
-  this PR should be the FIRST to add a new entry (starting at #34).
-
-  Example:
-    Number: #34
-    Title: <fix title>
-    Reference: SECURITY.md
+  ℹ️  Full registry (#1–#33): see `SECURITY.md` §15.1.
+  ⚠️ v1.1.0 through v1.6.0 do NOT add new audit corrections —
+     they are runtime, data-preservation, feature, integration,
+     modularization, and polish releases. See SECURITY.md §15.2.
+  If your PR fixes a new security issue, add entry #34.
 -->
 
 - **Audit Correction number**: #
@@ -191,12 +141,10 @@ Closes #
 - **Documentation reference**: `SECURITY.md`
 
 **Problem summary**:
-<!-- Brief description: what was wrong? What was its impact? -->
 
 
 
 **Solution summary**:
-<!-- Brief description: how was it fixed? Why this approach? -->
 
 ---
 
@@ -204,28 +152,20 @@ Closes #
 
 ### Mandatory checks
 
-<!--
-  All of these must pass before requesting review.
--->
-
 - [ ] `make build` passed (Go build for all 4 architectures)
-- [ ] `bash -n` clean on all modified shell scripts (`proxy/*.sh`, `scripts/*.sh`)
+- [ ] `bash -n` clean on all modified shell scripts (root `*.sh`, `lib/*.sh`, `scripts/*.sh`)
 - [ ] `gofmt -l proxy/` is empty (no unformatted files)
-- [ ] `shellcheck --severity=warning proxy/*.sh scripts/*.sh` is clean
+- [ ] `shellcheck --severity=warning *.sh lib/*.sh scripts/*.sh` is clean
 - [ ] No hardcoded secrets (`detect-secrets` clean)
-- [ ] **v1.2.0**: `make check-backup` passes (if `customize.sh` or
-      `functions.sh` changed)
-- [ ] **v1.4.0**: `make check-app-version` passes (if
-      `proxy/app-apk.version` changed)
-- [ ] **v1.5.0**: `make check-install-app` passes (if
-      `proxy/install_app.sh` changed)
-- [ ] **v1.5.0**: `make check-boot-mini` passes (if
-      `proxy/boot-mini.sh` or `proxy/functions.sh` changed)
+- [ ] **v1.2.0**: `make check-backup` passes (if `customize.sh` or `functions.sh` changed)
+- [ ] **v1.4.0**: `make check-app-version` passes (if `proxy/app-apk.version` changed)
+- [ ] **v1.5.0**: `make check-install-app` passes (if `install_app.sh` changed)
+- [ ] **v1.6.0**: `make check-boot-mini` passes (if `lib/*.sh`, `boot-mini.sh`, or `functions.sh` changed)
+- [ ] **v1.6.0**: `make check-consistency` passes (no `proxy/*.sh` refs in docs; no `customize.sh §[2]` for `_MONITORING_UI_PORT`)
 
 ### 🆕 Core fix verifications (v1.0.0)
 
-> ⚠️ The "Fix #N" labels below are **internal development reference
-> numbers** — NOT Audit Correction IDs. Mapping to `SECURITY.md §15`:
+> ⚠️ "Fix #N" labels are internal dev references — NOT Audit Correction IDs:
 >
 > | Dev fix | Audit Correction |
 > |---|---|
@@ -233,11 +173,6 @@ Closes #
 > | Fix #2 (Shell fallback) | *(pre-registry)* |
 > | Fix #8 (Basic Auth rate limit) | #22 |
 > | Fix #12 (Exact endpoint matching) | #24 |
-
-<!--
-  Run these if the PR touches main.go or web/*.html.
-  Fast (< 5 seconds total) — grep-based.
--->
 
 - [ ] **Fix #1 — Dashboard JSON conversion**
   ```bash
@@ -288,18 +223,7 @@ Closes #
 
 ### 🆕 v1.1.0 additions
 
-<!--
-  Run these if the PR touches main.go, functions.sh, service.sh,
-  action.sh, status.sh, or watchdog.sh. All are grep-based.
-
-  v1.1.0 introduced three runtime features that must be verified
-  by any PR that could affect them:
-    • MEM-1 — dynamic memory limit per profile
-    • MEM-2 — extended shellQuote character set
-    • MEM-3 — MONITORING_UI_PORT constant used everywhere
--->
-
-- [ ] **MEM-1 — Dynamic memory limit (main.go)**
+- [ ] **MEM-1 — Dynamic memory limit**
   ```bash
   grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅"
   grep -q 'func applyMemoryLimit' proxy/main.go && echo "✅"
@@ -307,49 +231,36 @@ Closes #
   ! grep -q 'debug.SetMemoryLimit(80 \* 1024 \* 1024)' proxy/main.go && echo "✅ no hardcoded limit"
   ```
 
-- [ ] **MEM-2 — Extended shellQuote (main.go)**
+- [ ] **MEM-2 — Extended shellQuote**
   ```bash
   awk '/func shellQuote/,/^}/' proxy/main.go | grep -q "'{'" && echo "✅ braces"
   awk '/func shellQuote/,/^}/' proxy/main.go | grep -q "r == '\\\\n'" && echo "✅ newline"
   awk '/func shellQuote/,/^}/' proxy/main.go | grep -q "r == '\\\\t'" && echo "✅ tab"
   ```
 
-- [ ] **MEM-3 — MONITORING_UI_PORT used in metrics handler (main.go)**
+- [ ] **MEM-3 — MONITORING_UI_PORT**
   ```bash
   grep -q 'MONITORING_UI_PORT = "8080"' proxy/main.go && echo "✅ const"
   awk '/func metricsProxyHandler/,/^}/' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ used"
   ! grep -q '"http://127.0.0.1:8080/api/metrics"' proxy/main.go && echo "✅ no hardcoded URL"
   ```
 
-- [ ] **v1.1.0 — runtime_info new fields (main.go + web/*.html)**
+- [ ] **v1.1.0 — runtime_info new fields**
   ```bash
-  awk '/func buildRuntimeInfo/,/^}/' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ backend memory_limit_mb"
-  awk '/func buildRuntimeInfo/,/^}/' proxy/main.go | grep -q '"profile_key"' && echo "✅ backend profile_key"
+  awk '/func buildRuntimeInfo/,/^}/' proxy/main.go | grep -q '"memory_limit_mb"' && echo "✅ backend"
+  awk '/func buildRuntimeInfo/,/^}/' proxy/main.go | grep -q '"profile_key"' && echo "✅ backend"
   grep -q "riMemoryLimit" web/index.html && echo "✅ index.html"
   grep -q "riMemoryLimit" web/dashboard.html && echo "✅ dashboard.html"
   ```
 
 ### 🆕 v1.2.0 additions — Data Preservation
 
-<!--
-  Run these if the PR touches customize.sh, functions.sh,
-  service.sh, status.sh, uninstall.sh, action.sh, watchdog.sh,
-  main.go (backup helpers only), docs/REFERENCE.md §4, or
-  docs/GUIDE.md §8.
-
-  ⚠️ v1.3.0 note: rotation logic in functions.sh:rotate_backups
-     was rewritten in v1.3.0 with SNAP-* / ROT-* semantics. The
-     v1.2.0 greps below still pass — they check for FUNCTION
-     PRESENCE, not semantics — but any PR touching rotation
-     must ALSO run the v1.3.0 greps in the next section.
--->
-
 - [ ] **v1.2.0 — 10 defensive layers present in customize.sh**
   ```bash
   for L in CANDIDATE_SOURCES PERSISTENT_BACKUP verify_backup_integrity \
-           begin_transaction detect_root_solution copy_with_context \
+           transaction_begin detect_root_solution copy_with_context \
            RECOVERY_TRIGGER migrate_config; do
-      grep -q "$L" proxy/customize.sh && echo "✅ $L" || echo "❌ $L"
+      grep -q "$L" customize.sh && echo "✅ $L" || echo "❌ $L"
   done
   ```
 
@@ -359,7 +270,7 @@ Closes #
            restore_user_files cleanup_old_transactions get_backup_dir \
            ensure_backup_dir get_last_backup_time copy_with_context \
            verify_backup_integrity write_manifest get_watchdog_token; do
-      grep -q "$H" proxy/functions.sh && echo "✅ $H" || echo "❌ $H"
+      grep -q "$H" functions.sh && echo "✅ $H" || echo "❌ $H"
   done
   ```
 
@@ -372,28 +283,28 @@ Closes #
   grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1 function"
   ```
 
-- [ ] **v1.2.0 — 7-field backups schema (BAK-1)**
+- [ ] **v1.2.0 — 7-field backups schema**
   ```bash
-  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'in_flight_txn' && echo "✅ in_flight_txn"
-  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'orphan_txn' && echo "✅ orphan_txn"
+  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'in_flight_txn' && echo "✅"
+  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'orphan_txn' && echo "✅"
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
   # Expected: 7
   ```
 
 - [ ] **v1.2.0 — Watchdog token (WD-TOKEN)**
   ```bash
-  grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ token loader"
+  grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ loader"
   grep -q 'verifyWatchdogToken' proxy/main.go && echo "✅ verify"
-  grep -q 'X-Watchdog-Token' proxy/main.go && echo "✅ header name"
+  grep -q 'X-Watchdog-Token' proxy/main.go && echo "✅ header"
   grep -q 'subtle.ConstantTimeCompare' proxy/main.go && echo "✅ constant-time"
-  grep -q 'watchdog_token' proxy/watchdog.sh && echo "✅ watchdog reads"
-  grep -q 'X-Watchdog-Token' proxy/watchdog.sh && echo "✅ watchdog sends"
+  grep -q 'watchdog_token' watchdog.sh && echo "✅ watchdog reads"
+  grep -q 'X-Watchdog-Token' watchdog.sh && echo "✅ watchdog sends"
   ```
 
 - [ ] **v1.2.0 — FIX-1 (recovery-mode snapshot-and-reapply)**
   ```bash
-  grep -q 'RECOVERY_SNAPSHOT_DIR' proxy/customize.sh && echo "✅ snapshot dir"
-  grep -q 'Re-applying recovery snapshot' proxy/customize.sh && echo "✅ §[9b2] re-apply block"
+  grep -q 'RECOVERY_SNAPSHOT_DIR' customize.sh && echo "✅ snapshot dir"
+  grep -q 'Re-applying recovery snapshot' customize.sh && echo "✅ §[13] re-apply block"
   ```
 
 - [ ] **v1.2.0 — FIX-2 (Service Worker update-banner)**
@@ -413,34 +324,13 @@ Closes #
   done
   ```
 
-- [ ] **v1.2.0 — Data-preservation test artifacts (`.gitignore` §[19])**
-  ```bash
-  grep -qE 'txn-\*/|orphan-txn-\*/|manifest\.json\.tmp' .gitignore && \
-    echo "✅ backup test patterns present"
-  ```
-
 ### 🆕 v1.3.0 additions — PWA install button + LED + DNS auto-start + rotation
-
-<!--
-  Run these if the PR touches:
-    • web/index.html (PWA install button / LED markup)
-    • proxy/service.sh (§[19] DNS auto-start block)
-    • web/dashboard.html, web/offline.html
-    • proxy/main.go (buildBackupInfo)
-    • proxy/functions.sh (rotate_backups)
-    • proxy/status.sh (_list_snapshots)
-    • proxy/watchdog.sh (§[5b] snapshot counter)
-    • proxy/customize.sh (rotate_backups)
-    • proxy/action.sh (_inline_rotate_backups + _inline_backup_summary)
-    • proxy/uninstall.sh (§[5b] BACKUP_COUNT / BACKUP_LAST_NAME)
-    • docs/REFERENCE.md §4.6, docs/REFERENCE.md §3.2
--->
 
 - [ ] **v1.3.0 — DNS auto-start-after-boot fix (service.sh)**
   ```bash
-  grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ §[19] block present"
-  grep -q 'ensure_running_service' proxy/service.sh && echo "✅ API call present"
-  grep -q 'X-Watchdog-Token' proxy/service.sh && echo "✅ uses token"
+  grep -q 'v1.3.0 FIX' service.sh && echo "✅ §[18] block present"
+  grep -q 'ensure_running_service' service.sh && echo "✅ API call present"
+  grep -q 'X-Watchdog-Token' service.sh && echo "✅ uses token"
   ```
 
 - [ ] **v1.3.0 — Live status LED (index.html)**
@@ -462,36 +352,24 @@ Closes #
 
 - [ ] **v1.3.0 — ROT-MANIFEST + ROT-MTIME + ROT-PROTECT (functions.sh)**
   ```bash
-  awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
-  awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
-  awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
+  awk '/rotate_backups\(\)/,/^}/' functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
+  awk '/rotate_backups\(\)/,/^}/' functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
+  awk '/rotate_backups\(\)/,/^}/' functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
   ```
 
 - [ ] **v1.3.0 — Parallel application in shell scripts**
   ```bash
-  grep -q '_list_snapshots' proxy/status.sh && echo "✅ status.sh helper"
-  grep -q 'manifest.json' proxy/watchdog.sh && echo "✅ watchdog.sh manifest check"
-  grep -q 'manifest.json' proxy/customize.sh && echo "✅ customize.sh manifest check"
-  grep -q '_inline_list_snapshots' proxy/action.sh && echo "✅ action.sh helper"
-  grep -q '_uninstall_list_snapshots' proxy/uninstall.sh && echo "✅ uninstall.sh helper"
+  # Note: `list_snapshots` / `count_snapshots` are defined in lib/backup.sh §[5]
+  # and sourced via functions.sh. `_list_snapshots` (with underscore) does not
+  # exist — that was a pre-v1.6.0 historical name.
+  grep -q 'list_snapshots' status.sh && echo "✅ status.sh helper"
+  grep -qE 'read_last_stable|count_snapshots' watchdog.sh && echo "✅ watchdog.sh helpers"
+  grep -qE '\.manifest\.json|write_manifest_to' customize.sh && echo "✅ customize.sh manifest write"
+  grep -q 'count_snapshots' action.sh && echo "✅ action.sh helper"
+  grep -qE 'list_snapshots|count_snapshots' uninstall.sh && echo "✅ uninstall.sh helper"
   ```
 
 ### 🆕 v1.4.0 additions — Companion APK + CodeQL + iOS removal
-
-<!--
-  Run these if the PR touches:
-    • proxy/main.go (removeModule, serveStaticAssets, APK_FILE)
-    • web/index.html (install button markup — v1.4.0 state)
-    • scripts/fetch_app_apk.sh, proxy/app-apk.version
-    • .github/workflows/release.yml (Fetch/Stage APK steps)
-    • .github/workflows/ci.yml (Verify companion app metadata)
-
-  ⚠️ v1.5.0 note: the v1.4.0 install button was a plain
-     `<a download href="/app-debug.apk">` link. In v1.5.0 it was
-     replaced by `handleCompanionInstall()` (IDX-24). The checks
-     below describe the v1.4.0 state; for a v1.5.0-aware PR, use
-     the v1.5.0 block instead.
--->
 
 - [ ] **v1.4.0 — Companion APK route + constant (main.go)**
   ```bash
@@ -500,91 +378,78 @@ Closes #
   grep -q 'application/vnd.android.package-archive' proxy/main.go && echo "✅ mime type"
   ```
 
-- [ ] **v1.4.0 — CodeQL path-injection fix in removeModule (main.go)**
+- [ ] **v1.4.0 — CodeQL path-injection fix in removeModule**
   ```bash
-  grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ filepath.Base sanitization"
-  grep -q 'securejoin.SecureJoin' proxy/main.go && echo "✅ path rebuilt via SecureJoin (ADR-0002)"
-  awk '/func removeModule/,/^}/' proxy/main.go | grep -q 'expectedPrefix' && echo "✅ prefix guard present"
+  grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ filepath.Base"
+  grep -q 'securejoin.SecureJoin' proxy/main.go && echo "✅ SecureJoin (ADR-0002)"
+  awk '/func removeModule/,/^}/' proxy/main.go | grep -q 'expectedPrefix' && echo "✅ prefix guard"
   ```
 
 - [ ] **v1.4.0 — Companion APK fetcher + version file**
   ```bash
-  test -f scripts/fetch_app_apk.sh && echo "✅ fetch_app_apk.sh present"
-  test -f proxy/app-apk.version && echo "✅ app-apk.version present"
-  grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' proxy/app-apk.version && echo "✅ version format valid"
+  test -f scripts/fetch_app_apk.sh && echo "✅ fetch_app_apk.sh"
+  test -f proxy/app-apk.version && echo "✅ app-apk.version"
+  grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' proxy/app-apk.version && echo "✅ version format"
   ```
 
 - [ ] **v1.4.0 — Release workflow fetches + stages APK**
   ```bash
   grep -q 'Fetch companion Android app APK' .github/workflows/release.yml && echo "✅ fetch step"
   grep -q 'Stage APK + .sha256 for module ZIP' .github/workflows/release.yml && echo "✅ stage step"
-  grep -q 'dist/DNS-Proxy-v\*.apk' .github/workflows/release.yml && echo "✅ APK attached to release"
+  grep -q 'dist/DNS-Proxy-v\*.apk' .github/workflows/release.yml && echo "✅ APK attached"
   ```
 
 - [ ] **v1.4.0 — CI verifies companion app metadata**
   ```bash
-  grep -q 'Verify companion app metadata' .github/workflows/ci.yml && echo "✅ CI step present"
+  grep -q 'Verify companion app metadata' .github/workflows/ci.yml && echo "✅ CI step"
   grep -q 'app-apk.version' .github/workflows/ci.yml && echo "✅ version file checked"
   ```
 
-- [ ] **v1.4.0 — iOS PWA logic removed (web/index.html)**
+- [ ] **v1.4.0 — iOS PWA logic removed**
   ```bash
   ! grep -qE '^\s*(function isIOSDevice|isIOSDevice\s*=)' web/index.html \
     && echo "✅ isIOSDevice removed"
   ! grep -q 'pwaStepIos' web/index.html && echo "✅ iOS step translations removed"
   ```
 
-### 🆕 v1.5.0 additions — Companion install flow + Layered Bootstrap
-
-<!--
-  Run these if the PR touches:
-    • proxy/install_app.sh (any change)
-    • proxy/main.go (4 install endpoints + 10 helpers)
-    • proxy/boot-mini.sh, proxy/functions.sh (Layer 0 / Layer 1)
-    • web/index.html (install-method modal — IDX-24)
-    • .github/workflows/ci.yml (Step 8 + Step 9)
-    • .github/workflows/release.yml (Stage .sha256)
-    • proxy/customize.sh (§[10c] APK mirror)
-    • scripts/package_module.sh (install_app.sh bundling)
-    • SECURITY.md §5.36, docs/REFERENCE.md §3.12, docs/REFERENCE.md §1.4
--->
+### 🆕 v1.5.0 additions — Companion install flow + Layered Bootstrap (2-layer baseline)
 
 #### Companion install flow
 
 - [ ] **v1.5.0 — install_app.sh present with 5 cascade levels**
   ```bash
-  test -f proxy/install_app.sh && echo "✅ present"
-  wc -l proxy/install_app.sh  # expected ~1,101 lines
+  test -f install_app.sh && echo "✅ present"
+  wc -l install_app.sh  # expected ~680 lines
   for pattern in 'pm install -r --user 0' 'pm install -r --user 0 -i com.android.shell' \
                  'pm install-create' 'magisk su' 'cmd package install'; do
-      grep -q "$pattern" proxy/install_app.sh && echo "✅ $pattern" || echo "❌ $pattern"
+      grep -q "$pattern" install_app.sh && echo "✅ $pattern" || echo "❌ $pattern"
   done
   ```
 
-- [ ] **v1.5.0 — Three-way trap split (EXIT / INT / TERM) with `_CLEANED_UP` guard**
+- [ ] **v1.5.0 — Three-way trap split with `_CLEANED_UP` guard**
   ```bash
-  grep -q "trap '_cleanup_app' EXIT" proxy/install_app.sh && echo "✅ EXIT trap"
-  grep -q "trap '_cleanup_app; exit 130' INT" proxy/install_app.sh && echo "✅ INT trap (exit 130)"
-  grep -q "trap '_cleanup_app; exit 143' TERM" proxy/install_app.sh && echo "✅ TERM trap (exit 143)"
-  grep -q '_CLEANED_UP=1' proxy/install_app.sh && echo "✅ re-entry guard"
+  grep -q "trap '_cleanup_app' EXIT" install_app.sh && echo "✅ EXIT trap"
+  grep -q "trap '_cleanup_app; exit 130' INT" install_app.sh && echo "✅ INT trap (exit 130)"
+  grep -q "trap '_cleanup_app; exit 143' TERM" install_app.sh && echo "✅ TERM trap (exit 143)"
+  grep -q '_CLEANED_UP=1' install_app.sh && echo "✅ re-entry guard"
   ```
 
 - [ ] **v1.5.0 — Cascade deadline 75 s < INSTALL_TIMEOUT 90 s**
   ```bash
-  grep -q 'CASCADE_DEADLINE_SECONDS=75' proxy/install_app.sh && echo "✅ 75 s deadline"
+  grep -q 'CASCADE_DEADLINE_SECONDS=75' install_app.sh && echo "✅ 75 s deadline"
   grep -q 'INSTALL_TIMEOUT.*90' proxy/main.go && echo "✅ 90 s handler timeout"
   ```
 
 - [ ] **v1.5.0 — SELinux staging (never `setenforce 0`)**
   ```bash
-  grep -q '/data/local/tmp/dnscrypt-companion.apk' proxy/install_app.sh && echo "✅ staging path"
-  ! grep -v '^[[:space:]]*#' proxy/install_app.sh | grep -q 'setenforce 0' && echo "✅ SELinux never disabled"
+  grep -q '/data/local/tmp/dnscrypt-companion.apk' install_app.sh && echo "✅ staging path"
+  ! grep -v '^[[:space:]]*#' install_app.sh | grep -q 'setenforce 0' && echo "✅ SELinux never disabled"
   ```
 
 - [ ] **v1.5.0 — Play Protect trap restores captured value**
   ```bash
-  grep -q 'package_verifier_enable' proxy/install_app.sh && echo "✅ Play Protect disable"
-  grep -q '_VERIFIER_ORIG' proxy/install_app.sh && echo "✅ restores captured value"
+  grep -q 'package_verifier_enable' install_app.sh && echo "✅ Play Protect disable"
+  grep -q '_VERIFIER_ORIG' install_app.sh && echo "✅ restores captured value"
   ```
 
 - [ ] **v1.5.0 — 4 endpoints registered in main.go**
@@ -595,7 +460,7 @@ Closes #
   grep -q 'companion_app_state' proxy/main.go && echo "✅ /api?action=companion_app_state"
   ```
 
-- [ ] **v1.5.0 — One-shot CSRF token (60 s TTL, constant-time compare)**
+- [ ] **v1.5.0 — One-shot CSRF token (60 s TTL, constant-time)**
   ```bash
   grep -q 'INSTALL_TOKEN_TTL.*60' proxy/main.go && echo "✅ 60 s TTL"
   grep -q 'installTokens' proxy/main.go && echo "✅ token store"
@@ -622,45 +487,16 @@ Closes #
 
 - [ ] **v1.5.0 — install_app.sh and boot-mini.sh extracted by customize.sh**
   ```bash
-  grep -q "'install_app.sh'" proxy/customize.sh && echo "✅ install_app.sh in unzip list"
-  grep -q "'boot-mini.sh'" proxy/customize.sh && echo "✅ boot-mini.sh in unzip list"
-  grep -q 'MISSING.*install_app.sh' proxy/customize.sh && echo "✅ install_app.sh critical check"
-  grep -q 'MISSING.*boot-mini.sh' proxy/customize.sh && echo "✅ boot-mini.sh critical check"
+  grep -q "'install_app.sh'" customize.sh && echo "✅ install_app.sh in unzip list"
+  grep -q "'boot-mini.sh'" customize.sh && echo "✅ boot-mini.sh in unzip list"
+  grep -q 'MISSING.*install_app.sh' customize.sh && echo "✅ install_app.sh critical check"
+  grep -q 'MISSING.*boot-mini.sh' customize.sh && echo "✅ boot-mini.sh critical check"
   ```
 
 - [ ] **v1.5.0 — package_module.sh bundles both new scripts**
   ```bash
   grep -q 'install_app.sh' scripts/package_module.sh && echo "✅ install_app.sh in package"
   grep -q 'boot-mini.sh' scripts/package_module.sh && echo "✅ boot-mini.sh in package"
-  ```
-
-#### Layered Bootstrap (Phase 0)
-
-- [ ] **v1.5.0 — boot-mini.sh present with 5 primitives + constant**
-  ```bash
-  test -s proxy/boot-mini.sh && echo "✅ present"
-  for fn in log_msg get_run_dir read_conf is_port_open get_webui_port; do
-      grep -qE "^${fn}\(\)" proxy/boot-mini.sh && echo "✅ primitive: $fn" || echo "❌ missing: $fn"
-  done
-  grep -q '^_MONITORING_UI_PORT=' proxy/boot-mini.sh && echo "✅ _MONITORING_UI_PORT"
-  ```
-
-- [ ] **v1.5.0 — functions.sh sources Layer 0**
-  ```bash
-  grep -q 'boot-mini.sh' proxy/functions.sh && echo "✅ sources boot-mini.sh"
-  ```
-
-- [ ] **v1.5.0 — functions.sh does NOT redefine Layer-0 primitives**
-  ```bash
-  for fn in get_run_dir read_conf is_port_open get_webui_port; do
-      grep -qE "^${fn}[[:space:]]*\(\)" proxy/functions.sh && echo "❌ redefines: $fn" || echo "✅ $fn not redefined"
-  done
-  ! grep -qE '^_MONITORING_UI_PORT=' proxy/functions.sh && echo "✅ _MONITORING_UI_PORT not redefined"
-  ```
-
-- [ ] **v1.5.0 — CI guard Step 9 active**
-  ```bash
-  grep -q 'Verify boot-mini.sh integration' .github/workflows/ci.yml && echo "✅ Step 9 present"
   ```
 
 #### ADR compliance
@@ -672,9 +508,7 @@ Closes #
   grep -q 'filepath-securejoin' proxy/main.go && echo "✅ used in main.go"
   ```
 
-- [ ] **ADR-0003 (Layered Bootstrap)** — verified by the block above
-
-- [ ] **No new external Go dependency** was added beyond `filepath-securejoin`
+- [ ] **No new external Go dependency** beyond `filepath-securejoin`
   ```bash
   grep -E '^\s+[a-z]' proxy/go.mod | grep -v filepath-securejoin | grep -v '^go ' | \
       grep -q '.' && echo "❌ new dependency!" || echo "✅ only filepath-securejoin"
@@ -686,11 +520,6 @@ Closes #
   ```bash
   grep -q 'renderAllDynamic' web/index.html && echo "✅ renderAllDynamic present"
   grep -q 'renderCompanionButton' web/index.html && echo "✅ renderCompanionButton present"
-  ```
-
-- [ ] **IDX-23b — Status card updates instantly on language toggle**
-  ```bash
-  awk '/function renderAllDynamic/,/^}/' web/index.html | grep -q 'updateStatusUI\|setNetworkDownUI' && echo "✅ status area hooked"
   ```
 
 - [ ] **IDX-24 — Install-method modal present**
@@ -706,12 +535,6 @@ Closes #
   grep -q 'diagFilesCard' web/dashboard.html && echo "✅ diagFilesCard"
   ```
 
-- [ ] **IDX-25a — Centered card-expand hint**
-  ```bash
-  grep -q 'card-hint' web/dashboard.html && echo "✅ card-hint class"
-  grep -q 'cardHintRemoveTimer' web/dashboard.html && echo "✅ dual-timer lifecycle"
-  ```
-
 - [ ] **IDX-429 — Install rate-limit message rendered distinctly**
   ```bash
   grep -q "isInstallFamilyUrl" web/index.html && echo "✅ isInstallFamilyUrl present"
@@ -723,23 +546,11 @@ Closes #
   awk '/function isInstallFamilyUrl/,/^}/' web/index.html | grep -q 'install_companion_app' && echo "✅ detects install-family URLs"
   ```
 
-- [ ] **DASH-REFRESH-01 — Dashboard `isRefreshing` reset on 401**
+- [ ] **DASH-REFRESH-01 / DASH-SESSION-RETRY-01 / DASH-HINT-01/02**
   ```bash
   grep -q 'isRefreshing = false' web/dashboard.html && echo "✅ isRefreshing reset"
-  ```
-
-- [ ] **DASH-SESSION-RETRY-01 — Dashboard session-expired retry**
-  ```bash
-  grep -q 'showSessionExpired\|sessionExpiredTitle' web/dashboard.html && echo "✅ session-expired retry"
-  ```
-
-- [ ] **DASH-HINT-01 — Dashboard dual-timer hint**
-  ```bash
-  grep -q 'cardHintTimer\|cardHintRemoveTimer' web/dashboard.html && echo "✅ dual-timer lifecycle"
-  ```
-
-- [ ] **DASH-HINT-02 — Dashboard `scrollend` scheduling**
-  ```bash
+  grep -q 'sessionExpiredTitle' web/dashboard.html && echo "✅ session-expired retry"
+  grep -q 'cardHintRemoveTimer' web/dashboard.html && echo "✅ dual-timer lifecycle"
   grep -q "'onscrollend' in window" web/dashboard.html && echo "✅ window scrollend detection"
   ```
 
@@ -749,9 +560,7 @@ Closes #
   grep -q 'M 416 142' web/icon-512.svg && echo "✅ right shoulder"
   ```
 
-#### Version consistency (9 places)
-
-- [ ] **v1.5.0 — Version consistency across 9 places**
+- [ ] **Version consistency across 9 places**
   ```bash
   V=$(cat VERSION)
   echo "VERSION:        $V"
@@ -765,17 +574,151 @@ Closes #
   grep -q 'filepath-securejoin v0.7.0' proxy/go.mod && echo "✅ go.mod pin (ADR-0002)"
   ```
 
+### 🆕 v1.6.0 additions — Modular shell + Timezone + mtime sort
+
+<!--
+  v1.6.0 introduced:
+    • lib/*.sh — Layer 0 (6 single-purpose modules)
+    • 3-layer Layered Bootstrap (lib/*.sh → boot-mini.sh → functions.sh)
+    • last_update_unix — timezone-agnostic backend field
+    • formatUnixTimestamp() — frontend local-timezone rendering
+    • buildBackupInfo mtime sort — aligns main.go with rotate_backups
+    • CACHE_VERSION bump — forces PWA client cache refresh
+  Verify these if the PR touches any of the corresponding subsystems.
+-->
+
+#### Modular shell (`lib/`) — 3-layer model
+
+- [ ] **v1.6.0 — All 6 `lib/*.sh` modules present**
+  ```bash
+  for M in constants fallbacks process http backup firewall; do
+      test -f lib/$M.sh && echo "✅ lib/$M.sh" || echo "❌ lib/$M.sh"
+  done
+  ```
+
+- [ ] **v1.6.0 — `boot-mini.sh` sources all `lib/*.sh` modules**
+  ```bash
+  for M in constants fallbacks process http backup firewall; do
+      grep -qE "$M\.sh|_LIB_BASE" boot-mini.sh && echo "✅ boot-mini sources $M" || echo "❌ missing $M"
+  done
+  ```
+
+- [ ] **v1.6.0 — `functions.sh` sources `boot-mini.sh` and does not redefine Layer-0 primitives**
+  ```bash
+  grep -q 'boot-mini.sh' functions.sh && echo "✅ Layer 2 → Layer 1"
+  for fn in get_run_dir read_conf is_port_open get_webui_port; do
+      grep -qE "^${fn}[[:space:]]*\(\)" functions.sh && \
+        echo "❌ functions.sh redefines $fn" || \
+        echo "✅ $fn lives only in Layer 0/1"
+  done
+  ```
+
+- [ ] **v1.6.0 — `_MONITORING_UI_PORT` canonical source of truth**
+  ```bash
+  grep -qE '^_MONITORING_UI_PORT="8080"' lib/constants.sh && echo "✅ canonical in lib/constants.sh"
+  grep -qE '^_MONITORING_UI_PORT="\$\{_MONITORING_UI_PORT:-' boot-mini.sh && echo "✅ fallback in boot-mini.sh §[4]"
+  ! grep -qE '^_MONITORING_UI_PORT=' functions.sh && echo "✅ not redefined in functions.sh"
+  ! grep -q '_MONITORING_UI_PORT=' customize.sh && echo "✅ not in customize.sh"
+  ```
+
+- [ ] **v1.6.0 — CI Step 9 verifies `lib/*.sh` and Layer chain**
+  ```bash
+  grep -q 'boot-mini.sh' .github/workflows/ci.yml && echo "✅ CI Step 9 present"
+  grep -q 'lib/constants.sh\|lib/\*.sh' .github/workflows/ci.yml && echo "✅ CI checks lib/"
+  ```
+
+- [ ] **v1.6.0 — `customize.sh §[16]` verifies all 6 `lib/*.sh` files**
+  ```bash
+  grep -q 'lib/constants.sh lib/fallbacks.sh' customize.sh && echo "✅ lib/*.sh in critical check"
+  ```
+
+- [ ] **v1.6.0 — `customize.sh` credential rewrite is section-aware**
+  ```bash
+  # Should use awk section tracking, not sed
+  grep -q 'monitoring_ui' customize.sh && echo "✅ monitoring_ui reference present"
+  ! grep -qE 'sed -i "s\|^\[\[:space:\]\]\*username.*=.*' customize.sh && echo "✅ no blind sed rewrite"
+  ```
+
+- [ ] **v1.6.0 — `customize.sh` version arithmetic is prerelease-safe**
+  ```bash
+  grep -q "tr -dc '0-9'" customize.sh && echo "✅ non-numeric stripped"
+  ! grep -q 'cut -d. -f3)$' customize.sh && echo "✅ no raw -beta arithmetic"
+  ```
+
+#### Timezone rendering (`last_update_unix` + `formatUnixTimestamp`)
+
+- [ ] **v1.6.0 — Backend emits `last_update_unix`**
+  ```bash
+  awk '/func buildProfileResponse/,/^}/' proxy/main.go | grep -q 'last_update_unix' && echo "✅ backend field"
+  grep -q 'lastUpdateUnixCache' proxy/main.go && echo "✅ cache field"
+  ```
+
+- [ ] **v1.6.0 — Frontend uses `formatUnixTimestamp()`**
+  ```bash
+  grep -q 'formatUnixTimestamp' web/index.html && echo "✅ helper present"
+  awk '/function renderProfileData/,/^}/' web/index.html | grep -q 'last_update_unix' && echo "✅ prefers Unix field"
+  awk '/function renderProfileData/,/^}/' web/index.html | grep -q 'last_update' && echo "✅ falls back to RFC3339"
+  ```
+
+- [ ] **v1.6.0 — `toLocaleString` uses `currentLang` for locale**
+  ```bash
+  grep -q "currentLang === 'ar' ? 'ar-EG' : 'en-US'" web/index.html && echo "✅ locale argument"
+  ! grep -q "toLocaleString('en-US'" web/index.html && echo "✅ no hardcoded locale"
+  ```
+
+#### `buildBackupInfo` mtime sort
+
+- [ ] **v1.6.0 — `buildBackupInfo` sorts by `ModTime()`, not name**
+  ```bash
+  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'Info()' && echo "✅ Info() called"
+  awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'ModTime().Before' && echo "✅ ModTime sort"
+  ```
+
+- [ ] **v1.6.0 — `buildBackupInfo` agrees with `rotate_backups` and `status.sh`**
+  ```bash
+  # Manually compare after running:
+  #   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq -r '.backups.last_backup_name'
+  #   su -c "sh status.sh --json" | jq -r '.backups.last_backup_name'
+  # Both should be identical
+  ```
+
+#### PWA cache bump
+
+- [ ] **v1.6.0 — `CACHE_VERSION` matches module version**
+  ```bash
+  V=$(cat VERSION)
+  grep -q "const CACHE_VERSION = '$V'" web/sw.js && echo "✅ CACHE_VERSION=$V"
+  ```
+
+- [ ] **v1.6.0 — `PRECACHE_ASSETS` count unchanged (11 files)**
+  ```bash
+  # grep -c in the PRECACHE_ASSETS array
+  grep -cE "^\s+'/.*',\s*$" web/sw.js
+  # Expected: 11
+  ```
+
+#### ADR-0003 extended to 3-layer
+
+- [ ] **v1.6.0 — ADR-0003 documents the 3-layer model**
+  ```bash
+  grep -q 'Extension (v1.6.0)' docs/adr/0003-layered-bootstrap.md && echo "✅ Extension section present"
+  grep -q '3-layer\|three layers' docs/adr/0003-layered-bootstrap.md && echo "✅ 3-layer described"
+  ```
+
+- [ ] **v1.6.0 — ADR-0001 / ADR-0002 carry "Verified in" note**
+  ```bash
+  grep -q 'Verified in' docs/adr/0001-release-workflow.md && echo "✅ ADR-0001 verified"
+  grep -q 'Verified in' docs/adr/0002-external-dependency.md && echo "✅ ADR-0002 verified"
+  ```
+
+---
+
 ### Custom tests (as applicable)
 
 - [ ] Added new static verification steps (grep-based) for new security fixes
 - [ ] Manually tested the change on a real device
 
 ### Manual test on a real device
-
-<!--
-  Very important! Automated tests are not enough for the Android environment.
-  Test on a real device (or emulator) if possible.
--->
 
 - [ ] Tested on a real Android device or emulator
 - [ ] **Android version**: <!-- e.g. Android 14 -->
@@ -785,35 +728,36 @@ Closes #
 
 ### Change-specific tests
 
-**If the change is in the WebUI:**
+**WebUI:**
 - [ ] Opened WebUI and confirmed no JS errors
 - [ ] Tested in both Arabic and English (bilingual)
 - [ ] Tested PWA install / reload
 - [ ] Tested SSE live updates
-- [ ] Tested dynamic links (with custom PORT / DASHBOARD_PORT)
-- [ ] Tested SW update-banner (both `index.html` and `dashboard.html`)
-- [ ] **(v1.3.0)** Verified the live status LED turns green when the DNS engine is ON and red when OFF
-- [ ] **(v1.4.0 → v1.5.0)** Verified the install button opens the install-method modal (not a direct `<a download>` link)
-- [ ] **(v1.5.0)** Verified the modal offers 3 actions: "Install locally" + "Open GitHub page" + "Direct download"
-- [ ] **(v1.5.0)** Verified `renderAllDynamic()` calls `renderCompanionButton()` and status area hooks
+- [ ] Tested dynamic links (custom PORT / DASHBOARD_PORT)
+- [ ] Tested SW update-banner (`index.html` and `dashboard.html`)
+- [ ] Verified live status LED turns green when DNS is ON and red when OFF
+- [ ] Verified install button opens the install-method modal (not a direct `<a download>` link)
+- [ ] Verified the modal offers 3 actions: local install + GitHub page + direct download
+- [ ] **v1.6.0**: Verified "Last update:" matches device clock (not UTC) in both EN and AR
 
-**If the change is in shell scripts:**
+**Shell scripts:**
 - [ ] Confirmed no new `shellcheck` warnings
 - [ ] Tested on a real device (if possible)
-- [ ] **v1.2.0**: Ran `make check-backup`
-- [ ] **(v1.3.0)** Verified the DNS auto-start-after-boot fix (log line `[v1.3.0 FIX]` in `dnscrypt_main.log`)
-- [ ] **(v1.3.0)** If the change touches `functions.sh:rotate_backups`, verified the SNAP-* / ROT-* semantics via `docs/REFERENCE.md` §5.2.4
+- [ ] Ran `make check-backup`
+- [ ] Verified the DNS auto-start-after-boot fix (log line `[v1.3.0 FIX]` in `dnscrypt_main.log`)
+- [ ] If `functions.sh:rotate_backups` touched: verified SNAP-* / ROT-* semantics via `docs/REFERENCE.md` §4.6
+- [ ] **v1.6.0**: If `lib/*.sh`, `boot-mini.sh`, or `functions.sh` touched: `make check-boot-mini` passes with all 6 modules + layer chain + no redefinition
 
-**If the change is in `install_app.sh` (v1.5.0):**
-- [ ] Verified the 5 cascade levels are all present
-- [ ] Verified the three-way trap (EXIT / INT / TERM) with exit codes 130 / 143
-- [ ] Verified the 75-second cascade deadline is enforced
+**`install_app.sh` (v1.5.0):**
+- [ ] Verified all 5 cascade levels present
+- [ ] Verified three-way trap (EXIT / INT / TERM) with exit codes 130 / 143
+- [ ] Verified 75-second cascade deadline is enforced
 - [ ] Verified `setenforce 0` is never called
-- [ ] Verified the Play Protect trap restores `$_VERIFIER_ORIG`
-- [ ] Tested direct CLI invocation: `su -c "sh install_app.sh"` — Ctrl+C returns 130, SIGTERM returns 143
-- [ ] Verified `/data/local/tmp/dnscrypt-companion.apk` is removed on every exit path
+- [ ] Verified Play Protect trap restores `$_VERIFIER_ORIG`
+- [ ] Tested CLI invocation: `su -c "sh install_app.sh"` — Ctrl+C returns 130, SIGTERM returns 143
+- [ ] Verified `/data/local/tmp/dnscrypt-companion.apk` removed on every exit path
 
-**If the change is in the firewalls:**
+**Firewalls:**
 - [ ] Checked `iptables -t nat -L DNSCRYPT_OUT -n`
 - [ ] Checked `ip6tables -t nat -L DNSCRYPT_OUT6 -n`
 - [ ] Confirmed `OUTPUT` has no orphans:
@@ -823,7 +767,7 @@ Closes #
   ```
 - [ ] Tested `stopService` and `startService` cleanly
 
-**If the change is in `STATUS_FILE` semantics:**
+**STATUS_FILE semantics:**
 - [ ] Confirmed `getStatusUncached` does not write `STATUS_FILE`
   ```bash
   awk '/func getStatusUncached/,/^}/' proxy/main.go | grep -q 'atomicWriteFile' && echo "⚠️ writes!" || echo "✅ read-only"
@@ -836,7 +780,7 @@ Closes #
   # Expected: true
   ```
 
-**If the change is in authentication:**
+**Authentication:**
 - [ ] Tested login / logout / session expiry
 - [ ] Tested rate limiting (5 attempts / 15 minutes)
 - [ ] Tested from IPv4 and IPv6 (`[::1]`)
@@ -853,29 +797,29 @@ Closes #
   done
   # Expected: 401 × 5 then 401 (locked)
   ```
-- [ ] **(v1.5.0)** Tested install token lifecycle: `GET /api?action=install_token` returns `{token, ttl: 60}`
-- [ ] **(v1.5.0)** Verified the token is one-shot: second use returns 401 `invalid_token`
-- [ ] **(v1.5.0)** Verified install rate limit: 6 rapid attempts → 429 on the 6th
+- [ ] Tested install token lifecycle: `GET /api?action=install_token` returns `{token, ttl: 60}`
+- [ ] Verified token is one-shot: second use returns 401 `invalid_token`
+- [ ] Verified install rate limit: 6 rapid attempts → 429 on the 6th
 
-**If the change is in `rebuildBlocklist` or `updateProfile` (RACE-1):**
+**`rebuildBlocklist` / `updateProfile` (RACE-1):**
 - [ ] Confirmed `rebuildMu.Lock()` present + `defer rebuildMu.Unlock()`
 - [ ] Tested concurrency manually (update + save simultaneously)
 - [ ] Confirmed no deadlock (30 s timeout is enough)
 
-**If the change is in `buildRuntimeInfo` or `runtime_info` (PORT-2 + MEM-1 + BAK-1):**
-- [ ] Confirmed `webui_port` + `dashboard_port` present in JSON response
+**`buildRuntimeInfo` / `runtime_info` (PORT-2 + MEM-1 + BAK-1):**
+- [ ] Confirmed `webui_port` + `dashboard_port` present in JSON
 - [ ] Confirmed `memory_limit_mb` + `profile_key` present
-- [ ] **v1.2.0**: Confirmed `backups` object with 7 fields:
+- [ ] Confirmed `backups` object with 7 fields:
   ```bash
   curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups | keys | length'
   # Expected: 7
   ```
-- [ ] **(v1.3.0)** Confirmed `backups.available` counts manifest-carrying directories only (SNAP-MANIFEST)
-- [ ] **(v1.3.0)** Confirmed `backups.last_backup_name` follows mtime (SNAP-MTIME)
+- [ ] Confirmed `backups.available` counts manifest-carrying directories only (SNAP-MANIFEST)
+- [ ] Confirmed `backups.last_backup_name` follows mtime (SNAP-MTIME)
 - [ ] Confirmed `index.html` uses `data.dashboard_port`
 - [ ] Confirmed `dashboard.html` uses `data.webui_port`
 
-**If the change is in `/api/metrics` or `parsePrometheus` (Fix #1 + MEM-3):**
+**`/api/metrics` / `parsePrometheus` (Fix #1 + MEM-3):**
 - [ ] Confirmed Content-Type:
   ```bash
   curl -s -I "http://127.0.0.1:9091/api/metrics" | grep Content-Type
@@ -888,7 +832,7 @@ Closes #
   ```
 - [ ] Tested Dashboard in browser (no "Cannot fetch data")
 
-**If the change is in the memory limit logic (MEM-1):**
+**Memory limit (MEM-1):**
 - [ ] Confirmed the limit adjusts when profile changes:
   ```bash
   echo "light" > /data/adb/modules/dnscrypt-proxy-webui/proxy/selected_profile.txt
@@ -898,8 +842,8 @@ Closes #
   # Expected: 80
   ```
 
-**If the change is in the backup layer (v1.2.0 — 10 defensive layers):**
-- [ ] Ran the backup flow end-to-end on a test device:
+**Backup layer (v1.2.0 — 10 defensive layers):**
+- [ ] Ran the backup flow end-to-end:
   ```bash
   su -c "sh /data/adb/modules/dnscrypt-proxy-webui/action.sh --backup"
   su -c "curl -s http://127.0.0.1:9090/api?action=runtime_info | jq '.backups.available'"
@@ -909,12 +853,12 @@ Closes #
 - [ ] Verified `status.sh --diagnose` produces a complete report
 - [ ] Verified the watchdog token file exists with mode `0600`
 
-**If the change is in the recovery mode (v1.2.0 — Layer 7):**
+**Recovery mode (v1.2.0 — Layer 7):**
 - [ ] Tested recovery trigger on a test device
 - [ ] Confirmed the trigger file is consumed after a successful restore
-- [ ] Verified the FIX-1 snapshot-and-reapply flow (`§[8a]` + `§[9]` + `§[9b2]`)
+- [ ] Verified the FIX-1 snapshot-and-reapply flow (`§[8]` + `§[12]` + `§[13]`)
 
-**If the change is in the DNS auto-start-after-boot (v1.3.0):**
+**DNS auto-start-after-boot (v1.3.0):**
 - [ ] Verified the fix on a test device:
   ```bash
   su -c "echo 'ON' > /data/adb/modules/dnscrypt-proxy-webui/proxy/run/dnscrypt.status"
@@ -925,18 +869,18 @@ Closes #
   # Expected: DNS=UP
   ```
 
-**If the change is in the rotation semantics (v1.3.0 — SNAP-* / ROT-*):**
+**Rotation semantics (v1.3.0 — SNAP-* / ROT-*):**
 - [ ] Verified SNAP-MANIFEST (manifest-less dir excluded)
 - [ ] Verified ROT-PROTECT (`.last_stable` preserved)
 - [ ] Verified parallel application (all consumers agree)
 - [ ] Cross-referenced `docs/REFERENCE.md` §4.6 for the authoritative semantics
 
-**If the change is in the Companion APK integration (v1.4.0):**
+**Companion APK integration (v1.4.0):**
 - [ ] Verified the APK is fetched and bundled
 - [ ] Verified the route serves the APK
 - [ ] Verified the route returns 404 when the APK is absent
 
-**If the change is in the Companion Install Flow (v1.5.0):**
+**Companion Install Flow (v1.5.0):**
 - [ ] Verified the full install flow on a test device:
   ```bash
   TOKEN=$(curl -s -b /tmp/cookies.txt \
@@ -951,23 +895,42 @@ Closes #
 - [ ] Verified Play Protect verifier was restored
 - [ ] Verified SELinux is still enforcing
 
-**If the change is in the CodeQL hardening (v1.4.0):**
+**CodeQL hardening (v1.4.0):**
 - [ ] Confirmed CodeQL analysis passes with no `go/path-injection` alerts
 - [ ] Tested `POST /api/remove_module` with various inputs
+
+**Timezone rendering (v1.6.0):**
+- [ ] Backend returns both fields:
+  ```bash
+  curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | \
+      jq '{last_update, last_update_unix}'
+  # Expected: both present; last_update_unix is an integer
+  ```
+- [ ] Unix converts to device local time:
+  ```bash
+  curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | \
+      jq -r '.last_update_unix' | xargs -I {} date -d @{}
+  date
+  # Both should match (same timezone)
+  ```
+- [ ] Tested across 2+ timezones (e.g., UTC, UTC+3, UTC-5, UTC+9)
+- [ ] Tested with Arabic toggle enabled (verify `ar-EG` renders Arabic numerals correctly)
+
+**Modular shell (v1.6.0):**
+- [ ] All 6 `lib/*.sh` modules load on boot
+- [ ] `boot-mini.sh` sources them in order
+- [ ] `functions.sh` sources `boot-mini.sh` without redefining Layer-0 primitives
+- [ ] `make check-boot-mini` passes
+- [ ] `make check-consistency` passes
 
 ---
 
 ## 🔒 Security Checklist
 
-<!--
-  Fill this section if the PR relates to security.
-  See SECURITY.md for full standards.
--->
-
 ### Basics
 
-- [ ] Code contains no hardcoded secrets (passwords, tokens, keys)
-- [ ] Contains no `console.log` or `fmt.Println` with sensitive data
+- [ ] No hardcoded secrets (passwords, tokens, keys)
+- [ ] No `console.log` or `fmt.Println` with sensitive data
 - [ ] Used `subtle.ConstantTimeCompare` for secret comparison (if applicable)
 - [ ] Applied `MaxBytesReader` on new POST bodies (if applicable)
 - [ ] Used `atomicWriteFile` / `atomicWriteStream` for writes (if applicable)
@@ -979,38 +942,38 @@ Closes #
 - [ ] Used `getClientIP(r)` to extract IP (not `strings.Split`)
 - [ ] Made `/api/auth/login` and `/api/auth/logout` POST-only (if applicable)
 - [ ] If a new rate limit was added, registered attempts in `loginAttempts`
-- [ ] **v1.2.0**: If adding an endpoint that needs watchdog auth, used `X-Watchdog-Token` + `verifyWatchdogToken()`
-- [ ] **v1.5.0**: If adding an install-family endpoint, applied the localhost gate (`isLocalRequest`) and either the one-shot CSRF token (`validateAndConsumeInstallToken`) or an explicit decision to require only the session
+- [ ] If adding an endpoint that needs watchdog auth, used `X-Watchdog-Token` + `verifyWatchdogToken()`
+- [ ] If adding an install-family endpoint, applied the localhost gate (`isLocalRequest`) and the one-shot CSRF token (`validateAndConsumeInstallToken`)
 
 ### Input Validation
 
-- [ ] If adding a port read, used `readConfPort` (with range check 1–65535)
+- [ ] If adding a port read, used `readConfPort` (range check 1–65535)
 - [ ] If using a dynamic shell command, used `shellQuote()`
 - [ ] If adding a new health endpoint, considered `isLocalRequest` (local-only)
-- [ ] **(v1.4.0)** If the PR routes a caller-provided path into any filesystem operation, used `filepath.Base()` sanitization + rebuilt the path from a trusted base (see `removeModule` for the canonical pattern)
-- [ ] **(v1.5.0)** If the PR runs an install, verified that `install_app.sh` uses a hardcoded APK path and `shellQuote()` on every argument
+- [ ] If routing a caller-provided path into any filesystem operation, used `filepath.Base()` + rebuilt from a trusted base (see `removeModule`)
+- [ ] If running an install, verified `install_app.sh` uses a hardcoded APK path and `shellQuote()` on every argument
 
 ### Firewall
 
 - [ ] Did not pollute `OUTPUT` / `INPUT` / `FORWARD` with dynamic rules
-- [ ] Used `DNSCRYPT_OUT` / `DNSCRYPT_OUT6` for the firewall
+- [ ] Used `DNSCRYPT_OUT` / `DNSCRYPT_OUT6`
 - [ ] Confirmed `--wait` on every `iptables` / `ip6tables` invocation
-- [ ] Tested `_legacy_cleanup_*` after upgrade from an older version
+- [ ] Tested legacy cleanup after upgrade from an older version
 
 ### Concurrency (RACE-1 + BAK-2)
 
 - [ ] Any operation modifying `ALLOWLIST` / `DENYLIST` / `BLOCKLIST` calls `rebuildBlocklist`
 - [ ] `rebuildBlocklist` is protected by `rebuildMu.Lock()` + `defer Unlock()`
 - [ ] No nested deadlock (never calls a function that locks the same mutex)
-- [ ] **v1.2.0**: Any new destructive operation on user data calls `createAutoBackup(reason)` first
-- [ ] **v1.2.0**: `backupMu` is used only via `createAutoBackup` — do NOT add a second mutex
-- [ ] **v1.2.0**: `backupMu` is held for at most `AUTO_BACKUP_TIMEOUT = 15 s`
-- [ ] **(v1.3.0)**: Any change to `buildBackupInfo` (main.go) or `rotate_backups` (functions.sh) keeps the SNAP-* / ROT-* semantics in sync across the module — see `docs/REFERENCE.md` §4.6
-- [ ] **(v1.5.0)**: If a new mutex is added for install-family state, documented its ordering relative to `installTokensMu`, `installAttemptsMu`, and `companionStateMutex`
+- [ ] Any new destructive operation on user data calls `createAutoBackup(reason)` first
+- [ ] `backupMu` is used only via `createAutoBackup` — no second mutex
+- [ ] `backupMu` is held for at most `AUTO_BACKUP_TIMEOUT = 15 s`
+- [ ] Any change to `buildBackupInfo` (main.go) or `rotate_backups` (functions.sh) keeps the SNAP-* / ROT-* semantics in sync — see `docs/REFERENCE.md` §4.6
+- [ ] If a new mutex is added for install-family state, documented its ordering relative to `installTokensMu`, `installAttemptsMu`, and `companionStateMutex`
 
 ### Memory (v1.1.0)
 
-- [ ] If adding a new profile, updated `MEMORY_LIMIT_*` in main.go
+- [ ] If adding a new profile, updated `MEMORY_LIMIT_*` in `main.go`
 - [ ] If adding a new profile, updated the inline fallback in all four shell scripts (`service.sh`, `action.sh`, `status.sh`, `watchdog.sh`)
 - [ ] If adding a new profile, updated `webui.conf` template in `customize.sh`
 - [ ] If adding a new profile, updated `web/index.html` `<select id="profileSelect">`
@@ -1019,50 +982,20 @@ Closes #
 
 - [ ] If adding a new preserved file:
   - [ ] Updated the `USER_FILES` list in **all 5** scripts: `customize.sh`, `functions.sh`, `service.sh`, `status.sh`, `uninstall.sh`
-  - [ ] Updated the "5 Preserved Files" table in `README.md`
+  - [ ] Updated `README.md` "5 Preserved Files" table
   - [ ] Updated `docs/REFERENCE.md` §4.2
 - [ ] If changing the rotation policy:
   - [ ] Updated the constant in **all 4** scripts: `customize.sh`, `functions.sh`, `service.sh`, `action.sh`
   - [ ] Updated `docs/REFERENCE.md` §4.6
-  - [ ] **(v1.3.0)** Aligned with the SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME + ROT-PROTECT semantics — see `docs/REFERENCE.md` §4.6
+  - [ ] Aligned with SNAP-MANIFEST + SNAP-MTIME + ROT-MANIFEST + ROT-MTIME + ROT-PROTECT
 - [ ] If changing the `runtime_info.backups` schema:
-  - [ ] Updated `buildBackupInfo()` in `main.go`
+  - [ ] Updated `buildBackupInfo()` in `proxy/main.go`
   - [ ] Kept `status.sh --json` in sync
   - [ ] Updated `docs/REFERENCE.md` §2.6.7
 - [ ] If adding a config migration:
   - [ ] Added it to `migrate_config()` in `customize.sh`
   - [ ] Updated `docs/GUIDE.md` §5
 - [ ] Confirmed the 10 defensive layers are still orthogonal to the firewall (see `docs/REFERENCE.md` §5.6.3)
-
-### Rotation semantics (v1.3.0)
-
-- [ ] If the PR touches `buildBackupInfo` (main.go):
-  - [ ] Verified SNAP-MANIFEST (`.manifest.json` presence)
-  - [ ] Verified SNAP-MTIME (`ModTime()` for newest selection)
-  - [ ] Cross-checked `functions.sh:rotate_backups` still agrees
-- [ ] If the PR touches `rotate_backups` (functions.sh):
-  - [ ] Verified ROT-MANIFEST (manifest-based detection)
-  - [ ] Verified ROT-MTIME (`sort -rn -k1,1`)
-  - [ ] Verified ROT-PROTECT (`.last_stable` + newest install preserved)
-  - [ ] Cross-checked the parallel helpers in `status.sh`, `watchdog.sh`, `customize.sh`, `action.sh`, `uninstall.sh`
-- [ ] If the PR touches `docs/REFERENCE.md` §4.6:
-  - [ ] Cross-checked `docs/REFERENCE.md` §4.6.5
-  - [ ] Cross-checked `CHANGELOG.md` §[v1.3.0]
-
-### Companion APK (v1.4.0)
-
-- [ ] If changing `proxy/app-apk.version`:
-  - [ ] Verified the format is `X.Y.Z` (no `v` prefix)
-  - [ ] Verified `make check-app-version` passes
-  - [ ] Verified the corresponding release exists in the sister repo [`gasciljh/dnscrypt-proxy-app`](https://github.com/gasciljh/dnscrypt-proxy-app)
-- [ ] If changing `scripts/fetch_app_apk.sh`:
-  - [ ] Verified it remains idempotent (cache hit on re-run)
-  - [ ] Verified the `--offline`, `--json`, `--force`, and `--version` flags still work
-  - [ ] Verified the SHA256 output is written next to the APK
-- [ ] If changing the `/app-debug.apk` route in `main.go`:
-  - [ ] Verified the 404 path (file absent) still works
-  - [ ] Verified the mime type is `application/vnd.android.package-archive`
-  - [ ] Verified the per-extension Cache-Control is applied
 
 ### Companion Install Flow (v1.5.0)
 
@@ -1075,15 +1008,45 @@ Closes #
   - [ ] Verified SELinux is still not disabled (`setenforce 0` absent)
   - [ ] Verified the Play Protect trap restores `$_VERIFIER_ORIG`
 - [ ] If changing the 4 install endpoints:
-  - [ ] Verified the localhost gate applies to all three surfaces (install, uninstall, install_token)
+  - [ ] Verified the localhost gate applies to all three surfaces
   - [ ] Verified the one-shot CSRF token has a 60 s TTL
   - [ ] Verified the per-IP rate limit is enforced (5 / 15 min)
   - [ ] Verified tokens are compared with `subtle.ConstantTimeCompare`
   - [ ] Verified `invalidateCompanionStateCache()` is called after every install/uninstall attempt (success or failure)
 - [ ] If changing the install-method modal (IDX-24):
-  - [ ] Verified the three actions remain: local install / open GitHub page / direct GitHub download
+  - [ ] Verified the three actions remain: local install / open GitHub page / direct download
   - [ ] Verified all GitHub URLs point at `gasciljh/dnscrypt-proxy-app`
   - [ ] Verified `_resetModalLayout()` is idempotent
+
+### Modular shell (v1.6.0)
+
+- [ ] If adding a new `lib/*.sh` module:
+  - [ ] Single responsibility per module
+  - [ ] No cross-module dependency (except documented sourcing order)
+  - [ ] `boot-mini.sh` sources it in the correct order
+  - [ ] `ci.yml` Step 9 updated to verify presence
+  - [ ] `customize.sh §[16]` critical-file check updated
+  - [ ] `docs/REFERENCE.md` §1.4, §1.6, §1.8 updated
+  - [ ] `docs/adr/0003-layered-bootstrap.md` §Extension updated
+- [ ] If changing `boot-mini.sh`:
+  - [ ] Remains an **aggregator only** — no business logic, no `case` chains
+  - [ ] `_MONITORING_UI_PORT` fallback (§[4]) preserved
+  - [ ] All 6 `lib/*.sh` modules still sourced
+- [ ] If changing `functions.sh`:
+  - [ ] Still sources `boot-mini.sh`
+  - [ ] Does not redefine any Layer-0 primitive
+  - [ ] No `_MONITORING_UI_PORT` assignment
+
+### Timezone rendering (v1.6.0)
+
+- [ ] If changing `buildProfileResponse` / `updateProfileBody`:
+  - [ ] Both `last_update` (RFC3339) and `last_update_unix` (int64) still emitted
+  - [ ] Both derived from the same `modTime`
+  - [ ] `lastUpdateUnixCache` updated alongside `lastUpdateCache`
+- [ ] If changing `index.html` / `dashboard.html`:
+  - [ ] `formatUnixTimestamp()` used for any timestamp rendering
+  - [ ] `toLocaleString()` locale follows `currentLang` (`ar-EG` / `en-US`)
+  - [ ] Fallback to `last_update` string when Unix field absent
 
 ### For security fixes
 
@@ -1094,7 +1057,7 @@ Closes #
 - [ ] Added HTML anchor `<a name="XXX"></a>` (if a new section was created)
 - [ ] Updated the Audit Corrections Registry in `SECURITY.md` §15
 
-### Global Edition (v1.2.0 — EN + AR)
+### Global Edition (EN + AR)
 
 - [ ] Any new user-facing string in the WebUI is present in **both** `translations.en` and `translations.ar`
 - [ ] The default language on first load is still **English**
@@ -1106,11 +1069,6 @@ Closes #
 
 ## 📖 Documentation
 
-<!--
-  Do not forget to update documentation — it is part of PR quality.
-  See docs/CONTRIBUTING.md §10.
--->
-
 - [ ] Updated `CHANGELOG.md` (auto-generated at release, but note it if relevant)
 - [ ] Updated `README.md` (if a new user-facing feature)
 - [ ] Updated `docs/REFERENCE.md` §2 (if an API change)
@@ -1121,18 +1079,21 @@ Closes #
 - [ ] Updated `docs/CONTRIBUTING.md` §5 or §11 (if a workflow change)
 - [ ] Added or updated an ADR in `docs/adr/` (if a non-trivial decision)
 - [ ] If reversing an ADR, created a new one that supersedes it (never edit the old)
-- [ ] Added / updated code comments (Go docstrings, shell comments)
 - [ ] If a new field was added to `runtime_info`, updated both `web/index.html` and `web/dashboard.html` translation tables (en + ar)
-- [ ] **v1.2.0**: If a backup-layer change, updated `docs/REFERENCE.md` §4 **and** `docs/GUIDE.md` §8
-- [ ] **v1.2.0**: If a language-toggle change, updated `docs/REFERENCE.md` §7.6
-- [ ] **(v1.3.0)** If a DNS auto-start-after-boot change, updated `docs/REFERENCE.md` §3.3 and `docs/GUIDE.md` §7
-- [ ] **(v1.3.0)** If a rotation-semantics change (SNAP-* / ROT-*), updated `docs/REFERENCE.md` §4.6 and `CHANGELOG.md` §[v1.3.0]
-- [ ] **(v1.4.0)** If a companion APK change, updated `README.md` §Optional Android App and `docs/REFERENCE.md` §7.8
-- [ ] **(v1.4.0)** If a `removeModule` change, updated `SECURITY.md` §5.34
-- [ ] **(v1.4.0)** If an iOS PWA removal change, updated `CHANGELOG.md` §[v1.4.0] Removed section
-- [ ] **(v1.5.0)** If a companion install flow change, updated `SECURITY.md` §5.36, `docs/REFERENCE.md` §3.12, `docs/REFERENCE.md` §2.7.14–§2.7.15, and `CHANGELOG.md` §[v1.5.0]
-- [ ] **(v1.5.0)** If a Layered Bootstrap change, updated `docs/REFERENCE.md` §1.4, `docs/adr/0003-layered-bootstrap.md`, and `CHANGELOG.md` §[v1.5.0]
-- [ ] **(v1.5.0)** If a `manifest.json` `x-note-*` change, updated `docs/REFERENCE.md` §7 and `CHANGELOG.md` §[v1.5.0]
+- [ ] If a backup-layer change, updated `docs/REFERENCE.md` §4 **and** `docs/GUIDE.md` §8
+- [ ] If a language-toggle change, updated `docs/REFERENCE.md` §7.6
+- [ ] If a DNS auto-start-after-boot change, updated `docs/REFERENCE.md` §3.3 and `docs/GUIDE.md` §7
+- [ ] If a rotation-semantics change (SNAP-* / ROT-*), updated `docs/REFERENCE.md` §4.6 and `CHANGELOG.md` §[v1.3.0]
+- [ ] If a companion APK change, updated `README.md` §Optional Android App and `docs/REFERENCE.md` §7.8
+- [ ] If a `removeModule` change, updated `SECURITY.md` §5.34
+- [ ] If an iOS PWA removal change, updated `CHANGELOG.md` §[v1.4.0] Removed section
+- [ ] If a companion install flow change, updated `SECURITY.md` §5.36, `docs/REFERENCE.md` §3.13, and `docs/REFERENCE.md` §2.7.14–§2.7.15
+- [ ] If a Layered Bootstrap change, updated `docs/REFERENCE.md` §1.4, `docs/adr/0003-layered-bootstrap.md`, and `CHANGELOG.md`
+- [ ] If a `manifest.json` `x-note-*` change, updated `docs/REFERENCE.md` §7 and `CHANGELOG.md`
+- [ ] **v1.6.0**: If a modular-shell change, updated `docs/REFERENCE.md` §1.4, §1.6, §1.8, and `docs/adr/0003-layered-bootstrap.md` §Extension
+- [ ] **v1.6.0**: If a timezone change, updated `docs/REFERENCE.md` §2.6.2 and §3.10
+- [ ] **v1.6.0**: If `buildBackupInfo` mtime sort changed, updated `docs/REFERENCE.md` §4.6.5
+- [ ] **v1.6.0**: If a PWA precache change, bumped `CACHE_VERSION` in `web/sw.js` and updated `docs/REFERENCE.md` §7.6
 
 ---
 
@@ -1149,7 +1110,7 @@ Closes #
 
 - [ ] Followed [Conventional Commits](https://www.conventionalcommits.org/) on every commit
 - [ ] Commit messages are clear and useful (no "WIP" or "fix stuff")
-- [ ] Reasonable number of commits (no 50 commits for a small PR)
+- [ ] Reasonable number of commits
 - [ ] No merge commits (`Merge branch 'main'`) — used `rebase` instead
 
 ### Code quality
@@ -1157,10 +1118,10 @@ Closes #
 - [ ] No dead code
 - [ ] No unjustified `TODO` or `FIXME`
 - [ ] No `fmt.Println` or `console.log` in production code
-- [ ] Names are clear (`userCount` not `uc`)
+- [ ] Names are clear
 - [ ] Comments on exported functions
 - [ ] Every error is handled (`if err != nil`) correctly
-- [ ] Used `defer unlock()` on every mutex (no forgotten unlock)
+- [ ] Used `defer unlock()` on every mutex
 
 ### Build verification
 
@@ -1168,27 +1129,28 @@ Closes #
 - [ ] `bash -n` clean on modified shell scripts
 - [ ] No hardcoded `/system/bin/sh` (use `getSystemShell()`)
 - [ ] No hardcoded `127.0.0.1` in HTML (use `window.location.hostname`)
-- [ ] **v1.2.0**: `make check-backup` passes (if backup layer touched)
-- [ ] **(v1.4.0)**: `make check-app-version` passes (if `app-apk.version` touched)
-- [ ] **(v1.5.0)**: `make check-install-app` passes (if `install_app.sh` touched)
-- [ ] **(v1.5.0)**: `make check-boot-mini` passes (if `boot-mini.sh` or `functions.sh` touched)
+- [ ] `make check-backup` passes (if backup layer touched)
+- [ ] `make check-app-version` passes (if `proxy/app-apk.version` touched)
+- [ ] `make check-install-app` passes (if `install_app.sh` touched)
+- [ ] `make check-boot-mini` passes (if `lib/*.sh`, `boot-mini.sh`, or `functions.sh` touched)
+- [ ] `make check-consistency` passes (no `proxy/*.sh` in docs; no `customize.sh §[2]` for `_MONITORING_UI_PORT`)
 
 ### Documentation
 
-- [ ] Reviewed every item in the "📖 Documentation" section above
+- [ ] Reviewed every item in the "📖 Documentation" section
 - [ ] No broken links in the updated documentation
 - [ ] Code examples in the documentation are correct (actually tested)
 
 ### Cleanliness
 
 - [ ] Removed all temporary files (`*.tmp`, `*.bak`, `scratch.*`)
-- [ ] No binary files uploaded without justification (exception: `web/app-debug.apk` in v1.4.0+, which is intentionally bundled)
-- [ ] No `.DS_Store` or `Thumbs.db` files
-- [ ] Reviewed `git diff` before pushing (no unintended changes)
+- [ ] No binary files uploaded without justification
+- [ ] No `.DS_Store` or `Thumbs.db`
+- [ ] Reviewed `git diff` before pushing
 - [ ] Confirmed no leftover `*.tmp_*` from `atomicWriteFile`
-- [ ] **v1.2.0**: No leftover `txn-*` / `orphan-txn-*` in the committed backup directory (those belong to runtime)
-- [ ] **(v1.4.0+)**: No leftover `dist/DNS-Proxy-v*.apk` committed (it is a build artifact)
-- [ ] **(v1.5.0)**: No leftover `web/app-debug.apk*` committed (they are gitignored via `.gitignore` §[20])
+- [ ] No leftover `txn-*` / `orphan-txn-*` in the committed backup directory
+- [ ] No leftover `dist/DNS-Proxy-v*.apk` committed
+- [ ] No leftover `web/app-debug.apk*` committed
 
 ---
 
@@ -1196,17 +1158,9 @@ Closes #
 
 <!--
   If the PR relates to the UI, attach images or GIFs.
-  For bug fixes: attach "before" and "after" images if possible.
-  For logic changes: no images needed.
-
-  v1.2.0: If the change touches the bilingual UI, attach BOTH
-  English and Arabic screenshots.
-
-  v1.4.0: If the change touches the companion APK integration, attach
-  a screenshot of the install button in the WebUI header.
-
-  v1.5.0: If the change touches the install-method modal (IDX-24),
-  attach a screenshot of all three actions across both categories.
+  For bug fixes: before / after.
+  For bilingual UI: BOTH English and Arabic screenshots.
+  For companion APK/install modal: screenshot of the header button and the install-method modal (3 actions).
 -->
 
 
@@ -1221,7 +1175,6 @@ Closes #
   - Trade-offs considered
   - Known limitations
   - Questions for the reviewer
-  - References (RFCs, OWASP, Netfilter docs, ...)
 -->
 
 
@@ -1231,24 +1184,14 @@ Closes #
 ## 🎯 Reviewer Suggestion
 
 <!--
-  Optional: if you want a specific review, mention it here.
+  If you want a specific review, mention it here.
 
-  v1.2.0: If the change touches the backup layer, consider requesting
-  a review from a Data Guardian badge holder (see docs/CONTRIBUTING.md §14).
-
-  v1.3.0: If the change touches rotation semantics (SNAP-* / ROT-*),
-  consider requesting a review from a contributor familiar with the
-  v1.3.0 refinements. See docs/REFERENCE.md §4.6 and §5.2.4 for the
-  verification procedure.
-
-  v1.4.0: If the change touches the companion APK integration,
-  consider requesting a review from a maintainer of the sister repo
-  gasciljh/dnscrypt-proxy-app.
-
-  v1.5.0: If the change touches the companion install flow, consider
-  requesting a review from a contributor who has verified the SELinux
-  staging + Play Protect trap path on a real device. See
-  SECURITY.md §5.36 and docs/REFERENCE.md §3.12.
+  • Data-preservation changes → Data Guardian badge holder (docs/CONTRIBUTING.md §14)
+  • Rotation-semantics changes (SNAP-* / ROT-*) → contributor familiar with the v1.3.0 refinements
+  • Companion APK integration → a maintainer of gasciljh/dnscrypt-proxy-app
+  • Companion install flow → a contributor who verified SELinux staging + Play Protect on a real device
+  • Modular shell (lib/) changes (v1.6.0) → a Modular Architect badge holder (docs/CONTRIBUTING.md §14.2)
+  • Timezone rendering changes (v1.6.0) → a Timezone Validator badge holder
 -->
 
 
@@ -1273,97 +1216,87 @@ Closes #
      │  Read docs/CONTRIBUTING.md §5 for the full explanation. │
      └─────────────────────────────────────────────────┘
 
-     • Ensure the PR references an Issue (if one exists)
-     • Review the diff one last time before pushing
-     • Test locally if possible
-     • Be ready to respond and adjust
-
      🎯 Quick verification commands (before pushing):
 
        make build                          # Go build for all 4 architectures
-       bash -n proxy/*.sh scripts/*.sh     # shell syntax check
+       bash -n *.sh lib/*.sh scripts/*.sh  # shell syntax check
        gofmt -l proxy/                     # Go format check
-       shellcheck --severity=warning proxy/*.sh scripts/*.sh
-       make check-backup                   # v1.2.0: backup shell validation
-       make check-app-version              # v1.4.0: companion APK version check
-       make check-install-app              # v1.5.0: install_app.sh validation
-       make check-boot-mini                # v1.5.0: Layer 0 / Layer 1 validation
+       shellcheck --severity=warning *.sh lib/*.sh scripts/*.sh
+       make check-backup                   # shell validation (all 16 scripts)
+       make check-app-version              # companion APK version check
+       make check-install-app              # install_app.sh validation
+       make check-boot-mini                # Layer 0/1/2 validation (v1.6.0)
+       make check-consistency              # docs path/version consistency (v1.6.0)
+       make check-all                      # full local validation suite
 
-     🎯 v1.1.0 extra checks (if main.go changed):
+     🎯 Quick subsystem checks (only if you touched that area):
 
+       # v1.1.0 (main.go)
        grep -q 'func memoryLimitForProfile' proxy/main.go && echo "✅ MEM-1"
        awk '/func shellQuote/,/^}/' proxy/main.go | grep -q "'{'" && echo "✅ MEM-2"
        awk '/func metricsProxyHandler/,/^}/' proxy/main.go | grep -q 'MONITORING_UI_PORT' && echo "✅ MEM-3"
 
-     🎯 v1.2.0 extra checks (if backup layer changed):
-
-       grep -q 'CANDIDATE_SOURCES' proxy/customize.sh && echo "✅ Layer 1"
-       grep -q 'PERSISTENT_BACKUP' proxy/customize.sh && echo "✅ Layer 2"
-       grep -q 'begin_transaction' proxy/customize.sh && echo "✅ Layer 4"
-       grep -q 'copy_with_context' proxy/customize.sh && echo "✅ Layer 6"
-       grep -q 'RECOVERY_TRIGGER' proxy/customize.sh && echo "✅ Layer 7"
+       # v1.2.0 (backup layer)
+       grep -q 'CANDIDATE_SOURCES' customize.sh && echo "✅ Layer 1"
+       grep -q 'begin_transaction' customize.sh && echo "✅ Layer 4"
        grep -q 'func createAutoBackup' proxy/main.go && echo "✅ BAK-2"
-       grep -q 'func buildBackupInfo' proxy/main.go && echo "✅ BAK-1"
        grep -q 'loadOrCreateWatchdogToken' proxy/main.go && echo "✅ WD-TOKEN"
-       grep -q 'swRegistration.waiting' web/index.html && echo "✅ FIX-2"
 
-     🎯 v1.3.0 extra checks (if service.sh / index.html / rotation changed):
-
-       grep -q 'v1.3.0 FIX' proxy/service.sh && echo "✅ DNS auto-start"
+       # v1.3.0 (boot/UI/rotation)
+       grep -q 'v1.3.0 FIX' service.sh && echo "✅ DNS auto-start"
        grep -q 'led-on' web/index.html && echo "✅ LED markup"
        awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q '.manifest.json' && echo "✅ SNAP-MANIFEST"
        awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'ModTime()' && echo "✅ SNAP-MTIME"
-       awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '.manifest.json' && echo "✅ ROT-MANIFEST"
-       awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q 'sort -rn -k1,1' && echo "✅ ROT-MTIME"
-       awk '/rotate_backups\(\)/,/^}/' proxy/functions.sh | grep -q '_protected' && echo "✅ ROT-PROTECT"
 
-     🎯 v1.4.0 extra checks (if companion APK / CodeQL / iOS changes):
-
+       # v1.4.0 (companion APK / CodeQL / iOS)
        grep -q 'APK_FILE' proxy/main.go && echo "✅ APK_FILE"
-       grep -q '/app-debug.apk' proxy/main.go && echo "✅ APK route"
-       grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ CodeQL sanitizer"
-       grep -q 'securejoin.SecureJoin' proxy/main.go && echo "✅ SecureJoin (ADR-0002)"
-       ! grep -qE '^\s*(function isIOSDevice|isIOSDevice\s*=)' web/index.html && echo "✅ iOS/JS removed"
-       test -f scripts/fetch_app_apk.sh && echo "✅ APK fetcher"
-       test -f proxy/app-apk.version && echo "✅ APK version file"
+       grep -q 'filepath.Base(modulePath)' proxy/main.go && echo "✅ CodeQL"
+       grep -q 'securejoin.SecureJoin' proxy/main.go && echo "✅ SecureJoin"
+       ! grep -qE '^\s*(function isIOSDevice|isIOSDevice\s*=)' web/index.html && echo "✅ iOS removed"
 
-     🎯 v1.5.0 extra checks (if companion install / Layered Bootstrap changed):
-
-       test -f proxy/install_app.sh && echo "✅ install_app.sh present"
-       test -f proxy/boot-mini.sh && echo "✅ boot-mini.sh present"
-       grep -q 'CASCADE_DEADLINE_SECONDS=75' proxy/install_app.sh && echo "✅ 75 s deadline"
+       # v1.5.0 (companion install flow)
+       grep -q 'CASCADE_DEADLINE_SECONDS=75' install_app.sh && echo "✅ 75 s deadline"
        grep -q 'INSTALL_TOKEN_TTL.*60' proxy/main.go && echo "✅ 60 s token TTL"
-       ! grep -v '^[[:space:]]*#' proxy/install_app.sh | grep -q 'setenforce 0' && echo "✅ no setenforce"
-       grep -q "trap '_cleanup_app; exit 130' INT" proxy/install_app.sh && echo "✅ INT trap exits 130"
-       grep -q "trap '_cleanup_app; exit 143' TERM" proxy/install_app.sh && echo "✅ TERM trap exits 143"
-       grep -q '_VERIFIER_ORIG' proxy/install_app.sh && echo "✅ trap restores verifier state"
-       grep -q 'boot-mini.sh' proxy/functions.sh && echo "✅ Layer 1 sources Layer 0"
-       grep -q 'Verify boot-mini.sh integration' .github/workflows/ci.yml && echo "✅ CI Step 9"
-       grep -q 'filepath-securejoin v0.7.0' proxy/go.mod && echo "✅ ADR-0002 pin"
+       ! grep -v '^[[:space:]]*#' install_app.sh | grep -q 'setenforce 0' && echo "✅ no setenforce"
+       grep -q '_VERIFIER_ORIG' install_app.sh && echo "✅ verifier restore"
+
+       # v1.6.0 (modular shell + timezone + mtime sort)
+       for M in constants fallbacks process http backup firewall; do
+           test -f lib/$M.sh && echo "✅ lib/$M.sh"
+       done
+       grep -q 'boot-mini.sh' functions.sh && echo "✅ Layer 2 → Layer 1"
+       grep -qE '^_MONITORING_UI_PORT="8080"' lib/constants.sh && echo "✅ SSOT"
+       awk '/func buildProfileResponse/,/^}/' proxy/main.go | grep -q 'last_update_unix' && echo "✅ backend timezone"
+       grep -q 'formatUnixTimestamp' web/index.html && echo "✅ frontend timezone"
+       awk '/func buildBackupInfo/,/^}/' proxy/main.go | grep -q 'ModTime().Before' && echo "✅ mtime sort"
+       V=$(cat VERSION); grep -q "const CACHE_VERSION = '$V'" web/sw.js && echo "✅ CACHE_VERSION=$V"
 
      📖 Documentation references:
 
        docs/CONTRIBUTING.md §5   - Branch strategy
        docs/CONTRIBUTING.md §7   - PR process
        docs/CONTRIBUTING.md §11  - Release process
-       docs/adr/README.md        - Architecture Decision Records
-       docs/adr/0002-external-dependency.md - External dependency — filepath-securejoin
-       docs/adr/0003-layered-bootstrap.md   - Layered Bootstrap
-       docs/CONTRIBUTING.md      - Contribution guide
-       SECURITY.md               - Security policy (§5.30–§5.36)
+       docs/adr/README.md        - Architecture Decision Records index
+       docs/adr/0002-external-dependency.md - filepath-securejoin policy
+       docs/adr/0003-layered-bootstrap.md   - Layered Bootstrap (3-layer, v1.6.0)
+       SECURITY.md §5.31–§5.37   - Security-relevant changes per version
        SECURITY.md §15           - Audit Corrections Registry
-       docs/REFERENCE.md §4.6    - v1.3.0 rotation semantics (authoritative)
-       docs/REFERENCE.md §3.12   - v1.5.0 backend additions
-       docs/REFERENCE.md §1.4    - Layered Bootstrap (v1.5.0)
-       docs/REFERENCE.md §3.12   - install_app.sh contract (v1.5.0)
-       docs/REFERENCE.md §4      - Backup system reference
-       docs/GUIDE.md §8          - Emergency recovery
-       docs/GUIDE.md §5          - Upgrade guide
+       docs/REFERENCE.md §1.4    - Layered Bootstrap
+       docs/REFERENCE.md §2.6.2  - get_profile response (timezone)
+       docs/REFERENCE.md §2.6.7  - runtime_info (backups schema)
+       docs/REFERENCE.md §3.10   - Timezone flow (v1.6.0)
+       docs/REFERENCE.md §3.13   - Companion install flow (v1.5.0)
+       docs/REFERENCE.md §4.6    - Rotation semantics (SNAP-* / ROT-*)
        docs/REFERENCE.md §5.2.4  - On-device SNAP-*/ROT-* verification
-       docs/REFERENCE.md §7      - Manifest technical notes (v1.5.0)
+       docs/REFERENCE.md §7      - Manifest x-note fields
+       docs/GUIDE.md §5          - Upgrade
+       docs/GUIDE.md §7          - Troubleshooting
+       docs/GUIDE.md §8          - Emergency recovery
+       docs/GUIDE.md §9          - Companion app
+       docs/MAP.md §1            - Documentation map (12 files)
 
-     Current version: v1.5.0
-     Last updated: 2026-10-19
+     Current version: v1.6.0
+     Last updated: 2026-11-12
 
      🎉 Thanks for your contribution! Every PR improves the project.
      ============================================================ -->

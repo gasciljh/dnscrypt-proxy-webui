@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — Bug Report Template
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -12,39 +12,42 @@
 #   • docs/GUIDE.md §10                 — FAQ
 #   • docs/GUIDE.md §7                  — troubleshooting
 #   • docs/REFERENCE.md §4              — backup system
+#   • docs/REFERENCE.md §4.6.5          — SNAP-*/ROT-* rules
+#   • docs/REFERENCE.md §5.9.1          — on-device SNAP-*/ROT-* verification
 #   • docs/GUIDE.md §8                  — emergency recovery
 #   • docs/REFERENCE.md §2              — HTTP API
-#   • docs/REFERENCE.md §3              — v1.3.0 SNAP-*/ROT-*
-#   • docs/REFERENCE.md §1.4            — Layered Bootstrap (v1.5.0)
-#   • docs/REFERENCE.md §3.12           — install_app.sh contract (v1.5.0)
+#   • docs/REFERENCE.md §1.4            — Layered Bootstrap (3-layer, v1.6.0)
+#   • docs/REFERENCE.md §3.10           — timezone flow (v1.6.0)
+#   • docs/REFERENCE.md §3.13           — install_app.sh flow (v1.5.0)
 #   • docs/REFERENCE.md §5              — device/ROM matrix
-#   • docs/adr/0002-external-dependency.md (v1.5.0)
-#   • docs/adr/0003-layered-bootstrap.md   (v1.5.0)
+#   • docs/adr/0002-external-dependency.md
+#   • docs/adr/0003-layered-bootstrap.md   (3-layer model — v1.6.0)
 #   • .github/workflows/ci.yml          — companion app metadata step
 #   • CHANGELOG.md                      — version history
 # ============================================================
-# v1.5.0 additions:
-#   • "Latest version" checkbox references v1.5.0.
-#   • New optional section "📲 v1.5.0 — Companion Install
-#     Diagnostics" with five fields:
-#       - Install-token issuance status (60 s TTL, one-shot)
-#       - 5-level cascade outcome (strategy 1..5)
-#       - HTTP status from /api/install_companion_app
-#       - SELinux staging state (/data/local/tmp/dnscrypt-companion.apk)
-#       - Play Protect verifier restore state
-#   • New optional section "🧩 v1.5.0 — Layered Bootstrap"
+# v1.6.0 additions:
+#   • "Latest version" checkbox references v1.6.0.
+#   • New optional section "🕐 v1.6.0 — Timezone Rendering" with
+#     three fields (last_update_unix presence, formatUnixTimestamp
+#     helper, toLocaleString locale behavior).
+#   • New optional section "🧩 v1.6.0 — Modular Shell (lib/)"
+#     with four fields (6 modules present, boot-mini sources them,
+#     functions sources boot-mini, _MONITORING_UI_PORT canonical).
+#   • New optional section "💾 v1.6.0 — buildBackupInfo mtime sort"
 #     with two fields.
-#   • Updated WebUI install-button hint (install-method modal,
-#     IDX-24).
-#   • New ADR references: ADR-0002 (external dependency) and
-#     ADR-0003 (Layered Bootstrap).
-#   • No new audit corrections — v1.5.0 is a feature release.
-#     Audit Corrections Registry remains at #33.
-# ============================================================
-# v1.5.0 — POST-AUDIT FIXES:
-#   🔧 IHV-1 — Added v1.5.0 Companion Install Diagnostics section.
-#   🔧 IHV-2 — Added v1.5.0 Layered Bootstrap section.
-#   🔧 IHV-3 — Updated "Audit Corrections Registry" note.
+#   • New optional section "📦 v1.6.0 — PWA cache bump".
+#   • New optional section "🔢 v1.6.0 — DNS version bump".
+#   • v1.5.0 Layered Bootstrap section updated to reflect the
+#     3-layer model (lib/*.sh + boot-mini + functions).
+#   • Fixed: `proxy/boot-mini.sh` → `boot-mini.sh` (RC-1 fix; the
+#     script is at the repo root since v1.6.0).
+#   • Fixed: `docs/REFERENCE.md §3.12` → §3.13 (install_app flow).
+#   • Fixed: `docs/REFERENCE.md §3` (SNAP-*/ROT-*) → §4.6.5.
+#   • Fixed: `docs/REFERENCE.md §5.2.4` → §5.9.1.
+#   • Fixed: `SECURITY.md §5.31–§5.36` → §5.31–§5.37.
+#   • No new audit corrections — v1.6.0 is a release addition
+#     to a runtime feature set. Audit Corrections Registry
+#     remains at #33.
 # ============================================================
 
 name: 🐛 Bug Report
@@ -70,7 +73,7 @@ body:
         - Checked [docs/REFERENCE.md §4 (Backup)](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system)
         - Checked [docs/GUIDE.md §8 (Emergency Recovery)](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery)
         - Searched [existing Issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues?q=is%3Aissue)
-        - Are running the **latest version** of the module (v1.5.0)
+        - Are running the **latest version** of the module (v1.6.0)
 
         ---
 
@@ -86,11 +89,11 @@ body:
       label: ✅ Pre-flight checks
       description: All items must be confirmed to continue
       options:
-        - label: I have read FAQ.md, TROUBLESHOOTING.md, BACKUP.md, and EMERGENCY.md
+        - label: I have read the FAQ, Troubleshooting, Backup, and Emergency Recovery sections of the docs
           required: true
         - label: I searched existing Issues and did not find the same problem
           required: true
-        - label: I am running the latest version of the module (v1.5.0)
+        - label: I am running the latest version of the module (v1.6.0)
           required: true
         - label: This is not a security vulnerability (otherwise I would use Private Reporting)
           required: true
@@ -107,9 +110,9 @@ body:
       description: A clear and concise description of the problem. What happened? What did you expect?
       placeholder: |
         Example:
-        After updating the module to v1.5.0, the WebUI stopped working.
-        When opening http://127.0.0.1:9090, a blank page appears.
-        I expected the main interface with the service status.
+        After updating the module to v1.6.0, the WebUI "Last update:"
+        field shows the wrong time (UTC instead of my local timezone).
+        I expected the timestamp to match my device clock.
     validations:
       required: true
 
@@ -122,11 +125,11 @@ body:
       label: 🔁 Steps to reproduce
       description: How can the problem be reproduced? Be as specific as possible.
       placeholder: |
-        1. Install the module v1.5.0 from Magisk
+        1. Install the module v1.6.0 from Magisk
         2. Reboot the device
         3. Open the WebUI from the Action button
-        4. Click "Install App" in the header
-        5. Choose "Install locally"
+        4. Note the "Last update:" timestamp
+        5. Compare with `date` in a terminal
         6. ...
       value: |
         1.
@@ -143,7 +146,7 @@ body:
     attributes:
       label: ✅ Expected behavior
       description: What should happen?
-      placeholder: 'Example: the companion app should be installed via the 5-level cascade and the button should show "✅ Installed"'
+      placeholder: 'Example: the "Last update:" field should match the device clock (e.g. 07:03:46 in UTC+3)'
     validations:
       required: true
 
@@ -155,7 +158,7 @@ body:
     attributes:
       label: ❌ Actual behavior
       description: What actually happens? (attach error messages if any)
-      placeholder: 'Example: the button shows "❌ Install failed" and the log says "all strategies failed"'
+      placeholder: 'Example: the field shows 04:03:46 — 3 hours behind my device clock'
     validations:
       required: true
 
@@ -193,8 +196,8 @@ body:
     id: module_version
     attributes:
       label: 🏷️ Module version
-      description: 'From `module.prop` or `status.sh` — example: v1.5.0'
-      placeholder: 'v1.5.0'
+      description: 'From `module.prop` or `status.sh` — example: v1.6.0'
+      placeholder: 'v1.6.0'
     validations:
       required: true
 
@@ -238,7 +241,7 @@ body:
     id: root_solution
     attributes:
       label: 🔓 Root solution
-      description: Which Root tool are you using?
+      description: Which root tool are you using?
       options:
         - Magisk
         - Magisk Delta
@@ -298,17 +301,6 @@ body:
         > ```bash
         > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.profile'
         > ```
-        >
-        > ⚠️ The HTTP endpoint (`/api?action=runtime_info`) requires
-        > credentials. If you prefer to query it directly, use:
-        > ```bash
-        > CREDS=/data/local/tmp/dnscrypt_credentials.txt
-        > USER=$(grep '^Username:' "$CREDS" | awk '{print $2}')
-        > PASS=$(grep '^Password:' "$CREDS" | awk '{print $2}')
-        > curl -s -u "$USER:$PASS" \
-        >   'http://127.0.0.1:9090/api?action=runtime_info' | \
-        >   jq '{profile_key, memory_limit_mb}'
-        > ```
 
   - type: input
     id: active_profile
@@ -342,15 +334,10 @@ body:
         > problems**, **recovery mode**, or **orphan transactions**,
         > please fill in the fields below.
         >
-        > ```bash
-        > su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
-        > ```
-        >
         > **⚠️ v1.3.0 semantics apply**: `backups.available` counts
         > directories that contain a `.manifest.json` (SNAP-MANIFEST);
         > `backups.last_backup_name` is selected by mtime (SNAP-MTIME).
-        > The `.last_stable` target and the newest install snapshot are
-        > protected from pruning (ROT-PROTECT).
+        > See `docs/REFERENCE.md §4.6.5`.
 
   - type: input
     id: backup_count
@@ -366,7 +353,7 @@ body:
     attributes:
       label: 🎯 Last stable snapshot
       description: 'From `cat /sdcard/dnscrypt-webui-backup/.last_stable` — protected from pruning by ROT-PROTECT.'
-      placeholder: '20261013-095826-v1.5.0-12345'
+      placeholder: '20261112-095826-v1.6.0-12345'
     validations:
       required: false
 
@@ -401,9 +388,9 @@ body:
         {
           "upgrades": [
             {
-              "from": "v1.4.0",
-              "to": "v1.5.0",
-              "date": "2026-10-13T10:30:00Z",
+              "from": "v1.5.0",
+              "to": "v1.6.0",
+              "date": "2026-11-12T10:30:00Z",
               "source": "/data/adb/modules/dnscrypt-proxy-webui/proxy",
               "files": 5
             }
@@ -415,93 +402,7 @@ body:
       required: false
 
 # ============================================================
-# [10b] v1.5.0 — Layered Bootstrap diagnostics
-# ============================================================
-  - type: markdown
-    attributes:
-      value: |
-        ## 🧩 v1.5.0 — Layered Bootstrap (Layer 0 / Layer 1)
-
-        > **Since v1.5.0 (Phase 0)**: the module's shell library is
-        > split into **Layer 0** (`proxy/boot-mini.sh` — 5 primitives
-        > + `_MONITORING_UI_PORT`) and **Layer 1** (`proxy/functions.sh`
-        > — every other helper). Layer 1 sources Layer 0 at load time.
-        > See [ADR-0003](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/0003-layered-bootstrap.md).
-        >
-        > If your issue relates to **shell scripts**, **status.sh**,
-        > **action.sh**, **watchdog.sh**, or **boot-time failures**,
-        > fill in the two fields below.
-
-  - type: dropdown
-    id: layer0_present
-    attributes:
-      label: 🧩 Layer 0 file present?
-      description: 'Run: `su -c "test -f /data/adb/modules/dnscrypt-proxy-webui/boot-mini.sh && echo present || echo missing"`'
-      options:
-        - 'Yes — boot-mini.sh is present'
-        - 'No — boot-mini.sh is missing'
-        - '❓ Not sure — did not check'
-    validations:
-      required: false
-
-  - type: input
-    id: layer1_sources_layer0
-    attributes:
-      label: 🧩 Layer 1 sources Layer 0?
-      description: 'Run: `su -c "grep -c boot-mini.sh /data/adb/modules/dnscrypt-proxy-webui/functions.sh"` — expected: ≥ 1'
-      placeholder: '1'
-    validations:
-      required: false
-
-# ============================================================
-# [11] v1.4.0 — Companion APK route diagnostics
-# ============================================================
-  - type: markdown
-    attributes:
-      value: |
-        ## 📱 v1.4.0 — Companion APK Route
-
-        > **Since v1.4.0**: the companion Android app
-        > (`web/app-debug.apk`) is served at `GET /app-debug.apk`.
-        > This route remains reachable as a **fallback** when the
-        > v1.5.0 local install cascade fails.
-        >
-        > ⚠️ The APK is **optional**: local developer builds may omit
-        > it; the installer succeeds with or without it; a missing
-        > APK produces a 404 on `/app-debug.apk`.
-
-  - type: dropdown
-    id: companion_apk_installed
-    attributes:
-      label: 📲 Companion app installed on this device?
-      options:
-        - 'Yes — installed and working'
-        - 'Yes — installed but not working'
-        - 'No — using the WebUI in a browser'
-        - '❓ Not sure'
-    validations:
-      required: false
-
-  - type: input
-    id: companion_apk_route_status
-    attributes:
-      label: 🌐 `/app-debug.apk` route status
-      description: 'Run: `curl -sI http://127.0.0.1:9090/app-debug.apk | head -1` — expected: 200 (APK present) or 404 (OPTIONAL)'
-      placeholder: 'HTTP/1.1 200 OK'
-    validations:
-      required: false
-
-  - type: input
-    id: companion_app_version
-    attributes:
-      label: 🏷️ Companion app version (if present)
-      description: 'From `cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version` — expected: X.Y.Z'
-      placeholder: '1.0.0'
-    validations:
-      required: false
-
-# ============================================================
-# [11b] v1.5.0 — Companion Install Diagnostics
+# [10b] v1.5.0 — Companion install diagnostics
 # ============================================================
   - type: markdown
     attributes:
@@ -516,7 +417,6 @@ body:
         >
         > **Failure modes** specific to this flow:
         >   • **HTTP 401** — one-shot CSRF token expired (60 s TTL).
-        >     Try again.
         >   • **HTTP 403** — non-localhost request (install is
         >     localhost-only).
         >   • **HTTP 429** — 5 failed attempts in 15 min (per-IP
@@ -605,6 +505,274 @@ body:
       required: false
 
 # ============================================================
+# [10c] v1.6.0 — Timezone Rendering Diagnostics
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 🕐 v1.6.0 — Timezone Rendering
+
+        > **Since v1.6.0**: the WebUI displays "Last update:" using
+        > the **device's local timezone** (via `toLocaleString()`)
+        > instead of raw UTC. The backend emits `last_update_unix`
+        > (integer epoch seconds) alongside `last_update` (RFC3339
+        > UTC fallback). Both are derived from the same `modTime`.
+        >
+        > If your issue relates to **timestamps**, **UTC display**,
+        > **wrong timezone**, **null timestamps**, or **the field
+        > never updating**, fill in the three fields below.
+        >
+        > See `docs/REFERENCE.md §3.10` for the full flow.
+
+  - type: input
+    id: tz_last_update_unix
+    attributes:
+      label: 🕐 `last_update_unix` value
+      description: 'From `curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | jq .last_update_unix` — expected: a large integer (e.g. 1794456226)'
+      placeholder: '1794456226'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: tz_helper_present
+    attributes:
+      label: 🕐 `formatUnixTimestamp()` helper present?
+      description: 'Run: `grep -c "formatUnixTimestamp" /data/adb/modules/dnscrypt-proxy-webui/web/index.html` — expected: ≥ 2'
+      options:
+        - 'Yes — the helper is present in index.html'
+        - 'No — the helper is missing (module was not upgraded properly)'
+        - '❓ Not sure — did not check'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: tz_locale_behavior
+    attributes:
+      label: 🕐 Locale behavior in the browser
+      description: 'Does the timestamp use the correct locale and timezone?'
+      options:
+        - 'Yes — matches device clock in both EN and AR'
+        - 'No — shows UTC time instead of local time'
+        - 'No — shows `null` or `undefined`'
+        - 'Partially — works in EN but not in AR (or vice versa)'
+        - '❓ Not sure — did not test both languages'
+    validations:
+      required: false
+
+  - type: input
+    id: tz_device_timezone
+    attributes:
+      label: 🕐 Device timezone
+      description: 'From `date +%Z` or `getprop persist.sys.timezone` — example: Asia/Aden, Europe/Berlin, UTC'
+      placeholder: 'Asia/Aden'
+    validations:
+      required: false
+
+# ============================================================
+# [10d] v1.6.0 — Modular Shell (lib/) Diagnostics
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 🧩 v1.6.0 — Modular Shell (`lib/`)
+
+        > **Since v1.6.0**: the shell code is split into 3 layers:
+        >   • **Layer 0** — `lib/*.sh` (6 single-purpose modules)
+        >   • **Layer 1** — `boot-mini.sh` (aggregator)
+        >   • **Layer 2** — `functions.sh` (orchestrator)
+        >
+        > See `docs/adr/0003-layered-bootstrap.md` §Extension and
+        > `docs/REFERENCE.md §1.4`.
+        >
+        > If your issue relates to **shell scripts**, **boot
+        > failures**, **status.sh**, **action.sh**, or **watchdog**,
+        > fill in the four fields below.
+        >
+        > **All scripts live at the module root** (`$MODDIR/`),
+        > NOT under `proxy/`. `lib/*.sh` lives at `$MODDIR/lib/`.
+
+  - type: input
+    id: lib_modules_count
+    attributes:
+      label: 🧩 `lib/*.sh` modules present
+      description: 'Run: `su -c "ls /data/adb/modules/dnscrypt-proxy-webui/lib/*.sh | wc -l"` — expected: 6'
+      placeholder: '6'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: layer0_present
+    attributes:
+      label: 🧩 Layer 1 file present? (`boot-mini.sh`)
+      description: 'Run: `su -c "test -f /data/adb/modules/dnscrypt-proxy-webui/boot-mini.sh && echo present || echo missing"`'
+      options:
+        - 'Yes — boot-mini.sh is present at $MODDIR/'
+        - 'No — boot-mini.sh is missing'
+        - '❓ Not sure — did not check'
+    validations:
+      required: false
+
+  - type: input
+    id: layer2_sources_layer1
+    attributes:
+      label: 🧩 Layer 2 sources Layer 1?
+      description: 'Run: `su -c "grep -c boot-mini.sh /data/adb/modules/dnscrypt-proxy-webui/functions.sh"` — expected: ≥ 1'
+      placeholder: '1'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: monitoring_ui_port_canonical
+    attributes:
+      label: 🧩 `_MONITORING_UI_PORT` source of truth
+      description: 'Run: `su -c "grep -c _MONITORING_UI_PORT /data/adb/modules/dnscrypt-proxy-webui/lib/constants.sh"` — expected: 1'
+      options:
+        - 'Yes — canonical definition is in lib/constants.sh'
+        - 'No — the definition is missing or duplicated'
+        - '❓ Not sure — did not check'
+    validations:
+      required: false
+
+# ============================================================
+# [10e] v1.6.0 — buildBackupInfo mtime sort
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 💾 v1.6.0 — `buildBackupInfo` mtime sort
+
+        > **Since v1.6.0**: `buildBackupInfo()` in `main.go` sorts
+        > snapshots by `ModTime()` (numeric, descending) — aligned
+        > with `rotate_backups()` and `status.sh`. Before v1.6.0 the
+        > API sorted by directory name, which could disagree with
+        > the shell tools when two snapshots shared a name prefix
+        > but had different mtimes.
+        >
+        > If your issue relates to **"latest backup" showing the
+        > wrong snapshot**, or **API vs status.sh disagreement**,
+        > fill in the two fields below.
+
+  - type: input
+    id: mtime_api_last_backup
+    attributes:
+      label: 💾 `last_backup_name` from API
+      description: 'From `curl -s .../api?action=runtime_info | jq -r .backups.last_backup_name`'
+      placeholder: '20261112-150000-manual-12345'
+    validations:
+      required: false
+
+  - type: input
+    id: mtime_status_last_backup
+    attributes:
+      label: 💾 `last_backup_name` from status.sh
+      description: 'From `su -c "sh status.sh --json" | jq -r .backups.last_backup_name` — must MATCH the API value'
+      placeholder: '20261112-150000-manual-12345'
+    validations:
+      required: false
+
+# ============================================================
+# [10f] v1.6.0 — PWA cache bump
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 📦 v1.6.0 — PWA Cache Bump
+
+        > **Since v1.6.0**: `CACHE_VERSION` in `web/sw.js` was bumped
+        > to `v1.6.0`. This forces existing PWA installs to discard
+        > the old cache and re-fetch assets — necessary so the
+        > timezone fix reaches clients.
+        >
+        > If your issue relates to **the WebUI showing old
+        > content**, **the "Update available" banner**, or **the
+        > timezone fix not applying**, fill in the field below.
+
+  - type: dropdown
+    id: pwa_cache_state
+    attributes:
+      label: 📦 PWA cache state
+      options:
+        - 'Yes — I reloaded via the "Update available" banner'
+        - 'No — the banner never appeared'
+        - 'Yes — I cleared site data manually'
+        - '❓ Not sure — I use the WebUI in a regular browser tab'
+    validations:
+      required: false
+
+# ============================================================
+# [10g] v1.6.0 — DNS version bump
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 🔢 v1.6.0 — DNS Version Bump
+
+        > **Since v1.6.0**: `proxy/dnscrypt-proxy.version` was bumped
+        > from `2.1.18` to `2.1.20`. This is a build-visible change
+        > (new upstream engine binaries ship in the module ZIP),
+        > independent of the module version.
+        >
+        > If your issue relates to **DNS resolution**, **resolver
+        > behavior**, or **upstream compatibility**, fill in the
+        > field below.
+
+  - type: input
+    id: dns_version
+    attributes:
+      label: 🔢 DNS engine version
+      description: 'From `cat /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.version` — expected: 2.1.20'
+      placeholder: '2.1.20'
+    validations:
+      required: false
+
+# ============================================================
+# [11] v1.4.0 — Companion APK route diagnostics
+# ============================================================
+  - type: markdown
+    attributes:
+      value: |
+        ## 📱 v1.4.0 — Companion APK Route
+
+        > **Since v1.4.0**: the companion Android app
+        > (`web/app-debug.apk`) is served at `GET /app-debug.apk`.
+        > This route remains reachable as a **fallback** when the
+        > v1.5.0 local install cascade fails.
+        >
+        > ⚠️ The APK is **optional**: local developer builds may omit
+        > it; the installer succeeds with or without it; a missing
+        > APK produces a 404 on `/app-debug.apk`.
+
+  - type: dropdown
+    id: companion_apk_installed
+    attributes:
+      label: 📲 Companion app installed on this device?
+      options:
+        - 'Yes — installed and working'
+        - 'Yes — installed but not working'
+        - 'No — using the WebUI in a browser'
+        - '❓ Not sure'
+    validations:
+      required: false
+
+  - type: input
+    id: companion_apk_route_status
+    attributes:
+      label: 🌐 `/app-debug.apk` route status
+      description: 'Run: `curl -sI http://127.0.0.1:9090/app-debug.apk | head -1` — expected: 200 (APK present) or 404 (OPTIONAL)'
+      placeholder: 'HTTP/1.1 200 OK'
+    validations:
+      required: false
+
+  - type: input
+    id: companion_app_version
+    attributes:
+      label: 🏷️ Companion app version (if present)
+      description: 'From `cat /data/adb/modules/dnscrypt-proxy-webui/proxy/app-apk.version` — expected: X.Y.Z'
+      placeholder: '1.0.0'
+    validations:
+      required: false
+
+# ============================================================
 # [12] Logs (optional but very useful)
 # ============================================================
   - type: markdown
@@ -635,23 +803,22 @@ body:
       description: 'Last 50 lines from `/data/local/tmp/dnscrypt_main.log`'
       placeholder: |
         ```
-        [2026-10-13T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.5.0
-        [2026-10-13T10:30:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
-        [2026-10-13T10:30:00Z] 🆕 v1.2.0: data-preservation layers active
-        [2026-10-13T10:30:00Z] 💾 v1.2.0: persistent backup dir = /sdcard/dnscrypt-webui-backup
-        [2026-10-13T10:30:00Z] 🆕 v1.3.0: buildBackupInfo — SNAP-MANIFEST + SNAP-MTIME
-        [2026-10-13T10:30:00Z] 🆕 v1.3.0: service.sh — boot-path DNS auto-start
-        [2026-10-13T10:30:00Z] 🔧 v1.4.0: currentLogLevel loaded right after initPaths (MAIN-01)
-        [2026-10-13T10:30:00Z] 🆕 v1.4.0: CodeQL path-injection fix in removeModule
-        [2026-10-13T10:30:00Z] 🆕 v1.4.0: iOS PWA logic removed
-        [2026-10-13T10:30:00Z] 🧩 v1.5.0: Layer 0 loaded (boot-mini.sh — 5 primitives + constant)
-        [2026-10-13T10:30:00Z] 🧩 v1.5.0: Layer 1 loaded (functions.sh — sources boot-mini.sh)
-        [2026-10-13T10:30:00Z] 📱 v1.5.0: companion install endpoints registered (4)
-        [2026-10-13T10:30:00Z] 🔐 v1.5.0: install token TTL = 60s (one-shot, localhost-only)
-        [2026-10-13T10:30:00Z] 🌐 v1.5.0: HTTP_WRITE_TIMEOUT = 150s (> INSTALL_TIMEOUT 90s)
-        [2026-10-13T10:30:00Z] 🔧 v1.5.0: MAIN-REENT-01 — logger three-layer split
-        [2026-10-13T10:30:00Z] 🔧 v1.5.0: MAIN-PORTCACHE-01 — port cache (30s TTL)
-        [2026-10-13T10:30:01Z] 📋 LOG_LEVEL=info
+        [2026-11-12T10:30:00Z] 🚀 Starting DNSCrypt WebUI v1.6.0
+        [2026-11-12T10:30:00Z] 🧠 v1.1.0: dynamic memory limit — profile=pro, limit=120 MB
+        [2026-11-12T10:30:00Z] 🆕 v1.2.0: data-preservation layers active
+        [2026-11-12T10:30:00Z] 💾 v1.2.0: persistent backup dir = /sdcard/dnscrypt-webui-backup
+        [2026-11-12T10:30:00Z] 🆕 v1.3.0: buildBackupInfo — SNAP-MANIFEST + SNAP-MTIME
+        [2026-11-12T10:30:00Z] 🔧 v1.4.0: currentLogLevel loaded right after initPaths (MAIN-01)
+        [2026-11-12T10:30:00Z] 🧩 v1.5.0: Layer 0/1 — 5 primitives + _MONITORING_UI_PORT
+        [2026-11-12T10:30:00Z] 📱 v1.5.0: companion install endpoints registered (4)
+        [2026-11-12T10:30:00Z] 🔐 v1.5.0: install token TTL = 60s (one-shot, localhost-only)
+        [2026-11-12T10:30:00Z] 🌐 v1.5.0: HTTP_WRITE_TIMEOUT = 150s (> INSTALL_TIMEOUT 90s)
+        [2026-11-12T10:30:00Z] 🆕 v1.6.0: Modular shell — 6 lib/*.sh modules loaded (Layer 0)
+        [2026-11-12T10:30:00Z] 🆕 v1.6.0: boot-mini.sh — 3-layer chain OK
+        [2026-11-12T10:30:00Z] 🕐 v1.6.0: timezone-aware timestamps (last_update_unix)
+        [2026-11-12T10:30:00Z] 💾 v1.6.0: buildBackupInfo mtime sort — aligned with rotate_backups
+        [2026-11-12T10:30:00Z] 📦 v1.6.0: PWA CACHE_VERSION bumped to v1.6.0
+        [2026-11-12T10:30:00Z] 🔢 v1.6.0: DNS engine version 2.1.20 (was 2.1.18)
         ...
         ```
       render: shell
@@ -666,7 +833,7 @@ body:
       placeholder: |
         ```json
         {
-          "version": "v1.5.0",
+          "version": "v1.6.0",
           "dns_engine": {"running": true, "port": 5354},
           "webui": {"running": true, "port": 9090},
           "profile": {"key": "pro", "name": "PRO", "memory_limit_mb": 120},
@@ -675,10 +842,10 @@ body:
             "available": 7,
             "in_flight_txn": 0,
             "orphan_txn": 0,
-            "last_backup": "2026-10-13 15:00:00",
-            "last_backup_name": "20261013-150000-manual-12345",
+            "last_backup": "2026-11-12 15:00:00",
+            "last_backup_name": "20261112-150000-manual-12345",
             "last_backup_age_seconds": 3600,
-            "last_stable": "20261013-095826-v1.5.0-12345",
+            "last_stable": "20261112-095826-v1.6.0-12345",
             "path": "/sdcard/dnscrypt-webui-backup"
           },
           ...
@@ -697,22 +864,9 @@ body:
         ```
         ═════════════════════════════════════════════════════════════════
           DNSCrypt Smart Filter — Diagnostic Report
-          Version: v1.5.0
-          Date:    2026-10-13 15:00:00 UTC
+          Version: v1.6.0
+          Date:    2026-11-12 15:00:00 UTC
         ═════════════════════════════════════════════════════════════════
-
-        ─── System Information ───
-          Android:      14 (API 34)
-          Device:       Pixel 6 Pro
-          ...
-        ─── Backups ───
-          ✅ 7 snapshot(s) available
-             Last backup: 20261013-150000-manual-12345 (1h ago)
-        ─── Health Checks ───
-          ✅ DNS engine listening on 5354/UDP
-          ✅ WebUI listening on port 9090
-          ✅ All 5 user data files present
-          ✅ Backup layer healthy (7 snapshot(s))
         ```
       render: shell
     validations:
@@ -725,12 +879,6 @@ body:
       description: 'iptables/ip6tables output — important for diagnosing Custom Chains'
       placeholder: |
         ```bash
-        $ iptables -t nat -L OUTPUT -n
-        Chain OUTPUT (policy ACCEPT)
-        target        prot opt source      destination
-        DNSCRYPT_OUT  udp -- 0.0.0.0/0   0.0.0.0/0   udp dpt:53
-        DNSCRYPT_OUT  tcp -- 0.0.0.0/0   0.0.0.0/0   tcp dpt:53
-
         $ iptables -t nat -L DNSCRYPT_OUT -n
         Chain DNSCRYPT_OUT (2 references)
         target  prot opt source      destination
@@ -757,32 +905,32 @@ body:
     id: runtime_info
     attributes:
       label: 🧭 Runtime Info — SEVEN-field `backups` object (API surface)
-      description: 'Run: `su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq`'
+      description: |
+        Run the API form to get the canonical 7-field `backups` object.
+        Authentication is required:
+        ```
+        CREDS=$(su -c ". /data/adb/modules/dnscrypt-proxy-webui/lib/constants.sh; read_toml_credentials" | paste -sd:)
+        curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=runtime_info | jq
+        ```
+        ℹ️  For the 9-field form (adds `status` + `last_backup_age_seconds`),
+        use `status.sh --json` instead — see the next field.
       placeholder: |
         ```json
         {
-          "version": "v1.5.0",
+          "version": "v1.6.0",
           "commit": "a1b2c3d",
-          "build_time_human": "2026-10-13T10:00:00Z",
-          "project_url": "https://github.com/gasciljh/dnscrypt-proxy-webui",
-          "app_version": "1.0.0",
-          "run_dir": "/data/adb/modules/dnscrypt-proxy-webui/proxy/run",
-          "status_file": "...",
-          "pid_file": "...",
-          "progress_file": "...",
-          "log_file": "/data/local/tmp/dnscrypt_main.log",
-          "bind_addr": "127.0.0.1",
-          "webui_port": "9090",
-          "dashboard_port": "9091",
+          "build_time_human": "2026-11-12T10:00:00Z",
           "profile_key": "pro",
           "memory_limit_mb": 120,
+          "webui_port": "9090",
+          "dashboard_port": "9091",
           "backups": {
             "available": 7,
             "in_flight_txn": 0,
             "orphan_txn": 0,
-            "last_backup": "2026-10-13 15:00:00",
-            "last_backup_name": "20261013-150000-manual-12345",
-            "last_stable": "20261013-095826-v1.5.0-12345",
+            "last_backup": "2026-11-12 15:00:00",
+            "last_backup_name": "20261112-150000-manual-12345",
+            "last_stable": "20261112-095826-v1.6.0-12345",
             "path": "/sdcard/dnscrypt-webui-backup"
           }
         }
@@ -830,17 +978,20 @@ body:
       placeholder: |
         - Did the problem start after a specific update?
         - Are you using a VPN or AdAway alongside the module?
-        - Did the problem occur after changing certain settings?
-        - Did the problem start after switching profiles?
-        - Did the problem occur during an upgrade from v1.4.0 to v1.5.0?
+        - Did the problem occur during an upgrade from v1.5.0 to v1.6.0?
+        - Did you force-refresh the WebUI (Ctrl+Shift+R) after upgrading?
+        - Did you clear the PWA cache (DevTools → Application → Storage)?
+        - Did you verify all 6 lib/*.sh modules present?
+        - Did you run `make check-boot-mini` locally?
         - Did you try recovery mode (`touch recovery && reboot`)?
-        - Did you inspect `/sdcard/dnscrypt-webui-backup/` manually?
-        - Did you try any solutions? What worked and what did not?
         - (v1.3.0) Does the rotation keep the `.last_stable` target?
         - (v1.4.0) Does the "Install App" button work?
         - (v1.5.0) Does the local install cascade succeed, or does it fail on a specific strategy?
-        - (v1.5.0) Is `/data/local/tmp/dnscrypt-companion.apk` cleaned up after install?
-        - (v1.5.0) Is Layer 0 (`boot-mini.sh`) present at `$MODDIR/boot-mini.sh`?
+        - (v1.6.0) Does `last_update_unix` appear in the API response?
+        - (v1.6.0) Does `last_update_unix` convert to the device's local time?
+        - (v1.6.0) Does the API agree with `status.sh --json` on `last_backup_name`?
+        - (v1.6.0) Is `CACHE_VERSION` equal to `v1.6.0` in `web/sw.js`?
+        - (v1.6.0) Is `proxy/dnscrypt-proxy.version` equal to `2.1.20`?
     validations:
       required: false
 
@@ -878,8 +1029,8 @@ body:
         ---
 
         > **Audit Corrections Registry**:
-        > The registry remains at **#33** (v1.0.0) as of v1.5.0.
-        > v1.1.0 – v1.5.0 did **not** add new audit corrections.
+        > The registry remains at **#33** (v1.0.0) as of v1.6.0.
+        > v1.1.0 – v1.6.0 did **not** add new audit corrections.
         > If your bug report reveals a **new** architectural or
         > security issue, it may become the first entry in the
         > next release (#34). See `SECURITY.md` §15 for the

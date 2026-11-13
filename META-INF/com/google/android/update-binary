@@ -1,8 +1,8 @@
 #!/sbin/sh
 # ============================================================
 # DNSCrypt Smart Filter — update-binary
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # ============================================================
 # Magisk / KernelSU / APatch module installer entry point.
 #
@@ -24,12 +24,42 @@
 # Compatibility: Magisk 20.4+, KernelSU, APatch.
 #
 # ⚠️ Standard Magisk boilerplate. Body unchanged since v1.0.0.
-#    All DNSCrypt logic lives in `proxy/customize.sh`.
+#    All DNSCrypt logic lives in `customize.sh` at the repo
+#    root — the update-binary only hands control to it.
+#
+# ============================================================
+# Module layout (v1.6.0)
+# ============================================================
+# The shell scripts invoked during installation are at the
+# REPOSITORY ROOT, not under proxy/:
+#   • customize.sh  — extraction, transaction, restore
+#   • functions.sh  — Layer 2 orchestrator (sources boot-mini.sh)
+#   • boot-mini.sh  — Layer 1 aggregator (sources lib/*.sh)
+#   • uninstall.sh  — uninstall handler
+#   • lib/*.sh      — Layer 0 (6 modules, 0644, sourced)
+#
+#   customize.sh itself sets SKIPUNZIP=1 in §[2], so Magisk's
+#   install_module() extracts only module.prop + customize.sh,
+#   then hands control to customize.sh for the rest of the
+#   extraction (including lib/*.sh, install_app.sh, and
+#   boot-mini.sh) via its own `unzip -o "$ZIPFILE" ...` call
+#   in §[12].
+#
+# ============================================================
+# v1.6.0 additions:
+#   • No change to the body — Magisk's util_functions.sh and
+#     install_module() are unchanged in v1.6.0.
+#   • The 3-layer shell model (lib/*.sh → boot-mini.sh →
+#     functions.sh) is set up by customize.sh §[12], not here.
+#   • Cross-references fixed: shell scripts live at the repo
+#     root, not under proxy/ (RC-1 correction).
 #
 # Cross-references:
-#   • proxy/customize.sh                — actual installer
-#   • proxy/functions.sh                — shared library (Layer 1)
-#   • proxy/uninstall.sh                — uninstall handler
+#   • customize.sh                      — actual installer
+#   • functions.sh                      — shared library (Layer 2)
+#   • boot-mini.sh                      — Layer 1 aggregator
+#   • lib/*.sh                          — Layer 0 (6 modules)
+#   • uninstall.sh                      — uninstall handler
 #   • docs/REFERENCE.md §1.8.2          — repository layout
 #   • docs/REFERENCE.md §4              — backup system reference
 #   • docs/GUIDE.md §2                  — installation guide

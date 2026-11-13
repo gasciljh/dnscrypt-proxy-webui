@@ -4,7 +4,7 @@ System-wide DNS filtering for Android devices, built on DNSCrypt
 and dnscrypt-proxy.
 
 [![CI](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml/badge.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-v1.5.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
+[![Version](https://img.shields.io/badge/version-v1.6.0-blue.svg)](https://github.com/gasciljh/dnscrypt-proxy-webui/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Android%205%2B-brightgreen.svg)](https://www.android.com/)
 [![Magisk](https://img.shields.io/badge/Magisk-20.4%2B-orange.svg)](https://github.com/topjohnwu/Magisk)
@@ -54,9 +54,9 @@ For per-profile memory recommendations, see
 
 ## Install (60 seconds)
 
-1. Download `dnscrypt-webui-1.5.0-module.zip` from
+1. Download `dnscrypt-webui-1.6.0-module.zip` from
    [Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest).
-2. Verify: `sha256sum -c dnscrypt-webui-1.5.0-module.zip.sha256`.
+2. Verify: `sha256sum -c dnscrypt-webui-1.6.0-module.zip.sha256`.
 3. Install via **Magisk Manager** / **KernelSU** / **APatch**.
 4. **Reboot**.
 5. Open `http://127.0.0.1:9090` and log in with the credentials
@@ -114,7 +114,7 @@ WebUI :9090     ← HTTP / SSE ←──── browser
 Dashboard :9091 ← /api/metrics (JSON proxy)
                   → monitoring_ui :8080
 
-Companion install (v1.5.0):
+Companion install (v1.6.0):
     WebUI button ──► install-method modal (3 actions)
         ├──► local root install (5-level pm install cascade)
         ├──► GitHub page (external)
@@ -123,12 +123,16 @@ Companion install (v1.5.0):
 Persistent Backup :/sdcard/dnscrypt-webui-backup/
     ← 10 defensive layers; protects the 5 user config files
     ← survives reboot and module uninstall
-    ← apk/ subfolder mirrors web/app-debug.apk (v1.5.0)
+    ← apk/ subfolder mirrors web/app-debug.apk
 
-Shell layout (v1.5.0 — Layered Bootstrap):
-    proxy/boot-mini.sh  (Layer 0 — 5 primitives + constant)
+Shell layout (v1.6.0 — Modular Bootstrap):
+    lib/                (Layer 0 — 6 core libraries: constants, fallbacks, process, http, backup, firewall)
             ↑ sourced by
-    proxy/functions.sh  (Layer 1 — advanced functions)
+    boot-mini.sh        (Layer 1 — aggregator/initializer)
+            ↑ sourced by
+    functions.sh        (Layer 2 — advanced runtime functions)
+            ↑ sources + uses
+    install_app.sh      (top-level; companion APK installer — not under proxy/)
 ```
 
 Full architecture, trade-offs, and internals:
@@ -145,7 +149,7 @@ A ~3 MB native WebView wrapper for the WebUI
 - **Telemetry**: None · **Source**:
   [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)
 
-**Install paths** (v1.5.0): click **📲 Install App** in the WebUI
+**Install paths** (v1.6.0): click **📲 Install App** in the WebUI
 header → choose **Install locally** (5-level `pm install` cascade,
 requires root), or one of the two GitHub fallbacks (Open GitHub
 page / Direct download).
@@ -163,18 +167,18 @@ see [`docs/GUIDE.md`](docs/GUIDE.md) §9.
   (5 / 15 min, includes Basic Auth), HttpOnly cookies with
   `SameSite=Lax`.
 - **Firewall**: Custom Chains only — no orphan rules.
-- **Data preservation (v1.2.0)**: 10 defensive layers, persistent
+- **Data preservation (v1.2.0+)**: 10 defensive layers, persistent
   backup with mode `0700` / `0600`, SHA256 advisory verification,
   transactional install with rollback.
-- **Companion install (v1.5.0)**: One-shot CSRF token (60 s TTL),
+- **Companion install (v1.6.0)**: One-shot CSRF token (60 s TTL),
   per-IP rate limit, localhost-only, SELinux staging
   (**never `setenforce 0`**), Play Protect trap, 75 s cascade
   deadline.
 
-**No GPG or Cosign signing** as of v1.5.0. Only the `.sha256`
+**No GPG or Cosign signing** as of v1.6.0. Only the `.sha256`
 checksum is attached to the release.
 
-Full threat model, 36 attack-vector subsections, and audit registry:
+Full threat model, 37 attack-vector subsections, and audit registry:
 see [`SECURITY.md`](SECURITY.md).
 
 ---

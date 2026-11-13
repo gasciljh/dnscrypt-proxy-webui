@@ -1,7 +1,7 @@
 // ============================================================
 // DNSCrypt Smart Filter — main.go
 // Version: v1.6.0 (Global Edition)
-// Last updated: 2026-11-12
+// Last updated: 2026-11-13
 // Author: gasciljh
 // Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 // ============================================================
@@ -357,9 +357,6 @@ var (
 	downloadClient   *http.Client
 )
 
-// readBootstrapResolvers extracts bootstrap_resolvers IPs from
-// dnscrypt-proxy.toml. The fallback defaults are obscure DNS
-// providers (FDN France, DNS.SB Sweden) — NOT consumer routers.
 func readBootstrapResolvers() []string {
 	defaults := []string{"80.67.169.12", "185.95.218.42"}
 
@@ -572,9 +569,10 @@ var (
 	lastModTime  time.Time
 	lastInode    uint64
 
-	lastUpdateCache string
-	lastUpdateTime  time.Time
-	lastUpdateMu    sync.Mutex
+	lastUpdateCache     string
+	lastUpdateUnixCache int64
+	lastUpdateTime      time.Time
+	lastUpdateMu        sync.Mutex
 
 	profiles = map[string]Profile{
 		"light":    {"HaGeZi Light", "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/wildcard/light.txt"},
@@ -1232,11 +1230,6 @@ func runShell(cmd string) error {
 	return runShellWithTimeout(cmd, 15*time.Second)
 }
 
-// runShellWithTimeout runs a shell command with a hard deadline.
-// The shell is placed in its own process group so that a timeout
-// signal reaches every descendant — not just the top-level shell.
-// Without this, a grandchild holding the stderr pipe (e.g. fuser,
-// nft, pm) keeps Run() blocked long after the shell has died.
 func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -1245,11 +1238,8 @@ func runShellWithTimeout(cmd string, timeout time.Duration) error {
 	command.Env = shellEnv()
 	command.Stdout = io.Discard
 
-	// Dedicated process group for the shell and its descendants.
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	// Override the default Cancel (SIGKILL to the shell pid only)
-	// to SIGKILL the entire process group (-pid).
 	command.Cancel = func() error {
 		if command.Process != nil {
 			_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
@@ -1257,8 +1247,6 @@ func runShellWithTimeout(cmd string, timeout time.Duration) error {
 		return nil
 	}
 
-	// After Cancel fires, allow at most 2 s for pipe I/O to drain,
-	// then force-close. Defense in depth with the process group kill.
 	command.WaitDelay = 2 * time.Second
 
 	errBuf := &limitedBuffer{max: MAX_STDERR_CAPTURE}
@@ -2252,16 +2240,21 @@ func isPortOpen(port int) bool {
 
 func isPortOpenCached(port int) bool {
 	portCacheMu.Lock()
-	defer portCacheMu.Unlock()
-
 	if entry, ok := portCacheMap[port]; ok {
 		if time.Since(entry.time) < PORT_CACHE_TTL {
-			return entry.open
+			open := entry.open
+			portCacheMu.Unlock()
+			return open
 		}
 	}
+	portCacheMu.Unlock()
 
 	open := isPortOpen(port)
+
+	portCacheMu.Lock()
 	portCacheMap[port] = portCacheEntry{open: open, time: time.Now()}
+	portCacheMu.Unlock()
+
 	return open
 }
 
@@ -2526,8 +2519,6 @@ func stopService() {
 	broadcastEvent("resources", "{\"ram\":\"N/A\"}")
 }
 
-// reloadService sends SIGHUP to the specific PID from PID_FILE,
-// not a broad pkill which could target unrelated processes.
 func reloadService() {
 	serviceMutex.Lock()
 	defer serviceMutex.Unlock()
@@ -2658,11 +2649,6 @@ func validateBlocklist(path string) error {
 	return fmt.Errorf("no valid domain/IP entries in first 500 lines")
 }
 
-// isInternetAvailable probes the configured bootstrap resolvers
-// directly via TCP:53, instead of hitting 1.1.1.1 / 9.9.9.9 /
-// 8.8.8.8. Those made direct contact with Cloudflare / Quad9 /
-// Google on every failed getprop, defeating the privacy
-// boundary set by bootstrap_resolvers.
 func isInternetAvailable() bool {
 	defer func() { recover() }()
 
@@ -2889,9 +2875,6 @@ func rebuildBlocklist() error {
 // ============================================================
 // [36] Atomic rules save
 // ============================================================
-// saveMu serializes all saves. rulesStateMu protects only the
-// hash snapshot — it is released while rebuildBlocklist runs
-// (which can take seconds) so readers are not blocked.
 type saveRulesRequest struct {
 	AllowContent      string
 	DenyContent       string
@@ -3228,23 +3211,37 @@ func buildProfileResponse() map[string]interface{} {
 	}
 	entries := getEntriesCount()
 
+	var lastUpdateStr string
+	var lastUpdateUnix int64
+
 	lastUpdateMu.Lock()
 	if time.Since(lastUpdateTime) >= LAST_UPDATE_CACHE_TTL || lastUpdateCache == "" {
 		if fi, err := os.Stat(BLOCKLIST_FILE); err == nil {
-			lastUpdateCache = fi.ModTime().Format("2006-01-02 15:04:05")
+			modTime := fi.ModTime()
+			lastUpdateStr = modTime.UTC().Format(time.RFC3339)
+			lastUpdateUnix = modTime.Unix()
+
+			lastUpdateCache = lastUpdateStr
+			lastUpdateUnixCache = lastUpdateUnix
+		} else {
+			lastUpdateStr = lastUpdateCache
+			lastUpdateUnix = lastUpdateUnixCache
 		}
 		lastUpdateTime = time.Now()
+	} else {
+		lastUpdateStr = lastUpdateCache
+		lastUpdateUnix = lastUpdateUnixCache
 	}
-	lastUpdateCopy := lastUpdateCache
 	lastUpdateMu.Unlock()
 
 	return map[string]interface{}{
-		"key":             key,
-		"name":            name,
-		"entries":         entries,
-		"is_empty":        entries == 0,
-		"last_update":     lastUpdateCopy,
-		"memory_limit_mb": memoryLimitForProfile(key) / (1024 * 1024),
+		"key":              key,
+		"name":             name,
+		"entries":          entries,
+		"is_empty":         entries == 0,
+		"last_update":      lastUpdateStr,
+		"last_update_unix": lastUpdateUnix,
+		"memory_limit_mb":  memoryLimitForProfile(key) / (1024 * 1024),
 	}
 }
 
@@ -3337,7 +3334,8 @@ func updateProfileBody(key string) {
 	entries := getEntriesCount()
 
 	lastUpdateMu.Lock()
-	lastUpdateCache = time.Now().Format("2006-01-02 15:04:05")
+	lastUpdateCache = time.Now().UTC().Format(time.RFC3339)
+	lastUpdateUnixCache = time.Now().Unix()
 	lastUpdateTime = time.Now()
 	lastUpdateMu.Unlock()
 
@@ -3935,6 +3933,11 @@ func buildBackupInfo() map[string]interface{} {
 
 	if len(snapshots) > 0 {
 		sort.Slice(snapshots, func(i, j int) bool {
+			fi, errI := snapshots[i].Info()
+			fj, errJ := snapshots[j].Info()
+			if errI == nil && errJ == nil {
+				return fi.ModTime().Before(fj.ModTime())
+			}
 			return snapshots[i].Name() < snapshots[j].Name()
 		})
 
@@ -3946,7 +3949,7 @@ func buildBackupInfo() map[string]interface{} {
 			tsStr := parts[0] + parts[1]
 			if t, err := time.Parse("20060102150405", tsStr); err == nil {
 				info["last_backup_unix"] = t.Unix()
-				info["last_backup"] = t.Format("2006-01-02 15:04:05 UTC")
+				info["last_backup"] = t.UTC().Format(time.RFC3339)
 			}
 		}
 	}
@@ -5129,9 +5132,6 @@ func findMetric(prom map[string]float64, names ...string) float64 {
 	return 0
 }
 
-// getProcessUptimeSeconds reads starttime from /proc/<pid>/stat.
-// Splits at the last ')' to survive comm strings that contain
-// spaces (which would shift the starttime field with Fields).
 func getProcessUptimeSeconds() int64 {
 	pidStr, found := isProcessRunning()
 	if !found {
@@ -5184,8 +5184,6 @@ func getProcessUptimeSeconds() int64 {
 	return int64(processUp)
 }
 
-// readCacheConfig reads cache_size, cache_min_ttl, cache_max_ttl
-// from dnscrypt-proxy.toml. Falls back to shipped defaults.
 func readCacheConfig() (size, minTTL, maxTTL int64) {
 	size = 10240
 	minTTL = 2400
@@ -5441,6 +5439,11 @@ func createAutoBackup(reason string) {
 
 func startBackupWorker() {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logWithLevel("error", fmt.Sprintf("PANIC in backup worker: %v", r))
+			}
+		}()
 		for reason := range backupQueue {
 			createAutoBackup(reason)
 			time.Sleep(1 * time.Second)
@@ -5520,10 +5523,13 @@ func cleanupOldTransactions() {
 		if strings.HasPrefix(name, "txn-") {
 			statePath := filepath.Join(PERSISTENT_BACKUP, name, ".state")
 			data, err := os.ReadFile(statePath)
-			if err == nil && strings.TrimSpace(string(data)) == "COMMIT" {
-				fullPath := filepath.Join(PERSISTENT_BACKUP, name)
-				if err := os.RemoveAll(fullPath); err == nil {
-					removed++
+			if err == nil {
+				state := strings.TrimSpace(string(data))
+				if state == "COMMIT" || state == "ROLLBACK" {
+					fullPath := filepath.Join(PERSISTENT_BACKUP, name)
+					if err := os.RemoveAll(fullPath); err == nil {
+						removed++
+					}
 				}
 			}
 			continue
@@ -5729,10 +5735,6 @@ func main() {
 		ErrorLog:          httpLogger,
 	}
 
-	// Signal escalation: a second signal forces os.Exit(1) to
-	// prevent a hung `manage_firewall 0` (bounded at 90s) from
-	// leaving partial firewall state when a supervisor sends
-	// SIGKILL before the graceful path completes.
 	go func() {
 		<-sigChan
 		logEvent("🛑 Shutdown signal received, cleaning up...")

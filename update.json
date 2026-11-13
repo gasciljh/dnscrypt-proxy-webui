@@ -1,14 +1,14 @@
 {
-  "version": "v1.5.0",
-  "versionCode": 1050000,
-  "versionName": "v1.5.0 (Global Edition)",
-  "releaseDate": "2026-10-19",
+  "version": "v1.6.0",
+  "versionCode": 1060000,
+  "versionName": "v1.6.0 (Global Edition)",
+  "releaseDate": "2026-11-12",
   "minMagiskVersion": 20400,
-  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.5.0/dnscrypt-webui-1.5.0-module.zip",
+  "zipUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/releases/download/v1.6.0/dnscrypt-webui-1.6.0-module.zip",
   "changelog": "https://raw.githubusercontent.com/gasciljh/dnscrypt-proxy-webui/main/CHANGELOG.md",
   "homepageUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui",
   "supportUrl": "https://github.com/gasciljh/dnscrypt-proxy-webui/issues",
   "donateUrl": "",
-  "x-note-last-updated": "2026-10-19",
-  "x-note-v150": "v1.5.0 — Companion app one-tap root install (5-level pm install cascade + install-method modal), Layered Bootstrap Phase 0 (boot-mini.sh), 4 new companion-app endpoints, 12 frontend state fixes, 9 server-side code-review corrections. No breaking changes."
+  "x-note-last-updated": "2026-11-12",
+  "x-note-v160": "v1.6.0 — Fixed WebUI timezone display (now uses local device time via Unix timestamp), bumped PWA Service Worker cache version to ensure seamless UI updates, and cleaned up codebase/documentation. MAJOR ARCHITECTURAL CHANGE: Introduced the 'lib/' directory and modularized the shell script components for better maintainability. No breaking changes."
 }

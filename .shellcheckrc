@@ -1,43 +1,29 @@
 # ============================================================
 # DNSCrypt Smart Filter — .shellcheckrc
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Project-wide ShellCheck configuration.
-# Applies to every shell script under proxy/ and scripts/.
+# Applies to every shell script under proxy/ (including 
+# proxy/lib/) and scripts/.
 #
 # Where ShellCheck runs:
 #   • Local pre-commit hook (.pre-commit-config.yaml §[2])
 #   • Local `make check-backup` / `make check-all`
-#
-# Where ShellCheck does NOT run:
-#   • CI — removed from .github/workflows/ci.yml on 2026-09-30.
-#     Rationale: even with --shell=bash and four excluded
-#     warning classes, it emitted false positives that blocked
-#     PRs without catching real bugs. Shell script safety is
-#     now enforced jointly by:
-#       – bash -n syntax check (ci.yml)
-#       – Verify Layer 1-10 function presence (ci.yml)
-#       – Verify companion install script (ci.yml)
-#       – The pre-commit hook below
 #
 # Principle: disable only verified false positives and style
 # notes. Real bugs and warnings are fixed in the source files —
 # not suppressed here.
 #
 # Reference: https://www.shellcheck.net/wiki/Directive
-#
-# Note on multiple `disable=` directives: they are MERGED
-# (union), not last-wins.
 # ============================================================
 
 # ------------------------------------------------------------
 # Global disables
 # ------------------------------------------------------------
-# SC2012 — "Use find instead of ls to better handle
-#           non-alphanumeric filenames."
+# SC2012 — "Use find instead of ls..."
 #   Accepted: the module uses `ls -1` for read-only
 #   enumeration of known directories (backup snapshots).
 #   `find` would add complexity without benefit — the
@@ -45,9 +31,9 @@
 #
 # SC1091 — "Not following: ... was not specified as input."
 #   Accepted: `source` targets are resolved at runtime
-#   (e.g. `. "$FUNCTIONS"`). ShellCheck cannot resolve them
-#   at parse time. The files are always present in the module
-#   environment.
+#   (e.g. `. "$FUNCTIONS"` or `. "$_LIB_BASE/constants.sh"`). 
+#   ShellCheck cannot resolve them at parse time. The files 
+#   are always present in the module environment.
 # ------------------------------------------------------------
 disable=SC2012,SC1091
 

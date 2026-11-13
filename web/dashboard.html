@@ -1,30 +1,10 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — Dashboard
-     Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-19
+     Version: v1.6.0 (Global Edition)
+     Last updated: 2026-11-13
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
-     ============================================================
-     Bilingual Dashboard (English default / Arabic toggle).
-
-     Features:
-       • Live metrics from /api/metrics (JSON)
-       • Resolver health + cache statistics
-       • Top domains + recent queries
-       • Runtime info (dynamic ports + profile + memory + backups)
-       • Diagnostic file viewer
-       • Service Worker update banner
-       • Read-only — no install button
-
-     The Dashboard has NO login form. If a session is required
-     and none exists, it navigates to the WebUI (9090), which
-     does host the login form. This avoids the reload-loop that
-     a session-expired modal would otherwise produce.
-
-     Service Worker:
-       The Dashboard registers its own SW instance (per origin).
-       The Dashboard is a read-only observability surface.
      ============================================================ -->
 <html lang="en" dir="ltr">
 <head>
@@ -40,7 +20,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
-    <title>DNSCrypt Dashboard v1.5.0</title>
+    <title>DNSCrypt Dashboard v1.6.0</title>
 
     <script>
       (function(){
@@ -218,28 +198,19 @@
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
 
         .card-hint {
-            position: fixed;
-            top: 50%;
-            left: 50%;
+            position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0.92);
             background: rgba(88,166,255,0.25);
             border: 2px solid var(--primary);
             color: var(--primary);
-            padding: 18px 36px;
-            border-radius: 16px;
-            font-family: inherit;
-            font-size: 15px;
-            font-weight: 600;
-            -webkit-backdrop-filter: blur(16px);
-            backdrop-filter: blur(16px);
+            padding: 18px 36px; border-radius: 16px;
+            font-family: inherit; font-size: 15px; font-weight: 600;
+            -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
             box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            z-index: 10005;
-            opacity: 0;
+            z-index: 10005; opacity: 0;
             transition: opacity .3s ease, transform .3s ease;
-            pointer-events: none;
-            text-align: center;
-            max-width: 90%;
-            min-width: 200px;
+            pointer-events: none; text-align: center;
+            max-width: 90%; min-width: 200px;
             will-change: opacity, transform;
         }
         .card-hint.visible {
@@ -347,7 +318,7 @@
         </div>
 
         <div class="footer">
-            <span id="footerText">DNSCrypt Proxy Dashboard – v1.5.0 Zero-Footprint</span>
+            <span id="footerText">DNSCrypt Proxy Dashboard – v1.6.0 Zero-Footprint</span>
             · <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
         </div>
     </div>
@@ -385,7 +356,7 @@
 // ============================================================
 // [1] Settings
 // ============================================================
-    var VERSION = 'v1.5.0';
+    var VERSION = 'v1.6.0';
 
     var PORTS = {
         webui:     '9090',
@@ -441,6 +412,7 @@
             dfLoading:'⏳ Loading...', dfFailedToLoad:'❌ Failed to load file',
             dfEmpty:'(empty)', dfTruncatedPrefix:'... [truncated to 500 KB] ...\n\n',
             dfDownloading:'⬇️ Downloading...', dfSensitiveWarning:'⚠️ Sensitive file — may contain credentials',
+            dfDownloadError:'❌ Download failed',
             confirmTitle:'Confirm', confirmCancel:'Cancel', confirmOk:'Confirm',
             closeLogs:'Close',
             fvClear: 'Clear',
@@ -450,6 +422,8 @@
             projectLink: 'Project',
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
+            swPrecacheIncomplete: '⚠️ PWA cache incomplete: {N} files failed to cache',
+            swError: '⚠️ Service Worker error',
             noData: 'No data',
             noDataTitle: 'No data yet',
             noDataMessage: 'The DNS engine may be stopped, or it has not produced any metrics yet.',
@@ -513,6 +487,7 @@
             dfLoading:'⏳ جاري التحميل...', dfFailedToLoad:'❌ فشل تحميل الملف',
             dfEmpty:'(فارغ)', dfTruncatedPrefix:'... [تم اقتصاص النص إلى 500 KB] ...\n\n',
             dfDownloading:'⬇️ جاري التحميل...', dfSensitiveWarning:'⚠️ ملف حساس — قد يحتوي بيانات دخول',
+            dfDownloadError:'❌ فشل التنزيل',
             confirmTitle:'تأكيد', confirmCancel:'إلغاء', confirmOk:'تأكيد',
             closeLogs:'إغلاق',
             fvClear: 'مسح',
@@ -522,6 +497,8 @@
             projectLink: 'المشروع',
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
+            swPrecacheIncomplete: '⚠️ تخزين PWA غير مكتمل: فشل {N} ملف',
+            swError: '⚠️ خطأ في Service Worker',
             noData: 'لا توجد بيانات',
             noDataTitle: 'لا توجد بيانات بعد',
             noDataMessage: 'محرك DNS قد لا يكون مشغّلًا، أو أنه لم يُنتج أي إحصائيات بعد.',
@@ -547,7 +524,7 @@
     try { showIdleResolvers = localStorage.getItem('dnscrypt-show-idle') === 'true'; } catch(e) {}
     var refreshInterval = null, sessionExpired = false;
     var sseConnected = false, lastRefreshTime = null, failureCount = 0, isRefreshing = false;
-var networkDownActive = false;
+    var networkDownActive = false;
     var runtimeInfoLoading = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
     var pendingConfirmCallback = null;
@@ -564,6 +541,7 @@ var networkDownActive = false;
     var swRegistration = null;
     var pendingReload = false;
     var controllerChangeHandlerInstalled = false;
+    var swMessageHandlerInstalled = false;
     var swUpdateCheckInterval = null;
 
     var dashboardLinkFallbackTimer = null;
@@ -577,773 +555,813 @@ var networkDownActive = false;
     function t(key) { return translations[currentLang][key] || key; }
 
 // ============================================================
-// [1b] WebUI URL builder (respects custom ports)
+// [1b] WebUI URL builder
 // ============================================================
-function getWebUIUrl() {
-    var hostname = window.location.hostname || '127.0.0.1';
-    if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
-        hostname = '[' + hostname + ']';
+    function getWebUIUrl() {
+        var hostname = window.location.hostname || '127.0.0.1';
+        if (hostname.indexOf(':') !== -1 && hostname.charAt(0) !== '[') {
+            hostname = '[' + hostname + ']';
+        }
+        var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return protocol + '//' + hostname + ':' + PORTS.webui + '/';
     }
-    var protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-    return protocol + '//' + hostname + ':' + PORTS.webui + '/';
-}
 
-function updateBackToHomeLinks() {
-    var ndAction = $('ndAction');
-    if (ndAction) {
-        ndAction.href = getWebUIUrl();
-        ndAction.setAttribute('data-port', PORTS.webui);
+    function updateBackToHomeLinks() {
+        var ndAction = $('ndAction');
+        if (ndAction) {
+            ndAction.href = getWebUIUrl();
+            ndAction.setAttribute('data-port', PORTS.webui);
+        }
     }
-}
 
 // ============================================================
-// [2] Token helpers — cookie-only
+// [2] Token helpers (cookie-only)
 // ============================================================
-function getStoredToken() { return null; }
-function storeToken(tk) { void tk; }
-function clearStoredToken() { }
+    function getStoredToken() { return null; }
+    function storeToken(tk) { void tk; }
+    function clearStoredToken() { }
 
 // ============================================================
 // [3] escapeHtml
 // ============================================================
-function escapeHtml(s) {
-    if (s === null || s === undefined) return '';
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/\u2028/g, '&#8232;')
-        .replace(/\u2029/g, '&#8233;');
-}
+    function escapeHtml(s) {
+        if (s === null || s === undefined) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/\u2028/g, '&#8232;')
+            .replace(/\u2029/g, '&#8233;');
+    }
 
 // ============================================================
 // [4] Formatters
 // ============================================================
-function formatNumber(num) {
-    if (num === null || num === undefined || num === '') return '0';
-    var n = Number(num);
-    if (isNaN(n)) return '0';
-    return n.toLocaleString('en-US');
-}
-function formatLocalTime(ts) {
-    if (!ts) return '--';
-    var d = new Date(ts), hours = d.getHours();
-    var mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
-    var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
-    return hours + ':' + mins + ':' + secs + ' ' + ampm;
-}
-function formatDateTime(ts, showDate) {
-    if (!ts) return '-';
-    var d = new Date(ts);
-    if (isNaN(d.getTime())) return '-';
-    var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
-    var hours = d.getHours(), mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
-    var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
-    var timeStr = hours + ':' + mins + ':' + secs + ' ' + ampm;
-    if (showDate) return '<span dir="ltr" style="display:inline-block; text-align:center;">' + yyyy + '/' + mm + '/' + dd + '<br>' + timeStr + '</span>';
-    return '<span dir="ltr" style="display:inline-block;">' + timeStr + '</span>';
-}
-function formatUptime(seconds) {
-    if (!seconds || seconds <= 0) return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">0s</span>';
-    var d = Math.floor(seconds/86400), h = Math.floor((seconds%86400)/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
-    var p = []; if (d>0) p.push(d+'d'); if (h>0) p.push(h+'h'); if (m>0) p.push(m+'m'); if (s>0 || p.length===0) p.push(s+'s');
-    return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + p.join(' ') + '</span>';
-}
-function formatDuration(seconds) {
-    if (!seconds || seconds <= 0) return '-';
-    var h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
-    return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + h + 'h ' + m + 'm ' + s + 's</span>';
-}
-function getStatusLabel(status) {
-    if (!status) return t('unknownStatus');
-    var map = { 'healthy':t('healthy'), 'stale':t('stale'), 'idle':t('idle'), 'ok':t('ok') };
-    return map[String(status).toLowerCase()] || status;
-}
-function formatBytes(bytes) {
-    if (!bytes || bytes < 0) return '0 B';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
-    if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
-    return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
-}
-function formatMtime(mtime) {
-    var d = new Date(mtime * 1000);
-    var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
-    var hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
-    return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
-}
+    function formatNumber(num) {
+        if (num === null || num === undefined || num === '') return '0';
+        var n = Number(num);
+        if (isNaN(n)) return '0';
+        return n.toLocaleString('en-US');
+    }
+    function formatLocalTime(ts) {
+        if (!ts) return '--';
+        var d = new Date(ts), hours = d.getHours();
+        var mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
+        var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
+        return hours + ':' + mins + ':' + secs + ' ' + ampm;
+    }
+    function formatDateTime(ts, showDate) {
+        if (!ts) return '-';
+        var d = new Date(ts);
+        if (isNaN(d.getTime())) return '-';
+        var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+        var hours = d.getHours(), mins = String(d.getMinutes()).padStart(2,'0'), secs = String(d.getSeconds()).padStart(2,'0');
+        var ampm = hours >= 12 ? 'PM' : 'AM'; hours = hours % 12 || 12;
+        var timeStr = hours + ':' + mins + ':' + secs + ' ' + ampm;
+        if (showDate) return '<span dir="ltr" style="display:inline-block; text-align:center;">' + yyyy + '/' + mm + '/' + dd + '<br>' + timeStr + '</span>';
+        return '<span dir="ltr" style="display:inline-block;">' + timeStr + '</span>';
+    }
+    function formatUptime(seconds) {
+        if (!seconds || seconds <= 0) return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">0s</span>';
+        var d = Math.floor(seconds/86400), h = Math.floor((seconds%86400)/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
+        var p = []; if (d>0) p.push(d+'d'); if (h>0) p.push(h+'h'); if (m>0) p.push(m+'m'); if (s>0 || p.length===0) p.push(s+'s');
+        return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + p.join(' ') + '</span>';
+    }
+    function formatDuration(seconds) {
+        if (!seconds || seconds <= 0) return '-';
+        var h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = Math.floor(seconds%60);
+        return '<span dir="ltr" style="white-space:nowrap; display:inline-block;">' + h + 'h ' + m + 'm ' + s + 's</span>';
+    }
+    function getStatusLabel(status) {
+        if (!status) return t('unknownStatus');
+        var map = { 'healthy':t('healthy'), 'stale':t('stale'), 'idle':t('idle'), 'ok':t('ok') };
+        return map[String(status).toLowerCase()] || status;
+    }
+    function formatBytes(bytes) {
+        if (!bytes || bytes < 0) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+        if (bytes < 1024*1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' MB';
+        return (bytes/(1024*1024*1024)).toFixed(2) + ' GB';
+    }
+    function formatMtime(mtime) {
+        var d = new Date(mtime * 1000);
+        var yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+        var hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
+        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+    }
 
-// PREMIUM FIX: Convert a backup directory name
-// (format: YYYYMMDD-HHMMSS-...) to local device time.
-// Returns null if the string is not a valid directory name.
-function dirNameToLocalTime(name) {
-    if (!name) return null;
-    var m = name.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
-    if (!m) return null;
-    var utcDate = new Date(Date.UTC(
-        parseInt(m[1], 10),
-        parseInt(m[2], 10) - 1,
-        parseInt(m[3], 10),
-        parseInt(m[4], 10),
-        parseInt(m[5], 10),
-        parseInt(m[6], 10)
-    ));
-    if (isNaN(utcDate.getTime())) return null;
-    var opts = {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-    };
-    return utcDate.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', opts);
-}
+    function dirNameToLocalTime(name) {
+        if (!name) return null;
+        var m = name.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/);
+        if (!m) return null;
+        var utcDate = new Date(Date.UTC(
+            parseInt(m[1], 10),
+            parseInt(m[2], 10) - 1,
+            parseInt(m[3], 10),
+            parseInt(m[4], 10),
+            parseInt(m[5], 10),
+            parseInt(m[6], 10)
+        ));
+        if (isNaN(utcDate.getTime())) return null;
+        var opts = {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        };
+        return utcDate.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', opts);
+    }
 
-function fileIcon(name) {
-    if (name.indexOf('query') !== -1) return '📊';
-    if (name.indexOf('blocked-ips') !== -1) return '🚫';
-    if (name.indexOf('blocked') !== -1) return '🔴';
-    if (name.indexOf('allowed') !== -1) return '🟢';
-    if (name.indexOf('proxy.log') !== -1) return '⚙️';
-    if (name.indexOf('install') !== -1) return '📦';
-    if (name.indexOf('credential') !== -1) return '🔐';
-    if (name.endsWith('.gz')) return '🗜️';
-    if (name.indexOf('.emergency.') !== -1) return '⚠️';
-    return '📄';
-}
+    function fileIcon(name) {
+        if (name.indexOf('query') !== -1) return '📊';
+        if (name.indexOf('blocked-ips') !== -1) return '🚫';
+        if (name.indexOf('blocked') !== -1) return '🔴';
+        if (name.indexOf('allowed') !== -1) return '🟢';
+        if (name.indexOf('proxy.log') !== -1) return '⚙️';
+        if (name.indexOf('install') !== -1) return '📦';
+        if (name.indexOf('credential') !== -1) return '🔐';
+        if (name.endsWith('.gz')) return '🗜️';
+        if (name.indexOf('.emergency.') !== -1) return '⚠️';
+        return '📄';
+    }
 
 // ============================================================
 // [5] Modal
 // ============================================================
-function showConfirmModal(message, callback, options) {
-    options = options || {};
-    $('modalMessage').textContent = message;
-    $('modalTitle').textContent = options.title || t('confirmTitle');
-    $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
-    $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
+    function showConfirmModal(message, callback, options) {
+        options = options || {};
+        $('modalMessage').textContent = message;
+        $('modalTitle').textContent = options.title || t('confirmTitle');
+        $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
+        $('modalConfirmBtn').textContent = options.confirmText || t('confirmOk');
 
-    var box = $('customModal').querySelector('.custom-modal-actions');
-    var existing = box.querySelector('.modal-primary');
-    if (existing) existing.remove();
+        var box = $('customModal').querySelector('.custom-modal-actions');
+        var existing = box.querySelector('.modal-primary');
+        if (existing) existing.remove();
 
-    if (options.primaryText && options.primaryCallback) {
-        var btn = document.createElement('button');
-        btn.className = 'modal-primary';
-        btn.textContent = options.primaryText;
-        btn.addEventListener('click', function() {
-            closeConfirmModal();
-            options.primaryCallback();
-        });
-        box.insertBefore(btn, box.firstChild);
-    }
-
-    $('customModal').style.display = 'flex';
-    pendingConfirmCallback = callback || function() { /* no-op */ };
-
-    requestAnimationFrame(function() {
-        var target = box.querySelector('.modal-primary') || $('modalCancelBtn');
-        if (target) {
-            try { target.focus(); } catch (e) { /* non-fatal */ }
+        if (options.primaryText && options.primaryCallback) {
+            var btn = document.createElement('button');
+            btn.className = 'modal-primary';
+            btn.textContent = options.primaryText;
+            btn.addEventListener('click', function() {
+                closeConfirmModal();
+                options.primaryCallback();
+            });
+            box.insertBefore(btn, box.firstChild);
         }
-    });
-}
-function closeConfirmModal() {
-    $('customModal').style.display = 'none';
-    pendingConfirmCallback = null;
-}
+
+        $('customModal').style.display = 'flex';
+        pendingConfirmCallback = callback || function() { };
+
+        requestAnimationFrame(function() {
+            var target = box.querySelector('.modal-primary') || $('modalCancelBtn');
+            if (target) {
+                try { target.focus(); } catch (e) { }
+            }
+        });
+    }
+    function closeConfirmModal() {
+        $('customModal').style.display = 'none';
+        pendingConfirmCallback = null;
+    }
 
 // ============================================================
 // [6] XHR with retries
 // ============================================================
-function getTimeoutForUrl(method, url) {
-    if (method === 'POST' && url.indexOf('update_profile') !== -1) {
-        return 310000;
-    }
-    if (url.indexOf('toggle_service') !== -1 ||
-        url.indexOf('restart_service') !== -1) {
-        return 60000;
-    }
-    return 15000;
-}
-
-function xhrRequest(method, url, data, cb, retries, delay) {
-    retries = (retries === undefined) ? 3 : retries;
-    delay = delay || 1000;
-    var attempt = 0;
-
-    function sendRequest() {
-        attempt++;
-        var xhr = new XMLHttpRequest();
-        xhr.open(method, url, true);
-        xhr.withCredentials = true;
-        if (method === 'POST') {
-            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    function getTimeoutForUrl(method, url) {
+        if (method === 'POST' && url.indexOf('update_profile') !== -1) {
+            return 310000;
         }
-        var tk = getStoredToken();
-        if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
-        xhr.timeout = getTimeoutForUrl(method, url);
-
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                try { cb(null, JSON.parse(xhr.responseText)); }
-                catch(e) { cb(e, null); }
-            } else if (xhr.status === 401) {
-                var e401 = new Error('HTTP 401');
-                e401.code = 401;
-                cb(e401, null);
-                handleSessionExpired();
-            } else if (xhr.status === 405) {
-                var e405 = new Error('HTTP 405');
-                e405.code = 405;
-                cb(e405, null);
-                showMsg(t('methodNotAllowed'), 'warning', 3000);
-            } else if (xhr.status === 409) {
-                var e409 = new Error('HTTP 409');
-                e409.code = 409;
-                cb(e409, null);
-                showMsg(t('conflictDetected'), 'warning', 3000);
-                if (typeof loadLogFiles === 'function') loadLogFiles();
-            } else if (xhr.status === 413) {
-                var e413 = new Error('HTTP 413');
-                e413.code = 413;
-                cb(e413, null);
-                showMsg(t('fileTooLarge'), 'error', 4000);
-            } else {
-                var eN = new Error('HTTP ' + xhr.status);
-                eN.code = xhr.status;
-                cb(eN, null);
-            }
-        };
-        xhr.onerror = function() {
-            if (attempt < retries) setTimeout(sendRequest, delay * attempt);
-            else cb(new Error('Network Error'), null);
-        };
-        xhr.ontimeout = function() {
-            if (attempt < retries) setTimeout(sendRequest, delay * attempt);
-            else cb(new Error('Timeout'), null);
-        };
-        xhr.send(data || null);
+        if (url.indexOf('toggle_service') !== -1 ||
+            url.indexOf('restart_service') !== -1) {
+            return 60000;
+        }
+        return 15000;
     }
 
-    sendRequest();
-}
+    function xhrRequest(method, url, data, cb, retries, delay) {
+        retries = (retries === undefined) ? 3 : retries;
+        delay = delay || 1000;
+        var attempt = 0;
 
-function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
-function xhrPost(url, data, cb) { xhrRequest('POST', url, data, cb); }
+        function sendRequest() {
+            attempt++;
+            var xhr = new XMLHttpRequest();
+            xhr.open(method, url, true);
+            xhr.withCredentials = true;
+            if (method === 'POST') {
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            }
+            var tk = getStoredToken();
+            if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+            xhr.timeout = getTimeoutForUrl(method, url);
+
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    try { cb(null, JSON.parse(xhr.responseText)); }
+                    catch(e) { cb(e, null); }
+                } else if (xhr.status === 401) {
+                    var e401 = new Error('HTTP 401');
+                    e401.code = 401;
+                    cb(e401, null);
+                    handleSessionExpired();
+                } else if (xhr.status === 405) {
+                    var e405 = new Error('HTTP 405');
+                    e405.code = 405;
+                    cb(e405, null);
+                    showMsg(t('methodNotAllowed'), 'warning', 3000);
+                } else if (xhr.status === 409) {
+                    var e409 = new Error('HTTP 409');
+                    e409.code = 409;
+                    cb(e409, null);
+                    showMsg(t('conflictDetected'), 'warning', 3000);
+                    if (typeof loadLogFiles === 'function') loadLogFiles();
+                } else if (xhr.status === 413) {
+                    var e413 = new Error('HTTP 413');
+                    e413.code = 413;
+                    cb(e413, null);
+                    showMsg(t('fileTooLarge'), 'error', 4000);
+                } else {
+                    var eN = new Error('HTTP ' + xhr.status);
+                    eN.code = xhr.status;
+                    cb(eN, null);
+                }
+            };
+            xhr.onerror = function() {
+                if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                else cb(new Error('Network Error'), null);
+            };
+            xhr.ontimeout = function() {
+                if (attempt < retries) setTimeout(sendRequest, delay * attempt);
+                else cb(new Error('Timeout'), null);
+            };
+            xhr.send(data || null);
+        }
+
+        sendRequest();
+    }
+
+    function xhrGet(url, cb) { xhrRequest('GET', url, null, cb); }
+    function xhrPost(url, data, cb) { xhrRequest('POST', url, data, cb); }
 
 // ============================================================
 // [7] No-data banner
 // ============================================================
-function showNoDataBanner() {
-    var banner = $('noDataBanner');
-    if (!banner) return;
-    var titleEl = $('ndTitle');
-    var msgEl = $('ndMessage');
-    var actionEl = $('ndAction');
-    if (titleEl) titleEl.textContent = t('noDataTitle');
-    if (msgEl) msgEl.textContent = t('noDataMessage');
-    if (actionEl) {
-        actionEl.textContent = t('noDataAction');
-        actionEl.href = getWebUIUrl();
+    function showNoDataBanner() {
+        var banner = $('noDataBanner');
+        if (!banner) return;
+        var titleEl = $('ndTitle');
+        var msgEl = $('ndMessage');
+        var actionEl = $('ndAction');
+        if (titleEl) titleEl.textContent = t('noDataTitle');
+        if (msgEl) msgEl.textContent = t('noDataMessage');
+        if (actionEl) {
+            actionEl.textContent = t('noDataAction');
+            actionEl.href = getWebUIUrl();
+        }
+        banner.classList.add('visible');
+        showingNoDataBanner = true;
     }
-    banner.classList.add('visible');
-    showingNoDataBanner = true;
-}
 
-function hideNoDataBanner() {
-    var banner = $('noDataBanner');
-    if (!banner) return;
-    banner.classList.remove('visible');
-    showingNoDataBanner = false;
-}
+    function hideNoDataBanner() {
+        var banner = $('noDataBanner');
+        if (!banner) return;
+        banner.classList.remove('visible');
+        showingNoDataBanner = false;
+    }
 
-function isDashboardEmpty(data) {
-    if (!data) return true;
-    var total = Number(data.total_queries) || 0;
-    var cacheHits = (data.cache_stats && Number(data.cache_stats.cache_hits)) || 0;
-    var cacheMisses = (data.cache_stats && Number(data.cache_stats.cache_misses)) || 0;
-    var resolverCount = (data.resolver_health && data.resolver_health.length) || 0;
-    var recentCount = (data.recent_queries && data.recent_queries.length) || 0;
-    return (total === 0 && cacheHits === 0 && cacheMisses === 0 && resolverCount === 0 && recentCount === 0);
-}
+    function isDashboardEmpty(data) {
+        if (!data) return true;
+        var total = Number(data.total_queries) || 0;
+        var cacheHits = (data.cache_stats && Number(data.cache_stats.cache_hits)) || 0;
+        var cacheMisses = (data.cache_stats && Number(data.cache_stats.cache_misses)) || 0;
+        var resolverCount = (data.resolver_health && data.resolver_health.length) || 0;
+        var recentCount = (data.recent_queries && data.recent_queries.length) || 0;
+        return (total === 0 && cacheHits === 0 && cacheMisses === 0 && resolverCount === 0 && recentCount === 0);
+    }
 
 // ============================================================
 // [8] Runtime Info
 // ============================================================
-function renderRuntimeInfo(data) {
-    var content = $('runtimeInfoContent');
-    if (!content) return;
+    function renderRuntimeInfo(data) {
+        var content = $('runtimeInfoContent');
+        if (!content) return;
 
-    if (data.webui_port) {
-        PORTS.webui = String(data.webui_port);
-        updateBackToHomeLinks();
-    }
-    if (data.dashboard_port) {
-        PORTS.dashboard = String(data.dashboard_port);
-    }
-
-    if (data.version && data.version !== 'dev') {
-        VERSION = data.version;
-        document.title = 'DNSCrypt Dashboard ' + VERSION;
-        var footer = $('footerText');
-        if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
-    }
-
-    if (data.project_url && data.project_url !== '') {
-        var link = $('footerProjectLink');
-        var linkText = $('footerProjectText');
-        if (link) {
-            link.href = data.project_url;
-            link.style.display = 'inline';
+        if (data.webui_port) {
+            PORTS.webui = String(data.webui_port);
+            updateBackToHomeLinks();
         }
-        if (linkText) linkText.textContent = t('projectLink');
-    }
+        if (data.dashboard_port) {
+            PORTS.dashboard = String(data.dashboard_port);
+        }
 
-    var memDisplay = 'unknown';
-    if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-        memDisplay = String(data.memory_limit_mb) + ' MB';
-    }
+        if (data.version && data.version !== 'dev') {
+            VERSION = data.version;
+            document.title = 'DNSCrypt Dashboard ' + VERSION;
+            var footer = $('footerText');
+            if (footer) footer.textContent = 'DNSCrypt Proxy Dashboard – ' + VERSION + ' Zero-Footprint';
+        }
 
-    var bk = data.backups || {};
-    var bkCount = Number(bk.available) || 0;
-    var bkPath = bk.path || t('riBackupNotInit');
+        if (data.project_url && data.project_url !== '') {
+            var link = $('footerProjectLink');
+            var linkText = $('footerProjectText');
+            if (link) {
+                link.href = data.project_url;
+                link.style.display = 'inline';
+            }
+            if (linkText) linkText.textContent = t('projectLink');
+        }
 
-    // PREMIUM FIX: Convert raw directory names to local time.
-    // Fallback chain: local-time from dirName → raw name → null.
-    var bkLast = dirNameToLocalTime(bk.last_backup_name) ||
-                 dirNameToLocalTime(bk.last_backup) ||
-                 bk.last_backup_name ||
-                 bk.last_backup ||
-                 null;
-    var bkLastStable = dirNameToLocalTime(bk.last_stable) ||
-                       bk.last_stable ||
-                       null;
+        var memDisplay = 'unknown';
+        if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+            memDisplay = String(data.memory_limit_mb) + ' MB';
+        }
 
-    var bkInFlight = Number(bk.in_flight_txn) || 0;
-    var bkOrphan = Number(bk.orphan_txn) || 0;
+        var bk = data.backups || {};
+        var bkCount = Number(bk.available) || 0;
+        var bkPath = bk.path || t('riBackupNotInit');
 
-    var bkCountLabel, bkCountClass;
-    if (bkCount === 0) {
-        bkCountLabel = t('riBackupNone');
-        bkCountClass = 'badge-muted';
-    } else if (bkCount === 1) {
-        bkCountLabel = '1 ' + t('riBackupSingle');
-        bkCountClass = 'badge-ok';
-    } else {
-        bkCountLabel = bkCount + ' ' + t('riBackupPlural');
-        bkCountClass = 'badge-ok';
-    }
+        var bkLast = null;
+        if (bk.last_backup_unix && typeof bk.last_backup_unix === 'number') {
+            bkLast = new Date(bk.last_backup_unix * 1000).toLocaleString(
+                currentLang === 'ar' ? 'ar-EG' : 'en-US',
+                { year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit', second: '2-digit',
+                  hour12: false }
+            );
+        } else if (bk.last_backup_name) {
+            bkLast = dirNameToLocalTime(bk.last_backup_name) || bk.last_backup_name;
+        } else if (bk.last_backup) {
+            bkLast = bk.last_backup;
+        }
 
-    var bkLatestLabel, bkLatestClass;
-    if (bkLast) {
-        bkLatestLabel = bkLast;
-        bkLatestClass = '';
-    } else {
-        bkLatestLabel = t('riBackupNotInit');
-        bkLatestClass = 'badge-warn';
-    }
+        var bkLastStable = dirNameToLocalTime(bk.last_stable) ||
+                           bk.last_stable ||
+                           null;
 
-    var bkLastStableLabel, bkLastStableClass;
-    if (bkLastStable) {
-        bkLastStableLabel = bkLastStable;
-        bkLastStableClass = 'badge-ok';
-    } else {
-        bkLastStableLabel = t('riBackupNone');
-        bkLastStableClass = 'badge-muted';
-    }
+        var bkInFlight = Number(bk.in_flight_txn) || 0;
+        var bkOrphan = Number(bk.orphan_txn) || 0;
 
-    var items = [
-        { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
-        { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
-        { icon:'⏱️', label:t('riBuildTime'), value:data.build_time_human||data.build_time||'unknown' },
-        { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
-        { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
-        { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
-        { icon:'📋', label:t('riProfile'), value:data.profile_key||'unknown' },
-        { icon:'🧠', label:t('riMemoryLimit'), value:memDisplay },
-        { icon:'💾', label:t('riBackupCount'), value:bkCountLabel, valueClass:bkCountClass },
-        { icon:'🕒', label:t('riBackupLatest'), value:bkLatestLabel, valueClass:bkLatestClass },
-        { icon:'🎯', label:t('riBackupLastStable'), value:bkLastStableLabel, valueClass:bkLastStableClass }
-    ];
-
-    if (bk.in_flight_txn !== undefined) {
-        items.push({ icon:'⏳', label:t('riBackupInFlight'), value:String(bkInFlight), valueClass:(bkInFlight > 0 ? 'badge-warn' : 'badge-muted') });
-    }
-    if (bk.orphan_txn !== undefined) {
-        items.push({ icon:'🗃️', label:t('riBackupOrphan'), value:String(bkOrphan), valueClass:(bkOrphan > 0 ? 'badge-warn' : 'badge-muted') });
-    }
-
-    items.push(
-        { icon:'📁', label:t('riBackupPath'), value:bkPath, valueClass:'badge-muted' },
-        { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
-        { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
-        { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
-        { icon:'📊', label:t('riProgressFile'), value:data.progress_file||'unknown' },
-        { icon:'📝', label:t('riLogFile'), value:data.log_file||'unknown' },
-        { icon:'🔌', label:t('riBindAddr'), value:data.bind_addr||'127.0.0.1' }
-    );
-
-    var html = '';
-    for (var i = 0; i < items.length; i++) {
-        var valHtml;
-        if (items[i].isLink && items[i].value !== 'unknown') {
-            valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+        var bkCountLabel, bkCountClass;
+        if (bkCount === 0) {
+            bkCountLabel = t('riBackupNone');
+            bkCountClass = 'badge-muted';
+        } else if (bkCount === 1) {
+            bkCountLabel = '1 ' + t('riBackupSingle');
+            bkCountClass = 'badge-ok';
         } else {
-            valHtml = escapeHtml(items[i].value);
+            bkCountLabel = bkCount + ' ' + t('riBackupPlural');
+            bkCountClass = 'badge-ok';
         }
-        var valCls = 'ri-value' + (items[i].valueClass ? ' ' + items[i].valueClass : '');
-        html += '<div class="ri-item"><span class="ri-label"><span class="ri-icon">' + items[i].icon + '</span>' + escapeHtml(items[i].label) + '</span><span class="' + valCls + '">' + valHtml + '</span></div>';
-    }
-    content.innerHTML = html;
-}
 
-function loadRuntimeInfo() {
-    var card = $('runtimeInfoCard');
-    var content = $('runtimeInfoContent');
-    var refreshBtn = $('riRefreshBtn');
-    if (!card || !content) return;
-    if (runtimeInfoLoading) return;
-    runtimeInfoLoading = true;
-    card.style.display = 'block';
-    if (refreshBtn) { refreshBtn.disabled = true; }
-    if (!content.querySelector('.ri-item')) content.innerHTML = '<div class="ri-loading">' + t('riLoading') + '</div>';
-    var url = '/api/runtime_info?_=' + Date.now();
-    xhrGet(url, function(err, data) {
-        runtimeInfoLoading = false;
-        if (refreshBtn) refreshBtn.disabled = false;
-        if (err || !data) {
-            content.innerHTML = '<div class="ri-error">' + t('riError') + '</div>';
+        var bkLatestLabel, bkLatestClass;
+        if (bkLast) {
+            bkLatestLabel = bkLast;
+            bkLatestClass = '';
+        } else {
+            bkLatestLabel = t('riBackupNotInit');
+            bkLatestClass = 'badge-warn';
+        }
+
+        var bkLastStableLabel, bkLastStableClass;
+        if (bkLastStable) {
+            bkLastStableLabel = bkLastStable;
+            bkLastStableClass = 'badge-ok';
+        } else {
+            bkLastStableLabel = t('riBackupNone');
+            bkLastStableClass = 'badge-muted';
+        }
+
+        var items = [
+            { icon:'🏷️', label:t('riVersion'), value:data.version||'unknown' },
+            { icon:'🔗', label:t('riCommit'), value:data.commit||'unknown' },
+            { icon:'⏱️', label:t('riBuildTime'), value:data.build_time_human||data.build_time||'unknown' },
+            { icon:'🌐', label:t('riProjectURL'), value:data.project_url||'unknown', isLink:true },
+            { icon:'🚪', label:t('riWebuiPort'), value:data.webui_port||'9090' },
+            { icon:'📊', label:t('riDashboardPort'), value:data.dashboard_port||'9091' },
+            { icon:'📋', label:t('riProfile'), value:data.profile_key||'unknown' },
+            { icon:'🧠', label:t('riMemoryLimit'), value:memDisplay },
+            { icon:'💾', label:t('riBackupCount'), value:bkCountLabel, valueClass:bkCountClass },
+            { icon:'🕒', label:t('riBackupLatest'), value:bkLatestLabel, valueClass:bkLatestClass },
+            { icon:'🎯', label:t('riBackupLastStable'), value:bkLastStableLabel, valueClass:bkLastStableClass }
+        ];
+
+        if (bk.in_flight_txn !== undefined) {
+            items.push({ icon:'⏳', label:t('riBackupInFlight'), value:String(bkInFlight), valueClass:(bkInFlight > 0 ? 'badge-warn' : 'badge-muted') });
+        }
+        if (bk.orphan_txn !== undefined) {
+            items.push({ icon:'🗃️', label:t('riBackupOrphan'), value:String(bkOrphan), valueClass:(bkOrphan > 0 ? 'badge-warn' : 'badge-muted') });
+        }
+
+        items.push(
+            { icon:'📁', label:t('riBackupPath'), value:bkPath, valueClass:'badge-muted' },
+            { icon:'📁', label:t('riRunDir'), value:data.run_dir||'unknown' },
+            { icon:'📄', label:t('riStatusFile'), value:data.status_file||'unknown' },
+            { icon:'🔢', label:t('riPidFile'), value:data.pid_file||'unknown' },
+            { icon:'📊', label:t('riProgressFile'), value:data.progress_file||'unknown' },
+            { icon:'📝', label:t('riLogFile'), value:data.log_file||'unknown' },
+            { icon:'🔌', label:t('riBindAddr'), value:data.bind_addr||'127.0.0.1' }
+        );
+
+        var html = '';
+        for (var i = 0; i < items.length; i++) {
+            var valHtml;
+            if (items[i].isLink && items[i].value !== 'unknown') {
+                valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+            } else {
+                valHtml = escapeHtml(items[i].value);
+            }
+            var valCls = 'ri-value' + (items[i].valueClass ? ' ' + items[i].valueClass : '');
+            html += '<div class="ri-item"><span class="ri-label"><span class="ri-icon">' + items[i].icon + '</span>' + escapeHtml(items[i].label) + '</span><span class="' + valCls + '">' + valHtml + '</span></div>';
+        }
+        content.innerHTML = html;
+    }
+
+    function loadRuntimeInfo(cb) {
+        var card = $('runtimeInfoCard');
+        var content = $('runtimeInfoContent');
+        var refreshBtn = $('riRefreshBtn');
+        if (!card || !content) {
+            if (typeof cb === 'function') cb();
             return;
         }
-        lastRuntimeData = data;
-        renderRuntimeInfo(data);
-    });
-}
+        if (runtimeInfoLoading) {
+            if (typeof cb === 'function') cb();
+            return;
+        }
+        runtimeInfoLoading = true;
+        card.style.display = 'block';
+        if (refreshBtn) { refreshBtn.disabled = true; }
+        if (!content.querySelector('.ri-item')) content.innerHTML = '<div class="ri-loading">' + t('riLoading') + '</div>';
+        var url = '/api/runtime_info?_=' + Date.now();
+        xhrGet(url, function(err, data) {
+            runtimeInfoLoading = false;
+            if (refreshBtn) refreshBtn.disabled = false;
+            if (err || !data) {
+                content.innerHTML = '<div class="ri-error">' + t('riError') + '</div>';
+                if (typeof cb === 'function') cb();
+                return;
+            }
+            lastRuntimeData = data;
+            renderRuntimeInfo(data);
+            if (typeof cb === 'function') cb();
+        });
+    }
 
 // ============================================================
 // [9] Log files
 // ============================================================
-function loadLogFiles() {
-    var card = $('diagFilesCard');
-    var content = $('diagFilesContent');
-    var btn = $('dfRefreshBtn');
-    if (!card || !content) return;
-    card.style.display = 'block';
-    if (btn) btn.disabled = true;
-    if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
-    xhrGet('/api?action=list_logs&_=' + Date.now(), function(err, data) {
-        if (btn) btn.disabled = false;
-        if (err || !data || !data.files) {
-            content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+    function loadLogFiles(cb) {
+        var card = $('diagFilesCard');
+        var content = $('diagFilesContent');
+        var btn = $('dfRefreshBtn');
+        if (!card || !content) {
+            if (typeof cb === 'function') cb();
             return;
         }
-        logFilesData = data;
-        renderLogFiles();
-    });
-}
-function renderLogFiles() {
-    var content = $('diagFilesContent');
-    if (!content || !logFilesData || !logFilesData.files) return;
-    var active = [], archive = [], emergency = [], sensitive = [];
-    for (var i = 0; i < logFilesData.files.length; i++) {
-        var f = logFilesData.files[i];
-        switch (f.type) {
-            case 'active': active.push(f); break;
-            case 'archive': archive.push(f); break;
-            case 'emergency': emergency.push(f); break;
-            case 'sensitive': sensitive.push(f); break;
-        }
-    }
-    var html = '';
-    html += renderSection('🟢', t('dfActiveFiles'), active);
-    html += renderSection('🗜️', t('dfArchiveFiles'), archive);
-    html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
-    if (sensitive.length > 0) {
-        html += '<div class="df-section"><div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
-        if (!sensitiveRevealed) {
-            html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
-        } else {
-            for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
-            html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
-        }
-        html += '</div>';
-    }
-    content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
-
-    content.querySelectorAll('[data-action]').forEach(function(el) {
-        var action = el.getAttribute('data-action');
-        if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
-        else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
-        else if (action === 'view-log') {
-            el.addEventListener('click', function() {
-                viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-            });
-        }
-        else if (action === 'download-log') {
-            el.addEventListener('click', function() {
-                downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-            });
-        }
-    });
-}
-function renderSection(icon, label, files) {
-    if (!files || files.length === 0) return '';
-    var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
-    for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
-    html += '</div>';
-    return html;
-}
-function renderFileRow(file, isSensitive) {
-    var sens = isSensitive ? '1' : '0';
-    return '<div class="df-file">'
-         + '<div class="df-file-info">'
-         + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
-         + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
-         + '</div>'
-         + '<div class="df-file-actions">'
-         + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
-         + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
-         + '</div></div>';
-}
-function revealSensitive() {
-    showConfirmModal(t('dfConfirmSensitive'), function(ok) {
-        if (ok) { sensitiveRevealed = true; renderLogFiles(); }
-    }, { title: '⚠️ ' + t('confirmTitle') });
-}
-function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
-
-function viewLogFile(name, isSensitive) {
-    var url = '/api?action=read_log&file=' + encodeURIComponent(name);
-    if (isSensitive) url += '&confirm=1';
-    var modal = $('fileViewerModal');
-    var title = $('fvTitle');
-    var body = $('fvContent');
-    var warning = $('fvWarning');
-    title.textContent = name;
-    body.textContent = t('dfLoading');
-    warning.style.display = isSensitive ? 'block' : 'none';
-    warning.textContent = t('dfSensitiveWarning');
-    modal.style.display = 'flex';
-    currentViewerFile = { name: name, sensitive: isSensitive };
-    xhrGet(url + '&_=' + Date.now(), function(err, data) {
-        if (err || !data || data.status !== 'ok') {
-            body.textContent = t('dfFailedToLoad');
-            return;
-        }
-        var content = data.content || '';
-        if (data.truncated) content = t('dfTruncatedPrefix') + content;
-        body.textContent = content || t('dfEmpty');
-        body.scrollTop = body.scrollHeight;
-    });
-}
-function downloadLogFile(name, isSensitive) {
-    var url = '/api/download_log?file=' + encodeURIComponent(name);
-    if (isSensitive) url += '&confirm=1';
-    showMsg(t('dfDownloading'), 'info', 1500);
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.withCredentials = true;
-    xhr.responseType = 'blob';
-    xhr.onload = function() {
-        if (xhr.status === 200) {
-            var blob = new Blob([xhr.response]);
-            var a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-        }
-    };
-    xhr.send();
-}
-function downloadCurrentFile() {
-    if (!currentViewerFile) return;
-    downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
-}
-function clearCurrentFile() {
-    if (!currentViewerFile) return;
-    var name = currentViewerFile.name;
-    showConfirmModal(t('fvClearConfirm'), function(confirmed) {
-        if (!confirmed) return;
-        xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
-            if (err || !data || data.status !== 'ok') {
-                showMsg((data && data.message) || t('fvClearError'), 'error', 3000);
+        card.style.display = 'block';
+        if (btn) btn.disabled = true;
+        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+        xhrGet('/api?action=list_logs&_=' + Date.now(), function(err, data) {
+            if (btn) btn.disabled = false;
+            if (err || !data || !data.files) {
+                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+                if (typeof cb === 'function') cb();
                 return;
             }
-            showMsg(t('fvClearSuccess'), 'success', 2500);
-            closeFileViewer();
-            setTimeout(function() { loadLogFiles(); }, 500);
+            logFilesData = data;
+            renderLogFiles();
+            if (typeof cb === 'function') cb();
         });
-    });
-}
-function closeFileViewer() {
-    $('fileViewerModal').style.display = 'none';
-    currentViewerFile = null;
-}
+    }
+    function renderLogFiles() {
+        var content = $('diagFilesContent');
+        if (!content || !logFilesData || !logFilesData.files) return;
+        var active = [], archive = [], emergency = [], sensitive = [];
+        for (var i = 0; i < logFilesData.files.length; i++) {
+            var f = logFilesData.files[i];
+            switch (f.type) {
+                case 'active': active.push(f); break;
+                case 'archive': archive.push(f); break;
+                case 'emergency': emergency.push(f); break;
+                case 'sensitive': sensitive.push(f); break;
+            }
+        }
+        var html = '';
+        html += renderSection('🟢', t('dfActiveFiles'), active);
+        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+        if (sensitive.length > 0) {
+            html += '<div class="df-section"><div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+            if (!sensitiveRevealed) {
+                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+            } else {
+                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+            }
+            html += '</div>';
+        }
+        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+
+        content.querySelectorAll('[data-action]').forEach(function(el) {
+            var action = el.getAttribute('data-action');
+            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+            else if (action === 'view-log') {
+                el.addEventListener('click', function() {
+                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+            else if (action === 'download-log') {
+                el.addEventListener('click', function() {
+                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+        });
+    }
+    function renderSection(icon, label, files) {
+        if (!files || files.length === 0) return '';
+        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+        html += '</div>';
+        return html;
+    }
+    function renderFileRow(file, isSensitive) {
+        var sens = isSensitive ? '1' : '0';
+        return '<div class="df-file">'
+             + '<div class="df-file-info">'
+             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+             + '</div>'
+             + '<div class="df-file-actions">'
+             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+             + '</div></div>';
+    }
+    function revealSensitive() {
+        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+        }, { title: '⚠️ ' + t('confirmTitle') });
+    }
+    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+
+    function viewLogFile(name, isSensitive) {
+        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        var modal = $('fileViewerModal');
+        var title = $('fvTitle');
+        var body = $('fvContent');
+        var warning = $('fvWarning');
+        title.textContent = name;
+        body.textContent = t('dfLoading');
+        warning.style.display = isSensitive ? 'block' : 'none';
+        warning.textContent = t('dfSensitiveWarning');
+        modal.style.display = 'flex';
+        currentViewerFile = { name: name, sensitive: isSensitive };
+        xhrGet(url + '&_=' + Date.now(), function(err, data) {
+            if (err || !data || data.status !== 'ok') {
+                body.textContent = t('dfFailedToLoad');
+                return;
+            }
+            var content = data.content || '';
+            if (data.truncated) content = t('dfTruncatedPrefix') + content;
+            body.textContent = content || t('dfEmpty');
+            body.scrollTop = body.scrollHeight;
+        });
+    }
+
+    function downloadLogFile(name, isSensitive) {
+        var url = '/api/download_log?file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        showMsg(t('dfDownloading'), 'info', 1500);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.withCredentials = true;
+        xhr.responseType = 'blob';
+        xhr.timeout = 30000;
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var blob = new Blob([xhr.response]);
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+            } else if (xhr.status === 401) {
+                handleSessionExpired();
+            } else if (xhr.status === 413) {
+                showMsg(t('fileTooLarge'), 'error', 4000);
+            } else if (xhr.status === 405) {
+                showMsg(t('methodNotAllowed'), 'warning', 3000);
+            } else {
+                showMsg(t('dfDownloadError') + (xhr.status ? ' (' + xhr.status + ')' : ''), 'error', 3000);
+            }
+        };
+        xhr.onerror = function() {
+            showMsg(t('dfDownloadError'), 'error', 3000);
+        };
+        xhr.ontimeout = function() {
+            showMsg(t('dfDownloadError'), 'error', 3000);
+        };
+        xhr.send();
+    }
+    function downloadCurrentFile() {
+        if (!currentViewerFile) return;
+        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+    }
+    function clearCurrentFile() {
+        if (!currentViewerFile) return;
+        var name = currentViewerFile.name;
+        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+            if (!confirmed) return;
+            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+                if (err || !data || data.status !== 'ok') {
+                    showMsg((data && data.message) || t('fvClearError'), 'error', 3000);
+                    return;
+                }
+                showMsg(t('fvClearSuccess'), 'success', 2500);
+                closeFileViewer();
+                setTimeout(function() { loadLogFiles(); }, 500);
+            });
+        });
+    }
+    function closeFileViewer() {
+        $('fileViewerModal').style.display = 'none';
+        currentViewerFile = null;
+    }
 
 // ============================================================
 // [10] Toast
 // ============================================================
-function showMsg(text, type, duration) {
-    duration = duration || 2500;
-    var existing = document.getElementById('__toast');
-    if (existing) existing.remove();
-    var t2 = document.createElement('div');
-    t2.id = '__toast';
-    var bg = type === 'error' ? 'rgba(248,81,73,0.9)' : 'rgba(63,185,80,0.9)';
-    t2.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;padding:14px 24px;border-radius:12px;background:' + bg + ';color:white;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;max-width:85%;white-space:pre-wrap;';
-    t2.textContent = text;
-    document.body.appendChild(t2);
-    setTimeout(function() {
-        t2.style.transition = 'opacity 0.4s';
-        t2.style.opacity = '0';
-        setTimeout(function() { t2.remove(); }, 400);
-    }, duration);
-}
+    function showMsg(text, type, duration) {
+        duration = duration || 2500;
+        var existing = document.getElementById('__toast');
+        if (existing) existing.remove();
+        var t2 = document.createElement('div');
+        t2.id = '__toast';
+        var bgMap = {
+            'error':   'rgba(248,81,73,0.9)',
+            'warning': 'rgba(210,153,34,0.9)',
+            'info':    'rgba(88,166,255,0.9)',
+            'success': 'rgba(63,185,80,0.9)'
+        };
+        var bg = bgMap[type] || bgMap.info;
+        t2.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;padding:14px 24px;border-radius:12px;background:' + bg + ';color:white;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;max-width:85%;white-space:pre-wrap;';
+        t2.textContent = text;
+        document.body.appendChild(t2);
+        setTimeout(function() {
+            t2.style.transition = 'opacity 0.4s';
+            t2.style.opacity = '0';
+            setTimeout(function() { t2.remove(); }, 400);
+        }, duration);
+    }
 
 // ============================================================
 // [10b] Card-expand hint
 // ============================================================
-function showCardHint() {
-    var existing = document.getElementById('__cardHint');
-    if (existing) {
-        existing.classList.add('visible');
-        resetCardHintTimer(existing);
-        return;
+    function showCardHint() {
+        var existing = document.getElementById('__cardHint');
+        if (existing) {
+            existing.classList.add('visible');
+            resetCardHintTimer(existing);
+            return;
+        }
+
+        var hint = document.createElement('div');
+        hint.id = '__cardHint';
+        hint.className = 'card-hint';
+        hint.textContent = t('cardHintExpand');
+        hint.setAttribute('role', 'status');
+        hint.setAttribute('aria-live', 'polite');
+        document.body.appendChild(hint);
+
+        requestAnimationFrame(function() {
+            hint.classList.add('visible');
+        });
+
+        resetCardHintTimer(hint);
     }
 
-    var hint = document.createElement('div');
-    hint.id = '__cardHint';
-    hint.className = 'card-hint';
-    hint.textContent = t('cardHintExpand');
-    hint.setAttribute('role', 'status');
-    hint.setAttribute('aria-live', 'polite');
-    document.body.appendChild(hint);
+    function resetCardHintTimer(hintEl) {
+        if (cardHintTimer) { clearTimeout(cardHintTimer); cardHintTimer = null; }
+        if (cardHintRemoveTimer) { clearTimeout(cardHintRemoveTimer); cardHintRemoveTimer = null; }
 
-    requestAnimationFrame(function() {
-        hint.classList.add('visible');
-    });
-
-    resetCardHintTimer(hint);
-}
-
-function resetCardHintTimer(hintEl) {
-    if (cardHintTimer) { clearTimeout(cardHintTimer); cardHintTimer = null; }
-    if (cardHintRemoveTimer) { clearTimeout(cardHintRemoveTimer); cardHintRemoveTimer = null; }
-
-    cardHintTimer = setTimeout(function() {
-        cardHintTimer = null;
-        hintEl.classList.remove('visible');
-        cardHintRemoveTimer = setTimeout(function() {
-            cardHintRemoveTimer = null;
-            if (hintEl.parentNode) hintEl.parentNode.removeChild(hintEl);
-        }, 400);
-    }, 4000);
-}
+        cardHintTimer = setTimeout(function() {
+            cardHintTimer = null;
+            hintEl.classList.remove('visible');
+            cardHintRemoveTimer = setTimeout(function() {
+                cardHintRemoveTimer = null;
+                if (hintEl.parentNode) hintEl.parentNode.removeChild(hintEl);
+            }, 400);
+        }, 4000);
+    }
 
 // ============================================================
 // [11] Diagnostics + network-down UI
 // ============================================================
-function setNetworkDownUI(isDown) {
-    var txt = $('diagSse');
-    if (!txt) return;
-    networkDownActive = isDown;
-    if (isDown) {
-        txt.textContent = t('networkDown');
-        txt.style.color = 'var(--warning)';
-        $('sseDot').className = 'sse-dot disconnected';
+    function setNetworkDownUI(isDown) {
+        var txt = $('diagSse');
+        if (!txt) return;
+        networkDownActive = isDown;
+        if (isDown) {
+            txt.textContent = t('networkDown');
+            txt.style.color = 'var(--warning)';
+            $('sseDot').className = 'sse-dot disconnected';
+        }
     }
-}
 
-function updateDiagnostics() {
-    var sseEl = $('diagSse');
-    if (networkDownActive) {
-        sseEl.textContent = t('networkDown');
-        sseEl.style.color = 'var(--warning)';
-        $('sseDot').className = 'sse-dot disconnected';
-    } else if (sseConnected) {
-        sseEl.textContent = t('diagSseConnected');
-        sseEl.style.color = 'var(--success)';
-        $('sseDot').className = 'sse-dot connected';
-    } else {
-        sseEl.textContent = t('diagSseDisconnected');
-        sseEl.style.color = 'var(--warning)';
-        $('sseDot').className = 'sse-dot disconnected';
+    function updateDiagnostics() {
+        var sseEl = $('diagSse');
+        if (networkDownActive) {
+            sseEl.textContent = t('networkDown');
+            sseEl.style.color = 'var(--warning)';
+            $('sseDot').className = 'sse-dot disconnected';
+        } else if (sseConnected) {
+            sseEl.textContent = t('diagSseConnected');
+            sseEl.style.color = 'var(--success)';
+            $('sseDot').className = 'sse-dot connected';
+        } else {
+            sseEl.textContent = t('diagSseDisconnected');
+            sseEl.style.color = 'var(--warning)';
+            $('sseDot').className = 'sse-dot disconnected';
+        }
+        var refreshEl = $('diagRefresh');
+        if (lastRefreshTime) refreshEl.textContent = t('diagLastRefresh') + formatLocalTime(lastRefreshTime);
+        else refreshEl.textContent = t('diagLastRefresh') + t('never');
+        $('diagFailures').textContent = t('diagFailures') + failureCount;
     }
-    var refreshEl = $('diagRefresh');
-    if (lastRefreshTime) refreshEl.textContent = t('diagLastRefresh') + formatLocalTime(lastRefreshTime);
-    else refreshEl.textContent = t('diagLastRefresh') + t('never');
-    $('diagFailures').textContent = t('diagFailures') + failureCount;
-}
 
 // ============================================================
 // [12] UI strings
 // ============================================================
-function updateNavLinks() {
-    var nav = $('sectionNav');
-    var links = [
-        { id:'runtimeInfoCard', key:'navRuntimeInfo' },
-        { id:'diagFilesCard',   key:'navDiagFiles' },
-        { id:'overview',        key:'navOverview' },
-        { id:'cache',           key:'navCache' },
-        { id:'query-types',     key:'navQueryTypes' },
-        { id:'resolvers',       key:'navResolvers' },
-        { id:'top-domains',     key:'navTopDomains' },
-        { id:'sources',         key:'navSources' },
-        { id:'recent',          key:'navRecent' }
-    ];
-    nav.innerHTML = links.map(function(l) { return '<a href="#' + l.id + '">' + t(l.key) + '</a>'; }).join('');
-}
-
-function updateUIStrings() {
-    $('pageTitle').textContent = t('pageTitle');
-    var langIcon = $('langIcon'); if (langIcon) langIcon.textContent = currentLang === 'ar' ? '🇬🇧' : '🇸🇦';
-    var langText = $('langText'); if (langText) langText.textContent = currentLang === 'ar' ? 'English' : 'العربية';
-    $('rawText').textContent = t('rawData');
-    $('refreshText').textContent = isRefreshing ? t('refreshing') : t('refresh');
-    var riTitle = $('riTitle'); if (riTitle) riTitle.textContent = t('riTitle');
-    var riRefreshText = $('riRefreshText'); if (riRefreshText) riRefreshText.textContent = t('riRefresh');
-    var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
-    var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
-    var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
-    var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
-    var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
-    var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
-
-    var swTxt = $('swUpdateText');
-    if (swTxt) swTxt.textContent = t('swUpdateAvailable');
-    var swReload = $('swUpdateReloadBtn');
-    if (swReload) swReload.textContent = t('swUpdateReload');
-
-    if (showingNoDataBanner) showNoDataBanner();
-
-    updateNavLinks();
-}
-
-function toggleLanguage() {
-    currentLang = currentLang === 'ar' ? 'en' : 'ar';
-    try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
-    document.documentElement.lang = currentLang;
-    document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-    updateUIStrings();
-    updateDiagnostics();
-    if (dataCache) renderDashboard(dataCache);
-    if (logFilesData) renderLogFiles();
-    if (lastRuntimeData) renderRuntimeInfo(lastRuntimeData);
-
-    var visibleHint = document.getElementById('__cardHint');
-    if (visibleHint) {
-        visibleHint.textContent = t('cardHintExpand');
+    function updateNavLinks() {
+        var nav = $('sectionNav');
+        var links = [
+            { id:'runtimeInfoCard', key:'navRuntimeInfo' },
+            { id:'diagFilesCard',   key:'navDiagFiles' },
+            { id:'overview',        key:'navOverview' },
+            { id:'cache',           key:'navCache' },
+            { id:'query-types',     key:'navQueryTypes' },
+            { id:'resolvers',       key:'navResolvers' },
+            { id:'top-domains',     key:'navTopDomains' },
+            { id:'sources',         key:'navSources' },
+            { id:'recent',          key:'navRecent' }
+        ];
+        nav.innerHTML = links.map(function(l) { return '<a href="#' + l.id + '">' + t(l.key) + '</a>'; }).join('');
     }
-}
 
-function toggleIdleResolvers() {
-    showIdleResolvers = !showIdleResolvers;
-    try { localStorage.setItem('dnscrypt-show-idle', showIdleResolvers); } catch(e) {}
-    if (dataCache) renderDashboard(dataCache);
-}
+    function updateUIStrings() {
+        $('pageTitle').textContent = t('pageTitle');
+        var langIcon = $('langIcon'); if (langIcon) langIcon.textContent = currentLang === 'ar' ? '🇬🇧' : '🇸🇦';
+        var langText = $('langText'); if (langText) langText.textContent = currentLang === 'ar' ? 'English' : 'العربية';
+        $('rawText').textContent = t('rawData');
+        $('refreshText').textContent = isRefreshing ? t('refreshing') : t('refresh');
+        var riTitle = $('riTitle'); if (riTitle) riTitle.textContent = t('riTitle');
+        var riRefreshText = $('riRefreshText'); if (riRefreshText) riRefreshText.textContent = t('riRefresh');
+        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+        var swTxt = $('swUpdateText');
+        if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+        var swReload = $('swUpdateReloadBtn');
+        if (swReload) swReload.textContent = t('swUpdateReload');
+
+        if (showingNoDataBanner) showNoDataBanner();
+
+        updateNavLinks();
+    }
+
+    function toggleLanguage() {
+        currentLang = currentLang === 'ar' ? 'en' : 'ar';
+        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        updateUIStrings();
+        updateDiagnostics();
+        if (dataCache) renderDashboard(dataCache);
+        if (logFilesData) renderLogFiles();
+        if (lastRuntimeData) renderRuntimeInfo(lastRuntimeData);
+
+        var visibleHint = document.getElementById('__cardHint');
+        if (visibleHint) {
+            visibleHint.textContent = t('cardHintExpand');
+        }
+    }
+
+    function toggleIdleResolvers() {
+        showIdleResolvers = !showIdleResolvers;
+        try { localStorage.setItem('dnscrypt-show-idle', showIdleResolvers); } catch(e) {}
+        if (dataCache) renderDashboard(dataCache);
+    }
 
 // ============================================================
 // [13] Empty-state helper
@@ -1477,7 +1495,6 @@ function toggleIdleResolvers() {
 // [15] Fetch Dashboard
 // ============================================================
     function stopPolling() {
-        sessionExpired = true;
         if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
         if (sse) { sse.close(); sse = null; }
         if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
@@ -1658,14 +1675,33 @@ function toggleIdleResolvers() {
 
         installControllerChangeHandler();
 
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (!event.data) return;
-            if (event.data.type === 'UPDATE_AVAILABLE') {
-                if (event.data.waiting && swRegistration && swRegistration.waiting) {
-                    showSWUpdateBanner();
+        if (!swMessageHandlerInstalled) {
+            navigator.serviceWorker.addEventListener('message', function(event) {
+                if (!event.data || typeof event.data.type !== 'string') return;
+
+                switch (event.data.type) {
+                    case 'UPDATE_AVAILABLE':
+                        if (event.data.waiting && swRegistration && swRegistration.waiting) {
+                            showSWUpdateBanner();
+                        }
+                        return;
+
+                    case 'SW_PRECACHE_PARTIAL':
+                        var failedCount = parseInt(event.data.failedCount, 10) || 0;
+                        console.warn('[SW] Precache incomplete:', failedCount, 'failures',
+                                     event.data.failures || []);
+                        var msg = t('swPrecacheIncomplete').replace('{N}', String(failedCount));
+                        showMsg(msg, 'warning', 5000);
+                        return;
+
+                    case 'SW_ERROR':
+                        console.error('[SW] Error:', event.data.message || '(no message)');
+                        showMsg(t('swError') + ': ' + (event.data.message || ''), 'error', 5000);
+                        return;
                 }
-            }
-        });
+            });
+            swMessageHandlerInstalled = true;
+        }
 
         if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
         swUpdateCheckInterval = setInterval(function() {
@@ -1846,9 +1882,29 @@ function toggleIdleResolvers() {
     }
 
 // ============================================================
-// [20] beforeunload
+// [20] Page lifecycle
 // ============================================================
-    window.addEventListener('beforeunload', function() { stopPolling(); });
+    window.addEventListener('pagehide', function() {
+        stopPolling();
+    });
+
+    window.addEventListener('pageshow', function(e) {
+        if (!e.persisted) return;
+
+        if (sessionExpired) {
+            handleSessionExpired();
+            return;
+        }
+
+        fetchDashboardData(false);
+        initSSE();
+        if (!refreshInterval) {
+            refreshInterval = setInterval(function() { fetchDashboardData(true); }, 30000);
+        }
+        loadRuntimeInfo();
+        loadLogFiles();
+        setupSWUpdateHandler();
+    });
 
 // ============================================================
 // [21] Boot
@@ -1891,9 +1947,7 @@ function toggleIdleResolvers() {
                 });
 
                 setupSWUpdateHandler();
-            }).catch(function() {
-                // Silent — non-critical.
-            });
+            }).catch(function() { });
         }
 
         loadRuntimeInfo();

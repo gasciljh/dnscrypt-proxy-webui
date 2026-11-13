@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter — devcontainer setup
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # ============================================================
 # Runs automatically after the devcontainer is created
 # (postCreateCommand). Installs all tools required for
@@ -39,35 +39,70 @@
 #   6. Android NDK check (optional)
 #   7. Project setup (permissions, pre-commit hooks)
 #
+# ============================================================
+# Module layout (v1.6.0)
+# ============================================================
+# The shell scripts live at the REPOSITORY ROOT, not under
+# proxy/:
+#   • Root shell scripts (10):
+#       boot-mini.sh, functions.sh, customize.sh,
+#       install_app.sh, service.sh, watchdog.sh, status.sh,
+#       action.sh, uninstall.sh, post-fs-data.sh
+#   • lib/*.sh (Layer 0, 6 modules; 0644 — sourced, not exec):
+#       lib/constants.sh, lib/fallbacks.sh, lib/process.sh,
+#       lib/http.sh, lib/backup.sh, lib/firewall.sh
+#   • proxy/build.sh (0755 — this is the only shell script
+#       under proxy/; the rest of proxy/ is Go + config)
+#
 # Idempotency: each tool install is wrapped in a
 # `command -v` check, so re-running installs only what is
 # missing. Individual tool failures are logged as warnings and
 # do not abort the script — a partial toolchain is still usable.
 #
+# ============================================================
+# v1.6.0 additions:
+#   • No new tool required. v1.6.0 adds lib/*.sh (6 modules)
+#     and boot-mini.sh (Layer 1 aggregator), plus the Makefile
+#     targets check-boot-mini and check-consistency — all
+#     covered by the existing shellcheck / shfmt toolchain.
+#   • Section [7] Project setup fixed: root-level shell
+#     scripts (including install_app.sh and boot-mini.sh) are
+#     chmod'ed at the repo root, and lib/*.sh are chmod'ed to
+#     0644 (sourced, not executed).
+#   • ADR-0003 (Layered Bootstrap) EXTENDED from 2-layer to
+#     3-layer; see docs/adr/0003-layered-bootstrap.md
+#     §Extension. No new ADR file.
+#
 # v1.5.0 additions:
 #   • No new tool is required. v1.5.0 adds boot-mini.sh
-#     (Layer 0) and install_app.sh (companion install) —
-#     both covered by the existing toolchain.
+#     (Layer 1) and install_app.sh (companion install) at the
+#     repo root — both covered by the existing toolchain.
 #
-#   ⚠️ The 10 defensive layers (v1.2.0) and the companion
-#      install cascade (v1.5.0) CANNOT be fully tested in a
-#      dev container. They require a real Android device (or
-#      emulator with root) because they depend on:
+#   ⚠️ The 10 defensive layers (v1.2.0), the companion install
+#      cascade (v1.5.0), the modular shell split (v1.6.0), and
+#      the timezone rendering fix (v1.6.0) CANNOT be fully
+#      tested in a dev container. They require a real Android
+#      device (or emulator with root) because they depend on:
 #        - SELinux contexts (restorecon / chcon)
 #        - Magisk / KernelSU / APatch
 #        - /sdcard/ mounts
 #        - Boot lifecycle (post-fs-data, service, boot_completed)
+#        - The Service Worker cache lifecycle
 #      The CI job that covers the runtime scenarios is
 #      .github/workflows/upgrade-test.yml (manual trigger).
 #
 # Cross-references:
 #   • .devcontainer/devcontainer.json  — postCreateCommand
-#   • .github/workflows/ci.yml         — CI matrix
+#   • .github/workflows/ci.yml         — CI matrix (Steps 1-11)
 #   • .github/workflows/upgrade-test.yml — 42-scenario matrix
 #   • .pre-commit-config.yaml          — pre-commit hooks
+#   • docs/REFERENCE.md §1.4           — Layered Bootstrap (3-layer, v1.6.0)
 #   • docs/REFERENCE.md §4             — backup reference
+#   • docs/REFERENCE.md §4.6.5         — SNAP-*/ROT-* rules
 #   • docs/GUIDE.md §8                 — recovery guide
-#   • docs/REFERENCE.md §3             — v1.3.0 SNAP-*/ROT-*
+#   • docs/adr/0003-layered-bootstrap.md — §Extension (3-layer)
+#   • Makefile check-boot-mini         — local Layer 0/1/2 check
+#   • Makefile check-consistency       — docs path/version check (v1.6.0)
 #   • CHANGELOG.md                     — version history
 # ============================================================
 
@@ -95,7 +130,7 @@ log_info()  { echo -e "  ${DIM}·${NC} $1"; }
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BOLD}║  🔧 DNSCrypt Smart Filter – DevContainer Setup           ║${NC}"
-echo -e "${BOLD}║  ${DIM}v1.4.0${NC}                                                 ${BOLD}║${NC}"
+echo -e "${BOLD}║  ${DIM}v1.6.0${NC}                                                 ${BOLD}║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -217,11 +252,6 @@ if ! echo "$PATH" | grep -q "$GOBIN"; then
 fi
 
 # --- golangci-lint (v2.5.0) ---
-#
-# See the "golangci-lint v2 — path note" in the header for the
-# rationale behind the version check regex and the v2 module
-# path. Do not downgrade to v1 without updating the check regex.
-# ============================================================
 GOLANGCI_VERSION="v2.5.0"
 GOLANGCI_INSTALLED=0
 
@@ -240,19 +270,15 @@ fi
 if [ "$GOLANGCI_INSTALLED" = "0" ]; then
     log_info "Installing golangci-lint ${GOLANGCI_VERSION}..."
 
-    # Remove the old version first
     if command -v golangci-lint >/dev/null 2>&1; then
         OLD_PATH=$(command -v golangci-lint)
         log_info "Removing old version from: $OLD_PATH"
         $SUDO rm -f "$OLD_PATH" 2>/dev/null || rm -f "$OLD_PATH" 2>/dev/null || true
     fi
 
-    # Install via go install (v2 path)
     if go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION}" 2>/dev/null; then
-        # Ensure GOBIN is on PATH
         if [ -x "$GOBIN/golangci-lint" ]; then
             log_ok "golangci-lint installed at $GOBIN/golangci-lint"
-            # Symlink into /usr/local/bin (optional — for compatibility)
             $SUDO ln -sf "$GOBIN/golangci-lint" /usr/local/bin/golangci-lint 2>/dev/null || true
             export PATH="$GOBIN:$PATH"
             GOLANGCI_INSTALLED=1
@@ -261,7 +287,6 @@ if [ "$GOLANGCI_INSTALLED" = "0" ]; then
         log_warn "Failed to install golangci-lint v2.5.0 via go install"
         log_info "Trying install.sh..."
 
-        # Fallback: install.sh with v2 path
         if curl -sSfL "https://raw.githubusercontent.com/golangci/golangci-lint/v2/master/install.sh" | \
             $SUDO sh -s -- -b /usr/local/bin "$GOLANGCI_VERSION" 2>/dev/null; then
             GOLANGCI_INSTALLED=1
@@ -415,24 +440,63 @@ fi
 # ============================================================
 # [10] Project setup
 # ============================================================
+# v1.6.0 fix: shell scripts live at the REPO ROOT, not under
+# proxy/. Only proxy/build.sh is under proxy/. The 6 lib/*.sh
+# modules are sourced (not executed) and are chmod'ed to 0644 —
+# matching customize.sh §[22].
+# ============================================================
 log_step "[7/7] Project setup"
 
-# --- Executable permissions ---
+# --- scripts/*.sh (all executable) ---
 if [ -d "scripts" ]; then
     chmod +x scripts/*.sh 2>/dev/null || true
-    log_ok "scripts/*.sh — executable"
+    _count=$(find scripts -maxdepth 1 -name '*.sh' -type f 2>/dev/null | wc -l | tr -d ' ')
+    log_ok "scripts/*.sh — executable (${_count} file(s))"
 fi
 
-if [ -d "proxy" ]; then
-    for f in build.sh customize.sh service.sh post-fs-data.sh \
-             action.sh status.sh uninstall.sh functions.sh watchdog.sh; do
-        [ -f "proxy/$f" ] && chmod +x "proxy/$f" 2>/dev/null || true
+# --- Root shell scripts (v1.6.0) ---
+# All 10 root shell scripts MUST be executable (0755). Missing
+# any of them from this loop breaks on-device execution.
+ROOT_SCRIPTS="customize.sh install_app.sh boot-mini.sh functions.sh \
+              service.sh watchdog.sh status.sh action.sh \
+              uninstall.sh post-fs-data.sh"
+_ROOT_CHMOD_OK=0
+for f in $ROOT_SCRIPTS; do
+    if [ -f "$f" ]; then
+        chmod 0755 "$f" 2>/dev/null && _ROOT_CHMOD_OK=$((_ROOT_CHMOD_OK + 1))
+    fi
+done
+if [ "$_ROOT_CHMOD_OK" -gt 0 ]; then
+    log_ok "root *.sh — executable (${_ROOT_CHMOD_OK}/10 file(s))"
+else
+    log_warn "root *.sh — no scripts found (unexpected)"
+fi
+
+# --- lib/*.sh (v1.6.0 Layer 0) ---
+# These modules are SOURCED, not executed. customize.sh §[22]
+# chmod'ed them to 0644. Match that behavior here.
+if [ -d "lib" ]; then
+    _LIB_COUNT=0
+    for f in lib/*.sh; do
+        [ -f "$f" ] || continue
+        chmod 0644 "$f" 2>/dev/null && _LIB_COUNT=$((_LIB_COUNT + 1))
     done
-    log_ok "proxy/*.sh — executable"
+    if [ "$_LIB_COUNT" -gt 0 ]; then
+        log_ok "lib/*.sh — 0644 (${_LIB_COUNT}/6 module(s))"
+    else
+        log_warn "lib/*.sh — no modules found (unexpected for v1.6.0)"
+    fi
 fi
 
-if [ -d ".devcontainer" ]; then
-    [ -f ".devcontainer/setup.sh" ] && chmod +x .devcontainer/setup.sh 2>/dev/null || true
+# --- proxy/build.sh (the only shell script under proxy/) ---
+if [ -f "proxy/build.sh" ]; then
+    chmod 0755 proxy/build.sh 2>/dev/null || true
+    log_ok "proxy/build.sh — executable"
+fi
+
+# --- .devcontainer/setup.sh ---
+if [ -f ".devcontainer/setup.sh" ]; then
+    chmod +x .devcontainer/setup.sh 2>/dev/null || true
 fi
 
 # --- go mod download ---
@@ -523,6 +587,33 @@ else
     printf "  ${RED}✗${NC} %-25s ${DIM}(missing)${NC}\n" "scripts/"
 fi
 
+# lib/*.sh (v1.6.0)
+if [ -d "lib" ]; then
+    count=$(find lib -maxdepth 1 -name "*.sh" -type f 2>/dev/null | wc -l)
+    if [ "$count" = "6" ]; then
+        printf "  ${GREEN}✓${NC} %-25s ${DIM}%d module(s)${NC}\n" "lib/*.sh" "$count"
+    else
+        printf "  ${YELLOW}⚠${NC}  %-25s ${DIM}%d module(s) — expected 6${NC}\n" "lib/*.sh" "$count"
+    fi
+else
+    printf "  ${RED}✗${NC} %-25s ${DIM}(missing — required in v1.6.0)${NC}\n" "lib/"
+fi
+
+# Makefile targets (v1.6.0)
+if [ -f "Makefile" ]; then
+    _targets=""
+    for t in check-boot-mini check-consistency check-backup check-install-app check-app-version; do
+        if grep -qE "^${t}:" Makefile 2>/dev/null; then
+            _targets="$_targets $t"
+        fi
+    done
+    if [ -n "$_targets" ]; then
+        printf "  ${GREEN}✓${NC} %-25s ${DIM}%s${NC}\n" "Makefile targets" "$_targets"
+    else
+        printf "  ${YELLOW}⚠${NC}  %-25s ${DIM}(none of the expected targets found)${NC}\n" "Makefile targets"
+    fi
+fi
+
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}${BOLD}✅ DevContainer Setup complete${NC}"
@@ -536,11 +627,16 @@ echo ""
 echo -e "  ${CYAN}2.${NC} Package the module:"
 echo -e "     ${DIM}make package${NC}"
 echo ""
-echo -e "  ${CYAN}3.${NC} Available tools:"
+echo -e "  ${CYAN}3.${NC} Validate shell + docs (v1.6.0):"
+echo -e "     ${DIM}make check-boot-mini${NC}      ${DIM}# Layer 0/1/2 integrity${NC}"
+echo -e "     ${DIM}make check-consistency${NC}   ${DIM}# docs path/version drift${NC}"
+echo -e "     ${DIM}make check-all${NC}            ${DIM}# full local validation${NC}"
+echo ""
+echo -e "  ${CYAN}4.${NC} Available tools:"
 echo -e "     ${DIM}make help${NC}     ${DIM}# list of all targets${NC}"
 echo -e "     ${DIM}make version${NC}  ${DIM}# show current version${NC}"
 echo ""
-echo -e "  ${CYAN}4.${NC} pre-commit hooks are active — every commit is checked automatically"
+echo -e "  ${CYAN}5.${NC} pre-commit hooks are active — every commit is checked automatically"
 echo ""
 
 exit 0

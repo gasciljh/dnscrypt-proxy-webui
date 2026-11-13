@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ============================================================
      DNSCrypt Smart Filter - PWA Icon (192x192)
-     Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-19
+     Version: v1.6.0 (Global Edition)
+     Last updated: 2026-11-13
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================
@@ -24,23 +24,8 @@
        This SVG produces icon-192.png only.
        It is NOT the source for icon-512.png or the favicons.
 
-     Generated from this file:
-       * icon-192.png (192x192)
-
-     Generated from icon-512.svg (for reference):
-       * icon-512.png         (512x512)
-       * apple-touch-icon.png (180x180)
-       * favicon-32x32.png    (32x32)
-       * favicon-16x16.png    (16x16)
-       * favicon.ico
-
      Do NOT edit this SVG without regenerating icon-192.png.
      Use: scripts/generate-icons.sh -f
-
-     XML note: the W3C XML specification (section 2.5) forbids
-     the sequence of two consecutive hyphens inside a comment.
-     This header therefore writes script flags in short form
-     only (for example, `-f`).
      ============================================================ -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="DNSCrypt Smart Filter">
     <title>DNSCrypt Smart Filter</title>

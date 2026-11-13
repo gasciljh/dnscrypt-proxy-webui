@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
 # DNSCrypt Smart Filter — release.sh
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # ============================================================
 # Automates a local release: bump version files, create an
 # ANNOTATED tag, push to origin. GitHub Actions

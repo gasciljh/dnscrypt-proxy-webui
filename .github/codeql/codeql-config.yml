@@ -1,7 +1,7 @@
 # ============================================================
 # CodeQL configuration — DNSCrypt Smart Filter
-# Version: v1.4.0 (Global Edition)
-# Last updated: 2026-10-08
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -14,12 +14,50 @@
 # ============================================================
 # Version history
 # ============================================================
-#   • v1.4.0 — Integration release. The two `go/path-injection`
-#     alerts (#1, #2) in `removeModule` were closed by a fix in
-#     `main.go` (sanitize via `filepath.Base()` + rebuild path
-#     via `filepath.Join(MODULES_DIR, name)`). No new
-#     suppressions were needed. No outstanding CodeQL alerts
-#     remain.
+#   • v1.6.0 — Architecture & UX release. Shell code was split
+#     into three layers (lib/*.sh → boot-mini.sh → functions.sh
+#     per ADR-0003 §Extension), the WebUI timezone fix added
+#     `last_update_unix` to `buildProfileResponse`, and
+#     `buildBackupInfo` now sorts snapshots by `ModTime()`
+#     (SNAP-MTIME alignment with rotate_backups).
+#
+#     None of these changes introduce new CodeQL concerns:
+#       — `lib/*.sh` is shell code (outside CodeQL's Go scope).
+#       — The timezone fields use `os.Stat` on a hardcoded path.
+#       — The mtime sort uses `DirEntry.Info()` on trusted
+#         directory entries from `os.ReadDir` on a hardcoded
+#         constant path (`PERSISTENT_BACKUP`).
+#     No configuration change was needed.
+#
+#   • v1.5.0 — Global Edition. **Both `go/path-injection`
+#     alerts (#1, #2) in `removeModule` were FULLY CLOSED**
+#     by adding `github.com/cyphar/filepath-securejoin v0.7.0`
+#     as the project's only external Go dependency (ADR-0002).
+#
+#     Background: v1.4.0 added `filepath.Base()` sanitization
+#     + prefix check + path reconstruction from a trusted base.
+#     That defense is functionally correct for all valid inputs,
+#     but CodeQL's `go/path-injection` query does NOT recognize
+#     `filepath.Base()` as a sanitizer in this data-flow context.
+#     Two alerts remained open on `main` (#1, #2).
+#
+#     `securejoin.SecureJoin(MODULES_DIR, name)` is the
+#     mitigation GitHub's own CodeQL documentation recommends
+#     for `go/path-injection`, and it closes the alerts
+#     permanently. The surrounding `filepath.Base()` +
+#     `MODULES_DIR` prefix check are kept (defense-in-depth).
+#
+#     No new suppressions were needed. No outstanding CodeQL
+#     alerts remain.
+#
+#   • v1.4.0 — Integration release. `filepath.Base()` +
+#     `MODULES_DIR` prefix check were added to `removeModule`
+#     to harden against path traversal. The defense is safe for
+#     all valid inputs, BUT — as documented in ADR-0002 §Context
+#     — CodeQL did NOT recognize this approach as sufficient.
+#     The two `go/path-injection` alerts (#1, #2) remained open
+#     through v1.4.0. They were closed in v1.5.0 via ADR-0002
+#     (see the v1.5.0 entry above).
 #
 #   • v1.3.0 — Server-side refinements to the snapshot-detection
 #     and rotation semantics shared by every consumer of the
@@ -27,18 +65,25 @@
 #     ROT-MANIFEST, ROT-MTIME, ROT-PROTECT). Those refinements
 #     touched `main.go::buildBackupInfo` (manifest-based
 #     detection + mtime sort) and `functions.sh::rotate_backups`
-#     (same semantics). None of them introduced new CodeQL
-#     alerts: `buildBackupInfo` only uses `os.ReadDir`,
-#     `os.Stat`, and `sort.Slice` on trusted constants —
-#     there is no user-controlled path or shell surface. No
-#     configuration change was needed.
+#     (same semantics; the function later moved to
+#     `lib/backup.sh` in v1.6.0 per ADR-0003 §Extension).
 #
-#   • v1.2.0 — Data-preservation release. Six of the eight
-#     `go/path-injection` alerts were closed in this release;
-#     the remaining two were closed in v1.4.0. No new
-#     suppressions were needed. The backup system uses
-#     `filepath.Join` + `shellQuote` throughout, which CodeQL
-#     correctly recognizes as sanitizers.
+#     None introduced new CodeQL alerts: `buildBackupInfo` only
+#     uses `os.ReadDir`, `os.Stat`, and `sort.Slice` on trusted
+#     constants — there is no user-controlled path or shell
+#     surface. No configuration change was needed.
+#
+#   • v1.2.0 — Data-preservation release. Introduced the 10
+#     defensive layers and the persistent backup directory.
+#     The backup system uses `filepath.Join` on hardcoded
+#     constants (`PERSISTENT_BACKUP`, `MODULES_DIR`) and
+#     `shellQuote` on every dynamic shell path. CodeQL
+#     correctly recognizes these as sanitizers, so six of the
+#     eight `go/path-injection` alerts then in flight were
+#     closed. The remaining two (#1, #2) were addressed in
+#     v1.4.0 (partial) and v1.5.0 (full — see above).
+#
+#     No new suppressions were needed.
 #
 #   • v1.0.0 — Initial configuration. One suppression was
 #     needed for `go/cookie-secure-not-set`.
@@ -61,21 +106,23 @@
 #   CodeQL for Go only analyzes GO SOURCE CODE. The rules
 #   referenced below — both the active suppression and the
 #   informational list — are all Go-specific rules that apply
-#   to `proxy/main.go` and any other `.go` files in the module.
+#   to `proxy/main.go` (the project's only Go source file in
+#   the analyzed path).
 #
-#   Shell scripts (`proxy/*.sh`, `scripts/*.sh`), workflow
-#   YAML files, and frontend JS are NOT analyzed by CodeQL and
-#   are NOT covered by this configuration. Their static
-#   analysis is the responsibility of `bash -n` (syntax) and
-#   `actionlint` / developer-side pre-commit hooks (workflows).
+#   Shell scripts (`*.sh` at the repo root, `lib/*.sh`,
+#   `scripts/*.sh`), workflow YAML files, and frontend JS are
+#   NOT analyzed by CodeQL and are NOT covered by this
+#   configuration. Their static analysis is the responsibility
+#   of `bash -n` (syntax), `shellcheck`, and `actionlint` /
+#   developer-side pre-commit hooks (workflows).
 #
 #   For a Go-only ruleset, an entry such as
 #   `go/unsafe-unzip-symlink` would only be relevant if a Go
 #   file called `archive/zip` with an untrusted path. The
-#   `unzip` invocation in `customize.sh` is a SHELL command
-#   and is therefore outside CodeQL's Go analysis surface
-#   entirely — it is not a Go rule that could ever fire here,
-#   and is not listed below.
+#   `unzip` invocation in `customize.sh §[12]` is a SHELL
+#   command and is therefore outside CodeQL's Go analysis
+#   surface entirely — it is not a Go rule that could ever
+#   fire here, and is not listed below.
 # ============================================================
 
 name: "DNSCrypt Smart Filter CodeQL config"
@@ -102,7 +149,7 @@ query-filters:
   # This is a documented design decision, not a vulnerability.
   #
   # Status: ACTIVE suppression (unchanged since v1.0.0).
-  # Reviewed at: v1.1.0, v1.2.0, v1.3.0, v1.4.0.
+  # Reviewed at: v1.1.0, v1.2.0, v1.3.0, v1.4.0, v1.5.0, v1.6.0.
   # ----------------------------------------------------------
   - exclude:
       id: go/cookie-secure-not-set
@@ -117,33 +164,42 @@ query-filters:
   # has explicitly considered.
   #
   #   • go/path-injection
-  #       — Two alerts (#1, #2) in `removeModule` were fixed in
-  #         v1.4.0 via `filepath.Base()` + `filepath.Join()`.
-  #         No suppression was needed.
+  #       — Two alerts (#1, #2) in `removeModule` were FULLY
+  #         closed in v1.5.0 via `filepath.Base()` +
+  #         `securejoin.SecureJoin()` (ADR-0002).
+  #       — The v1.4.0 attempt (`filepath.Base()` + prefix
+  #         check) was functionally safe but not recognized by
+  #         CodeQL — see the v1.4.0 history entry above.
   #       — Six related alerts were closed in v1.2.0 via the
-  #         backup system's `filepath.Join` usage.
+  #         backup system's `filepath.Join` usage on hardcoded
+  #         constants.
   #       — Any future alert from this rule indicates a real
   #         regression and must be fixed.
   #
   #   • go/command-injection
   #       — All shell commands go through `shellQuote()` (see
-  #         `main.go` [12]). No alerts have been raised.
+  #         `proxy/main.go` §[20] Shell command execution).
+  #         No alerts have been raised.
   #
   #   • go/sql-injection
   #       — Not applicable: the project uses no SQL database.
   #
   #   • go/ssrf
-  #       — The download client in `main.go` [6] uses
+  #       — The download client in `proxy/main.go` §[7] uses
   #         hardcoded URLs from the profile map. No user input
   #         reaches the URL. No alerts have been raised.
   #
   #   • go/unsafe-unzip-symlink
   #       — The project's only `unzip` invocation is a shell
-  #         command in `customize.sh` [9], which is OUTSIDE the
-  #         scope of CodeQL for Go. There is no Go call to
+  #         command in `customize.sh §[12]`, which is OUTSIDE
+  #         the scope of CodeQL for Go. There is no Go call to
   #         `archive/zip` anywhere in the codebase, so this rule
   #         can never fire. Listed here for completeness only.
   #
-  # See SECURITY.md §5.31 and §5.32 for the full security
-  # model, and docs/REFERENCE.md §3.13 for the BAK-1..BAK-4
+  # See SECURITY.md §5.27 (shellQuote injection protection),
+  # §5.31 (v1.1.0 runtime hardening), §5.32 (v1.2.0 data
+  # preservation), and §5.34 (CodeQL path-injection fix — the
+  # authoritative record of the v1.5.0 resolution via ADR-0002).
+  #
+  # See also docs/REFERENCE.md §3.12 for the BAK-1..BAK-4
   # backend additions that CodeQL verified.

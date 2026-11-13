@@ -1,7 +1,7 @@
 # ============================================================
 # DNSCrypt Smart Filter — Feature Request Template
-# Version: v1.5.0 (Global Edition)
-# Last updated: 2026-10-19
+# Version: v1.6.0 (Global Edition)
+# Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
@@ -13,29 +13,33 @@
 #   • .github/ISSUE_TEMPLATE/config.yml            — templates config
 #   • .github/PULL_REQUEST_TEMPLATE.md             — PR template
 #   • .github/PULL_REQUEST_TEMPLATE/release.md     — release PR template
-#   • docs/ROADMAP.md                              — v1.6.0 + v2.0.0
-#   • docs/REFERENCE.md §4                         — backup system (v1.2.0)
-#   • docs/GUIDE.md §8                             — recovery (v1.2.0)
+#   • docs/ROADMAP.md                              — v1.7.0 + v2.0.0
+#   • docs/REFERENCE.md §4                         — backup system
+#   • docs/REFERENCE.md §4.6.5                     — SNAP-*/ROT-* rules
+#   • docs/REFERENCE.md §1.4                       — Layered Bootstrap (3-layer, v1.6.0)
+#   • docs/REFERENCE.md §3.10                      — timezone flow (v1.6.0)
+#   • docs/GUIDE.md §8                             — recovery
 #   • docs/GUIDE.md §5                             — upgrade paths
-#   • docs/REFERENCE.md §3                         — v1.3.0 SNAP-*/ROT-*
 #   • docs/adr/README.md                           — ADR system
 #   • docs/CONTRIBUTING.md §14                     — recognition badges
 #   • docs/REFERENCE.md §5                         — device/ROM matrix
 #   • CHANGELOG.md                                 — version history
-#   • gasciljh/dnscrypt-proxy-app                  — companion repo (v1.4.0)
+#   • gasciljh/dnscrypt-proxy-app                  — companion repo
 # ============================================================
-# v1.5.0 additions:
-#   • Version bumped to v1.5.0 (skipping v1.4.0 which is now
-#     documented in CHANGELOG).
-#   • All links updated to the consolidated documentation.
-#   • New request_type option:
-#       - "📲 Companion install flow (v1.5.0)"
+# v1.6.0 additions:
+#   • Version bumped to v1.6.0.
+#   • ROADMAP reference updated: v1.6.0 is now shipped, so the
+#     tracked versions are v1.7.0 and v2.0.0.
+#   • New request_type options:
+#       - "🕐 Timezone rendering improvement (v1.6.0)"
+#       - "🧩 Modular shell (lib/) improvement (v1.6.0)"
+#       - "💾 Backup mtime sort (v1.6.0)"
 #   • New willing_to_contribute option:
-#       - "📲 I can help with the companion install flow (v1.5.0)"
-#   • ROADMAP reference updated to v1.6.0 and v2.0.0 (v1.5.0
-#     shipped).
-#   • §17 references extended with the consolidated docs and
-#     the three ADRs.
+#       - "🧩 I can help with the modular shell (v1.6.0)"
+#   • Layered Bootstrap references updated to 3-layer model
+#     (lib/*.sh + boot-mini + functions).
+#   • Changelog footer reference updated to "v1.0.0 → v1.6.0".
+#   • Added reference to ADR-0003 §Extension (3-layer).
 # ============================================================
 
 name: ✨ Feature Request
@@ -77,9 +81,12 @@ body:
         >   fill in the "Data-preservation impact" section below.
         >   v1.2.0 encodes a strict contract here — see
         >   [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system).
-        > - If your idea **touches the companion Android app** (v1.4.0),
-        >   note that it lives in a **separate repository**
+        > - If your idea **touches the companion Android app**, note
+        >   that it lives in a **separate repository**
         >   ([gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app)).
+        > - If your idea **touches the modular shell (`lib/`)** (v1.6.0),
+        >   read [ADR-0003 §Extension](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/0003-layered-bootstrap.md)
+        >   first — the 3-layer boundaries are intentionally strict.
 
 # ============================================================
 # [2] Pre-flight checks
@@ -92,7 +99,7 @@ body:
       options:
         - label: I have read ROADMAP.md and FAQ.md
           required: true
-        - label: I have read BACKUP.md and EMERGENCY.md (v1.2.0)
+        - label: I have read the Backup and Emergency Recovery sections (v1.2.0)
           required: true
         - label: I checked docs/adr/ for existing architectural decisions on this topic
           required: true
@@ -126,6 +133,9 @@ body:
         - 📲 PWA / install experience (v1.3.0)
         - 📱 Companion app / native client (v1.4.0)
         - 📲 Companion install flow (v1.5.0)
+        - 🕐 Timezone rendering improvement (v1.6.0)
+        - 🧩 Modular shell (lib/) improvement (v1.6.0)
+        - 💾 Backup mtime sort (v1.6.0)
         - 📋 ADR proposal (reverses or amends an existing decision)
         - 🔄 Other
     validations:
@@ -165,11 +175,6 @@ body:
         - Produces a downloadable JSON file
         - Contains allowlist.txt + denylist.txt
         - Can be imported later via an "Import" button
-
-        Proposed design:
-        ┌──────────────────────────────┐
-        │  [Export]  [Import]          │
-        └──────────────────────────────┘
     validations:
       required: true
 
@@ -208,7 +213,6 @@ body:
         - ✅ Time saved: 5–10 minutes per recovery operation
         - ✅ Fewer errors: no need for manual retyping
         - ✅ Encourages customization: lowers the entry barrier for custom rules
-        - ✅ Serves 30–40% of users (based on survey X)
     validations:
       required: true
 
@@ -223,7 +227,7 @@ body:
       placeholder: |
         Example:
         **UC-1: Major upgrade**
-        - User wants to upgrade the module from v1.3.0 to v1.4.0
+        - User wants to upgrade the module from v1.5.0 to v1.6.0
         - Exports the rules first
         - Updates the module
         - Imports the rules immediately
@@ -272,18 +276,17 @@ body:
         > behavior, or uninstall behavior, please fill in the
         > section below.
         >
-        > This is not a gate — it is a **planning aid**. It
-        > ensures the discussion starts with the right context.
-        >
         > **⚠️ v1.3.0 semantics apply** (SNAP-MANIFEST,
         > SNAP-MTIME, ROT-MANIFEST, ROT-MTIME, ROT-PROTECT).
         > If your proposal adds or modifies a snapshot-producing
         > path, or changes how rotation selects candidates, you
         > must align with these rules — see
-        > [docs/REFERENCE.md §3](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#3-data-flow--internals).
+        > [docs/REFERENCE.md §4.6.5](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#465-rotation-ordering--mtime-not-directory-name).
         >
-        > See [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system)
-        > for the full reference.
+        > **🆕 v1.6.0 note**: `buildBackupInfo()` in `main.go`
+        > now sorts snapshots by `ModTime()`, aligning the API
+        > with `rotate_backups()` and `status.sh`. If your
+        > proposal touches that sort, describe the impact below.
 
   - type: dropdown
     id: data_preservation_impact
@@ -294,7 +297,7 @@ body:
         Choose the option that best describes your proposal.
       options:
         - 'No interaction — the proposal does not touch user data, backups, or restore logic'
-        - 'Extends an existing layer — adds a new case to an existing layer (e.g. a new candidate source path)'
+        - 'Extends an existing layer — adds a new case to an existing layer'
         - 'Adds a new layer (11th) — introduces a new defensive mechanism'
         - 'Changes existing behavior — modifies how a layer works today (needs a migration path)'
         - '❓ Not sure — I need guidance on how this interacts'
@@ -313,18 +316,18 @@ body:
         - Whether a new file should be added to the preserved set
         - Whether the .manifest.json schema needs to change
         - Whether existing backups would still be valid
-        - Whether a migration is needed for users upgrading from v1.1.0
-        - (v1.3.0) Whether the proposal respects the
-          SNAP-MANIFEST / SNAP-MTIME / ROT-* semantics
+        - Whether a migration is needed for users upgrading
+        - Whether the proposal respects SNAP-MANIFEST / SNAP-MTIME / ROT-*
+        - Whether the proposal affects the v1.6.0 mtime sort
       placeholder: |
         Example:
         - Affected file: allowlist.txt (extension of Layer 2)
         - No schema change to .manifest.json
         - Existing backups remain valid
-        - Migration: none needed; v1.2.0 already handles 5 files
+        - Migration: none needed
         - Uninstall behavior: unchanged (backup dir preserved)
-        - (v1.3.0) Snapshot-producing path writes a manifest
-          (.manifest.json). Rotation sorts by mtime.
+        - Snapshot-producing path writes a manifest (.manifest.json)
+        - Rotation sorts by mtime
     validations:
       required: false
 
@@ -346,6 +349,7 @@ body:
         - 💾 I can help with backup testing across devices (v1.2.0)
         - 📱 I can help with the companion app (v1.4.0)
         - 📲 I can help with the companion install flow (v1.5.0)
+        - 🧩 I can help with the modular shell (v1.6.0)
         - 👀 Sadly no — I leave it to the maintainer
     validations:
       required: false
@@ -396,15 +400,16 @@ body:
         > Reversals are handled by creating a **new** ADR that
         > supersedes the old one — never by editing an accepted ADR.
         >
-        > This section is optional. Skip it if your proposal does not
-        > touch an existing decision.
+        > Note: ADR-0003 (Layered Bootstrap) was **extended** in
+        > v1.6.0 from a 2-layer to a 3-layer model. Extensions are
+        > appended to the same file; they do not require a new ADR.
 
   - type: input
     id: adr_reference
     attributes:
       label: 📐 Related ADR(s)
-      description: 'ADR numbers this proposal relates to (e.g. "ADR-0001, ADR-0006") — or leave empty'
-      placeholder: 'ADR-0001'
+      description: 'ADR numbers this proposal relates to (e.g. "ADR-0001, ADR-0003") — or leave empty'
+      placeholder: 'ADR-0003'
     validations:
       required: false
 
@@ -413,16 +418,18 @@ body:
     attributes:
       label: 📐 How does this affect the referenced decision?
       description: |
-        Does it **amend** the decision (backward-compatible extension)
-        or **reverse** it (contradicts the original rationale)?
+        Does it **amend/extend** the decision (backward-compatible
+        refinement) or **reverse** it (contradicts the original
+        rationale)?
       placeholder: |
-        Example (amend):
-        This extends ADR-0001 with a third permanent branch
-        (`staging`) but does not change the two-branch rationale.
+        Example (extend):
+        This extends ADR-0003 by adding a 7th lib/*.sh module
+        (`lib/logging.sh`) for structured audit logging. The
+        3-layer boundary is preserved.
 
         Example (reverse):
-        This reverses ADR-0004 (unified PR template). The new
-        template would be split into 3 instead of 2.
+        This reverses ADR-0002 (single external dependency).
+        It proposes adding a second dependency for YAML parsing.
     validations:
       required: false
 
@@ -445,7 +452,6 @@ body:
         - Requires a new endpoint: POST /api/export_rules
         - Must update main.go (new handler)
         - No new dependencies
-        - Compatibility: works on all versions
         - May need an ADR if the endpoint shape is
           considered a public API commitment
     validations:
@@ -463,7 +469,7 @@ body:
         - Related links
         - Articles or discussions
         - Assumed timeline (aligned with which ROADMAP version —
-          v1.5.0, v2.0.0, or later?)
+          v1.7.0, v2.0.0, or later?)
         - Any other information
     validations:
       required: false
@@ -493,12 +499,16 @@ body:
 
         ## 📚 References
 
-        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.6.0 and v2.0.0 are the currently-tracked future versions
-        - [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system) — backup system reference (v1.2.0 + v1.3.0 rotation semantics)
-        - [docs/GUIDE.md §8](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery) — emergency recovery guide (v1.2.0)
-        - [docs/GUIDE.md §5](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#5-update) — upgrade path (v1.0.0 → v1.5.0)
-        - [docs/REFERENCE.md §3](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#3-data-flow--internals) — v1.3.0 server-side refinements (SNAP-*/ROT-*)
-        - [docs/CONTRIBUTING.md §14](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/CONTRIBUTING.md#14-recognition) — recognition badges (Data Guardian v1.2.0 + Memory Architect v1.1.0)
+        - [docs/ROADMAP.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/ROADMAP.md) — v1.7.0 and v2.0.0 are the currently-tracked future versions
+        - [docs/REFERENCE.md §4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#4-backup-system) — backup system reference
+        - [docs/REFERENCE.md §4.6.5](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#465-rotation-ordering--mtime-not-directory-name) — SNAP-*/ROT-* rules
+        - [docs/REFERENCE.md §1.4](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#14-layered-bootstrap-adr-0003) — Layered Bootstrap (3-layer model)
+        - [docs/REFERENCE.md §3.10](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/REFERENCE.md#310-local-timezone-rendering-flow-v160) — timezone flow (v1.6.0)
+        - [docs/GUIDE.md §8](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#8-emergency-recovery) — emergency recovery guide
+        - [docs/GUIDE.md §5](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/GUIDE.md#5-update) — upgrade path (v1.0.0 → v1.6.0)
+        - [docs/CONTRIBUTING.md §14](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/CONTRIBUTING.md#14-recognition) — recognition badges
         - [docs/adr/README.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/README.md) — ADR system and index
-        - [Companion app repository](https://github.com/gasciljh/dnscrypt-proxy-app) — separate repo (v1.4.0)
-        - [CHANGELOG.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md) — version history (v1.0.0 → v1.5.0)
+        - [docs/adr/0002-external-dependency.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/0002-external-dependency.md) — external dependency policy
+        - [docs/adr/0003-layered-bootstrap.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/docs/adr/0003-layered-bootstrap.md) — Layered Bootstrap (3-layer)
+        - [Companion app repository](https://github.com/gasciljh/dnscrypt-proxy-app) — separate repo
+        - [CHANGELOG.md](https://github.com/gasciljh/dnscrypt-proxy-webui/blob/main/CHANGELOG.md) — version history (v1.0.0 → v1.6.0)

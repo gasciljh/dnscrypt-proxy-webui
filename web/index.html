@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!-- ============================================================
      DNSCrypt Smart Filter — WebUI
-     Version: v1.5.0 (Global Edition)
-     Last updated: 2026-10-19
+     Version: v1.6.0 (Global Edition)
+     Last updated: 2026-11-13
      Author: gasciljh
      Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
      ============================================================ -->
@@ -92,38 +92,32 @@
         @keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
         .card-editor { margin-top:24px; background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:var(--radius); padding:20px; text-align:right; }
         [dir="ltr"] .card-editor { text-align:left; }
-        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 4px; flex-wrap: nowrap; }
-        .editor-header h3 { font-size: 14px; color: var(--primary); margin: 0; white-space: nowrap; }
-        .source-count { font-size: 11px !important; white-space: nowrap; text-align: right; }
+        .editor-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:4px; flex-wrap:nowrap; }
+        .editor-header h3 { font-size:14px; color:var(--primary); margin:0; white-space:nowrap; }
+        .source-count { font-size:11px !important; white-space:nowrap; text-align:right; }
         .profile-selector { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
-        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:3px solid #88c0ff; box-shadow: 0 0 10px rgba(136,192,255,0.2); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; transition: 0.3s; }
-        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; border-color: var(--border); box-shadow: none; }
+        .profile-selector select { flex:1; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:3px solid #88c0ff; box-shadow:0 0 10px rgba(136,192,255,0.2); color:var(--text); font-size:15px; font-family:inherit; outline:none; min-width:150px; transition:0.3s; }
+        .profile-selector select:disabled { opacity:0.5; cursor:not-allowed; border-color:var(--border); box-shadow:none; }
         .profile-selector select option { background:var(--bg); color:var(--text); }
         .btn-apply { background:linear-gradient(135deg,#1f6feb,#58a6ff); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:15px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; }
         .btn-apply:disabled { opacity:0.5; cursor:not-allowed; }
-
-        .btn-update-pulse { background: linear-gradient(135deg, #d29922, #e3b341) !important; color: #000 !important; animation: pulse-yellow 2s infinite; }
-        .btn-update-unknown { background: linear-gradient(135deg, #e67e22, #d35400) !important; color: #fff !important; }
-        @keyframes pulse-yellow {
-            0% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(210, 153, 34, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(210, 153, 34, 0); }
-        }
-        .btn-update-disabled { background: rgba(139, 148, 158, 0.2) !important; color: var(--text-muted) !important; pointer-events: none; opacity: 0.7; box-shadow: none !important; }
-        #updateBtnWrapper { width: 100%; margin-top: 2px; cursor: pointer; transition: transform 0.1s; }
-        #updateBtnWrapper:active { transform: scale(0.98); }
-
+        .btn-update-pulse { background:linear-gradient(135deg,#d29922,#e3b341) !important; color:#000 !important; animation:pulse-yellow 2s infinite; }
+        .btn-update-unknown { background:linear-gradient(135deg,#e67e22,#d35400) !important; color:#fff !important; }
+        @keyframes pulse-yellow { 0%{box-shadow:0 0 0 0 rgba(210,153,34,0.7);} 70%{box-shadow:0 0 0 10px rgba(210,153,34,0);} 100%{box-shadow:0 0 0 0 rgba(210,153,34,0);} }
+        .btn-update-disabled { background:rgba(139,148,158,0.2) !important; color:var(--text-muted) !important; pointer-events:none; opacity:0.7; box-shadow:none !important; }
+        #updateBtnWrapper { width:100%; margin-top:2px; cursor:pointer; transition:transform 0.1s; }
+        #updateBtnWrapper:active { transform:scale(0.98); }
         .btn-edit { background:linear-gradient(135deg,#8957e5,#6e40c9); color:white; border:none; padding:12px 24px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; transition:0.2s; white-space:nowrap; font-family:inherit; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; }
         .btn-edit:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 20px rgba(137,87,229,0.4); }
-        .btn-edit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-edit:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
         .btn-cancel-edit { background:rgba(139,148,158,0.15); border:1px solid rgba(139,148,158,0.3); color:var(--text-muted); padding:10px 16px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer; width:100%; margin-top:6px; font-family:inherit; transition:0.2s; display:none; }
         .btn-cancel-edit:hover:not(:disabled) { background:rgba(248,81,73,0.15); border-color:rgba(248,81,73,0.3); color:var(--danger); }
-        .btn-cancel-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-cancel-edit:disabled { opacity:0.5; cursor:not-allowed; }
         .rule-box textarea.editing { border-color:var(--warning) !important; background:rgba(210,153,34,0.05) !important; box-shadow:0 0 10px rgba(210,153,34,0.15); }
         .rule-box textarea.rollback { border-color:var(--danger) !important; background:rgba(248,81,73,0.05) !important; }
         .rule-box textarea:read-only { cursor:pointer; opacity:0.85; }
         .rule-box textarea:read-only:hover { border-color:rgba(88,166,255,0.3); }
-        .rule-box textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+        .rule-box textarea:disabled { opacity:0.5; cursor:not-allowed; }
         .edit-badge { display:none; background:rgba(210,153,34,0.15); color:var(--warning); font-size:10px; padding:2px 10px; border-radius:10px; border:1px solid rgba(210,153,34,0.3); margin-right:8px; animation:pulse-edit 1.5s ease-in-out infinite; }
         .edit-badge.visible { display:inline-block; }
         @keyframes pulse-edit { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
@@ -180,110 +174,34 @@
         .btn-delete-old { background:var(--danger); color:white; border:none; padding:6px 16px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; transition:0.2s; font-family:inherit; }
         .btn-delete-old:hover { opacity:0.8; }
         .btn-delete-old:disabled { opacity:0.4; cursor:not-allowed; }
-
-        .footer {
-            margin-top: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px 16px;
-            font-size: 12px;
-            color: var(--text-muted);
-            border-top: 1px solid var(--border);
-            padding-top: 14px;
-        }
-        .footer-brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            white-space: nowrap;
-        }
-        .footer-meta {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            white-space: nowrap;
-            flex-wrap: wrap;
-        }
-        .footer-sep {
-            opacity: 0.4;
-            padding: 0 2px;
-        }
-        .footer a {
-            color: var(--primary);
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .footer a:hover {
-            text-decoration: underline;
-        }
-
-        .stats-area { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-top: 12px; 
-            font-size: 13px; 
-            color: var(--text-muted); 
-            gap: 8px; 
-            align-items: stretch; }
-        .stats-area > span { 
-            background: rgba(255,255,255,0.03); 
-            padding: 8px 12px; 
-            border-radius: 8px; 
-            border: 1px solid var(--border); 
-            flex: 1 1 0px;
-            width: 0; 
-            min-width: 0; 
-            display: flex; 
-            align-items: center;
-            justify-content: center; }
-        #blockedToday { 
-            display: inline-flex; 
-            align-items: center; 
-            flex-wrap: wrap; 
-            justify-content: center; 
-            transition: opacity .3s ease; }
-        #blockedToday .stat-sub { flex-basis: 100%; width: 100%; }
-        .stat-paused { opacity: 0.9; }
-        .stat-sub { display: block; font-size: 9px; opacity: 0.9; margin-top: 4px; font-style: italic; line-height: 1.4; font-weight: 400; white-space: nowrap; letter-spacing: -0.2px; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; max-width: 100%; box-sizing: border-box; scrollbar-width: thin; padding-bottom: 2px; }
-        .stat-sub::-webkit-scrollbar { height: 3px; }
-        .stat-sub::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
-        .stat-sub::-webkit-scrollbar-thumb { background: rgba(88,166,255,0.4); border-radius: 2px; }
-
-        #blockedToday .led {
-            display: inline-block !important;
-            width: 12px !important;
-            height: 12px !important;
-            min-width: 12px !important;
-            min-height: 12px !important;
-            max-width: 12px !important;
-            max-height: 12px !important;
-            padding: 0 !important;
-            border: 0 !important;
-            border-radius: 50% !important;
-            box-sizing: border-box !important;
-            aspect-ratio: 1 / 1 !important;
-            flex: 0 0 12px !important;
-            line-height: 0 !important;
-            vertical-align: middle;
-            margin: 0 6px;
-            transition: 0.5s;
-        }
-        #blockedToday .led-on  { background: var(--success) !important; box-shadow: 0 0 20px var(--success) !important; }
-        #blockedToday .led-off { background: var(--danger) !important; box-shadow: none !important; }
+        .footer { margin-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px 16px; font-size:12px; color:var(--text-muted); border-top:1px solid var(--border); padding-top:14px; }
+        .footer-brand { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+        .footer-meta { display:inline-flex; align-items:center; gap:8px; white-space:nowrap; flex-wrap:wrap; }
+        .footer-sep { opacity:0.4; padding:0 2px; }
+        .footer a { color:var(--primary); text-decoration:none; display:inline-flex; align-items:center; gap:4px; }
+        .footer a:hover { text-decoration:underline; }
+        .stats-area { display:flex; justify-content:space-between; margin-top:12px; font-size:13px; color:var(--text-muted); gap:8px; align-items:stretch; }
+        .stats-area > span { background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:8px; border:1px solid var(--border); flex:1 1 0px; width:0; min-width:0; display:flex; align-items:center; justify-content:center; }
+        #blockedToday { display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:center; transition:opacity .3s ease; }
+        #blockedToday .stat-sub { flex-basis:100%; width:100%; }
+        .stat-paused { opacity:0.9; }
+        .stat-sub { display:block; font-size:9px; opacity:0.9; margin-top:4px; font-style:italic; line-height:1.4; font-weight:400; white-space:nowrap; letter-spacing:-0.2px; overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; max-width:100%; box-sizing:border-box; scrollbar-width:thin; padding-bottom:2px; }
+        .stat-sub::-webkit-scrollbar { height:3px; }
+        .stat-sub::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); border-radius:2px; }
+        .stat-sub::-webkit-scrollbar-thumb { background:rgba(88,166,255,0.4); border-radius:2px; }
+        #blockedToday .led { display:inline-block !important; width:12px !important; height:12px !important; min-width:12px !important; min-height:12px !important; max-width:12px !important; max-height:12px !important; padding:0 !important; border:0 !important; border-radius:50% !important; box-sizing:border-box !important; aspect-ratio:1/1 !important; flex:0 0 12px !important; line-height:0 !important; vertical-align:middle; margin:0 6px; transition:0.5s; }
+        #blockedToday .led-on { background:var(--success) !important; box-shadow:0 0 20px var(--success) !important; }
+        #blockedToday .led-off { background:var(--danger) !important; box-shadow:none !important; }
         .runtime-info { margin-top:16px; background:rgba(88,166,255,0.05); border:1px solid rgba(88,166,255,0.2); border-radius:var(--radius); padding:16px; display:none; }
-        .runtime-info .card-body { padding: 0 12px 14px 12px; }
+        .runtime-info .card-body { padding:0 12px 14px 12px; }
         .runtime-info .ri-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.04); gap:12px; }
         .runtime-info .ri-item:last-child { border-bottom:none; }
         .runtime-info .ri-label { color:var(--text-muted); flex-shrink:0; font-weight:600; }
-        .runtime-info .ri-label.ri-warn { color: var(--warning); }
-        .runtime-info .ri-label.ri-warn::before { content: '⚠️ '; font-size: 10px; }
+        .runtime-info .ri-label.ri-warn { color:var(--warning); }
+        .runtime-info .ri-label.ri-warn::before { content:'⚠️ '; font-size:10px; }
         .runtime-info .ri-value { font-family:'JetBrains Mono',monospace; color:var(--text); font-size:11px; word-break:break-all; text-align:left; direction:ltr; max-width:65%; line-height:1.5; }
-        .runtime-info .ri-value a { color: var(--primary); text-decoration: none; }
-        .runtime-info .ri-value a:hover { text-decoration: underline; }
+        .runtime-info .ri-value a { color:var(--primary); text-decoration:none; }
+        .runtime-info .ri-value a:hover { text-decoration:underline; }
         .runtime-info .btn-ri-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; }
         .runtime-info .btn-ri-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
         .runtime-info .btn-ri-refresh:disabled { opacity:0.5; cursor:not-allowed; }
@@ -294,7 +212,7 @@
         .btn-ri-action.secondary:hover { background:rgba(139,148,158,0.25); color:var(--text); }
         #riRawJson { display:none; margin-top:12px; background:rgba(0,0,0,0.4); padding:12px; border-radius:8px; font-size:11px; font-family:monospace; color:var(--text); overflow-x:auto; overflow-y:auto; -webkit-overflow-scrolling:touch; max-height:400px; max-width:calc(100vw - 80px); width:100%; direction:ltr; text-align:left; line-height:1.6; border:1px solid var(--border); white-space:pre; box-sizing:border-box; }
         .diag-files { margin-top:16px; background:rgba(139,148,158,0.05); border:1px solid rgba(139,148,158,0.2); border-radius:var(--radius); padding:16px; display:none; }
-        .diag-files .card-body { padding: 0 12px 14px 12px; }
+        .diag-files .card-body { padding:0 12px 14px 12px; }
         .diag-files .btn-df-refresh { background:rgba(88,166,255,0.15); border:1px solid rgba(88,166,255,0.3); color:var(--primary); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; font-family:inherit; transition:0.2s; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; }
         .diag-files .btn-df-refresh:hover:not(:disabled) { background:rgba(88,166,255,0.25); }
         .diag-files .btn-df-refresh:disabled { opacity:0.5; cursor:not-allowed; }
@@ -336,17 +254,16 @@
         .custom-modal-actions .modal-cancel:hover { background:rgba(255,255,255,0.2); }
         .custom-modal-actions .modal-primary { background:var(--primary); color:white; }
         .custom-modal-actions .modal-primary:hover { opacity:0.85; }
-        .card-body-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease-out, visibility 0.3s, opacity 0.3s; overflow: hidden; visibility: hidden; opacity: 0; }
-        .card.open .card-body-wrapper { grid-template-rows: 1fr; visibility: visible; opacity: 1; }
-        .card-body-wrapper > .card-body { min-height: 0; }
-        .card-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; padding: 14px 12px; border-bottom: 1px solid var(--border); margin-bottom: 0 !important; flex-wrap: nowrap; gap: 8px; }
-        .card-header .arrow { transition: transform 0.3s ease; font-size: 12px; color: var(--primary); }
-        .card.open .card-header .arrow { transform: rotate(180deg); }
-        .runtime-info, .diag-files { padding: 0 !important; }
-        .card { display: block; }
-        button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
-
+        .card-body-wrapper { display:grid; grid-template-rows:0fr; transition:grid-template-rows 0.3s ease-out,visibility 0.3s,opacity 0.3s; overflow:hidden; visibility:hidden; opacity:0; }
+        .card.open .card-body-wrapper { grid-template-rows:1fr; visibility:visible; opacity:1; }
+        .card-body-wrapper > .card-body { min-height:0; }
+        .card-header { cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:14px 12px; border-bottom:1px solid var(--border); margin-bottom:0 !important; flex-wrap:nowrap; gap:8px; }
+        .card-header .arrow { transition:transform 0.3s ease; font-size:12px; color:var(--primary); }
+        .card.open .card-header .arrow { transform:rotate(180deg); }
+        .runtime-info, .diag-files { padding:0 !important; }
+        .card { display:block; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; } }
         .pwa-install-btn { display:inline-flex; align-items:center; gap:8px; margin:18px auto 20px; padding:10px 20px; background:linear-gradient(135deg,var(--primary),#1f6feb); color:#fff; border:none; border-radius:12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:transform .2s,box-shadow .2s,opacity .2s; box-shadow:0 6px 18px rgba(88,166,255,.25); animation:pwaFade .5s ease-out; }
         .pwa-install-btn:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 10px 24px rgba(88,166,255,.4); }
         .pwa-install-btn:active { transform:translateY(0); }
@@ -354,7 +271,6 @@
         .pwa-install-btn .pwa-install-icon { font-size:16px; line-height:1; }
         .pwa-install-btn .pwa-install-text { white-space:nowrap; }
         @keyframes pwaFade { from{opacity:0;transform:translateY(-6px);} to{opacity:1;transform:translateY(0);} }
-
         .install-modal-box { max-width:500px; }
         .install-modal-header { font-size:18px; font-weight:800; color:var(--primary); margin-bottom:6px; }
         .install-modal-subtitle { font-size:13px; color:var(--text-muted); margin-bottom:18px; }
@@ -418,7 +334,7 @@
             <h1 id="title">DNSCrypt Proxy</h1>
             <p class="subtitle">
                 <span id="subtitle">Smart Filter</span>
-                <span class="badge" id="versionBadge">v1.5.0</span>
+                <span class="badge" id="versionBadge">v1.6.0</span>
                 <a href="#" target="_blank" rel="noopener noreferrer" class="badge-dashboard loading" id="dashboardLink" data-port="9091">
                     📊 <span id="dashboardLinkText">Dashboard</span>
                 </a>
@@ -565,7 +481,7 @@
         <div class="footer">
             <span class="footer-brand">📋 HaGeZi Profiles</span>
             <span class="footer-meta">
-                <span id="footerVersion">v1.5.0 Smart Edit Mode</span>
+                <span id="footerVersion">v1.6.0 Smart Edit Mode</span>
                 <span class="footer-sep">·</span>
                 <a id="footerProjectLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;">🔗 <span id="footerProjectText">Project</span></a>
             </span>
@@ -600,9 +516,16 @@
 (function() {
     'use strict';
 
-    var VERSION = 'v1.5.0';
+    var VERSION = 'v1.6.0';
 
     var APP_GITHUB_PAGE_URL = 'https://github.com/gasciljh/dnscrypt-proxy-app';
+
+    var PORTS = { webui: '9090', dashboard: '9091' };
+
+    var updateCheckTimer = null;
+    var UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+    var _inputDebounce = { allow: null, deny: null };
 
     function getCompanionApkUrl() {
         var v = companionState && companionState.expected_version;
@@ -613,16 +536,11 @@
             }
         }
         if (!v || v === 'unknown') {
-            v = '1.0.0';
+            return APP_GITHUB_PAGE_URL + '/releases';
         }
         return 'https://github.com/gasciljh/dnscrypt-proxy-app/releases/download/v'
             + v + '/app-debug.apk';
     }
-
-    var PORTS = {
-        webui:     '9090',
-        dashboard: '9091'
-    };
 
     var translations = {
         en: {
@@ -661,6 +579,8 @@
             editorTitle: '📝 Select Blocklist', sourceCount: 'Choose protection level',
             entriesLabel: 'Protection entries', currentLabel: 'Current Profile:', lastUpdateLabel: '🕒 Last update: ',
             apply: 'Apply', alreadyActive: '⚠️ This profile is already active', applyConfirm: 'Are you sure you want to apply rules and "',
+            profileLight: '☀️ Light', profileNormal: '🧹 Normal', profilePro: '🛡️ PRO',
+            profileProPlus: '⚡ PRO Plus', profileUltimate: '🔥 Ultimate',
             updateChecking: '⏳ Checking updates...',
             updateAvailable: '🔄 Update Available Now',
             updateAvailableMsg: '🔄 Blocklist Update Available Now',
@@ -721,11 +641,13 @@
             projectLink: 'Project',
             swUpdateAvailable: '🔄 Update available — reload',
             swUpdateReload: 'Reload',
+            swPrecacheIncomplete: '⚠️ PWA cache incomplete: {N} files failed to cache',
+            swError: '⚠️ Service Worker error',
             pwaInstallBtn: 'Install App',
             pwaInstallAriaLabel: 'Install companion Android app',
             pwaInstalled: 'Installed',
             pwaUpdate: 'Update App',
-            installing: '⏳ Installing...',
+            installing: 'Installing...',
             installSuccess: '✅ Companion app installed',
             installError: '❌ Install failed',
             installRateLimited: '🚫 Too many install attempts. Try again in 15 minutes.',
@@ -739,7 +661,15 @@
             installGithubTitle: '🌐 Download from GitHub',
             installGithubDesc: 'Downloads the app from the official page.\nRequires internet, then install it manually.',
             installGithubBtnPage: '🌐 Open GitHub page',
-            installGithubBtnDirect: '🌐 Direct download from GitHub'
+            installGithubBtnDirect: '🌐 Direct download from GitHub',
+            msgMethodNotAllowed: '⚠️ Endpoint requires POST',
+            msgFileTooLarge: '❌ File too large (> 5 MB)',
+            msgTooManyRequests: '⚠️ Too many requests — wait a moment',
+            msgForbidden: '❌ Access denied',
+            msgNotFound: '❌ Not found',
+            msgBadRequest: '❌ Invalid request',
+            msgTimeout: '⏱️ Request timed out',
+            msgServerError: '❌ Server error'
         },
         ar: {
             title: 'DNSCrypt Proxy', subtitle: 'Smart Filter',
@@ -777,6 +707,8 @@
             editorTitle: '📝 اختيار القائمة', sourceCount: 'اختر مستوى الحماية',
             entriesLabel: 'مدخلة حماية', currentLabel: 'القائمة الحالية:', lastUpdateLabel: '🕒 آخر تحديث: ',
             apply: 'تطبيق', alreadyActive: '⚠️ هذه القائمة مفعلة بالفعل', applyConfirm: 'هل أنت متأكد من تطبيق القواعد وقائمة ',
+            profileLight: '☀️ خفيف', profileNormal: '🧹 عادي', profilePro: '🛡️ احترافي',
+            profileProPlus: '⚡ احترافي بلس', profileUltimate: '🔥 حماية أقصى',
             updateChecking: '⏳ جاري فحص التحديثات...',
             updateAvailable: '🔄 تحديث متاح الآن',
             updateAvailableMsg: '🔄 تحديث قوائم الحجب متاح الآن',
@@ -837,16 +769,18 @@
             projectLink: 'المشروع',
             swUpdateAvailable: '🔄 تحديث متاح — أعد التحميل',
             swUpdateReload: 'إعادة التحميل',
+            swPrecacheIncomplete: '⚠️ تخزين PWA غير مكتمل: فشل {N} ملف',
+            swError: '⚠️ خطأ في Service Worker',
             pwaInstallBtn: 'ثبّت التطبيق',
             pwaInstallAriaLabel: 'تثبيت تطبيق أندرويد المرافق',
             pwaInstalled: 'مثبَّت',
             pwaUpdate: 'تحديث التطبيق',
-            installing: '⏳ جاري التثبيت...',
+            installing: 'جاري التثبيت...',
             installSuccess: '✅ تم تثبيت التطبيق بنجاح',
             installError: '❌ فشل التثبيت',
             installRateLimited: '🚫 محاولات تثبيت كثيرة. حاول بعد 15 دقيقة.',
             installTokenError: '❌ فشل الحصول على رمز التثبيت',
-            installManualDownload: '⬇️ التنزيل يدويًا',
+            installManualDownload: '⬇️ التنزيل يدوياً',
             waitForContent: '⏳ يرجى الانتظار قليلاً حتى يتم تحميل المحتوى من الخادم',
             installChooseMethod: 'اختر طريقة تثبيت التطبيق المرافق:',
             installLocalTitle: '📦 التثبيت المحلي',
@@ -855,7 +789,15 @@
             installGithubTitle: '🌐 التنزيل من GitHub',
             installGithubDesc: 'يُنزَّل التطبيق من الصفحة الرسمية.\nيحتاج اتصالاً بالإنترنت، ثم ثبّته يدوياً.',
             installGithubBtnPage: '🌐 فتح صفحة GitHub',
-            installGithubBtnDirect: '🌐 تنزيل مباشر من GitHub'
+            installGithubBtnDirect: '🌐 تنزيل مباشر من GitHub',
+            msgMethodNotAllowed: '⚠️ نقطة النهاية تتطلب POST',
+            msgFileTooLarge: '❌ الملف كبير جداً (> 5 MB)',
+            msgTooManyRequests: '⚠️ طلبات كثيرة — انتظر قليلاً',
+            msgForbidden: '❌ ممنوع الوصول',
+            msgNotFound: '❌ غير موجود',
+            msgBadRequest: '❌ طلب غير صالح',
+            msgTimeout: '⏱️ انتهت مهلة الطلب',
+            msgServerError: '❌ خطأ في الخادم'
         }
     };
 
@@ -870,12 +812,10 @@
     var runtimeInfoLoaded = false, runtimeInfoData = null, rawJsonVisible = false;
     var logFilesData = null, currentViewerFile = null, sensitiveRevealed = false;
 
-    var rulesState = { 
-        savingAllow: false, 
-        savingDeny: false, 
-        serverAllowHash: '', 
-        serverDenyHash: '',
-        isSaving: false 
+    var rulesState = {
+        savingAllow: false, savingDeny: false,
+        serverAllowHash: '', serverDenyHash: '',
+        isSaving: false
     };
 
     var currentStatus = '';
@@ -886,7 +826,6 @@
 
     var sseBackoff = 5000;
     var sseMaxBackoff = 60000;
-
     var sseStatusDebounceTimer = null;
     var SSE_STATUS_DEBOUNCE_MS = 500;
 
@@ -904,17 +843,12 @@
     var networkDownActive = false;
 
     var COMPANION_CACHE_KEY = 'companion-state';
-    var companionState = {
-        installed: false,
-        version_name: '',
-        expected_version: ''
-    };
+    var companionState = { installed: false, version_name: '', expected_version: '' };
     var companionInstallInFlight = false;
     var installModalActive = false;
 
     var currentUpdateState = 'checking';
     var isCheckingUpdates = false;
-
     var updateCompletionHandled = false;
     var lastKnownUpdateState = null;
     var updateCheckRetryTimer = null;
@@ -955,6 +889,25 @@
             .replace(/\u2029/g, '&#8233;');
     }
 
+    function describeXhrError(err) {
+        if (!err) return t('serverError');
+        switch (err.code) {
+            case 400: return t('msgBadRequest');
+            case 403: return t('msgForbidden');
+            case 404: return t('msgNotFound');
+            case 405: return t('msgMethodNotAllowed');
+            case 409: return t('conflictDetected');
+            case 413: return t('msgFileTooLarge');
+            case 429: return t('msgTooManyRequests');
+            case 500: case 502: case 503: case 504:
+                return t('msgServerError') + ' (' + err.code + ')';
+            default:
+                if (err.message === 'Network Error') return t('networkDown');
+                if (err.message === 'Timeout') return t('msgTimeout');
+                return t('serverError') + (err.code ? ' (' + err.code + ')' : '');
+        }
+    }
+
     function getStoredToken() { return null; }
     function storeToken(tk) { void tk; }
     function clearStoredToken() { }
@@ -963,8 +916,7 @@
     function saveDraft(listType, value) {
         try {
             localStorage.setItem(getDraftKey(listType), JSON.stringify({
-                value: value,
-                timestamp: Date.now()
+                value: value, timestamp: Date.now()
             }));
         } catch(e) {}
     }
@@ -984,8 +936,7 @@
     function hasDraft(listType) {
         var draft = getDraft(listType);
         if (!draft) return false;
-        var orig = originalValues[listType] || '';
-        return draft.value !== orig;
+        return draft.value !== (originalValues[listType] || '');
     }
 
     function countChanges(listType) {
@@ -1031,6 +982,14 @@
         } else {
             badge.classList.remove('visible');
         }
+    }
+
+    function _scheduleChangeCounter(listType) {
+        if (_inputDebounce[listType]) clearTimeout(_inputDebounce[listType]);
+        _inputDebounce[listType] = setTimeout(function() {
+            _inputDebounce[listType] = null;
+            updateChangeCounter(listType);
+        }, 250);
     }
 
     function transitionTo(listType, newState) {
@@ -1145,117 +1104,15 @@
         el.className = 'rule-status' + (type ? ' ' + type : '');
     }
 
-    function saveWithOptimistic(targetListType) {
-        if (rulesState.isSaving) return;
-
-        var targetHasChanges = countChanges(targetListType) > 0;
-        
-        if (!targetHasChanges) {
-            showMsg(targetListType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
-            return;
-        }
-
-        rulesState.isSaving = true;
-        
-        $('saveAllowBtn').disabled = true;
-        $('saveDenyBtn').disabled = true;
-        $('cancelAllowBtn').disabled = true;
-        $('cancelDenyBtn').disabled = true;
-        $('allowlistInput').disabled = true;
-        $('denylistInput').disabled = true;
-
-        var content = targetListType === 'allow' ? $('allowlistInput').value : $('denylistInput').value;
-        var hash = targetListType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
-        
-        var url = targetListType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
-        var params = (targetListType === 'allow' ? 'allowlist=' : 'denylist=') +
-                     encodeURIComponent(content) +
-                     '&expected_hash=' + hash;
-                     
-        setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus', '⏳ Saving...', 'pending');
-
-        xhrPost(url, params, function(err, data) {
-            rulesState.isSaving = false;
-            
-            $('saveAllowBtn').disabled = false;
-            $('saveDenyBtn').disabled = false;
-            $('cancelAllowBtn').disabled = false;
-            $('cancelDenyBtn').disabled = false;
-            $('allowlistInput').disabled = false;
-            $('denylistInput').disabled = false;
-
-            if (err || !data || data.status !== 'ok') {
-                if (err && err.code === 409) {
-                    showMsg(t('conflictDetected'), 'warning', 4000);
-                    loadCustomRules(); 
-                } else {
-                    showMsg(t('serverError'), 'error', 4000);
-                }
-                
-                transitionTo(targetListType, EditState.ROLLBACK);
-                setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus', 
-                              targetListType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
-                return;
-            }
-
-            if (data.allow_hash) rulesState.serverAllowHash = data.allow_hash;
-            if (data.deny_hash) rulesState.serverDenyHash = data.deny_hash;
-
-            if (targetListType === 'allow') {
-                originalValues.allow = content;
-                clearDraft('allow');
-                $('allowDraftBadge').classList.remove('visible');
-                transitionTo('allow', EditState.VIEW);
-                setRuleStatus('allowStatus', t('allowSavedMsg'), 'saved');
-            } else {
-                originalValues.deny = content;
-                clearDraft('deny');
-                $('denyDraftBadge').classList.remove('visible');
-                transitionTo('deny', EditState.VIEW);
-                setRuleStatus('denyStatus', t('denySavedMsg'), 'saved');
-            }
-
-            showMsg(targetListType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
-            
-            setTimeout(function() { 
-                setRuleStatus('allowStatus', '', ''); 
-                setRuleStatus('denyStatus', '', ''); 
-            }, 3000);
-            
-            setTimeout(loadProfile, 500);
-        });
-    }
-
     function hasUnsavedChanges() {
         return ((editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) && countChanges('allow') > 0) ||
                ((editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) && countChanges('deny') > 0);
     }
 
-    document.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            e.preventDefault();
-            if (rulesState.isSaving) return;
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                saveWithOptimistic('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                saveWithOptimistic('deny');
-            }
-        }
-        if (e.key === 'Escape') {
-            if (rulesState.isSaving) return;
-            if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
-                cancelEdit('allow');
-            } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
-                cancelEdit('deny');
-            }
-        }
-    });
-
     function showConfirmModal(message, callback, options) {
         options = options || {};
         _resetModalLayout();
         installModalActive = false;
-        companionInstallInFlight = false;
         $('modalMessage').textContent = message;
         $('modalTitle').textContent = options.title || t('confirmTitle');
         $('modalCancelBtn').textContent = options.cancelText || t('confirmCancel');
@@ -1277,780 +1134,29 @@
         }
 
         $('customModal').style.display = 'flex';
-        pendingConfirmCallback = callback || function() { /* no-op */ };
+        pendingConfirmCallback = callback || function() { };
     }
+
+    function _resetModalLayout() {
+        var modal = $('customModal');
+        var box = modal.querySelector('.custom-modal-box');
+        box.classList.remove('install-modal-box');
+        $('modalTitle').style.display = '';
+        $('modalMessage').style.display = '';
+        $('modalMessage').style.whiteSpace = 'pre-wrap';
+        $('modalCancelBtn').style.display = '';
+        $('modalConfirmBtn').style.display = '';
+        var actionsBox = modal.querySelector('.custom-modal-actions');
+        actionsBox.style.display = '';
+    }
+
     function closeConfirmModal() {
+        if (installModalActive) {
+            companionInstallInFlight = false;
+        }
         $('customModal').style.display = 'none';
         pendingConfirmCallback = null;
         installModalActive = false;
-    }
-
-    function showAuthBadge() {
-        var b = $('authBadge');
-        if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
-    }
-    function hideAuthBadge() {
-        var b = $('authBadge');
-        if (b) b.style.display = 'none';
-    }
-
-    function setNetworkDownUI(isDown) {
-        var area = $('statusArea'), txt = $('statusText');
-        if (!area || !txt) return;
-        if (isDown) {
-            area.style.borderColor = 'rgba(210,153,34,0.4)';
-            txt.textContent = t('networkDown');
-            networkDownActive = true;
-        } else {
-            area.style.borderColor = '';
-            if (networkDownActive) {
-                if (currentStatus === 'ON') {
-                    txt.textContent = t('statusOn');
-                } else if (currentStatus === 'OFF') {
-                    txt.textContent = t('statusOff');
-                } else {
-                    txt.textContent = t('statusChecking');
-                }
-                networkDownActive = false;
-            }
-        }
-    }
-    function updateStatsDisplay() {
-        var btEl = $('blockedToday');
-        if (btEl) {
-            var isPaused = (currentStatus !== 'ON');
-            var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
-            var rawLabel = t('blockedTodayLabel');
-            var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
-            var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
-            var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
-            var ledCls = isPaused ? 'led led-off' : 'led led-on';
-
-            btEl.innerHTML =
-                escapeHtml(icon) + ' ' +
-                escapeHtml(labelText) + ' ' +
-                escapeHtml(currentBlockedCount) +
-                '<span class="' + ledCls + '" aria-hidden="true"></span>' +
-                '<span class="stat-sub">' +
-                escapeHtml(before) + ' ' + escapeHtml(after) +
-                '</span>';
-
-            if (isPaused) btEl.classList.add('stat-paused');
-            else btEl.classList.remove('stat-paused');
-        }
-        $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
-    }
-
-    function showSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        var txt = $('swUpdateText');
-        if (txt) txt.textContent = t('swUpdateAvailable');
-        if (banner) banner.style.display = 'flex';
-    }
-    function hideSWUpdateBanner() {
-        var banner = $('swUpdateBanner');
-        if (banner) banner.style.display = 'none';
-    }
-    function installControllerChangeHandler() {
-        if (controllerChangeHandlerInstalled) return;
-        if (!('serviceWorker' in navigator)) return;
-        controllerChangeHandlerInstalled = true;
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            if (!pendingReload) return;
-            pendingReload = false;
-            if (swUpdateCheckInterval) {
-                clearInterval(swUpdateCheckInterval);
-                swUpdateCheckInterval = null;
-            }
-            window.location.reload();
-        });
-    }
-    function setupSWUpdateHandler() {
-        if (!('serviceWorker' in navigator)) return;
-        installControllerChangeHandler();
-        navigator.serviceWorker.addEventListener('message', function(event) {
-            if (!event.data) return;
-            if (event.data.type === 'UPDATE_AVAILABLE') {
-                if (event.data.waiting) showSWUpdateBanner();
-            }
-        });
-        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-        swUpdateCheckInterval = setInterval(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-            }
-        }, 3600000);
-        setTimeout(function() {
-            if (navigator.serviceWorker.controller) {
-                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-            }
-        }, 5000);
-    }
-    function bindSWUpdateButtons() {
-        var reloadBtn = $('swUpdateReloadBtn');
-        var closeBtn = $('swUpdateCloseBtn');
-        if (reloadBtn) {
-            reloadBtn.addEventListener('click', function() {
-                if (pendingReload) return;
-                if (!swRegistration) { window.location.reload(); return; }
-                var waiting = swRegistration.waiting;
-                if (!waiting) { window.location.reload(); return; }
-                pendingReload = true;
-                reloadBtn.disabled = true;
-                try {
-                    waiting.postMessage({ type: 'SKIP_WAITING' });
-                } catch (e) {
-                    pendingReload = false;
-                    reloadBtn.disabled = false;
-                    window.location.reload();
-                    return;
-                }
-                setTimeout(function() {
-                    if (pendingReload) {
-                        pendingReload = false;
-                        if (swUpdateCheckInterval) {
-                            clearInterval(swUpdateCheckInterval);
-                            swUpdateCheckInterval = null;
-                        }
-                        window.location.reload();
-                    }
-                }, 3000);
-            });
-        }
-        if (closeBtn) closeBtn.addEventListener('click', hideSWUpdateBanner);
-    }
-
-    function loadRuntimeInfo() {
-        var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
-        if (!content) return;
-        if (card) card.style.display = 'block';
-        if (refreshBtn) refreshBtn.disabled = true;
-        content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
-        xhrGet('/api?action=runtime_info', function(err, data) {
-            if (refreshBtn) refreshBtn.disabled = false;
-            if (err || !data) {
-                content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
-                return;
-            }
-            runtimeInfoData = data;
-            runtimeInfoLoaded = true;
-            if (data.webui_port) PORTS.webui = String(data.webui_port);
-            if (data.dashboard_port) {
-                PORTS.dashboard = String(data.dashboard_port);
-                updateDashboardLink();
-            }
-            if (data.version && data.version !== 'dev') {
-                VERSION = data.version;
-                document.title = 'DNSCrypt Proxy ' + VERSION;
-                var badge = $('versionBadge');
-                if (badge) badge.textContent = VERSION;
-                var footer = $('footerVersion');
-                if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
-            }
-            if (data.project_url && data.project_url !== '') {
-                var link = $('footerProjectLink');
-                var linkText = $('footerProjectText');
-                if (link) {
-                    link.href = data.project_url;
-                    link.style.display = 'inline-flex';
-                }
-                if (linkText) linkText.textContent = t('projectLink');
-            }
-            var memDisplay = 'unknown';
-            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
-                memDisplay = String(data.memory_limit_mb) + ' MB';
-            }
-            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
-            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
-            var bkLatest    = bk.last_backup_name || t('riBackupNone');
-            var bkDate      = bk.last_backup      || t('riBackupNone');
-            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
-            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
-            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
-            var bkPath      = bk.path || t('riBackupDirMissing');
-
-            if (bk.last_backup_unix) {
-                var d = new Date(bk.last_backup_unix * 1000);
-                var options = { 
-                    year: 'numeric', month: '2-digit', day: '2-digit', 
-                    hour: '2-digit', minute: '2-digit', second: '2-digit',
-                    hour12: false 
-                };
-                bkDate = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', options);
-            }
-
-            var html = '';
-            var items = [
-                { label: t('riVersion'), value: data.version || 'unknown' },
-                { label: t('riCommit'), value: data.commit || 'unknown' },
-                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
-                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
-                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
-                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
-                { label: t('riProfile'), value: data.profile_key || 'unknown' },
-                { label: t('riMemoryLimit'), value: memDisplay },
-                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
-                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
-                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
-                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
-                { label: t('riLogFile'), value: data.log_file || 'unknown' },
-                { label: t('riBackupCount'), value: bkAvailable, warn: bkAvailable === '0' },
-                { label: t('riBackupLatest'), value: bkLatest, warn: !bk.last_backup_name },
-                { label: t('riBackupDate'), value: bkDate, warn: !bk.last_backup },
-                { label: t('riBackupLastStable'), value: bkLastStbl, warn: !bk.last_stable },
-                { label: t('riBackupInFlight'), value: bkInFlight, warn: parseInt(bkInFlight, 10) > 0 },
-                { label: t('riBackupOrphan'), value: bkOrphan, warn: parseInt(bkOrphan, 10) > 0 },
-                { label: t('riBackupPath'), value: bkPath }
-            ];
-            for (var i = 0; i < items.length; i++) {
-                var valHtml;
-                if (items[i].isLink && items[i].value !== 'unknown') {
-                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
-                } else {
-                    valHtml = escapeHtml(items[i].value);
-                }
-                var labelClass = 'ri-label';
-                if (items[i].warn) labelClass += ' ri-warn';
-                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
-            }
-            html += '<div class="ri-actions">'
-                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
-                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
-                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
-                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
-            content.innerHTML = html;
-
-            var copyBtn = $('riCopyBtn');
-            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
-            var rawBtn = $('riRawJsonBtn');
-            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
-        });
-    }
-
-    function copyRuntimeInfo() {
-        if (!runtimeInfoData) return;
-        var text = JSON.stringify(runtimeInfoData, null, 2);
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
-                showMsg(t('riCopySuccess'), 'success', 1500);
-            }).catch(function() { _fallbackCopy(text); });
-        } else {
-            _fallbackCopy(text);
-        }
-    }
-    function _fallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            document.execCommand('copy');
-            showMsg(t('riCopySuccess'), 'success', 1500);
-        } catch(e) {
-            showMsg(t('riCopyError'), 'error', 2000);
-        }
-        document.body.removeChild(ta);
-    }
-    function toggleRawJson() {
-        var el = $('riRawJson'), btn = $('riRawJsonBtn');
-        if (!el) return;
-        rawJsonVisible = !rawJsonVisible;
-        el.style.display = rawJsonVisible ? 'block' : 'none';
-        if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-    }
-
-    function formatBytes(bytes) {
-        if (!bytes || bytes < 0) return '0 B';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
-    }
-    function formatMtime(mtime) {
-        var d = new Date(mtime * 1000);
-        var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
-        var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
-        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
-    }
-    function fileIcon(name) {
-        if (name.indexOf('query') !== -1) return '📊';
-        if (name.indexOf('blocked-ips') !== -1) return '🚫';
-        if (name.indexOf('blocked') !== -1) return '🔴';
-        if (name.indexOf('allowed') !== -1) return '🟢';
-        if (name.indexOf('proxy.log') !== -1) return '⚙️';
-        if (name.indexOf('install') !== -1) return '📦';
-        if (name.indexOf('credential') !== -1) return '🔐';
-        if (name.endsWith('.gz')) return '🗜️';
-        if (name.indexOf('.emergency.') !== -1) return '⚠️';
-        return '📄';
-    }
-    function loadLogFiles() {
-        var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
-        if (!card || !content) return;
-        card.style.display = 'block';
-        if (btn) btn.disabled = true;
-        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
-        xhrGet('/api?action=list_logs', function(err, data) {
-            if (btn) btn.disabled = false;
-            if (err || !data || !data.files) {
-                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
-                return;
-            }
-            logFilesData = data;
-            renderLogFiles();
-        });
-    }
-    function renderLogFiles() {
-        var content = $('diagFilesContent');
-        if (!content || !logFilesData || !logFilesData.files) return;
-        var active = [], archive = [], emergency = [], sensitive = [];
-        for (var i = 0; i < logFilesData.files.length; i++) {
-            var f = logFilesData.files[i];
-            switch (f.type) {
-                case 'active': active.push(f); break;
-                case 'archive': archive.push(f); break;
-                case 'emergency': emergency.push(f); break;
-                case 'sensitive': sensitive.push(f); break;
-            }
-        }
-        var html = '';
-        html += renderSection('🟢', t('dfActiveFiles'), active);
-        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
-        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
-        if (sensitive.length > 0) {
-            html += '<div class="df-section">';
-            html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
-            if (!sensitiveRevealed) {
-                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
-            } else {
-                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
-                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
-            }
-            html += '</div>';
-        }
-        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
-        content.querySelectorAll('[data-action]').forEach(function(el) {
-            var action = el.getAttribute('data-action');
-            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
-            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
-            else if (action === 'view-log') {
-                el.addEventListener('click', function() {
-                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-            else if (action === 'download-log') {
-                el.addEventListener('click', function() {
-                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
-                });
-            }
-        });
-    }
-    function renderSection(icon, label, files) {
-        if (!files || files.length === 0) return '';
-        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
-        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
-        html += '</div>';
-        return html;
-    }
-    function renderFileRow(file, isSensitive) {
-        var sens = isSensitive ? '1' : '0';
-        return '<div class="df-file">'
-             + '<div class="df-file-info">'
-             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
-             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
-             + '</div>'
-             + '<div class="df-file-actions">'
-             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
-             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
-             + '</div></div>';
-    }
-    function revealSensitive() {
-        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
-            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
-        }, { title: '⚠️ ' + t('confirmTitle') });
-    }
-    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
-
-    function viewLogFile(name, isSensitive) {
-        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
-        title.textContent = name;
-        body.textContent = t('dfLoading');
-        warning.style.display = isSensitive ? 'block' : 'none';
-        warning.textContent = t('dfSensitiveWarning');
-        modal.style.display = 'flex';
-        currentViewerFile = { name: name, sensitive: isSensitive };
-        xhrGet(url, function(err, data) {
-            if (err || !data || data.status !== 'ok') {
-                body.textContent = t('dfFailedToLoad');
-                return;
-            }
-            var content = data.content || '';
-            if (data.truncated) content = t('dfTruncatedPrefix') + content;
-            body.textContent = content || t('dfEmpty');
-            body.scrollTop = body.scrollHeight;
-        });
-    }
-    function downloadLogFile(name, isSensitive) {
-        var url = '/api/download_log?file=' + encodeURIComponent(name);
-        if (isSensitive) url += '&confirm=1';
-        showMsg(t('dfDownloading'), 'info', 1500);
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.withCredentials = true;
-        xhr.responseType = 'blob';
-        xhr.onload = function() {
-            if (xhr.status === 200) {
-                var blob = new Blob([xhr.response]);
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-            }
-        };
-        xhr.send();
-    }
-    function downloadCurrentFile() {
-        if (!currentViewerFile) return;
-        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
-    }
-    function clearCurrentFile() {
-        if (!currentViewerFile) return;
-        var name = currentViewerFile.name;
-        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
-            if (!confirmed) return;
-            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
-                if (err || !data || data.status !== 'ok') {
-                    showMsg(t('fvClearError'), 'error', 3000);
-                    return;
-                }
-                showMsg(t('fvClearSuccess'), 'success', 2500);
-                closeFileViewer();
-                setTimeout(function() { loadLogFiles(); }, 500);
-            });
-        });
-    }
-    function closeFileViewer() {
-        $('fileViewerModal').style.display = 'none';
-        currentViewerFile = null;
-    }
-
-    function updateUIStrings() {
-        $('title').textContent = t('title');
-        $('subtitle').textContent = t('subtitle');
-        $('editorTitle').textContent = t('editorTitle');
-        var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
-        if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
-        else $('sourceCountText').textContent = t('sourceCount');
-        $('currentLabel').textContent = t('currentLabel');
-        $('applyText').textContent = t('apply');
-
-        $('syncText').textContent = t('sync');
-        $('forceRefreshText').textContent = t('forceRefresh');
-        $('logsText').textContent = t('logs');
-        $('clearLogsText').textContent = t('clearLogs');
-        $('closeLogsText').textContent = t('closeLogs');
-        $('logsModalTitle').textContent = t('logsModalTitle');
-        $('oldModulesTitle').textContent = t('oldModulesTitle');
-        $('customRulesTitle').textContent = t('customRulesTitle');
-
-        var allowBadge = $('allowEditBadge');
-        if (allowBadge) allowBadge.textContent = t('editBadge');
-        var denyBadge = $('denyEditBadge');
-        if (denyBadge) denyBadge.textContent = t('editBadge');
-
-        var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
-        var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
-        $('saveAllowText').textContent = allowBtnText;
-        $('saveDenyText').textContent = denyBtnText;
-        $('cancelAllowBtn').textContent = t('cancelEdit');
-        $('cancelDenyBtn').textContent = t('cancelEdit');
-
-        var allowLabel = $('allowlistLabel');
-        if (allowLabel) {
-            var firstSpan = allowLabel.querySelector('span:first-child');
-            if (firstSpan) firstSpan.textContent = t('allowlistLabel');
-        }
-        var denyLabel = $('denylistLabel');
-        if (denyLabel) {
-            var firstSpan2 = denyLabel.querySelector('span:first-child');
-            if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
-        }
-
-        var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
-        var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
-        var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
-        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
-        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
-        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
-        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
-        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
-        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
-
-        var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
-        var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
-
-        $('loginTitle').textContent = t('loginTitle');
-        $('usernameInput').placeholder = t('username');
-        $('passwordInput').placeholder = t('password');
-        $('loginBtn').textContent = t('loginBtn');
-        $('logoutBtn').textContent = t('logoutBtn');
-
-        $('restartBtn').title = t('restartBtn');
-        $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
-
-        renderAllDynamic();
-
-        var ab = $('authBadge');
-        if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
-    }
-
-    function renderAllDynamic() {
-        renderCompanionButton();
-        if (networkDownActive) {
-            setNetworkDownUI(true);
-            updateStatsDisplay();
-        } else if (currentStatus === 'ON' || currentStatus === 'OFF') {
-            updateStatusUI(currentStatus);
-        } else {
-            updateStatsDisplay();
-        }
-        if (logFilesData) renderLogFiles();
-        var dashText = $('dashboardLinkText');
-        if (dashText) dashText.textContent = t('dashboardLinkText');
-
-        updateSmartUpdateButtonUI();
-    }
-
-    function toggleLanguage() {
-        if (rulesState.isSaving) return;
-        currentLang = currentLang === 'ar' ? 'en' : 'ar';
-        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
-        document.documentElement.lang = currentLang;
-        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
-        updateUIStrings();
-        if (appInitialized) {
-            loadProfile();
-            checkOldModules();
-            if (runtimeInfoLoaded) loadRuntimeInfo();
-            refreshCompanionState();
-        }
-    }
-
-    function showMsg(text, type, duration) {
-        duration = duration || 2000;
-        var m = $('msg');
-        m.textContent = text;
-        m.className = 'msg-float ' + (type || 'info');
-        m.style.display = 'block';
-        m.style.opacity = '1';
-        m.style.visibility = 'visible';
-        clearTimeout(m._timeout);
-        m._timeout = setTimeout(function() {
-            m.style.opacity = '0';
-            m.style.visibility = 'hidden';
-            setTimeout(function() { m.style.display = 'none'; }, 400);
-        }, duration);
-    }
-
-    function performLogin() {
-        var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
-        if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
-        isLoginAttempt = true;
-        var btn = $('loginBtn');
-        btn.disabled = true;
-        btn.textContent = t('loggingIn');
-        fetch('/api/auth/login', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
-        }).then(function(r) {
-            return r.json().then(function(d) { return { status: r.status, data: d }; });
-        }).then(function(resp) {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            if (resp.status === 200 && resp.data.status === 'ok') {
-                $('passwordInput').value = '';
-                sessionExpiredShown = false;
-                if (resp.data.profile) renderProfileData(resp.data.profile);
-                if (resp.data.token) storeToken(resp.data.token);
-                closeConfirmModal();
-                showAuthBadge();
-                showMainScreen();
-                if (!appInitialized) {
-                    showMsg(t('welcomeMsg'), 'info', 4000);
-                    appInitialized = true;
-                }
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
-                refreshCompanionState();
-                setTimeout(function() { checkForUpdates(false); }, 4500);
-                setTimeout(checkServerUpdateState, 1000);
-                verifyFailures = 0;
-                verifyBackoff = 3000;
-            } else if (resp.status === 429) {
-                showMsg(t('tooManyAttempts'), 'error', 5000);
-                isLoginAttempt = false;
-            } else {
-                showMsg(t('loginError'), 'error');
-                isLoginAttempt = false;
-            }
-        }).catch(function() {
-            btn.disabled = false;
-            btn.textContent = t('loginBtn');
-            showMsg(t('networkError'), 'error');
-            isLoginAttempt = false;
-        });
-    }
-
-    function logout() {
-        if (hasUnsavedChanges()) {
-            showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
-                function(confirmed) {
-                    if (!confirmed) return;
-                    doLogout();
-                },
-                { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
-            );
-            return;
-        }
-        doLogout();
-    }
-
-    function doLogout() {
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-            .catch(function() {})
-            .then(function() {
-                clearStoredToken();
-                clearDraft('allow');
-                clearDraft('deny');
-                try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
-                if (sse) { sse.close(); sse = null; }
-                if (statusPollInterval) clearInterval(statusPollInterval);
-                if (statsInterval) clearInterval(statsInterval);
-                if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
-                if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
-                if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
-                if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
-                if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-                if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
-                location.reload();
-            });
-    }
-
-    function verifyAuth() {
-        xhrGet('/api?action=status', function(err, data) {
-            if (err) {
-                if (err.code === 401) {
-                    clearStoredToken();
-                    showLoginScreen();
-                    hideAuthBadge();
-                    if (isLoginAttempt) {
-                        showMsg(t('loginError'), 'error');
-                        isLoginAttempt = false;
-                    }
-                    verifyFailures = 0;
-                    verifyBackoff = 3000;
-                } else {
-                    verifyFailures++;
-                    setNetworkDownUI(true);
-                    if (verifyFailures === 1) {
-                        showMsg(t('networkError'), 'warning', 3000);
-                    }
-                    setTimeout(verifyAuth, verifyBackoff);
-                    verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
-                }
-                return;
-            }
-            verifyFailures = 0;
-            verifyBackoff = 3000;
-            sessionExpiredShown = false;
-            setNetworkDownUI(false);
-            showMainScreen();
-            showAuthBadge();
-            var wasFirstInit = !appInitialized;
-            if (wasFirstInit) {
-                showMsg(t('welcomeMsg'), 'info', 4000);
-                initSSE();
-                startPolling();
-                loadCustomRules();
-                loadRuntimeInfo();
-                loadLogFiles();
-                appInitialized = true;
-                setTimeout(checkServerUpdateState, 1000);
-            }
-            refreshCompanionState();
-            setTimeout(function() { checkForUpdates(false); }, wasFirstInit ? 4500 : 0);
-        });
-    }
-
-    function showLoginScreen() {
-        $('loginScreen').style.display = 'flex';
-        $('appContent').style.display = 'none';
-        $('logoutBtn').style.display = 'none';
-        hideAuthBadge();
-    }
-    function showMainScreen() {
-        $('loginScreen').style.display = 'none';
-        $('appContent').style.display = 'block';
-        $('logoutBtn').style.display = 'block';
-        showAuthBadge();
-        closeConfirmModal();
-        sessionExpiredShown = false;
-    }
-    function handleSessionExpired() {
-        if (sessionExpiredShown) return;
-        sessionExpiredShown = true;
-        var wasInitialized = appInitialized;
-        appInitialized = false;
-        clearStoredToken();
-        verifyFailures = 0;
-        verifyBackoff = 3000;
-        sseBackoff = 5000;
-
-        isProcessing = false;
-        updateCompletionHandled = false;
-        isCheckingUpdates = false;
-        rulesState.isSaving = false;
-        var pc = $('progressContainer');
-        if (pc) { pc.style.display = 'none'; pc.style.opacity = '1'; }
-        var pb = $('progressBar');
-        if (pb) { pb.style.width = '0%'; pb.classList.remove('success'); }
-        var pt = $('progressText');
-        if (pt) pt.textContent = '0%';
-
-        if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
-        if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
-        if (sse) { sse.close(); sse = null; }
-        if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
-        if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
-        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
-        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
-        if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
-        showLoginScreen();
-        if (!wasInitialized) return;
-        showConfirmModal(t('sessionExpiredMsg'), function(ok) {
-            if (ok) $('usernameInput').focus();
-        }, {
-            title: t('sessionExpiredTitle'),
-            primaryText: t('sessionRelogin'),
-            primaryCallback: function() {
-                $('usernameInput').value = '';
-                $('passwordInput').value = '';
-                $('usernameInput').focus();
-            }
-        });
     }
 
     function getTimeoutForUrl(method, url) {
@@ -2059,6 +1165,10 @@
         if (url.indexOf('toggle_service') !== -1 || url.indexOf('restart_service') !== -1) return 60000;
         if (url.indexOf('check_update') !== -1) return 30000;
         return 15000;
+    }
+
+    function _updateSafetyMs() {
+        return getTimeoutForUrl('POST', '/api/update_profile') + 10000;
     }
 
     function isInstallFamilyUrl(url) {
@@ -2090,17 +1200,20 @@
                 } else if (xhr.status === 405) {
                     var e405 = new Error('HTTP 405'); e405.code = 405;
                     cb(e405, null);
-                    showMsg('⚠️ endpoint requires POST', 'warning', 3000);
+                    showMsg(t('msgMethodNotAllowed'), 'warning', 3000);
                 } else if (xhr.status === 409) {
                     var e409 = new Error('HTTP 409'); e409.code = 409;
                     cb(e409, null);
                 } else if (xhr.status === 413) {
                     var e413 = new Error('HTTP 413'); e413.code = 413;
                     cb(e413, null);
-                    showMsg('❌ File too large (> 5 MB)', 'error', 4000);
+                    showMsg(t('msgFileTooLarge'), 'error', 4000);
                 } else if (xhr.status === 429) {
                     var e429 = new Error('HTTP 429'); e429.code = 429;
                     cb(e429, null);
+                } else if (xhr.status >= 500) {
+                    var e5 = new Error('HTTP ' + xhr.status); e5.code = xhr.status;
+                    cb(e5, null);
                 } else {
                     var eN = new Error('HTTP ' + xhr.status); eN.code = xhr.status;
                     cb(eN, null);
@@ -2248,6 +1361,54 @@
         updateStatsDisplay();
     }
 
+    function setNetworkDownUI(isDown) {
+        var area = $('statusArea'), txt = $('statusText');
+        if (!area || !txt) return;
+        if (isDown) {
+            area.style.borderColor = 'rgba(210,153,34,0.4)';
+            txt.textContent = t('networkDown');
+            networkDownActive = true;
+        } else {
+            area.style.borderColor = '';
+            if (networkDownActive) {
+                if (currentStatus === 'ON') {
+                    txt.textContent = t('statusOn');
+                } else if (currentStatus === 'OFF') {
+                    txt.textContent = t('statusOff');
+                } else {
+                    txt.textContent = t('statusChecking');
+                }
+                networkDownActive = false;
+            }
+        }
+    }
+
+    function updateStatsDisplay() {
+        var btEl = $('blockedToday');
+        if (btEl) {
+            var isPaused = (currentStatus !== 'ON');
+            var icon = isPaused ? '\u23F8\uFE0F' : '\uD83D\uDEAB';
+            var rawLabel = t('blockedTodayLabel');
+            var labelText = rawLabel.replace(/^[^\s]+\s+/, '');
+            var before = isPaused ? t('statsPausedBefore') : t('statsRunningBefore');
+            var after  = isPaused ? t('statsPausedAfter')  : t('statsRunningAfter');
+            var ledCls = isPaused ? 'led led-off' : 'led led-on';
+
+            btEl.innerHTML =
+                escapeHtml(icon) + ' ' +
+                escapeHtml(labelText) + ' ' +
+                escapeHtml(currentBlockedCount) +
+                '<span class="' + ledCls + '" aria-hidden="true"></span>' +
+                '<span class="stat-sub">' +
+                escapeHtml(before) + ' ' + escapeHtml(after) +
+                '</span>';
+
+            if (isPaused) btEl.classList.add('stat-paused');
+            else btEl.classList.remove('stat-paused');
+        }
+        $('ramUsage').textContent = t('ramUsageLabel') + ' ' + currentRamUsage;
+    }
+
     function fetchStatus(callback) {
         if (isToggling) { if (callback) callback(); return; }
         xhrGet('/api?action=status', function(err, data) {
@@ -2268,7 +1429,7 @@
             isToggling = false;
             $('loaderContainer').style.display = 'none';
             if (!isProcessing) { btn.disabled = false; $('restartBtn').disabled = false; }
-            if (err) { showMsg(t('toggleError'), 'error'); return; }
+            if (err) { showMsg(describeXhrError(err), 'error'); return; }
             showMsg(t('toggleSuccess'), 'success');
             if (data && data.status) updateStatusUI(data.status);
             else setTimeout(fetchStatus, 500);
@@ -2288,7 +1449,7 @@
                 isToggling = false;
                 $('loaderContainer').style.display = 'none';
                 if (!isProcessing) { btn.disabled = false; $('restartBtn').disabled = false; }
-                if (err) { showMsg(t('restartError'), 'error'); return; }
+                if (err) { showMsg(describeXhrError(err), 'error'); return; }
                 showMsg(t('restartSuccess'), 'success');
                 if (data && data.status) updateStatusUI(data.status);
                 else setTimeout(fetchStatus, 500);
@@ -2321,10 +1482,24 @@
                 if (!isSilent) showMsg(t('syncSuccess'), 'success', Math.max(elapsed + 1000, 4000));
             }
         }
-        fetchStatus(function() { checkComplete(); });
-        setTimeout(function() { loadProfile(function() { checkComplete(); }); }, 300);
-        setTimeout(function() { loadRuntimeInfo(); checkComplete(); }, 500);
-        setTimeout(function() { loadLogFiles(); checkComplete(); }, 700);
+        fetchStatus(checkComplete);
+        setTimeout(function() { loadProfile(checkComplete); }, 300);
+        setTimeout(function() { loadRuntimeInfo(checkComplete); }, 500);
+        setTimeout(function() { loadLogFiles(checkComplete); }, 700);
+    }
+
+    function formatUnixTimestamp(unix) {
+        if (typeof unix !== 'number' || unix <= 0) return null;
+        try {
+            return new Date(unix * 1000).toLocaleString(
+                currentLang === 'ar' ? 'ar-EG' : 'en-US',
+                { year: 'numeric', month: '2-digit', day: '2-digit',
+                  hour: '2-digit', minute: '2-digit', second: '2-digit',
+                  hour12: false }
+            );
+        } catch (e) {
+            return null;
+        }
     }
 
     function renderProfileData(data) {
@@ -2335,7 +1510,14 @@
         $('currentProfileName').textContent = data.name;
         var count = data.entries || 0;
         $('sourceCountText').textContent = t('entriesLabel') + ' ' + count.toLocaleString('en-US');
-        if (data.last_update) $('lastUpdateText').textContent = t('lastUpdateLabel') + data.last_update;
+        
+        var lu = formatUnixTimestamp(data.last_update_unix);
+        if (lu) {
+            $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + lu;
+        } else if (data.last_update) {
+            $('lastUpdateText').textContent = t('lastUpdateLabel') + ' ' + data.last_update;
+        }
+
         if (currentProfileIsEmpty) {
             $('currentProfileName').style.color = 'var(--danger)';
             $('sourceCountText').style.color = 'var(--danger)';
@@ -2545,7 +1727,7 @@
                     showMsg(t('safetyTimeout'), 'warning', 5000);
                 }
                 safetyTimer = null;
-            }, 120000);
+            }, _updateSafetyMs());
         }
 
         var progContainer = $('progressContainer'), progBar = $('progressBar'), progText = $('progressText');
@@ -2661,6 +1843,84 @@
         $('restartBtn').disabled = false;
     }
 
+    function saveWithOptimistic(targetListType) {
+        if (rulesState.isSaving) return;
+
+        var targetHasChanges = countChanges(targetListType) > 0;
+
+        if (!targetHasChanges) {
+            showMsg(targetListType === 'allow' ? t('noAllowChanges') : t('noDenyChanges'), 'info', 2000);
+            return;
+        }
+
+        rulesState.isSaving = true;
+
+        $('saveAllowBtn').disabled = true;
+        $('saveDenyBtn').disabled = true;
+        $('cancelAllowBtn').disabled = true;
+        $('cancelDenyBtn').disabled = true;
+        $('allowlistInput').disabled = true;
+        $('denylistInput').disabled = true;
+
+        var content = targetListType === 'allow' ? $('allowlistInput').value : $('denylistInput').value;
+        var hash = targetListType === 'allow' ? rulesState.serverAllowHash : rulesState.serverDenyHash;
+
+        var url = targetListType === 'allow' ? '/api/save_allowlist' : '/api/save_denylist';
+        var params = (targetListType === 'allow' ? 'allowlist=' : 'denylist=') +
+                     encodeURIComponent(content) +
+                     '&expected_hash=' + hash;
+
+        setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus', '⏳ Saving...', 'pending');
+
+        xhrPost(url, params, function(err, data) {
+            rulesState.isSaving = false;
+
+            $('saveAllowBtn').disabled = false;
+            $('saveDenyBtn').disabled = false;
+            $('cancelAllowBtn').disabled = false;
+            $('cancelDenyBtn').disabled = false;
+            $('allowlistInput').disabled = false;
+            $('denylistInput').disabled = false;
+
+            if (err || !data || data.status !== 'ok') {
+                showMsg(describeXhrError(err), 'error', 4000);
+                if (err && err.code === 409) {
+                    loadCustomRules();
+                }
+                transitionTo(targetListType, EditState.ROLLBACK);
+                setRuleStatus(targetListType === 'allow' ? 'allowStatus' : 'denyStatus',
+                              targetListType === 'allow' ? t('allowSaveFailed') : t('denySaveFailed'), 'error');
+                return;
+            }
+
+            if (data.allow_hash) rulesState.serverAllowHash = data.allow_hash;
+            if (data.deny_hash) rulesState.serverDenyHash = data.deny_hash;
+
+            if (targetListType === 'allow') {
+                originalValues.allow = content;
+                clearDraft('allow');
+                $('allowDraftBadge').classList.remove('visible');
+                transitionTo('allow', EditState.VIEW);
+                setRuleStatus('allowStatus', t('allowSavedMsg'), 'saved');
+            } else {
+                originalValues.deny = content;
+                clearDraft('deny');
+                $('denyDraftBadge').classList.remove('visible');
+                transitionTo('deny', EditState.VIEW);
+                setRuleStatus('denyStatus', t('denySavedMsg'), 'saved');
+            }
+
+            showMsg(targetListType === 'allow' ? t('allowSavedMsg') : t('denySavedMsg'), 'success', 2000);
+
+            setTimeout(function() {
+                setRuleStatus('allowStatus', '', '');
+                setRuleStatus('denyStatus', '', '');
+            }, 3000);
+
+            setTimeout(loadProfile, 500);
+        });
+    }
+
     function applyProfile(forceUpdate) {
         if (isProcessing || rulesState.isSaving) return;
         var select = $('profileSelect'), profile = select.value;
@@ -2709,8 +1969,7 @@
             var onSaveDone = function(err, data) {
                 unlockUI();
                 if (err || !data || data.status !== 'ok') {
-                    var msg = (err && err.code === 409) ? t('conflictDetected') : t('serverError');
-                    showMsg(msg, 'error', 4000);
+                    showMsg(describeXhrError(err), 'error', 4000);
                     if (needsAllowSave) transitionTo('allow', EditState.ROLLBACK);
                     if (needsDenySave) transitionTo('deny', EditState.ROLLBACK);
                     return;
@@ -2777,7 +2036,7 @@
                 showMsg(t('safetyTimeout'), 'warning', 5000);
             }
             safetyTimer = null;
-        }, 120000);
+        }, _updateSafetyMs());
 
         startProgressMonitor();
 
@@ -2787,7 +2046,7 @@
                 if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
                 progContainer.style.display = 'none';
                 finishUpdateUI();
-                showMsg(t('serverError'), 'error', 4000);
+                showMsg(describeXhrError(err), 'error', 4000);
                 return;
             }
             if (data && data.status === 'already_running') {
@@ -2927,24 +2186,768 @@
         }, 10000);
     }
 
-    window.addEventListener('beforeunload', function(e) {
-        if (hasUnsavedChanges()) {
-            e.preventDefault();
-            e.returnValue = t('unsavedWarning');
-            return t('unsavedWarning');
+    function loadRuntimeInfo(cb) {
+        var content = $('runtimeInfoContent'), refreshBtn = $('riRefreshBtn'), card = $('runtimeInfoCard');
+        if (!content) { if (typeof cb === 'function') cb(); return; }
+        if (card) card.style.display = 'block';
+        if (refreshBtn) refreshBtn.disabled = true;
+        content.innerHTML = '<div class="ri-item"><span class="ri-label">' + t('runtimeInfoLoading') + '</span></div>';
+        xhrGet('/api?action=runtime_info', function(err, data) {
+            if (refreshBtn) refreshBtn.disabled = false;
+            if (err || !data) {
+                content.innerHTML = '<div class="ri-item"><span class="ri-label" style="color:var(--danger);">' + t('runtimeInfoError') + '</span></div>';
+                if (typeof cb === 'function') cb();
+                return;
+            }
+            runtimeInfoData = data;
+            runtimeInfoLoaded = true;
+            if (data.webui_port) PORTS.webui = String(data.webui_port);
+            if (data.dashboard_port) {
+                PORTS.dashboard = String(data.dashboard_port);
+                updateDashboardLink();
+            }
+            if (data.version && data.version !== 'dev') {
+                VERSION = data.version;
+                document.title = 'DNSCrypt Proxy ' + VERSION;
+                var badge = $('versionBadge');
+                if (badge) badge.textContent = VERSION;
+                var footer = $('footerVersion');
+                if (footer) footer.textContent = VERSION + ' Smart Edit Mode';
+            }
+            if (data.project_url && data.project_url !== '') {
+                var link = $('footerProjectLink');
+                var linkText = $('footerProjectText');
+                if (link) {
+                    link.href = data.project_url;
+                    link.style.display = 'inline-flex';
+                }
+                if (linkText) linkText.textContent = t('projectLink');
+            }
+            var memDisplay = 'unknown';
+            if (data.memory_limit_mb !== undefined && data.memory_limit_mb !== null) {
+                memDisplay = String(data.memory_limit_mb) + ' MB';
+            }
+            var bk = (data.backups && typeof data.backups === 'object') ? data.backups : {};
+            var bkAvailable = (bk.available !== undefined && bk.available !== null) ? String(bk.available) : '0';
+            var bkLatest    = bk.last_backup_name || t('riBackupNone');
+            var bkDate      = bk.last_backup      || t('riBackupNone');
+            var bkLastStbl  = bk.last_stable      || t('riBackupNone');
+            var bkInFlight  = (bk.in_flight_txn !== undefined && bk.in_flight_txn !== null) ? String(bk.in_flight_txn) : '0';
+            var bkOrphan    = (bk.orphan_txn    !== undefined && bk.orphan_txn    !== null) ? String(bk.orphan_txn)    : '0';
+            var bkPath      = bk.path || t('riBackupDirMissing');
+
+            if (bk.last_backup_unix) {
+                var d = new Date(bk.last_backup_unix * 1000);
+                var options = {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit',
+                    hour12: false
+                };
+                bkDate = d.toLocaleString(currentLang === 'ar' ? 'ar-EG' : 'en-US', options);
+            }
+
+            var html = '';
+            var items = [
+                { label: t('riVersion'), value: data.version || 'unknown' },
+                { label: t('riCommit'), value: data.commit || 'unknown' },
+                { label: t('riBuildTime'), value: data.build_time_human || data.build_time || 'unknown' },
+                { label: t('riProjectURL'), value: data.project_url || 'unknown', isLink: true },
+                { label: t('riWebuiPort'), value: data.webui_port || '9090' },
+                { label: t('riDashboardPort'), value: data.dashboard_port || '9091' },
+                { label: t('riProfile'), value: data.profile_key || 'unknown' },
+                { label: t('riMemoryLimit'), value: memDisplay },
+                { label: t('riRunDir'), value: data.run_dir || 'unknown' },
+                { label: t('riStatusFile'), value: data.status_file || 'unknown' },
+                { label: t('riPidFile'), value: data.pid_file || 'unknown' },
+                { label: t('riProgressFile'), value: data.progress_file || 'unknown' },
+                { label: t('riLogFile'), value: data.log_file || 'unknown' },
+                { label: t('riBackupCount'), value: bkAvailable, warn: bkAvailable === '0' },
+                { label: t('riBackupLatest'), value: bkLatest, warn: !bk.last_backup_name },
+                { label: t('riBackupDate'), value: bkDate, warn: !bk.last_backup },
+                { label: t('riBackupLastStable'), value: bkLastStbl, warn: !bk.last_stable },
+                { label: t('riBackupInFlight'), value: bkInFlight, warn: parseInt(bkInFlight, 10) > 0 },
+                { label: t('riBackupOrphan'), value: bkOrphan, warn: parseInt(bkOrphan, 10) > 0 },
+                { label: t('riBackupPath'), value: bkPath }
+            ];
+            for (var i = 0; i < items.length; i++) {
+                var valHtml;
+                if (items[i].isLink && items[i].value !== 'unknown') {
+                    valHtml = '<a href="' + escapeHtml(items[i].value) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(items[i].value) + '</a>';
+                } else {
+                    valHtml = escapeHtml(items[i].value);
+                }
+                var labelClass = 'ri-label';
+                if (items[i].warn) labelClass += ' ri-warn';
+                html += '<div class="ri-item"><span class="' + labelClass + '">' + escapeHtml(items[i].label) + '</span><span class="ri-value">' + valHtml + '</span></div>';
+            }
+            html += '<div class="ri-actions">'
+                 + '<button class="btn-ri-action" type="button" id="riCopyBtn">' + t('riCopyAll') + '</button>'
+                 + '<button class="btn-ri-action secondary" type="button" id="riRawJsonBtn">' + (rawJsonVisible ? t('riHideJson') : t('riRawJson')) + '</button>'
+                 + '</div><pre id="riRawJson" style="display:' + (rawJsonVisible ? 'block' : 'none') + ';">'
+                 + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+            content.innerHTML = html;
+
+            var copyBtn = $('riCopyBtn');
+            if (copyBtn) copyBtn.addEventListener('click', copyRuntimeInfo);
+            var rawBtn = $('riRawJsonBtn');
+            if (rawBtn) rawBtn.addEventListener('click', toggleRawJson);
+
+            if (typeof cb === 'function') cb();
+        });
+    }
+
+    function copyRuntimeInfo() {
+        if (!runtimeInfoData) return;
+        var text = JSON.stringify(runtimeInfoData, null, 2);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+                showMsg(t('riCopySuccess'), 'success', 1500);
+            }).catch(function() { _fallbackCopy(text); });
+        } else {
+            _fallbackCopy(text);
         }
-        if (statusPollInterval) clearInterval(statusPollInterval);
-        if (statsInterval) clearInterval(statsInterval);
+    }
+    function _fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showMsg(t('riCopySuccess'), 'success', 1500);
+        } catch(e) {
+            showMsg(t('riCopyError'), 'error', 2000);
+        }
+        document.body.removeChild(ta);
+    }
+    function toggleRawJson() {
+        var el = $('riRawJson'), btn = $('riRawJsonBtn');
+        if (!el) return;
+        rawJsonVisible = !rawJsonVisible;
+        el.style.display = rawJsonVisible ? 'block' : 'none';
+        if (btn) btn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+    }
+
+    function loadLogFiles(cb) {
+        var card = $('diagFilesCard'), content = $('diagFilesContent'), btn = $('dfRefreshBtn');
+        if (!card || !content) { if (typeof cb === 'function') cb(); return; }
+        card.style.display = 'block';
+        if (btn) btn.disabled = true;
+        if (!logFilesData) content.innerHTML = '<div class="df-empty">' + t('dfLoading') + '</div>';
+        xhrGet('/api?action=list_logs', function(err, data) {
+            if (btn) btn.disabled = false;
+            if (err || !data || !data.files) {
+                content.innerHTML = '<div class="df-empty" style="color:var(--danger);">' + t('dfLoadError') + '</div>';
+                if (typeof cb === 'function') cb();
+                return;
+            }
+            logFilesData = data;
+            renderLogFiles();
+            if (typeof cb === 'function') cb();
+        });
+    }
+    function renderLogFiles() {
+        var content = $('diagFilesContent');
+        if (!content || !logFilesData || !logFilesData.files) return;
+        var active = [], archive = [], emergency = [], sensitive = [];
+        for (var i = 0; i < logFilesData.files.length; i++) {
+            var f = logFilesData.files[i];
+            switch (f.type) {
+                case 'active': active.push(f); break;
+                case 'archive': archive.push(f); break;
+                case 'emergency': emergency.push(f); break;
+                case 'sensitive': sensitive.push(f); break;
+            }
+        }
+        var html = '';
+        html += renderSection('🟢', t('dfActiveFiles'), active);
+        html += renderSection('🗜️', t('dfArchiveFiles'), archive);
+        html += renderSection('⚠️', t('dfEmergencyFiles'), emergency);
+        if (sensitive.length > 0) {
+            html += '<div class="df-section">';
+            html += '<div class="df-section-header">🔐 ' + t('dfSensitiveFiles') + ' (' + sensitive.length + ')</div>';
+            if (!sensitiveRevealed) {
+                html += '<button class="df-reveal-btn" type="button" data-action="reveal-sensitive">' + t('dfRevealCredentials') + '</button>';
+            } else {
+                for (var j = 0; j < sensitive.length; j++) html += renderFileRow(sensitive[j], true);
+                html += '<button class="df-btn ghost" type="button" style="width:100%;margin-top:6px;" data-action="hide-sensitive">' + t('dfHide') + '</button>';
+            }
+            html += '</div>';
+        }
+        content.innerHTML = html || '<div class="df-empty">' + t('dfNoFiles') + '</div>';
+        content.querySelectorAll('[data-action]').forEach(function(el) {
+            var action = el.getAttribute('data-action');
+            if (action === 'reveal-sensitive') el.addEventListener('click', revealSensitive);
+            else if (action === 'hide-sensitive') el.addEventListener('click', hideSensitive);
+            else if (action === 'view-log') {
+                el.addEventListener('click', function() {
+                    viewLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+            else if (action === 'download-log') {
+                el.addEventListener('click', function() {
+                    downloadLogFile(this.getAttribute('data-file'), this.getAttribute('data-sensitive') === '1');
+                });
+            }
+        });
+    }
+    function renderSection(icon, label, files) {
+        if (!files || files.length === 0) return '';
+        var html = '<div class="df-section"><div class="df-section-header">' + icon + ' ' + label + ' (' + files.length + ')</div>';
+        for (var i = 0; i < files.length; i++) html += renderFileRow(files[i], false);
+        html += '</div>';
+        return html;
+    }
+    function renderFileRow(file, isSensitive) {
+        var sens = isSensitive ? '1' : '0';
+        return '<div class="df-file">'
+             + '<div class="df-file-info">'
+             + '<span class="df-file-name">' + fileIcon(file.name) + ' ' + escapeHtml(file.name) + '</span>'
+             + '<span class="df-file-meta">' + formatBytes(file.size) + ' · ' + formatMtime(file.mtime) + '</span>'
+             + '</div>'
+             + '<div class="df-file-actions">'
+             + '<button class="df-btn" type="button" data-action="view-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '">👁️ ' + t('dfView') + '</button>'
+             + '<button class="df-btn ghost" type="button" data-action="download-log" data-file="' + escapeHtml(file.name) + '" data-sensitive="' + sens + '" title="' + t('dfDownload') + '">⬇️</button>'
+             + '</div></div>';
+    }
+    function revealSensitive() {
+        showConfirmModal(t('dfConfirmSensitive'), function(ok) {
+            if (ok) { sensitiveRevealed = true; renderLogFiles(); }
+        }, { title: '⚠️ ' + t('confirmTitle') });
+    }
+    function hideSensitive() { sensitiveRevealed = false; renderLogFiles(); }
+
+    function formatBytes(bytes) {
+        if (!bytes || bytes < 0) return '0 B';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+    function formatMtime(mtime) {
+        var d = new Date(mtime * 1000);
+        var yyyy = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+        var hh = String(d.getHours()).padStart(2, '0'), mi = String(d.getMinutes()).padStart(2, '0');
+        return yyyy + '/' + mm + '/' + dd + ' ' + hh + ':' + mi;
+    }
+    function fileIcon(name) {
+        if (name.indexOf('query') !== -1) return '📊';
+        if (name.indexOf('blocked-ips') !== -1) return '🚫';
+        if (name.indexOf('blocked') !== -1) return '🔴';
+        if (name.indexOf('allowed') !== -1) return '🟢';
+        if (name.indexOf('proxy.log') !== -1) return '⚙️';
+        if (name.indexOf('install') !== -1) return '📦';
+        if (name.indexOf('credential') !== -1) return '🔐';
+        if (name.endsWith('.gz')) return '🗜️';
+        if (name.indexOf('.emergency.') !== -1) return '⚠️';
+        return '📄';
+    }
+
+    function viewLogFile(name, isSensitive) {
+        var url = '/api?action=read_log&file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        var modal = $('fileViewerModal'), title = $('fvTitle'), body = $('fvContent'), warning = $('fvWarning');
+        title.textContent = name;
+        body.textContent = t('dfLoading');
+        warning.style.display = isSensitive ? 'block' : 'none';
+        warning.textContent = t('dfSensitiveWarning');
+        modal.style.display = 'flex';
+        currentViewerFile = { name: name, sensitive: isSensitive };
+        xhrGet(url, function(err, data) {
+            if (err || !data || data.status !== 'ok') {
+                body.textContent = t('dfFailedToLoad');
+                return;
+            }
+            var content = data.content || '';
+            if (data.truncated) content = t('dfTruncatedPrefix') + content;
+            body.textContent = content || t('dfEmpty');
+            body.scrollTop = body.scrollHeight;
+        });
+    }
+    function downloadLogFile(name, isSensitive) {
+        var url = '/api/download_log?file=' + encodeURIComponent(name);
+        if (isSensitive) url += '&confirm=1';
+        showMsg(t('dfDownloading'), 'info', 1500);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.withCredentials = true;
+        xhr.responseType = 'blob';
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                var blob = new Blob([xhr.response]);
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+            }
+        };
+        xhr.send();
+    }
+    function downloadCurrentFile() {
+        if (!currentViewerFile) return;
+        downloadLogFile(currentViewerFile.name, currentViewerFile.sensitive);
+    }
+    function clearCurrentFile() {
+        if (!currentViewerFile) return;
+        var name = currentViewerFile.name;
+        showConfirmModal(t('fvClearConfirm'), function(confirmed) {
+            if (!confirmed) return;
+            xhrPost('/api/clear_log_file', 'file=' + encodeURIComponent(name), function(err, data) {
+                if (err || !data || data.status !== 'ok') {
+                    showMsg(t('fvClearError'), 'error', 3000);
+                    return;
+                }
+                showMsg(t('fvClearSuccess'), 'success', 2500);
+                closeFileViewer();
+                setTimeout(function() { loadLogFiles(); }, 500);
+            });
+        });
+    }
+    function closeFileViewer() {
+        $('fileViewerModal').style.display = 'none';
+        currentViewerFile = null;
+    }
+
+    function updateUIStrings() {
+        $('title').textContent = t('title');
+        $('subtitle').textContent = t('subtitle');
+        $('editorTitle').textContent = t('editorTitle');
+        var currentCount = $('sourceCountText').textContent.replace(/[^0-9,]/g, '');
+        if (currentCount) $('sourceCountText').textContent = t('entriesLabel') + ' ' + currentCount;
+        else $('sourceCountText').textContent = t('sourceCount');
+        $('currentLabel').textContent = t('currentLabel');
+        $('applyText').textContent = t('apply');
+
+        var profileKeyMap = {
+            light:    'profileLight',
+            normal:   'profileNormal',
+            pro:      'profilePro',
+            proplus:  'profileProPlus',
+            ultimate: 'profileUltimate'
+        };
+        var profileSel = $('profileSelect');
+        if (profileSel) {
+            for (var i = 0; i < profileSel.options.length; i++) {
+                var optVal = profileSel.options[i].value;
+                if (profileKeyMap[optVal]) {
+                    profileSel.options[i].text = t(profileKeyMap[optVal]);
+                }
+            }
+        }
+
+        $('syncText').textContent = t('sync');
+        $('forceRefreshText').textContent = t('forceRefresh');
+        $('logsText').textContent = t('logs');
+        $('clearLogsText').textContent = t('clearLogs');
+        $('closeLogsText').textContent = t('closeLogs');
+        $('logsModalTitle').textContent = t('logsModalTitle');
+        $('oldModulesTitle').textContent = t('oldModulesTitle');
+        $('customRulesTitle').textContent = t('customRulesTitle');
+
+        var allowBadge = $('allowEditBadge');
+        if (allowBadge) allowBadge.textContent = t('editBadge');
+        var denyBadge = $('denyEditBadge');
+        if (denyBadge) denyBadge.textContent = t('editBadge');
+
+        var allowBtnText = editStates.allow === EditState.VIEW ? t('editAllowText') : (editStates.allow === EditState.ROLLBACK ? t('retryText') : t('saveAllowText'));
+        var denyBtnText = editStates.deny === EditState.VIEW ? t('editDenyText') : (editStates.deny === EditState.ROLLBACK ? t('retryText') : t('saveDenyText'));
+        $('saveAllowText').textContent = allowBtnText;
+        $('saveDenyText').textContent = denyBtnText;
+        $('cancelAllowBtn').textContent = t('cancelEdit');
+        $('cancelDenyBtn').textContent = t('cancelEdit');
+
+        var allowLabel = $('allowlistLabel');
+        if (allowLabel) {
+            var firstSpan = allowLabel.querySelector('span:first-child');
+            if (firstSpan) firstSpan.textContent = t('allowlistLabel');
+        }
+        var denyLabel = $('denylistLabel');
+        if (denyLabel) {
+            var firstSpan2 = denyLabel.querySelector('span:first-child');
+            if (firstSpan2) firstSpan2.textContent = t('denylistLabel');
+        }
+
+        var riTitle = $('runtimeInfoTitle'); if (riTitle) riTitle.textContent = t('runtimeInfoTitle');
+        var riRawBtn = $('riRawJsonBtn'); if (riRawBtn) riRawBtn.textContent = rawJsonVisible ? t('riHideJson') : t('riRawJson');
+        var riRefText = $('riRefreshText'); if (riRefText) riRefText.textContent = t('riRefresh');
+        var dfTitle = $('diagFilesTitle'); if (dfTitle) dfTitle.textContent = t('diagFilesTitle');
+        var dfRef = $('dfRefreshText'); if (dfRef) dfRef.textContent = t('dfRefresh');
+        var fvDownload = $('fvDownloadText'); if (fvDownload) fvDownload.textContent = t('dfDownload');
+        var fvClear = $('fvClearText'); if (fvClear) fvClear.textContent = t('fvClear');
+        var fvClose = $('fvCloseText'); if (fvClose) fvClose.textContent = t('closeLogs');
+        var projText = $('footerProjectText'); if (projText) projText.textContent = t('projectLink');
+
+        var swTxt = $('swUpdateText'); if (swTxt) swTxt.textContent = t('swUpdateAvailable');
+        var swReload = $('swUpdateReloadBtn'); if (swReload) swReload.textContent = t('swUpdateReload');
+
+        $('loginTitle').textContent = t('loginTitle');
+        $('usernameInput').placeholder = t('username');
+        $('passwordInput').placeholder = t('password');
+        $('loginBtn').textContent = t('loginBtn');
+        $('logoutBtn').textContent = t('logoutBtn');
+
+        $('restartBtn').title = t('restartBtn');
+        $('langToggle').textContent = currentLang === 'ar' ? '🇬🇧 English' : '🇸🇦 العربية';
+
+        renderAllDynamic();
+
+        var ab = $('authBadge');
+        if (ab && ab.style.display === 'flex') ab.textContent = t('authConnected');
+    }
+
+    function renderAllDynamic() {
+        renderCompanionButton();
+        if (networkDownActive) {
+            setNetworkDownUI(true);
+            updateStatsDisplay();
+        } else if (currentStatus === 'ON' || currentStatus === 'OFF') {
+            updateStatusUI(currentStatus);
+        } else {
+            updateStatsDisplay();
+        }
+        if (logFilesData) renderLogFiles();
+        var dashText = $('dashboardLinkText');
+        if (dashText) dashText.textContent = t('dashboardLinkText');
+
+        updateSmartUpdateButtonUI();
+    }
+
+    function toggleLanguage() {
+        if (rulesState.isSaving) return;
+        currentLang = currentLang === 'ar' ? 'en' : 'ar';
+        try { localStorage.setItem('dnscrypt-lang', currentLang); } catch(e) {}
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        updateUIStrings();
+        if (appInitialized) {
+            loadProfile();
+            checkOldModules();
+            if (runtimeInfoLoaded) loadRuntimeInfo();
+            refreshCompanionState();
+        }
+    }
+
+    function showMsg(text, type, duration) {
+        duration = duration || 2000;
+        var m = $('msg');
+        m.textContent = text;
+        m.className = 'msg-float ' + (type || 'info');
+        m.style.display = 'block';
+        m.style.opacity = '1';
+        m.style.visibility = 'visible';
+        clearTimeout(m._timeout);
+        m._timeout = setTimeout(function() {
+            m.style.opacity = '0';
+            m.style.visibility = 'hidden';
+            setTimeout(function() { m.style.display = 'none'; }, 400);
+        }, duration);
+    }
+
+    function showAuthBadge() {
+        var b = $('authBadge');
+        if (b) { b.textContent = t('authConnected'); b.style.display = 'flex'; }
+    }
+    function hideAuthBadge() {
+        var b = $('authBadge');
+        if (b) b.style.display = 'none';
+    }
+
+    function performLogin() {
+        var u = $('usernameInput').value.trim(), p = $('passwordInput').value;
+        if (!u || !p) { showMsg(t('loginError'), 'error'); return; }
+        isLoginAttempt = true;
+        var btn = $('loginBtn');
+        btn.disabled = true;
+        btn.textContent = t('loggingIn');
+        fetch('/api/auth/login', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        }).then(function(r) {
+            return r.json().then(function(d) { return { status: r.status, data: d }; });
+        }).then(function(resp) {
+            btn.disabled = false;
+            btn.textContent = t('loginBtn');
+            if (resp.status === 200 && resp.data.status === 'ok') {
+                $('passwordInput').value = '';
+                sessionExpiredShown = false;
+                if (resp.data.profile) renderProfileData(resp.data.profile);
+                if (resp.data.token) storeToken(resp.data.token);
+                closeConfirmModal();
+                showAuthBadge();
+                showMainScreen();
+                if (!appInitialized) {
+                    showMsg(t('welcomeMsg'), 'info', 4000);
+                    appInitialized = true;
+                }
+                initSSE();
+                startPolling();
+                loadCustomRules();
+                loadRuntimeInfo();
+                loadLogFiles();
+                refreshCompanionState();
+                setTimeout(function() { checkForUpdates(false); }, 4500);
+                setTimeout(checkServerUpdateState, 1000);
+                verifyFailures = 0;
+                verifyBackoff = 3000;
+            } else if (resp.status === 429) {
+                showMsg(t('tooManyAttempts'), 'error', 5000);
+                isLoginAttempt = false;
+            } else {
+                showMsg(t('loginError'), 'error');
+                isLoginAttempt = false;
+            }
+        }).catch(function() {
+            btn.disabled = false;
+            btn.textContent = t('loginBtn');
+            showMsg(t('networkError'), 'error');
+            isLoginAttempt = false;
+        });
+    }
+
+    function logout() {
+        if (hasUnsavedChanges()) {
+            showConfirmModal(t('unsavedWarning') + '\n\n' + (currentLang === 'ar' ? 'هل تريد الخروج مع تجاهل التعديلات؟' : 'Leave and discard changes?'),
+                function(confirmed) {
+                    if (!confirmed) return;
+                    doLogout();
+                },
+                { title: '⚠️ ' + (currentLang === 'ar' ? 'تعديلات غير محفوظة' : 'Unsaved Changes') }
+            );
+            return;
+        }
+        doLogout();
+    }
+
+    function doLogout() {
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+            .catch(function() {})
+            .then(function() {
+                clearStoredToken();
+                clearDraft('allow');
+                clearDraft('deny');
+                try { sessionStorage.removeItem(COMPANION_CACHE_KEY); } catch(e) {}
+                if (sse) { sse.close(); sse = null; }
+                if (statusPollInterval) clearInterval(statusPollInterval);
+                if (statsInterval) clearInterval(statsInterval);
+                if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+                if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
+                if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
+                if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+                if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
+                if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+                if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
+                location.reload();
+            });
+    }
+
+    function verifyAuth() {
+        xhrGet('/api?action=status', function(err, data) {
+            if (err) {
+                if (err.code === 401) {
+                    clearStoredToken();
+                    showLoginScreen();
+                    hideAuthBadge();
+                    if (isLoginAttempt) {
+                        showMsg(t('loginError'), 'error');
+                        isLoginAttempt = false;
+                    }
+                    verifyFailures = 0;
+                    verifyBackoff = 3000;
+                } else {
+                    verifyFailures++;
+                    setNetworkDownUI(true);
+                    if (verifyFailures === 1) {
+                        showMsg(t('networkError'), 'warning', 3000);
+                    }
+                    setTimeout(verifyAuth, verifyBackoff);
+                    verifyBackoff = Math.min(verifyBackoff * 2, verifyMaxBackoff);
+                }
+                return;
+            }
+            verifyFailures = 0;
+            verifyBackoff = 3000;
+            sessionExpiredShown = false;
+            setNetworkDownUI(false);
+            showMainScreen();
+            showAuthBadge();
+            var wasFirstInit = !appInitialized;
+            if (wasFirstInit) {
+                showMsg(t('welcomeMsg'), 'info', 4000);
+                initSSE();
+                startPolling();
+                loadCustomRules();
+                loadRuntimeInfo();
+                loadLogFiles();
+                appInitialized = true;
+                setTimeout(checkServerUpdateState, 1000);
+            }
+            refreshCompanionState();
+            setTimeout(function() { checkForUpdates(false); }, wasFirstInit ? 4500 : 0);
+        });
+    }
+
+    function showLoginScreen() {
+        $('loginScreen').style.display = 'flex';
+        $('appContent').style.display = 'none';
+        $('logoutBtn').style.display = 'none';
+        hideAuthBadge();
+    }
+    function showMainScreen() {
+        $('loginScreen').style.display = 'none';
+        $('appContent').style.display = 'block';
+        $('logoutBtn').style.display = 'block';
+        showAuthBadge();
+        closeConfirmModal();
+        sessionExpiredShown = false;
+    }
+    function handleSessionExpired() {
+        if (sessionExpiredShown) return;
+        sessionExpiredShown = true;
+        var wasInitialized = appInitialized;
+        appInitialized = false;
+        clearStoredToken();
+        verifyFailures = 0;
+        verifyBackoff = 3000;
+        sseBackoff = 5000;
+
+        isProcessing = false;
+        updateCompletionHandled = false;
+        isCheckingUpdates = false;
+        rulesState.isSaving = false;
+        var pc = $('progressContainer');
+        if (pc) { pc.style.display = 'none'; pc.style.opacity = '1'; }
+        var pb = $('progressBar');
+        if (pb) { pb.style.width = '0%'; pb.classList.remove('success'); }
+        var pt = $('progressText');
+        if (pt) pt.textContent = '0%';
+
+        if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
+        if (statsInterval) { clearInterval(statsInterval); statsInterval = null; }
         if (sse) { sse.close(); sse = null; }
-        if (safetyTimer) clearTimeout(safetyTimer);
-        if (window.sseHeartbeat) clearInterval(window.sseHeartbeat);
-        if (window.progressPoller) clearInterval(window.progressPoller);
-        if (window.updateStatePoller) clearInterval(window.updateStatePoller);
-        if (updateCheckRetryTimer) clearTimeout(updateCheckRetryTimer);
-        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+        if (window.sseHeartbeat) { clearInterval(window.sseHeartbeat); window.sseHeartbeat = null; }
+        if (window.updateStatePoller) { clearInterval(window.updateStatePoller); window.updateStatePoller = null; }
         if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
-        if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
-    });
+        if (window.progressPoller) { clearInterval(window.progressPoller); window.progressPoller = null; }
+        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+        if (updateCheckRetryTimer) { clearTimeout(updateCheckRetryTimer); updateCheckRetryTimer = null; }
+        showLoginScreen();
+        if (!wasInitialized) return;
+        showConfirmModal(t('sessionExpiredMsg'), function(ok) {
+            if (ok) $('usernameInput').focus();
+        }, {
+            title: t('sessionExpiredTitle'),
+            primaryText: t('sessionRelogin'),
+            primaryCallback: function() {
+                $('usernameInput').value = '';
+                $('passwordInput').value = '';
+                $('usernameInput').focus();
+            }
+        });
+    }
+
+    function showSWUpdateBanner() {
+        var banner = $('swUpdateBanner');
+        var txt = $('swUpdateText');
+        if (txt) txt.textContent = t('swUpdateAvailable');
+        if (banner) banner.style.display = 'flex';
+    }
+    function hideSWUpdateBanner() {
+        var banner = $('swUpdateBanner');
+        if (banner) banner.style.display = 'none';
+    }
+    function installControllerChangeHandler() {
+        if (controllerChangeHandlerInstalled) return;
+        if (!('serviceWorker' in navigator)) return;
+        controllerChangeHandlerInstalled = true;
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (!pendingReload) return;
+            pendingReload = false;
+            if (swUpdateCheckInterval) {
+                clearInterval(swUpdateCheckInterval);
+                swUpdateCheckInterval = null;
+            }
+            window.location.reload();
+        });
+    }
+    function setupSWUpdateHandler() {
+        if (!('serviceWorker' in navigator)) return;
+        installControllerChangeHandler();
+        navigator.serviceWorker.addEventListener('message', function(event) {
+            if (!event.data || typeof event.data.type !== 'string') return;
+
+            switch (event.data.type) {
+                case 'UPDATE_AVAILABLE':
+                    if (event.data.waiting && swRegistration && swRegistration.waiting) {
+                        showSWUpdateBanner();
+                    }
+                    return;
+
+                case 'SW_PRECACHE_PARTIAL':
+                    var failedCount = parseInt(event.data.failedCount, 10) || 0;
+                    console.warn('[SW] Precache incomplete:', failedCount, 'failures',
+                                 event.data.failures || []);
+                    var msg = t('swPrecacheIncomplete').replace('{N}', String(failedCount));
+                    showMsg(msg, 'warning', 5000);
+                    return;
+
+                case 'SW_ERROR':
+                    console.error('[SW] Error:', event.data.message || '(no message)');
+                    showMsg(t('swError') + ': ' + (event.data.message || ''), 'error', 5000);
+                    return;
+            }
+        });
+        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+        swUpdateCheckInterval = setInterval(function() {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            }
+        }, 3600000);
+        setTimeout(function() {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            }
+        }, 5000);
+    }
+    function bindSWUpdateButtons() {
+        var reloadBtn = $('swUpdateReloadBtn');
+        var closeBtn = $('swUpdateCloseBtn');
+        if (reloadBtn) {
+            reloadBtn.addEventListener('click', function() {
+                if (pendingReload) return;
+                if (!swRegistration) { window.location.reload(); return; }
+                var waiting = swRegistration.waiting;
+                if (!waiting) { window.location.reload(); return; }
+                pendingReload = true;
+                reloadBtn.disabled = true;
+                try {
+                    waiting.postMessage({ type: 'SKIP_WAITING' });
+                } catch (e) {
+                    pendingReload = false;
+                    reloadBtn.disabled = false;
+                    window.location.reload();
+                    return;
+                }
+                setTimeout(function() {
+                    if (pendingReload) {
+                        pendingReload = false;
+                        if (swUpdateCheckInterval) {
+                            clearInterval(swUpdateCheckInterval);
+                            swUpdateCheckInterval = null;
+                        }
+                        window.location.reload();
+                    }
+                }, 3000);
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', hideSWUpdateBanner);
+    }
 
     function _companionCacheWrite() {
         try { sessionStorage.setItem(COMPANION_CACHE_KEY, JSON.stringify(companionState)); } catch(e) {}
@@ -2975,11 +2978,20 @@
             renderCompanionButton();
         });
     }
+
     function renderCompanionButton() {
         var btn = $('pwaInstallBtn');
         var txt = $('pwaInstallText');
         if (!btn || !txt) return;
         var icon = btn.querySelector('.pwa-install-icon');
+
+        if (companionInstallInFlight) {
+            if (icon) icon.textContent = '\u23F3';
+            txt.textContent = t('installing');
+            btn.disabled = true;
+            return;
+        }
+
         var installed = companionState.installed;
         var vname = companionState.version_name;
         var expected = companionState.expected_version;
@@ -2989,7 +3001,7 @@
             txt.textContent = t('pwaInstallBtn');
             btn.setAttribute('aria-label', t('pwaInstallAriaLabel'));
             btn.dataset.mode = 'install';
-            btn.disabled = companionInstallInFlight;
+            btn.disabled = false;
         } else if (vname && expected && vname === expected) {
             if (icon) icon.textContent = '\u2705';
             txt.textContent = t('pwaInstalled');
@@ -3001,15 +3013,17 @@
             txt.textContent = t('pwaUpdate');
             btn.setAttribute('aria-label', t('pwaUpdate'));
             btn.dataset.mode = 'install';
-            btn.disabled = companionInstallInFlight;
+            btn.disabled = false;
         }
     }
+
     function handleCompanionInstall() {
         var btn = $('pwaInstallBtn');
         if (!btn || btn.dataset.mode === 'none') return;
         if (btn.disabled || companionInstallInFlight || rulesState.isSaving) return;
         companionInstallInFlight = true;
         btn.disabled = true;
+        renderCompanionButton();
         xhrGet('/api?action=install_token', function(err, data) {
             if (err || !data || !data.token) {
                 companionInstallInFlight = false;
@@ -3018,10 +3032,10 @@
                 showMsg(t('installTokenError'), 'error', 3000);
                 return;
             }
-            var token = data.token;
-            showInstallModal(token);
+            showInstallModal(data.token);
         });
     }
+
     function showInstallModal(token) {
         var modal = $('customModal');
         var box = modal.querySelector('.custom-modal-box');
@@ -3088,18 +3102,6 @@
             renderCompanionButton();
         });
     }
-    function _resetModalLayout() {
-        var modal = $('customModal');
-        var box = modal.querySelector('.custom-modal-box');
-        box.classList.remove('install-modal-box');
-        $('modalTitle').style.display = '';
-        $('modalMessage').style.display = '';
-        $('modalMessage').style.whiteSpace = 'pre-wrap';
-        $('modalCancelBtn').style.display = '';
-        $('modalConfirmBtn').style.display = '';
-        var actionsBox = modal.querySelector('.custom-modal-actions');
-        actionsBox.style.display = '';
-    }
     function doCompanionInstall(token) {
         var txt = $('pwaInstallText');
         var btn = $('pwaInstallBtn');
@@ -3115,7 +3117,7 @@
                     } else if (err && err.code === 401) {
                         showMsg(t('installTokenError'), 'error', 4000);
                     } else {
-                        showMsg(t('installError'), 'error', 4000);
+                        showMsg(describeXhrError(err), 'error', 4000);
                     }
                     renderCompanionButton();
                     refreshCompanionState();
@@ -3197,8 +3199,8 @@
         $('cancelAllowBtn').addEventListener('click', function() { cancelEdit('allow'); });
         $('cancelDenyBtn').addEventListener('click', function() { cancelEdit('deny'); });
 
-        $('allowlistInput').addEventListener('input', function() { updateChangeCounter('allow'); });
-        $('denylistInput').addEventListener('input', function() { updateChangeCounter('deny'); });
+        $('allowlistInput').addEventListener('input', function() { _scheduleChangeCounter('allow'); });
+        $('denylistInput').addEventListener('input', function() { _scheduleChangeCounter('deny'); });
 
         $('allowlistInput').addEventListener('click', function() {
             if (rulesState.isSaving) return;
@@ -3250,7 +3252,66 @@
             if (pendingConfirmCallback) pendingConfirmCallback(false);
             closeConfirmModal();
         });
+
+        document.addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+            }
+
+            var modalOpen = ($('customModal') && $('customModal').style.display === 'flex');
+
+            if (modalOpen) {
+                if (e.key === 'Escape') {
+                    if (installModalActive) {
+                        companionInstallInFlight = false;
+                        _resetModalLayout();
+                    }
+                    if (pendingConfirmCallback) pendingConfirmCallback(false);
+                    closeConfirmModal();
+                }
+                return;
+            }
+
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                if (rulesState.isSaving) return;
+                if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+                    saveWithOptimistic('allow');
+                } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+                    saveWithOptimistic('deny');
+                }
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                if (rulesState.isSaving) return;
+                if (editStates.allow === EditState.EDIT || editStates.allow === EditState.ROLLBACK) {
+                    cancelEdit('allow');
+                } else if (editStates.deny === EditState.EDIT || editStates.deny === EditState.ROLLBACK) {
+                    cancelEdit('deny');
+                }
+            }
+        });
     }
+
+    window.addEventListener('beforeunload', function(e) {
+        if (hasUnsavedChanges()) {
+            e.preventDefault();
+            e.returnValue = t('unsavedWarning');
+            return t('unsavedWarning');
+        }
+        if (statusPollInterval) clearInterval(statusPollInterval);
+        if (statsInterval) clearInterval(statsInterval);
+        if (sse) { sse.close(); sse = null; }
+        if (safetyTimer) clearTimeout(safetyTimer);
+        if (window.sseHeartbeat) clearInterval(window.sseHeartbeat);
+        if (window.progressPoller) clearInterval(window.progressPoller);
+        if (window.updateStatePoller) clearInterval(window.updateStatePoller);
+        if (updateCheckRetryTimer) clearTimeout(updateCheckRetryTimer);
+        if (swUpdateCheckInterval) clearInterval(swUpdateCheckInterval);
+        if (sseStatusDebounceTimer) { clearTimeout(sseStatusDebounceTimer); sseStatusDebounceTimer = null; }
+        if (dashboardLinkFallbackTimer) { clearTimeout(dashboardLinkFallbackTimer); dashboardLinkFallbackTimer = null; }
+        if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
+    });
 
     function boot() {
         document.documentElement.lang = currentLang;
@@ -3287,14 +3348,13 @@
             }).catch(function() {});
         }
 
-        let updateCheckTimer = null;
         function startUpdatePolling() {
             if (updateCheckTimer) clearInterval(updateCheckTimer);
             updateCheckTimer = setInterval(function() {
                 if (appInitialized && !isProcessing && !isCheckingUpdates && !rulesState.isSaving) {
                     checkForUpdates(false);
                 }
-            }, 30 * 60 * 1000);
+            }, UPDATE_CHECK_INTERVAL_MS);
         }
 
         document.addEventListener('visibilitychange', function() {

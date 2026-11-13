@@ -1,7 +1,7 @@
 # User Guide — DNSCrypt Smart Filter
 
-**Version**: v1.5.0 (Global Edition)
-**Last updated**: 2026-10-19
+**Version**: v1.6.0 (Global Edition)
+**Last updated**: 2026-11-13
 **Audience**: End users installing, using, upgrading, and troubleshooting the module.
 
 > This file replaces `docs/INSTALL.md`, `docs/UPGRADE.md`,
@@ -43,7 +43,7 @@ in **every app** — no VPN required.
 | `/sdcard` free | 6 MB | 50 MB+ |
 | Architecture | arm64 / arm / x86_64 / x86 | arm64 |
 
-**v1.5.0 `/sdcard` note**: The 6 MB minimum accounts for the
+**v1.6.0 `/sdcard` note**: The 6 MB minimum accounts for the
 persistent backup (~2.5 MB with rotation) plus the companion APK
 mirror (~3 MB, best-effort). 50 MB recommended leaves headroom
 for `txn-*` staging during an install.
@@ -83,25 +83,25 @@ su -c "magisk -V"   # or: ksud -V, apd --version
 From [GitHub Releases](https://github.com/gasciljh/dnscrypt-proxy-webui/releases):
 
 ```bash
-wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.5.0-module.zip
+wget https://github.com/gasciljh/dnscrypt-proxy-webui/releases/latest/download/dnscrypt-webui-1.6.0-module.zip
 ```
 
 The release has 8 assets (2 optional):
 
 | Asset | Required | Purpose |
 |---|:---:|---|
-| `dnscrypt-webui-1.5.0-module.zip` | ✅ | The module |
-| `dnscrypt-webui-1.5.0-module.zip.sha256` | ✅ | Integrity |
+| `dnscrypt-webui-1.6.0-module.zip` | ✅ | The module |
+| `dnscrypt-webui-1.6.0-module.zip.sha256` | ✅ | Integrity |
 | `dnscrypt-webui-{arm64,arm,amd64,386}` | ✅ | Standalone binaries |
 | `DNS-Proxy-v1.0.0.apk` + `.sha256` | Optional | Companion app |
 
-**No GPG signing** as of v1.5.0. The `.sha256` file is the only
+**No GPG signing** as of v1.6.0. The `.sha256` file is the only
 integrity artifact. See `docs/REFERENCE.md` §3 for details.
 
 ### 2.2 Verify SHA-256
 
 ```bash
-sha256sum -c dnscrypt-webui-1.5.0-module.zip.sha256
+sha256sum -c dnscrypt-webui-1.6.0-module.zip.sha256
 # → OK
 ```
 
@@ -120,7 +120,7 @@ differs:
 
 ### 2.4 What happens during install
 
-The installer runs 10 defensive layers plus the v1.5.0 additions:
+The installer runs 10 defensive layers plus the v1.5.0/v1.6.0 additions:
 
 1. Detects architecture + existing module.
 2. Searches 7 locations for user data (Layer 1).
@@ -129,13 +129,13 @@ The installer runs 10 defensive layers plus the v1.5.0 additions:
 5. Begins a transaction (`txn-*`, state=START) (Layer 4).
 6. Snapshots user data to `/sdcard/` (Layer 2).
 7. Writes `.manifest.json` with per-file SHA256 (Layer 3).
-8. Extracts module files (including `boot-mini.sh` and
-   `install_app.sh` in v1.5.0).
+8. Extracts module files (including `boot-mini.sh`,
+   `lib/*.sh` (6 modules, v1.6.0), and `install_app.sh`).
 9. Mirrors the companion APK to
    `/sdcard/dnscrypt-webui-backup/apk/` (v1.5.0, best-effort).
 10. Restores user data with SELinux contexts (Layer 6).
-11. Verifies critical files (v1.5.0 includes `boot-mini.sh` and
-    `install_app.sh`; a missing file triggers rollback).
+11. Verifies critical files (v1.6.0 includes all 6 `lib/*.sh`
+    modules and `install_app.sh`; a missing file triggers rollback).
 12. Applies config migrations (Layer 8).
 13. Commits the transaction.
 
@@ -147,23 +147,25 @@ The installer runs 10 defensive layers plus the v1.5.0 additions:
 ```text
 ╔══════════════════════════════════════╗
 ║  ✅ Installation Complete            ║
-║      v1.5.0                          ║
+║      v1.6.0                          ║
 ╚══════════════════════════════════════╝
 
-  📊 Upgrade detected: YES (5 files restored)
-  💾 Persistent backup: /sdcard/dnscrypt-webui-backup/
+  📊 Upgrade: YES
+  🔍 Source: /data/adb/modules/dnscrypt-proxy-webui/proxy
+  📦 Root: Magisk
   🌐 WebUI: http://127.0.0.1:9090
   📈 Dashboard: http://127.0.0.1:9091
   🔌 Bind: 127.0.0.1
-  🧠 Memory limit: ~120 MB (profile: pro)
-  📱 Companion APK: bundled (optional)
-  📱 Companion APK mirror: /sdcard/…/apk/
-  🧩 Layered Bootstrap: Layer 0 + Layer 1 active
+  🧠 Memory: ~120 MB (pro)
+  💾 Backup: 20261112-120000-v1.6.0-12345
+     Last stable: 20261112-120000-v1.6.0-12345
+  📱 APK mirror: /sdcard/dnscrypt-webui-backup/apk
+  🔐 SHA256: present
 
   ℹ️  Next steps:
     1. Reboot your device
-    2. Open the WebUI and login
-    3. Choose a blocklist profile and press Apply
+    2. Open WebUI and log in with the credentials above
+    3. Choose a blocklist profile and Apply
 ```
 
 **Copy the credentials** printed above — you will need them in
@@ -173,12 +175,17 @@ The installer runs 10 defensive layers plus the v1.5.0 additions:
 
 | Warning | Meaning | Action |
 |---|---|---|
-| `PORT=8080 conflicts…` | Port Guard auto-fixed the port | None |
+| `Port collision resolved` | `PORT` and `DASHBOARD_PORT` were equal; auto-fixed | None |
 | `Failed to create backup dir (continuing)` | `/sdcard` not writable | Reboot |
 | `Companion APK mirror skipped` | APK absent or `/sdcard` full | None (optional feature) |
 | `Missing critical files: boot-mini.sh` | Corrupt ZIP | Re-download + verify |
+| `CRITICAL: lib/ directory not found` | Corrupt ZIP or missing `lib/` | Re-download + verify |
 | `Missing critical files: install_app.sh` | Corrupt ZIP | Re-download + verify |
 | `🛑 You MUST REBOOT NOW` | Old processes were killed | Reboot |
+
+**Note**: If `PORT` was set to `8080` (reserved), the installer
+silently replaces it with `9090` during the `webui.conf` write step.
+There is no explicit warning for this specific case.
 
 ### 2.7 Reboot
 
@@ -196,7 +203,6 @@ start without it.
 ### 3.1 Open the WebUI
 
 Two ways:
-
 - **From Magisk**: Modules → DNSCrypt Proxy → **Action** button.
 - **From browser**: Navigate to `http://127.0.0.1:9090`.
 
@@ -208,10 +214,10 @@ Use the credentials printed during install, or:
 su -c "cat /data/local/tmp/dnscrypt_credentials.txt"
 ```
 
-Or read them directly from the TOML:
+Or read them directly from the TOML (safer, avoids comments):
 
 ```bash
-su -c "grep -E 'username|password' \
+su -c "grep -E '^[[:space:]]*(username|password)[[:space:]]*=' \
     /data/adb/modules/dnscrypt-proxy-webui/proxy/dnscrypt-proxy.toml"
 ```
 
@@ -235,7 +241,6 @@ list and network.
 ### 3.4 Optional: custom rules
 
 Two lists in the WebUI:
-
 - **Allowlist** — exceptions (domains that bypass blocking).
 - **Denylist** — extra blocking.
 
@@ -246,7 +251,6 @@ A pre-critical backup is created before each save.
 ### 3.5 Optional: PWA
 
 To install the **WebUI itself** as a PWA:
-
 1. Open Chrome at `http://127.0.0.1:9090`.
 2. Chrome menu → **Install app** or **Add to Home screen**.
 
@@ -267,6 +271,12 @@ su -c "nslookup google.com 127.0.0.1"
 su -c "curl -s http://127.0.0.1:9090/healthz"
 # → ok
 ```
+
+**v1.6.0 — Local timezone check**: after login, the WebUI's
+"Last update:" field should match your **device clock** (not UTC).
+If you upgraded from v1.5.0, force-refresh the WebUI
+(Ctrl+Shift+R, or the 🔄 Force Refresh button) to load the new
+JavaScript.
 
 ---
 
@@ -291,36 +301,41 @@ intent is tracked in `dnscrypt.status`).
 ### 4.2 Dashboard
 
 Open `http://127.0.0.1:9091` for:
-
 - Live query statistics.
 - Cache performance.
 - Resolver health.
 - Top domains.
 - Recent queries.
 
-To populate `top_domains` and `recent_queries`, enable the query
-log in `dnscrypt-proxy.toml`:
-
-```toml
-[monitoring_ui]
-  enable_query_log = true
-  privacy_level = 1
-```
-
-Then restart the service.
+**Note**: `top_domains` and `recent_queries` require the query log,
+which is **enabled by default** in `dnscrypt-proxy.toml`
+(`enable_query_log = true`, `privacy_level = 1`). If you previously
+disabled it, restore those lines and restart the service.
 
 ### 4.3 Update the blocklist
 
-The blocklist is re-downloaded automatically on service restart
-and every 24 hours.
+The blocklist is **not** re-downloaded automatically. It is fetched
+from the internet only when you press **Apply** in the WebUI
+(which sends `POST /api/update_profile`).
 
-To force an update: WebUI → select profile → **Apply**.
+To check whether a newer list exists without applying it, press
+the **🔄 Update Current Lists** button — this only queries the
+upstream version, it does not download.
+
+The `24h` interval mentioned in some backup settings applies to
+**backup rotation**, not blocklist refresh.
 
 ### 4.4 Language toggle
 
 The WebUI ships bilingual (English default + Arabic). Click the
 **🇸🇦 العربية** button in the header. Preference persists in
 browser `localStorage`.
+
+**v1.6.0 — timezone-aware rendering**: the "Last update:"
+timestamp now respects the device's local timezone in **both**
+languages. In Arabic (`ar-EG`), it uses Arabic numerals; in
+English (`en-US`), it uses Latin digits. Both reflect your
+device's clock.
 
 ---
 
@@ -330,7 +345,6 @@ browser `localStorage`.
 
 If `update.json` is configured in `module.prop` (it is by
 default):
-
 1. Magisk Manager → Settings → Update channel → **Custom**.
 2. Magisk shows a notification when a new version is available.
 
@@ -354,23 +368,24 @@ The **5 user config files** survive every update:
 | `denylist.txt` | Custom denylist |
 
 **Not preserved** (rebuilt or re-downloaded):
-
 - `blocklist.txt` — rebuilt from `blocklist.raw`.
 - `blocklist.raw` — downloaded from the internet.
 - `run/` directory — recreated.
 - Logs — rotated.
+- `lib/*.sh` — reinstalled from the new ZIP (v1.6.0).
 
 **Not affected by updates**:
-
 - The WebUI language preference (client-side).
 - The companion app if separately installed.
+- The PWA cache — **may trigger an "Update available" banner**;
+  click **Reload** to apply.
 
 ### 5.4 Verify after update
 
 ```bash
 # Version
 su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
-# → version=v1.5.0
+# → version=v1.6.0
 
 # Services
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --check"
@@ -383,6 +398,15 @@ su -c "iptables -t nat -L OUTPUT -n | grep -cE 'RETURN|DNAT'"
 # Config preserved
 su -c "grep '^PORT=' /data/adb/modules/dnscrypt-proxy-webui/proxy/webui.conf"
 # → PORT=9090 (or your custom value)
+
+# v1.6.0 — modular lib/ present
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/lib/*.sh | wc -l"
+# → 6 (constants, fallbacks, process, http, backup, firewall)
+
+# v1.6.0 — local timezone fix active
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | \
+    jq '{last_update, last_update_unix}'
+# → Both fields present; last_update_unix is an integer
 ```
 
 ### 5.5 If the update fails
@@ -397,10 +421,9 @@ su -c "grep -iE 'error|fail|abort' \
 ```
 
 Common causes:
-
 - Corrupt ZIP (re-download + verify SHA-256).
 - Insufficient disk space.
-- ZIP from an old release (missing v1.5.0 files).
+- ZIP from an old release (missing v1.6.0 `lib/*.sh` files).
 
 ---
 
@@ -415,7 +438,6 @@ Common causes:
 ### 6.2 What happens
 
 `uninstall.sh` runs:
-
 1. Kills all processes (`dnscrypt-proxy`, `dnscrypt-webui`).
 2. Cleans firewall rules (Custom Chains + legacy).
 3. Resets `private_dns_mode` to AUTO.
@@ -429,6 +451,10 @@ Common causes:
 9. Removes `txn-*` with state COMMIT or ROLLBACK.
 10. Renames `txn-*` with state START to `orphan-txn-*` (preserved).
 11. Removes the recovery trigger (if any).
+
+**v1.6.0 note**: The `lib/*.sh` directory (Layer 0) is inside
+the module folder and is removed with the module. Your 5 config
+files are unaffected.
 
 ### 6.3 What is preserved
 
@@ -507,6 +533,7 @@ Problem?
 ├── Some sites not blocked → §7.7
 ├── Battery drains → §7.8
 ├── Companion app won't install → §7.9
+├── Timezone wrong / not updating → §7.11
 └── Nothing else → §8 (Emergency)
 ```
 
@@ -519,8 +546,11 @@ Problem?
 | `Required tool 'X' not found` | Missing busybox | Use a ROM with busybox |
 | `Failed to extract module files` | Corrupt ZIP / disk full | Re-download + verify SHA; free space |
 | `Missing critical files: boot-mini.sh` | Corrupt ZIP | Re-download + verify SHA |
+| `CRITICAL: lib/ directory not found` | Corrupt ZIP or missing `lib/` | Re-download + verify SHA (v1.6.0) |
+| `Missing critical files: lib/constants.sh` | ZIP had `lib/` but missing a file | Re-download + verify SHA (v1.6.0) |
+| `Missing critical files: install_app.sh` | Corrupt ZIP | Re-download + verify SHA |
 | `DNS binary missing for <arch>` | Unsupported ABI | Check `getprop ro.product.cpu.abi` |
-| `PORT=8080 conflicts` | Port Guard auto-fix | None — expected |
+| `Port collision resolved` | `PORT` == `DASHBOARD_PORT` | None — expected |
 
 ### 7.4 Cannot open WebUI
 
@@ -577,7 +607,7 @@ su -c "nslookup google.com 127.0.0.1"
 | Symptom | Cause | Fix |
 |---|---|---|
 | DNS engine stopped | Crashed, watchdog waiting | `action.sh --restart` |
-| Firewall missing | Rules dropped | `. functions.sh; manage_firewall 1` |
+| Firewall missing | Rules dropped | `su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; manage_firewall 1"` |
 | Wrong binary | Architecture mismatch | `getprop ro.product.cpu.abi` |
 | SELinux blocking | Rare | `restorecon -R module/` |
 
@@ -598,7 +628,7 @@ su -c "nslookup google.com 127.0.0.1"
 - **Cause**: Watchdog loop on a repeatedly-failing service.
 - **Fix**: Set `AUTO_RESTART_DNS=0` in `webui.conf`, restart.
 
-### 7.9 Companion app won't install (v1.5.0)
+### 7.9 Companion app won't install
 
 See §9.4 for the full list of cascade failure modes.
 
@@ -631,6 +661,40 @@ su -c "tail -200 /data/local/tmp/dnscrypt_main.log" \
 Attach `diagnose.txt` + `diagnose.json` + `logs.txt` to the issue
 at [github.com/gasciljh/dnscrypt-proxy-webui/issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues).
 
+### 7.11 Timezone wrong / not updating (v1.6.0)
+
+**Symptoms**:
+- The WebUI still shows UTC (e.g., `04:03:46` instead of `07:03:46`).
+- The timestamp does not change after changing device timezone.
+- The timestamp shows `null` or `undefined`.
+
+**Cause & Fix**:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Shows old UTC time | Stale `index.html` from PWA cache | Force-refresh (Ctrl+Shift+R) or click **🔄 Force Refresh** in the WebUI. Or: DevTools → Application → Storage → Clear site data → reload. |
+| Timestamp is `null` | Backend did not return `last_update_unix` (mixed-version upgrade) | Verify module version is `v1.6.0`: `grep '^version=' $MODDIR/module.prop`. If older, reinstall the v1.6.0 ZIP. |
+| Wrong timezone displayed | Browser is using a cached `Intl` locale | Hard-reload the page. If persists, clear browser cache for `127.0.0.1:9090`. |
+| Timestamp format odd in Arabic | Browser lacks `ar-EG` locale data | Update Chrome/Firefox to a recent version. |
+
+**Verification**:
+
+```bash
+# 1. Backend returns both fields
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | \
+    jq '{last_update, last_update_unix}'
+
+# Expected: both fields present; last_update_unix is a large integer.
+
+# 2. Unix timestamp converts to expected local time
+curl -s -u "$CREDS" http://127.0.0.1:9090/api?action=get_profile | \
+    jq -r '.last_update_unix' | xargs -I {} date -d @{}
+
+# 3. Compare with device clock
+date
+# Both should match (same timezone).
+```
+
 ---
 
 ## 8. Emergency Recovery
@@ -648,7 +712,6 @@ reboot
 ```
 
 **Method B — Safe Mode**:
-
 - Reboot holding Volume Down until the lock screen appears.
 - Open Magisk Manager → Modules → disable/remove DNSCrypt.
 - Reboot normally.
@@ -675,14 +738,13 @@ If `webui.conf`, `allowlist.txt`, etc. reset to defaults:
 # 1. Check what's available
 su -c "ls -la /sdcard/dnscrypt-webui-backup/"
 
-# 2. Find the newest snapshot
-SNAP=$(su -c "ls -1dt /sdcard/dnscrypt-webui-backup/*/ | \
-    grep -vE '/(current|txn-|orphan-txn-|apk)' | head -1" | tr -d '\r')
+# 2. Find the newest snapshot (function is defined in lib/backup.sh §[5])
+SNAP=$(su -c ". /data/adb/modules/dnscrypt-proxy-webui/functions.sh; list_snapshots 1" | tr -d '\r')
 
 # 3. Restore the 5 files
 for f in webui.conf dnscrypt-proxy.toml selected_profile.txt \
          allowlist.txt denylist.txt; do
-    su -c "cp $SNAP/$f /data/adb/modules/dnscrypt-proxy-webui/proxy/"
+    su -c "cp /sdcard/dnscrypt-webui-backup/$SNAP/$f /data/adb/modules/dnscrypt-proxy-webui/proxy/"
 done
 
 # 4. Fix SELinux contexts
@@ -769,7 +831,6 @@ su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --diagnose"
 ```
 
 **Recovery source priority**:
-
 1. `.last_stable` pointer.
 2. `current/` live snapshot.
 3. In-place `proxy/` directory.
@@ -820,7 +881,7 @@ opens the WebUI in a WebView wrapper.
 | Source | [gasciljh/dnscrypt-proxy-app](https://github.com/gasciljh/dnscrypt-proxy-app) |
 | Version | Pinned in `proxy/app-apk.version` |
 
-### 9.2 Install via WebUI (v1.5.0)
+### 9.2 Install via WebUI
 
 Click **📲 Install App** in the WebUI header. A modal opens with
 **three actions across two categories**:
@@ -832,7 +893,6 @@ Click **📲 Install App** in the WebUI header. A modal opens with
 | **GitHub** | Direct download | Opens APK download URL |
 
 **Requirements for the local path**:
-
 - Root.
 - APK present in the module ZIP.
 - Access via `127.0.0.1` (localhost-only).
@@ -860,6 +920,7 @@ First success wins. Bounded by a 75-second deadline.
 | `Installed app version is newer` | `INSTALL_FAILED_VERSION_DOWNGRADE` | Uninstall current version |
 | `Insufficient storage` | `INSTALL_FAILED_INSUFFICIENT_STORAGE` | Free up space |
 | `Different signature` | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Uninstall manually |
+| `App is already installed` | `INSTALL_FAILED_ALREADY_EXISTS` | Uninstall current version, or use **Update App** |
 | `APK corrupt` | `INSTALL_PARSE_FAILED_NO_CERTIFICATES` | Reinstall module |
 | `Internal error` | `INSTALL_FAILED_INTERNAL_ERROR` | Reboot, retry |
 
@@ -869,7 +930,6 @@ or open `http://127.0.0.1:9090/app-debug.apk` in a browser.
 ### 9.5 Uninstall the companion app
 
 Standard Android uninstall:
-
 - Long-press the **DNS Proxy** icon → **Uninstall**.
 - Or: Settings → Apps → DNS Proxy → Uninstall.
 - Or: `adb uninstall com.gasciljh.dnsproxy.debug`.
@@ -973,6 +1033,31 @@ adb push ./my-backup/ /sdcard/dnscrypt-webui-backup/
 A: Download the previous version's ZIP, install over the current
 one, reboot. Data is preserved.
 
+### 10.6 v1.6.0-specific
+
+**Q: Why does "Last update:" now show a different time?**
+A: v1.6.0 changed the display from **UTC** to your **device's
+local timezone**. If you were used to seeing `04:03:46`, you will
+now see `07:03:46` (or your local equivalent). This is the
+correct time. See §7.11 if it does not work.
+
+**Q: What is the `lib/` directory?**
+A: `lib/` is a new folder (v1.6.0) that holds 6 single-purpose
+shell modules: `constants.sh`, `fallbacks.sh`, `process.sh`,
+`http.sh`, `backup.sh`, `firewall.sh`. It is part of the
+module's internal architecture and is removed when you uninstall.
+It does not affect your configuration.
+
+**Q: The PWA shows "Update available" — what do I do?**
+A: Click **Reload** in the banner. v1.6.0 bumped the PWA cache
+version, so existing installs must reload to see the new
+timezone fix and other UI changes.
+
+**Q: Do I need to do anything different to upgrade from v1.5.0?**
+A: No. The standard upgrade (§5) works. Just remember to
+force-refresh the WebUI after the reboot if you want to see the
+timezone fix.
+
 ---
 
 ## 11. Reference
@@ -991,6 +1076,7 @@ one, reboot. Data is preserved.
 | Path | Purpose |
 |---|---|
 | `/data/adb/modules/dnscrypt-proxy-webui/` | Module root |
+| `/data/adb/modules/dnscrypt-proxy-webui/lib/` | Shell modules (Layer 0, v1.6.0) |
 | `/data/adb/modules/dnscrypt-proxy-webui/proxy/` | Config + binaries |
 | `/data/adb/modules/dnscrypt-proxy-webui/proxy/run/` | Runtime state |
 | `/data/adb/modules/dnscrypt-proxy-webui/web/` | Static assets |
@@ -1019,6 +1105,10 @@ su -c "grep '^version=' /data/adb/modules/dnscrypt-proxy-webui/module.prop"
 
 # Check backup state
 su -c "sh /data/adb/modules/dnscrypt-proxy-webui/status.sh --json" | jq '.backups'
+
+# v1.6.0 — modular lib/ present
+su -c "ls /data/adb/modules/dnscrypt-proxy-webui/lib/*.sh | wc -l"
+# → 6
 ```
 
 ### 11.4 Exit codes
@@ -1042,16 +1132,46 @@ versionCode = MAJOR × 1,000,000 + MINOR × 10,000 + PATCH × 100
 |---|:---:|
 | v1.0.0 | 1000000 |
 | v1.5.0 | 1050000 |
-| v1.6.0 (planned) | 1060000 |
+| **v1.6.0 (current)** | **1060000** |
+| v1.7.0 (planned) | 1070000 |
 | v2.0.0 | 2000000 |
 
-### 11.6 What's not in this guide
+### 11.6 What's new in v1.6.0
 
-- **Architecture, internals, design decisions** → `docs/REFERENCE.md`
+If you are upgrading from v1.5.0, you will notice:
+
+| Change | Impact |
+|---|---|
+| **Local timezone** | "Last update:" now matches your device clock (was UTC) |
+| **Modular shell (`lib/`)** | New `lib/*.sh` directory — affects shell internals only; no user action needed |
+| **PWA cache bump** | May see "Update available" banner on next visit — click **Reload** |
+| **DNS version** | Bumped 2.1.18 → 2.1.20 (same engine, newer build) |
+| **Version display** | Footers, badges, and `status.sh` all report `v1.6.0` |
+
+**No action required** beyond the standard upgrade (§5).
+
+### 11.7 What's not in this guide
+
+- **Architecture, internals, design decisions** →
+  `docs/REFERENCE.md` §1
+- **Modular shell (`lib/`) details** → `docs/REFERENCE.md` §1.4
+- **Local timezone fix internals** → `docs/REFERENCE.md` §3.10
 - **HTTP API schema** → `docs/REFERENCE.md` §2
-- **Backup system details (SNAP-*, ROT-*, transaction states)**
-  → `docs/REFERENCE.md` §4
+- **Backup system details (SNAP-*, ROT-*, transaction states)** →
+  `docs/REFERENCE.md` §4
 - **Developer setup, build, release process** →
   `docs/CONTRIBUTING.md`
-- **Version history** → `CHANGELOG.md`
+- **Version history (v1.0.0 → v1.6.0)** → `CHANGELOG.md`
 - **Security audit corrections** → `SECURITY.md` §15
+- **Documentation map** → `docs/MAP.md`
+
+---
+
+**Footer**
+
+**Version**: v1.6.0 (Global Edition)
+**Last updated**: 2026-11-13
+**Author**: gasciljh
+
+For bug reports: [github.com/gasciljh/dnscrypt-proxy-webui/issues](https://github.com/gasciljh/dnscrypt-proxy-webui/issues)
+For security reports: see `SECURITY.md` §1 — do **not** open a public issue.

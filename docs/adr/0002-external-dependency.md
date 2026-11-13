@@ -3,9 +3,15 @@
 **Status**: ✅ Accepted
 **Date**: 2026-10-10
 **Consolidated**: 2026-10-19 (v1.5.0 Global Edition — renumbered from ADR-0007)
+**Verified in**: 2026-11-12 (v1.6.0 Global Edition — still the only external dependency)
 **Authors**: [@gasciljh](https://github.com/gasciljh)
 **Supersedes**: —
 **Superseded by**: —
+
+> **v1.6.0 note**: This ADR was **verified** — not changed — by the v1.6.0
+> release. `github.com/cyphar/filepath-securejoin v0.7.0` remains the only
+> external Go dependency. The v1.6.0 `lib/` modularization did **not** add
+> any new external dependency. See `CHANGELOG.md` §[v1.6.0] for details.
 
 ---
 
@@ -48,8 +54,8 @@ in `proxy/main.go`.
 
 - `filepath-securejoin` is the mitigation GitHub's own CodeQL documentation
   recommends for `go/path-injection`.
-- Small (~500 LoC), stable, maintained by the containers community
-  (`containerd`, `runc`, `buildah`, `podman`).
+- Small (~300 LoC of Go source), stable, maintained by the containers
+  community (`containerd`, `runc`, `buildah`, `podman`).
 - `SecureJoin` rejects any path that would escape the base directory, even
   under adversarial inputs.
 - Closes the two `go/path-injection` alerts permanently.
@@ -96,7 +102,7 @@ This ADR is the only authorized exception to the dependency-free policy of
 ## Related Decisions
 
 - [ADR-0001](0001-release-workflow.md) — the release workflow that ships this
-  dependency and the six-cycle verification of the release process.
+  dependency and the seven-cycle verification of the release process.
 - [ADR-0003](0003-layered-bootstrap.md) — applies the same "single source of
   truth" reasoning to the shell library.
 
@@ -112,4 +118,6 @@ This ADR is the only authorized exception to the dependency-free policy of
 ---
 
 *This ADR is immutable. To reverse or amend it, create a new ADR that supersedes
-it and update its Status line.*
+it and update its Status line. The v1.6.0 verification note added at the top
+is a metadata update — it confirms the v1.6.0 release did not introduce a
+second external dependency.*

@@ -1,11 +1,11 @@
 # Contributor Covenant Code of Conduct
 
 **Project**: DNSCrypt Smart Filter
-**Version**: v1.5.0 (Global Edition)
+**Version**: v1.6.0 (Global Edition)
 **License**: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 **Author**: gasciljh
 **Repository**: https://github.com/gasciljh/dnscrypt-proxy-webui
-**Last updated**: 2026-10-19
+**Last updated**: 2026-11-13
 
 > For contribution workflow, see
 > [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
@@ -179,9 +179,9 @@ Translations are available at
 
 | Field | Value |
 |---|---|
-| Project version | v1.5.0 (Global Edition) |
+| Project version | v1.6.0 (Global Edition) |
 | First release | 2026-09-24 |
-| Latest release | 2026-10-13 (v1.5.0) |
+| Latest release | 2026-11-12 (v1.6.0) |
 | Maintainer | [@gasciljh](https://github.com/gasciljh) |
 | License (this document) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | License (project code) | [MIT](LICENSE) |
@@ -197,6 +197,6 @@ https://www.contributor-covenant.org/ar/version/2/1/code_of_conduct/
 
 ---
 
-*Last updated: 2026-10-19*
-*Version: v1.5.0 (Global Edition)*
+*Last updated: 2026-11-13*
+*Version: v1.6.0 (Global Edition)*
 *Maintainer: [@gasciljh](https://github.com/gasciljh)*

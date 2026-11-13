@@ -1,9 +1,12 @@
 // ============================================================
 // DNSCrypt Smart Filter — Dev Container Configuration
-// Version: v1.5.0 (Global Edition)
-// Last updated: 2026-10-19
+// Version: v1.6.0 (Global Edition)
+// Last updated: 2026-11-13
 // ============================================================
 // Reproducible VS Code Dev Container for the project.
+//
+// Note: VSCode's devcontainer.json parser accepts `//` line
+// comments (JSONC-style) — the header below is valid.
 //
 // On container creation:
 //   1. Minimal Ubuntu 22.04 image is pulled.
@@ -36,23 +39,63 @@
 //   $HOME (go binaries, pip user packages, pre-commit hooks)
 //   are affected. Root-needing tools use sudo.
 //
+// ============================================================
+// Module layout (v1.6.0)
+// ============================================================
+// The shell scripts the devcontainer validates live at the
+// REPOSITORY ROOT, not under proxy/:
+//
+//   • Root shell scripts (10):
+//       boot-mini.sh, functions.sh, customize.sh,
+//       install_app.sh, service.sh, watchdog.sh, status.sh,
+//       action.sh, uninstall.sh, post-fs-data.sh
+//   • lib/*.sh (Layer 0, 6 modules):
+//       lib/constants.sh, lib/fallbacks.sh, lib/process.sh,
+//       lib/http.sh, lib/backup.sh, lib/firewall.sh
+//   • proxy/ (8 files): main.go, go.mod, go.sum, build.sh,
+//       dnscrypt-proxy.toml, dnscrypt-proxy.version,
+//       webui.conf, app-apk.version
+//
+// ============================================================
+// v1.6.0 additions:
+//   • lib/*.sh (6 modules) added at repo root — covered by the
+//     existing shellcheck / shfmt toolchain, no new devcontainer
+//     feature or tool required.
+//   • Makefile targets `check-boot-mini` and `check-consistency`
+//     added — both shell-only, no new tool required.
+//   • CI Step 9 extended (verifies lib/*.sh + 3-layer chain),
+//     Step 10 moved (canonical _MONITORING_UI_PORT in
+//     lib/constants.sh), Step 11 added (timezone + mtime sort +
+//     make check-consistency) — all tool-neutral.
+//   • ADR-0003 (Layered Bootstrap) EXTENDED from 2-layer to
+//     3-layer model; see docs/adr/0003-layered-bootstrap.md
+//     §Extension. No new ADR file.
+//
+// ============================================================
 // v1.5.0 additions:
-//   • No new feature or tool. v1.5.0 adds two shell scripts
-//     (boot-mini.sh, install_app.sh) covered by the existing
-//     toolchain.
+//   • Adds two root-level shell scripts:
+//       boot-mini.sh (Layer 1 aggregator, ADR-0003)
+//       install_app.sh (5-level pm install cascade)
+//     Both are covered by the existing toolchain.
 //   • Cross-references updated to the consolidated docs
 //     (v1.5.0 merged 35 markdown files → 15).
 //   • ADR-0007 and ADR-0008 were renumbered to ADR-0002 and
 //     ADR-0003 respectively in v1.5.0 (see docs/MAP.md §5.1).
+//     ADR-0003 was extended to a 3-layer model in v1.6.0.
 //
 // Cross-references:
 //   • .devcontainer/setup.sh             — postCreateCommand
-//   • .github/workflows/ci.yml           — CI matrix
+//   • .github/workflows/ci.yml           — CI matrix (Steps 1-11)
 //   • .github/workflows/upgrade-test.yml — 42-scenario matrix
 //   • .github/dependabot.yml §[3]        — devcontainer features
+//   • docs/REFERENCE.md §1.4             — Layered Bootstrap (3-layer, v1.6.0)
 //   • docs/REFERENCE.md §4               — backup reference
+//   • docs/REFERENCE.md §4.6.5           — SNAP-*/ROT-* rules
 //   • docs/GUIDE.md §8                   — recovery guide
-//   • docs/REFERENCE.md §3               — v1.3.0 SNAP-*/ROT-*
+//   • docs/adr/0002-external-dependency.md
+//   • docs/adr/0003-layered-bootstrap.md — §Extension (3-layer)
+//   • Makefile check-boot-mini           — local Layer 0/1/2 check
+//   • Makefile check-consistency         — docs path/version check (v1.6.0)
 //   • CHANGELOG.md                       — version history
 // ============================================================
 {
@@ -92,12 +135,21 @@
       "settings": {
         "go.useLanguageServer": true,
         "go.lintTool": "golangci-lint",
+        // `--fast` disables slow linters for editor-time feedback.
+        // The full lint suite runs in CI + `make check-all`, so
+        // editor-side latency stays under 500ms.
         "go.lintFlags": ["--fast"],
         "go.testFlags": ["-race", "-count=1"],
         "editor.formatOnSave": true,
         "editor.insertSpaces": true,
         "editor.tabSize": 4,
         "files.eol": "\n",
+        // Note: `.editorconfig [*.md]` sets
+        // `trim_trailing_whitespace = false` (Markdown uses
+        // trailing spaces for line breaks). The
+        // `editorconfig.editorconfig` extension overrides this
+        // global setting per-file, so Markdown files are NOT
+        // trimmed despite the global `true` below.
         "files.trimTrailingWhitespace": true,
         "files.insertFinalNewline": true,
         "[go]": {
