@@ -2177,6 +2177,17 @@ func isLockedOut(ip string) bool {
 // ============================================================
 // [30] Process + port checks
 // ============================================================
+
+// isDnsEngineAlive checks ONLY the DNS engine process name
+// (matches pgrep -x dnscrypt-proxy semantics).
+func isDnsEngineAlive(pid int) bool {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(data)) == "dnscrypt-proxy"
+}
+
 func isPidAlive(pid int) bool {
 	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", pid))
 	if err != nil {
@@ -2190,8 +2201,13 @@ func isPidAlive(pid int) bool {
 	return false
 }
 
+// isProcessRunning scans /proc directly (no pgrep — which can
+// enter uninterruptible D-state for 15+ seconds under memory
+// pressure). Fast (~1ms) and always safe.
 func isProcessRunning() (string, bool) {
 	defer func() { recover() }()
+
+	// Path 1: PID_FILE (fast, trusted)
 	if data, err := os.ReadFile(PID_FILE); err == nil {
 		pidStr := strings.TrimSpace(string(data))
 		if pidStr != "" {
@@ -2201,15 +2217,59 @@ func isProcessRunning() (string, bool) {
 			}
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, "pgrep", "-x", "dnscrypt-proxy").CombinedOutput()
-	if err == nil {
-		if pid := strings.TrimSpace(string(out)); pid != "" {
-			return pid, true
+
+	// Path 2: /proc scan
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return "", false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		pidStr := entry.Name()
+		pidInt, err := strconv.Atoi(pidStr)
+		if err != nil || pidInt <= 0 {
+			continue
+		}
+		if isDnsEngineAlive(pidInt) {
+			return pidStr, true
 		}
 	}
 	return "", false
+}
+
+// migrateStatusFile preserves user intent (ON/OFF) across the
+// v1.5.0 → v1.6.0 upgrade path. Idempotent — safe to call on
+// every boot.
+func migrateStatusFile() {
+	if _, err := os.Stat(STATUS_FILE); err == nil {
+		return
+	}
+
+	legacyPaths := []string{"/data/local/tmp/dnscrypt.status"}
+	for _, legacyPath := range legacyPaths {
+		if legacyPath == STATUS_FILE {
+			continue
+		}
+		data, err := os.ReadFile(legacyPath)
+		if err != nil {
+			continue
+		}
+		val := strings.TrimSpace(string(data))
+		if val != "ON" && val != "OFF" {
+			continue
+		}
+		if werr := atomicWriteFile(STATUS_FILE, []byte(val), 0600); werr != nil {
+			logWithLevel("warn", "migrateStatusFile: write failed: "+werr.Error())
+			continue
+		}
+		logEvent(fmt.Sprintf("✅ Migrated legacy STATUS_FILE (%s) from %s", val, legacyPath))
+		return
+	}
+
+	atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
+	logEvent("ℹ️ STATUS_FILE initialized (OFF)")
 }
 
 func isPortOpen(port int) bool {
@@ -4530,12 +4590,16 @@ func (h *apiHandler) postRestartService(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]interface{}{"status": newStatus})
 }
 
+// postEnsureRunningService — invoked by watchdog.sh when DNS is
+// down and user intent is ON. Runs async (returns HTTP 202) so
+// the watchdog's 10s timeout cannot expire during a slow restart.
 func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Request) {
 	statusData, _ := os.ReadFile(STATUS_FILE)
 	userIntent := strings.TrimSpace(string(statusData))
 	if userIntent == "" {
 		userIntent = "OFF"
 	}
+
 	if userIntent != "ON" {
 		logEvent("ℹ️ ensure_running: user stopped the service, skipping")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -4545,6 +4609,7 @@ func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Req
 		})
 		return
 	}
+
 	if getStatus() == "ON" {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":  "ON",
@@ -4553,6 +4618,7 @@ func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Req
 		})
 		return
 	}
+
 	if !serviceMutex.TryLock() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -4563,15 +4629,32 @@ func (h *apiHandler) postEnsureRunningService(w http.ResponseWriter, r *http.Req
 		})
 		return
 	}
-	defer serviceMutex.Unlock()
+
 	logEvent("🔁 ensure_running: restarting crashed DNS (user wants ON)")
-	startService()
-	time.Sleep(500 * time.Millisecond)
-	invalidateStatusCache()
-	broadcastEvent("status", getStatus())
+
+	go func() {
+		defer serviceMutex.Unlock()
+		defer func() {
+			if rec := recover(); rec != nil {
+				logWithLevel("error",
+					fmt.Sprintf("PANIC in ensure_running goroutine: %v", rec))
+			}
+		}()
+
+		startService()
+		time.Sleep(500 * time.Millisecond)
+		invalidateStatusCache()
+		broadcastEvent("status", getStatus())
+		broadcastEvent("resources",
+			fmt.Sprintf("{\"ram\":\"%s\"}", getResourceUsage()))
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": getStatus(),
-		"action": "started",
+		"status":  "starting",
+		"action":  "restart_initiated",
+		"message": "Restart initiated in background",
 	})
 }
 
@@ -5669,11 +5752,10 @@ func main() {
 		logWithLevel("warn", "   Credentials are REQUIRED for all requests.")
 	}
 
+	migrateStatusFile()
+
 	if _, err := os.Stat(SELECTED_FILE); err != nil {
 		atomicWriteFile(SELECTED_FILE, []byte("pro"), 0644)
-	}
-	if _, err := os.Stat(STATUS_FILE); err != nil {
-		atomicWriteFile(STATUS_FILE, []byte("OFF"), 0600)
 	}
 
 	if _, err := os.Stat(RAW_BLOCKLIST_FILE); os.IsNotExist(err) {

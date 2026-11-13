@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # shellcheck shell=ksh
-# shellcheck disable=SC2059  # printf color codes are trusted constants
+# shellcheck disable=SC2059
 # ============================================================
 # DNSCrypt Smart Filter — status.sh
 # Version: v1.6.0 (Global Edition)
@@ -9,6 +9,10 @@
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
 # Display current status of the DNSCrypt Smart Filter module.
+#
+# User intent (ON/OFF) is read via get_user_intent() which
+# handles v1.5.0 → v1.6.0 migration automatically. Actual
+# process state is read via is_dnscrypt_running().
 #
 # Modes:
 #   status.sh                Full display (default)
@@ -57,7 +61,8 @@ fi
 . "$MODDIR/functions.sh" 2>/dev/null
 
 if ! command -v list_snapshots >/dev/null 2>&1 \
-   || ! command -v is_port_open >/dev/null 2>&1; then
+   || ! command -v is_port_open >/dev/null 2>&1 \
+   || ! command -v get_user_intent >/dev/null 2>&1; then
     echo "ERROR: functions.sh failed to load required symbols" >&2
     exit 1
 fi
@@ -284,9 +289,9 @@ fi
 # ============================================================
 # [9] Intent, blocklist, config, IPv6, root
 # ============================================================
-STATUS_FROM_FILE="UNKNOWN"
-[ -f "$STATUS_FILE" ] && \
-    STATUS_FROM_FILE=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
+# User intent — via the trusted accessor (auto-migrates from
+# v1.5.0 legacy location). Returns ON/OFF, never empty.
+STATUS_FROM_FILE=$(get_user_intent)
 
 BLOCKLIST_COUNT="0"
 BLOCKLIST_SIZE="0"
@@ -382,8 +387,8 @@ if [ "$CHECK_MODE" = "1" ]; then
     _dis=""
     [ "$IS_DISABLED" = "YES" ] && _dis=" DISABLED"
 
-    printf "%s | %s | %s | %s | %s | %s | %s | %s%s\n" \
-        "$MODULE_VERSION" "$_dns" "$_web" "$_prof" "$_mem" "$_ent" "$_bak" "$_run" "$_dis"
+    printf "%s | %s | %s | %s | %s | %s | %s | %s | %s%s\n" \
+        "$MODULE_VERSION" "$_dns" "$_web" "$_prof" "$_mem" "$_ent" "$_bak" "$_run" "$STATUS_FROM_FILE" "$_dis"
 
     exit "$(_exit_code)"
 fi
@@ -431,7 +436,7 @@ if [ "$JSON_MODE" = "1" ]; then
     "webui": $AUTO_WEBUI
   },
   "ipv6_available": $([ "$IPV6_AVAILABLE" = "YES" ] && echo "true" || echo "false"),
-  "status_file": "$(esc_json "$STATUS_FROM_FILE")",
+  "user_intent": "$(esc_json "$STATUS_FROM_FILE")",
   "recovery_mode_active": $([ "$RECOVERY_MODE_ACTIVE" = "YES" ] && echo "true" || echo "false"),
   "pending_notification": $(_json_str "$PENDING_NOTIFY_CONTENT"),
   "profile": {
@@ -484,7 +489,7 @@ if [ "$SHORT_MODE" = "1" ]; then
 fi
 
 # ============================================================
-# [14] Colour setup (all modes below use it)
+# [14] Colour setup
 # ============================================================
 if [ -t 1 ]; then
     C_RED=$(printf '\033[0;31m');   C_GREEN=$(printf '\033[0;32m')
@@ -543,6 +548,7 @@ if [ "$DIAGNOSE_MODE" = "1" ]; then
     else
         echo "  ${C_DIM}−${C_NC} Watchdog:     inactive"
     fi
+    echo "  ${C_DIM}ℹ${C_NC} User intent:  ${C_BOLD}$STATUS_FROM_FILE${C_NC}"
     [ "$IS_DISABLED" = "YES" ] && \
         echo "  ${C_YELLOW}⚠️${C_NC} Module:       ${C_YELLOW}DISABLED${C_NC}"
     echo ""
@@ -670,9 +676,9 @@ EOF
 
     if [ "$IS_DISABLED" = "NO" ]; then
         if [ "$STATUS_FROM_FILE" = "ON" ] && [ "$DNS_RUNNING" = "NO" ]; then
-            echo "  ${C_YELLOW}⚠️${C_NC} STATUS_FILE=ON but DNS is not running"
+            echo "  ${C_YELLOW}⚠️${C_NC} intent=ON but DNS is not running"
         elif [ "$STATUS_FROM_FILE" = "OFF" ] && [ "$DNS_RUNNING" = "YES" ]; then
-            echo "  ${C_YELLOW}⚠️${C_NC} STATUS_FILE=OFF but DNS is running"
+            echo "  ${C_YELLOW}⚠️${C_NC} intent=OFF but DNS is running"
         fi
     fi
 
@@ -747,16 +753,15 @@ printf "%s--- Service Status ---%s\n" "$C_CYAN" "$C_NC"
 printf "  %s DNS Engine:   %s\n" "$DNS_ICON"   "$DNS_TEXT"
 printf "  %s WebUI:        %s\n" "$WEBUI_ICON" "$WEBUI_TEXT"
 printf "  %s Watchdog:     %s\n" "$WD_ICON"    "$WD_TEXT"
+printf "  ${C_DIM}ℹ User intent:  %s${C_NC}\n" "$STATUS_FROM_FILE"
 
 [ "$IS_DISABLED" = "YES" ] && \
     printf "  ${C_YELLOW}WARNING: Module disabled (disable file present)${C_NC}\n"
 
-if [ "$STATUS_FROM_FILE" != "UNKNOWN" ]; then
-    _expected=$([ "$DNS_RUNNING" = "YES" ] && echo "ON" || echo "OFF")
-    if [ "$STATUS_FROM_FILE" != "$_expected" ]; then
-        printf "  ${C_DIM}(status file: %s - user intent; may differ from actual state)${C_NC}\n" \
-            "$STATUS_FROM_FILE"
-    fi
+_expected=$([ "$DNS_RUNNING" = "YES" ] && echo "ON" || echo "OFF")
+if [ "$STATUS_FROM_FILE" != "$_expected" ]; then
+    printf "  ${C_DIM}(intent=%s, actual=%s)${C_NC}\n" \
+        "$STATUS_FROM_FILE" "$_expected"
 fi
 echo ""
 
@@ -847,7 +852,8 @@ if [ "$VERBOSE_MODE" = "1" ]; then
     printf "  ${C_DIM}backup dir:         %s${C_NC}\n" "$PERSISTENT_BACKUP"
     printf "  ${C_DIM}recovery trigger:   %s${C_NC}\n" "$RECOVERY_TRIGGER"
     echo ""
-    printf "  STATUS_FILE raw:   %s\n" "${STATUS_FROM_FILE:-<missing>}"
+    printf "  User intent:       %s\n" "$STATUS_FROM_FILE"
+    printf "  Status file:       %s\n" "$STATUS_FILE"
     echo ""
 
     if [ "$BACKUP_STATUS" = "ok" ]; then

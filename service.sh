@@ -10,17 +10,14 @@
 # Boot service launcher (Magisk / KernelSU / APatch phase).
 # Triggered at sys.boot_completed = 1.
 #
-# Sources functions.sh (which loads boot-mini.sh + all lib/).
-# Delegates every process operation to lib/process.sh, every
-# HTTP call to lib/http.sh, every backup to lib/backup.sh,
-# and every firewall op to lib/firewall.sh.
-#
-# Design Notes:
+# Design notes:
 #   • Watchdog is killed via /proc-based enumeration, preventing
 #     orphan watchdogs from restarting a disabled service.
 #   • STATUS_FILE is PRESERVED during disable. It encodes user
 #     intent, not current state. On re-enable, DNS auto-starts
 #     if the user's last action was ON.
+#   • User intent is read via get_user_intent() which handles
+#     v1.5.0 → v1.6.0 migration automatically.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
@@ -56,7 +53,8 @@ fi
 . "$MODDIR/functions.sh" 2>/dev/null
 
 if ! command -v cleanup_proxy >/dev/null 2>&1 \
-   || ! command -v start_native_webui >/dev/null 2>&1; then
+   || ! command -v start_native_webui >/dev/null 2>&1 \
+   || ! command -v get_user_intent >/dev/null 2>&1; then
     echo "service.sh: functions.sh failed to load required symbols" >&2
     exit 1
 fi
@@ -149,7 +147,7 @@ if [ -f "$MODDIR/disable" ]; then
         ndc resolver flushdefaultif 2>/dev/null
 
     # STATUS_FILE is deliberately NOT modified.
-    log_msg "STATUS_FILE preserved (user intent kept: $(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n '))"
+    log_msg "STATUS_FILE preserved (user intent: $(get_user_intent))"
     log_msg "Module disabled cleanup complete"
     exit 0
 fi
@@ -471,8 +469,7 @@ done
 [ "$_wait_webui" -ge "$_wait_max" ] && \
     log_msg "⚠️ WebUI not ready after ${_wait_max}s — proceeding anyway"
 
-_dns_intent=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
-[ -z "$_dns_intent" ] && _dns_intent="OFF"
+_dns_intent=$(get_user_intent)
 log_msg "DNS intent: $_dns_intent"
 
 if [ "$_dns_intent" = "ON" ]; then
@@ -489,10 +486,11 @@ if [ "$_dns_intent" = "ON" ]; then
         case "$_rc" in
             0)
                 case "$HTTP_BODY" in
-                    *'"action":"started"'*) log_msg "✅ DNS start requested (action=started)" ;;
-                    *'"action":"none"'*)    log_msg "✅ DNS already running (action=none)" ;;
-                    *'"action":"skipped"'*) log_msg "ℹ️ DNS restart skipped (action=skipped)" ;;
-                    *)                       log_msg "✅ DNS API OK (HTTP $HTTP_CODE)" ;;
+                    *'"action":"started"'*)           log_msg "✅ DNS start requested (action=started)" ;;
+                    *'"action":"restart_initiated"'*) log_msg "✅ DNS restart initiated (async, 202)" ;;
+                    *'"action":"none"'*)              log_msg "✅ DNS already running (action=none)" ;;
+                    *'"action":"skipped"'*)           log_msg "ℹ️ DNS restart skipped (action=skipped)" ;;
+                    *)                                log_msg "✅ DNS API OK (HTTP $HTTP_CODE)" ;;
                 esac
                 ;;
             3) log_msg "⚠️ API rate-limited (HTTP 429) — watchdog will retry" ;;

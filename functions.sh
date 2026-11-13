@@ -19,6 +19,7 @@
 #   get_auto_restart_dns     [conf]
 #   get_auto_restart_webui   [conf]
 #   get_watchdog_token
+#   get_user_intent
 #   is_dnscrypt_running
 #   is_webui_running         [port]
 #   cleanup_proxy
@@ -166,6 +167,8 @@ get_watchdog_token() {
 # ============================================================
 # [8] State checks
 # ============================================================
+# is_dnscrypt_running — answers "is the process alive right now?"
+# Deliberately ignores user intent; see get_user_intent for that.
 is_dnscrypt_running() {
     local pid_file pid comm
     pid_file=$(run_file dnscrypt.pid)
@@ -192,12 +195,66 @@ is_webui_running() {
 }
 
 # ============================================================
+# [8.5] User Intent (SSOT for desired state)
+# ============================================================
+# Returns ON/OFF. Auto-migrates from v1.5.0 legacy location.
+# Idempotent — safe to call repeatedly.
+#
+# MUST NOT be used inside is_dnscrypt_running() — that function
+# answers a different question (actual process state).
+get_user_intent() {
+    local new_file legacy_file val tmp
+    new_file="$(run_file dnscrypt.status)"
+
+    # Path 1: New location (v1.6.0+)
+    if [ -f "$new_file" ]; then
+        val=$(cat "$new_file" 2>/dev/null | tr -d '\r\n ')
+        case "$val" in ON|OFF) printf '%s' "$val"; return ;; esac
+    fi
+
+    # Path 2: Legacy migration (v1.5.0 → v1.6.0)
+    legacy_file="/data/local/tmp/dnscrypt.status"
+    if [ -f "$legacy_file" ] && [ "$legacy_file" != "$new_file" ]; then
+        val=$(cat "$legacy_file" 2>/dev/null | tr -d '\r\n ')
+        case "$val" in
+            ON|OFF)
+                mkdir -p "$(dirname "$new_file")" 2>/dev/null
+                tmp="${new_file}.migrate.$$"
+                if printf '%s' "$val" > "$tmp" 2>/dev/null; then
+                    chmod 0600 "$tmp" 2>/dev/null
+                    chown 0:0 "$tmp" 2>/dev/null
+                    mv -f "$tmp" "$new_file" 2>/dev/null \
+                        || rm -f "$tmp" 2>/dev/null
+                fi
+                log_msg "Migrated legacy STATUS_FILE ($val) -> $new_file"
+                printf '%s' "$val"
+                return
+                ;;
+        esac
+    fi
+
+    # Path 3: Safe default
+    printf 'OFF'
+}
+
+# ============================================================
 # [9] Cleanup functions (delegate to lib/process.sh)
 # ============================================================
 cleanup_proxy() {
     log_msg "🧹 cleanup_proxy"
     local _start_ts
     _start_ts=$(date +%s)
+
+    # Fast-path: skip entirely when no DNS process exists.
+    # Prevents 15s D-state hang when pgrep was frozen.
+    if ! list_pids_by_comm "dnscrypt-proxy" >/dev/null 2>&1; then
+        log_msg "⏭️ cleanup_proxy: no DNS process (fast-path)"
+        remove_pid_file "$(run_file dnscrypt.pid)"
+        rm -f /data/local/tmp/dnscrypt.pid 2>/dev/null
+        [ -n "${PROGRESS_FILE:-}" ] && rm -f "${PROGRESS_FILE}.tmp" 2>/dev/null
+        log_msg "✅ cleanup_proxy complete ($(( $(date +%s) - _start_ts ))s)"
+        return 0
+    fi
 
     if ! kill_by_comm "dnscrypt-proxy" 30; then
         log_msg "⚠️ dnscrypt-proxy survived 3s (D-state?)"
@@ -216,10 +273,7 @@ cleanup_proxy() {
     rm -f /data/local/tmp/dnscrypt.pid 2>/dev/null
     [ -n "${PROGRESS_FILE:-}" ] && rm -f "${PROGRESS_FILE}.tmp" 2>/dev/null
 
-    local _end_ts _elapsed
-    _end_ts=$(date +%s)
-    _elapsed=$((_end_ts - _start_ts))
-    log_msg "✅ cleanup_proxy complete (${_elapsed}s)"
+    log_msg "✅ cleanup_proxy complete ($(( $(date +%s) - _start_ts ))s)"
 }
 
 cleanup_webui() {

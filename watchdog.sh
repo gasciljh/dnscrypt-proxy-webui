@@ -7,32 +7,23 @@
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
 # ============================================================
-# Standalone watchdog. Monitors the WebUI (TCP port) and the
-# DNS engine (5354/UDP) and restarts them as needed.
+# Standalone watchdog. Monitors WebUI (TCP port) and DNS engine
+# (5354/UDP), restarts them as needed. Launched by service.sh
+# as an independent process.
 #
-# Launched by service.sh as an independent process (nohup or
-# setsid), so $$ inside this file refers to the real watchdog
-# PID, not service.sh's.
-#
-# Arguments (in order):
-#   1. WATCHDOG_PID_FILE
-#   2. MODDIR
-#   3. PORT               — WebUI port
-#   4. AUTO_RESTART_DNS   — "0" or "1"
-#   5. AUTO_RESTART_WEBUI — "0" or "1"
-#
-# Single-instance model:
+# Single-instance guarantees:
 #   1. is_duplicate_watchdog (four-layer /proc check)
 #   2. Atomic startup lock via acquire_lock
 #   3. PID file written atomically
-#   Duplicate watchdogs cannot start even under a race
-#   between two service.sh invocations.
+#
+# User intent is read via get_user_intent() (auto-migrates from
+# v1.5.0 legacy location). STATUS_FILE semantics are preserved.
 # ============================================================
 
 export PATH=/sbin:/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:/data/adb/ksu/bin:/data/adb/ap/bin:$PATH
 
 # ============================================================
-# [1] Module path + standalone --version
+# [1] Module path + --version
 # ============================================================
 _MODDIR_FROM_SELF=${0%/*}
 [ "$_MODDIR_FROM_SELF" = "." ] && _MODDIR_FROM_SELF=$(pwd)
@@ -104,15 +95,14 @@ fi
 if ! command -v log_msg >/dev/null 2>&1 \
    || ! command -v is_port_open >/dev/null 2>&1 \
    || ! command -v start_native_webui >/dev/null 2>&1 \
-   || ! command -v get_watchdog_token >/dev/null 2>&1; then
+   || ! command -v get_watchdog_token >/dev/null 2>&1 \
+   || ! command -v get_user_intent >/dev/null 2>&1; then
     echo "watchdog.sh: functions.sh failed to load required symbols" >&2
     exit 1
 fi
 
 LOG_PREFIX="[watchdog]"
 
-# Defensive defaults — init_module_paths may have failed if the
-# dir was partially extracted (very rare but possible).
 BIN_DIR="${BIN_DIR:-$MODDIR/proxy}"
 WEBUI_BIN="${WEBUI_BIN:-$BIN_DIR/dnscrypt-webui}"
 TOML_FILE="${TOML_FILE:-$BIN_DIR/dnscrypt-proxy.toml}"
@@ -162,8 +152,6 @@ if ! write_pid_file "$WATCHDOG_PID_FILE" "$$"; then
     exit 1
 fi
 
-# Release the startup lock immediately — from here on, the
-# PID file itself is the single-instance guard.
 release_lock "$_WD_LOCK_PATH"
 _WD_LOCK_HELD=0
 
@@ -177,9 +165,6 @@ trap '_wd_terminate QUIT' QUIT
 # ============================================================
 # [7] Load Basic Auth fallback credentials
 # ============================================================
-# Primary auth is the watchdog token (get_watchdog_token).
-# Basic Auth is used ONLY when the token file is missing or
-# corrupt AND TOML credentials are readable.
 WATCH_USER=""
 WATCH_PASS=""
 HAS_CREDS=0
@@ -240,8 +225,8 @@ log_msg "============================================"
 # [9] API call helper
 # ============================================================
 # Returns the same codes as lib/http.sh::http_request:
-#   0 = success, 1 = no client, 2 = network,
-#   3 = rate-limited (429), 4 = HTTP error
+#   0 = success (includes 202 Accepted), 1 = no client,
+#   2 = network, 3 = rate-limited (429), 4 = HTTP error
 #
 # Populates HTTP_CODE and HTTP_ERROR (globals). HTTP_BODY is
 # captured so the caller can inspect {"action":"..."} fields.
@@ -303,9 +288,6 @@ while true; do
     sleep "$SLEEP_DURATION"
 
     # --- [11.1] Disable check ---
-    # Checked immediately after each sleep, BEFORE the next
-    # restart attempt, so disable takes effect within one
-    # sleep window (≤ BACKOFF_MAX).
     if [ -f "$MODDIR/disable" ]; then
         log_msg "Module disabled — watchdog exiting"
         remove_pid_file "$WATCHDOG_PID_FILE"
@@ -340,12 +322,8 @@ while true; do
 
     # --- [11.4] DNS restart ---
     if [ "$AUTO_RESTART_DNS" = "1" ]; then
-        desired="OFF"
-        [ -f "$STATUS_FILE" ] && \
-            desired=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
-        [ -z "$desired" ] && desired="OFF"
+        desired=$(get_user_intent)
 
-        # Detect intent change → reset backoff.
         if [ "$desired" != "$PREV_DESIRED" ]; then
             [ -n "$PREV_DESIRED" ] && \
                 log_msg "STATUS_FILE changed: $PREV_DESIRED → $desired"
@@ -358,12 +336,10 @@ while true; do
             LAST_DNS_ATTEMPT="$now"
 
             if ! is_port_open "$DNS_ENGINE_PORT" udp; then
-                # TOCTOU mitigation: re-read STATUS_FILE
-                # immediately before the API call.
+                # TOCTOU mitigation: re-read intent immediately
+                # before the API call, using the same trusted path.
                 sleep 1
-                recheck="OFF"
-                [ -f "$STATUS_FILE" ] && \
-                    recheck=$(cat "$STATUS_FILE" 2>/dev/null | tr -d '\r\n ')
+                recheck=$(get_user_intent)
 
                 if [ "$recheck" != "ON" ]; then
                     log_msg "intent changed to $recheck — skipping DNS restart"
@@ -377,10 +353,22 @@ while true; do
                     case "$RC" in
                         0)
                             case "$HTTP_BODY" in
-                                *'"action":"started"'*) log_msg "✅ DNS started (action=started)" ;;
-                                *'"action":"none"'*)    log_msg "✅ DNS already running (action=none)" ;;
-                                *'"action":"skipped"'*) log_msg "ℹ️ DNS skipped (action=skipped)" ;;
-                                *)                       log_msg "✅ DNS API OK (HTTP $HTTP_CODE)" ;;
+                                *'"action":"started"'*)
+                                    log_msg "✅ DNS started (action=started)"
+                                    ;;
+                                *'"action":"restart_initiated"'*)
+                                    log_msg "✅ DNS restart initiated (async) — grace 10s"
+                                    sleep 10
+                                    ;;
+                                *'"action":"none"'*)
+                                    log_msg "✅ DNS already running (action=none)"
+                                    ;;
+                                *'"action":"skipped"'*)
+                                    log_msg "ℹ️ DNS skipped (action=skipped)"
+                                    ;;
+                                *)
+                                    log_msg "✅ DNS API OK (HTTP $HTTP_CODE)"
+                                    ;;
                             esac
                             DNS_BACKOFF_CURRENT="$BACKOFF_BASE"
                             ;;

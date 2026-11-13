@@ -12,12 +12,13 @@
 #
 # Design:
 #   • Enumerates processes via /proc directly, NOT via
-#     `ps -A -o ARGS`. The latter is missing on many toybox
-#     builds shipped with Android 5-8 and silently returns
-#     empty output on those devices, defeating single-instance
-#     guarantees.
-#   • Every function is idempotent and safe to call on missing
-#     processes.
+#     `ps -A -o ARGS` (missing on many toybox builds
+#     shipped with Android 5-8) nor via `pgrep` (can
+#     enter uninterruptible sleep for 15+ seconds under
+#     memory pressure, defeating single-instance
+#     guarantees and delaying SIGKILL indefinitely).
+#   • Every function is idempotent and safe to call on
+#     missing processes.
 # ============================================================
 
 if [ -n "${_LIB_PROCESS_LOADED:-}" ]; then
@@ -36,14 +37,6 @@ list_pids_by_comm() {
     local pid_dir pid comm found=""
 
     [ -z "$target" ] && return 1
-
-    if command -v pgrep >/dev/null 2>&1; then
-        found=$(pgrep -x "$target" 2>/dev/null | tr '\n' ' ')
-        if [ -n "$found" ]; then
-            printf '%s' "${found% }"
-            return 0
-        fi
-    fi
 
     for pid_dir in /proc/[0-9]*; do
         [ -d "$pid_dir" ] || continue
