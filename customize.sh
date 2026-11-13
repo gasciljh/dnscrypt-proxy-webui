@@ -6,6 +6,9 @@
 # Last updated: 2026-11-13
 # Author: gasciljh
 # Repository: https://github.com/gasciljh/dnscrypt-proxy-webui
+# Cross-references:
+#   • docs/REFERENCE.md — architecture, API, backup system
+#   • docs/GUIDE.md     — end-user install, upgrade, recovery
 # ============================================================
 # Magisk / KernelSU / APatch installer (customize.sh hook).
 #
