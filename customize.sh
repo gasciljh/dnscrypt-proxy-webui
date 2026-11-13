@@ -525,7 +525,7 @@ ui_print "  ✅ Binaries installed"
 ui_print ""
 
 # ============================================================
-# [18] Create run/ directory
+# [18] Create run/ directory + preserve user intent (ON/OFF)
 # ============================================================
 RUN_DIR_TARGET="$BIN_DIR/run"
 mkdir -p "$RUN_DIR_TARGET" 2>/dev/null || \
@@ -534,18 +534,32 @@ mkdir -p "$RUN_DIR_TARGET" 2>/dev/null || \
 chmod 0700 "$RUN_DIR_TARGET" 2>/dev/null
 chown 0:0 "$RUN_DIR_TARGET" 2>/dev/null
 
-_STATUS_KEPT=0
-if [ -f /data/local/tmp/dnscrypt.status ] && \
-   [ ! -f "$RUN_DIR_TARGET/dnscrypt.status" ]; then
-    if cp -f /data/local/tmp/dnscrypt.status "$RUN_DIR_TARGET/dnscrypt.status" 2>/dev/null; then
+_OLD_STATUS=""
+_INSTALLED_PROXY="/data/adb/modules/$MODULE_ID/proxy"
+
+for _cand in \
+    "$_INSTALLED_PROXY/run/dnscrypt.status" \
+    "$FOUND_SOURCE/run/dnscrypt.status" \
+    "/data/local/tmp/dnscrypt.status"; do
+    if [ -f "$_cand" ]; then
+        _OLD_STATUS="$_cand"
+        break
+    fi
+done
+
+if [ -n "$_OLD_STATUS" ] && [ ! -f "$RUN_DIR_TARGET/dnscrypt.status" ]; then
+    if cp -f "$_OLD_STATUS" "$RUN_DIR_TARGET/dnscrypt.status" 2>/dev/null; then
         chmod 0600 "$RUN_DIR_TARGET/dnscrypt.status" 2>/dev/null
-    else
-        _STATUS_KEPT=1
+        chown 0:0 "$RUN_DIR_TARGET/dnscrypt.status" 2>/dev/null
+        echo "Preserved service state (ON/OFF) from $_OLD_STATUS" >> "$INSTALL_LOG"
     fi
 fi
 
 rm -f /data/local/tmp/dnscrypt.pid /data/local/tmp/webui.pid /data/local/tmp/watchdog.pid 2>/dev/null
-[ "$_STATUS_KEPT" = "0" ] && rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+
+if [ "$_OLD_STATUS" != "/data/local/tmp/dnscrypt.status" ]; then
+    rm -f /data/local/tmp/dnscrypt.status 2>/dev/null
+fi
 
 ui_print "  ✅ run/ created (0700)"
 
@@ -965,12 +979,13 @@ if [ -n "$FOUND_SOURCE" ]; then
     _vpat=$(printf '%s' "${MODULE_VERSION#v}" | cut -d. -f3 | tr -dc '0-9')
     _new_score=$(( ${_vmaj:-0} * 10000 + ${_vmin:-0} * 100 + ${_vpat:-0} ))
     _disabled=0
+    _installed_dir="/data/adb/modules/$MODULE_ID"
 
     for _root in /data/adb/modules /data/adb/modules_update \
                  /data/adb/ksu/modules /data/adb/ap/modules; do
         [ -d "$_root" ] || continue
         for _m in "$_root"/*; do
-            [ -d "$_m" ] && [ "$_m" != "$MODPATH" ] || continue
+            [ -d "$_m" ] && [ "$_m" != "$MODPATH" ] && [ "$_m" != "$_installed_dir" ] || continue
             [ -f "$_m/module.prop" ] || continue
             _mid=$(grep '^id=' "$_m/module.prop" | head -1 | cut -d= -f2- | tr -d '\r ')
             [ "$_mid" = "$MODULE_ID" ] || continue
